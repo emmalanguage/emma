@@ -1,0 +1,11 @@
+.cache
+.classpath
+.idea
+.idea/*
+.metadata/*
+.project
+.settings
+target
+*.swp
+*.class
+*.iml

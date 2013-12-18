@@ -1,0 +1,70 @@
+package eu.stratosphere.examples.datamining
+
+/**
+ * Hierarchical Agglomerative Clustering - Complete Linkage using Cosine Distance.
+ *
+ * NF2 algebra API (with de-sugared folds / monads)
+ */
+class HierarchicalAgglomerativeClustering {
+
+  // helper function: cosine distance
+  val cosdist(features1, features2) = {
+    val s  = features1 cross features2
+      .fold( (s, (f1, f2⟩) => s + f1.value * f2.value )(0)
+
+    val n1 = features1
+      .fold( (n, f) => n + f.value * f.value )(0)
+
+    val n2 = features2
+      .fold( (n, f) => n + f.value * f.value )(0)
+
+    return s / sqrt(n1) * sqrt(n2)
+  }
+
+  val getPlan() = {
+    // step 1: extract features
+    val documents: {⟨pid, features⟩} // = ...
+
+    // step 2: compute distance matrix
+    val distances: {⟨pid1, pid2, distsance⟩} = documents cross documents
+      .map( (d1, d2) => ⟨d1.pid, d2.pid, cosdist(d1.features, d2.features)⟩ )
+
+    // step 3: initialize single point clusters
+    val clusters: {⟨l, pids⟩} = documents
+      .map( d => ⟨d.id, new List(d.pid)⟩ )
+
+    // step 4: HAC
+    val finalClusters: {⟨l, pids⟩} = clusters.iterate(t < θ, (t, clusters) => {
+      // 4.e: build all point pairs for each pair of clusters
+      val clusterPairs: {⟨l1, l2, pid1, pid2⟩} = clusters cross clusters
+        .map( (c1, c2) => { c1.ids cross c2.ids
+          .map( (pid1, pid2) => ⟨c1.l, c2.l, pid1, pid2⟩ )
+        })
+
+      // 4.b: find the max distance of any two points for each cluster pair
+      val clusterDistances: {⟨l1, l2, dist⟩} = clusterPairs join distances
+        .where({ p => ⟨p.pid1, p.pid2⟩ } equals { d => ⟨d.pid1, d.pid2⟩ })
+        .map( (p, d) => ⟨p.l1, p.l2, d.dist⟩ )
+        .groupBy( x => ⟨x.l1, x.l2⟩ )
+        .groupReduce( _.maxBy { _.dist } )
+
+      // 4.c get the cluster pair with min distance
+      val minDistance: ⟨l1, l2, dist⟩ = clusterDistances
+        .reduceAll( _.minBy { _.dist } )
+
+      // 4.d: filter old clusters
+      val filteredClusters: {⟨l, pids⟩} = clusters
+        .filter( c => (c.l != minDistance.l1) || (c.l != minDistance.l2) )
+
+      // 4.e: merge new cluster
+      val mergedCluster: ⟨l, pids⟩ = clusters
+        .filter( c => (c.l == minDistance.l1) || (c.l == minDistance.l2) )
+        .reduceAll( (c1, c2) => ⟨min(c1.l, c2.l), c1.pids union c2.pids⟩ )
+
+      // 4.f: prepare and return result
+      val newClusters = filteredClusters union {mergedCluster}
+      val newDistance = minDistance.dist
+      (newDistance, newClusters)
+    }) // end of iteration
+  }
+}
