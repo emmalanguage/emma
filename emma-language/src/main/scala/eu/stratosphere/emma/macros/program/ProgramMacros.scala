@@ -328,7 +328,7 @@ class ProgramMacros(val c: Context) {
     }
 
     /**
-     * Eates-up and accumulates the predicates passed to a chain of DataSet[T].withFilter applications.
+     * Eates-up and accumulates the predicates passed to a chain of DataBag[T].withFilter applications.
      *
      * @param term The term tree to consume
      * @return A pair consisting of the residual term tree and the accumulated predicate functions.
@@ -467,7 +467,7 @@ class ProgramMacros(val c: Context) {
 
   object typeUtils {
     val collTypeSymbols = List[Symbol](
-      typeOf[eu.stratosphere.emma.DataSet[_]].typeSymbol
+      typeOf[eu.stratosphere.emma.DataBag[_]].typeSymbol
     )
 
     def isCollectionType(typeSymbol: Symbol) = collTypeSymbols.contains(typeSymbol)
