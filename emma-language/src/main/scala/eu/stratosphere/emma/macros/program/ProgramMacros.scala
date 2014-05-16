@@ -15,7 +15,7 @@ class ProgramMacros(val c: Context) {
    *
    * @return
    */
-  def liftDataflow(e: Expr[Any]): Expr[Dataflow] = {
+  def dataflow(e: Expr[Any]): Expr[Dataflow] = {
     new DataflowHelper(e).execute()
   }
 
@@ -23,7 +23,7 @@ class ProgramMacros(val c: Context) {
    *
    * @return
    */
-  def liftToybox(e: Expr[Any]): Expr[String] = {
+  def toybox(e: Expr[Any]): Expr[String] = {
     val b = e.tree.asInstanceOf[Block]
     val z = b.expr
     z match {
@@ -74,7 +74,7 @@ class ProgramMacros(val c: Context) {
       stats += c.parse("import _root_.scala.collection.mutable.ListBuffer")
       stats += c.parse("import _root_.scala.reflect.runtime.universe._")
       // 2) initialize translated sinks list
-      stats += c.parse("val sinks = ListBuffer[Comprehension[AlgExists, Boolean, Boolean]]()")
+      stats += c.parse("val sinks = ListBuffer[Comprehension]()")
       // 3) add the translated MC expressions for all sinks
       stats ++= sinks
 
@@ -125,26 +125,24 @@ class ProgramMacros(val c: Context) {
 
     private def translateSource(scope: Tree)(term: TermTree, name: TermName): Tree = {
       term match {
-        case Apply(TypeApply(fn, List(t)), location :: ifmt :: Nil) =>
+        case Apply(TypeApply(fn, List(outTpe)), location :: ifmt :: Nil) =>
           q"""
           {
-            val bind_bytes = DirectGenerator[Seq[Byte], List[Seq[Byte]]]("bytes", {
-              val ifmt: InputFormat[$t] = $ifmt
+            val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr({
+              val ifmt: InputFormat[$outTpe] = $ifmt
               val dop = 20
-              val bytes = null.asInstanceOf[Seq[Byte]]
 
               reify{ ifmt.split($location, dop) }
-            })
+            }))
 
-            val head = Head[Seq[Byte], Seq[$t]]({
-              val ifmt: InputFormat[$t] = $ifmt
-              val dop = 20
+            val head = ScalaExpr({
+              val ifmt: InputFormat[$outTpe] = $ifmt
               val bytes = null.asInstanceOf[Seq[Byte]]
 
               reify{ ifmt.read(bytes) }
             })
 
-            Comprehension[AlgBag[$t],$t,List[$t]](head, bind_bytes)
+            Comprehension(monad.Bag[$outTpe], head, bind_bytes)
           }
           """
         case _ =>
@@ -160,16 +158,16 @@ class ProgramMacros(val c: Context) {
           {
             $inTerm
 
-            val bind_record = ComprehensionGenerator[AlgBag[$t],$t,List[$t]]("record", $inName)
+            val bind_record = ComprehensionGenerator("record", $inName)
 
-            val head = Head[$t, Seq[Boolean]]({
+            val head = ScalaExpr({
               val ofmt = $ofmt
               val record = null.asInstanceOf[$t]
 
               reify { ofmt.write(record) }
             })
 
-            val comp = Comprehension[AlgExists,Boolean,Boolean](head, bind_record)
+            val comp = Comprehension(monad.All, head, bind_record)
             sinks += comp
             comp
           }
@@ -197,22 +195,22 @@ class ProgramMacros(val c: Context) {
           // construct qualifier
           val qualifierTerms = ListBuffer[Tree](q"val qualifiers = ListBuffer[Qualifier]()")
           // add input generator
-          qualifierTerms += q"qualifiers += ComprehensionGenerator[AlgBag[$inTpe], $inTpe, List[$inTpe]](${inVar.toString}, $inName)"
+          qualifierTerms += q"qualifiers += ComprehensionGenerator(${inVar.toString}, $inName)"
           // add filters with unified parameter names
           for (p <- predicates) {
             val filterExpr = freeIdents(replaceVparams(p, List(q"val $inVar: $inTpe".asInstanceOf[ValDef])), inVars.toList).body
-            qualifierTerms += q"qualifiers += Filter[$inTpe](reify { $filterExpr })"
+            qualifierTerms += q"qualifiers += Filter(ScalaExpr(reify { $filterExpr }))"
           }
 
           q"""
           {
             $inTerm
             ..$qualifierTerms
-            val head = Head[$inTpe, $inTpe]({
+            val head = ScalaExpr({
               val $inVar: $inTpe = null.asInstanceOf[$inTpe]
               reify{ $inVar }
             })
-            Comprehension[AlgBag[$inTpe], $inTpe, List[$inTpe]](head, qualifiers.toList)
+            Comprehension(monad.Bag[$inTpe], head, qualifiers.toList)
           }
           """
         case Apply(TypeApply(Select(parent, TermName("map")), List(outTpe)), List(fn@Function(List(arg), body))) =>
@@ -226,19 +224,19 @@ class ProgramMacros(val c: Context) {
           // construct qualifier
           val qualifierTerms = ListBuffer[Tree](q"val qualifiers = ListBuffer[Qualifier]()")
           // add input generator
-          qualifierTerms += q"qualifiers += ComprehensionGenerator[AlgBag[$inTpe], $inTpe, List[$inTpe]](${inVar.toString}, $inName)"
+          qualifierTerms += q"qualifiers += ComprehensionGenerator(${inVar.toString}, $inName)"
           // add filters with unified parameter names
           for (p <- predicates) {
             val filterExpr = freeIdents(replaceVparams(p, List(q"val $inVar: ${arg.tpe}".asInstanceOf[ValDef])), inVars.toList).body
-            qualifierTerms += q"qualifiers += Filter[$inTpe](reify { $filterExpr })"
+            qualifierTerms += q"qualifiers += Filter(ScalaExpr(reify { $filterExpr }))"
           }
 
           q"""
           {
             $inTerm
             ..$qualifierTerms
-            val head = Head[$inTpe, $outTpe](reify{ ${replaceVparams(fn, List(q"val $inVar: ${arg.tpe}".asInstanceOf[ValDef])).body} })
-            Comprehension[AlgBag[$outTpe], $outTpe, List[$outTpe]](head, qualifiers.toList)
+            val head = ScalaExpr(reify{ ${replaceVparams(fn, List(q"val $inVar: ${arg.tpe}".asInstanceOf[ValDef])).body} })
+            Comprehension(monad.Bag[$outTpe], head, qualifiers.toList)
           }
           """
         case Apply(TypeApply(Select(parent, TermName("flatMap")), List(outTpe)), List(fn@Function(List(arg), body))) =>
@@ -264,11 +262,11 @@ class ProgramMacros(val c: Context) {
             inVars += q"val $inVar = null.asInstanceOf[$inTpe]".asInstanceOf[ValDef]
             inTerms += inTerm
             // add input generator
-            qualifierTerms += q"qualifiers += ComprehensionGenerator[AlgBag[$inTpe], $inTpe, List[$inTpe]](${inVar.toString}, $inName)"
+            qualifierTerms += q"qualifiers += ComprehensionGenerator(${inVar.toString}, $inName)"
             // add filters with unified parameter names
             for (p <- predicates) {
               val filterExpr = freeIdents(replaceVparams(p, List(q"val $inVar: ${arg.tpe}".asInstanceOf[ValDef])), inVars.toList).body
-              qualifierTerms += q"qualifiers += Filter[$inTpe](reify { $filterExpr })"
+              qualifierTerms += q"qualifiers += Filter(ScalaExpr(reify { $filterExpr }))"
             }
 
             currBody match {
@@ -288,8 +286,8 @@ class ProgramMacros(val c: Context) {
                 hasNext = true
               case _ =>
                 val headExpr = freeIdents(replaceVparams(currFn, List(q"val $inVar: ${arg.tpe}".asInstanceOf[ValDef])), inVars.toList).body
-                finalTerms += q"val head = Head[$inTpe, $outTpe](reify{ $headExpr })"
-                finalTerms += q"Comprehension[AlgBag[$outTpe], $outTpe, List[$outTpe]](head, qualifiers.toList)"
+                finalTerms += q"val head = ScalaExpr(reify{ $headExpr })"
+                finalTerms += q"Comprehension(monad.Bag[$outTpe], head, qualifiers.toList)"
                 hasNext = false
             }
           }
@@ -394,7 +392,7 @@ class ProgramMacros(val c: Context) {
      */
     private def findValDef(scope: Tree)(name: TermName): Option[ValDef] = {
       scope.find {
-        case ValDef(_, n, _, rhs: TermTree) => n == name
+        case ValDef(_, n, _, _) => n == name
         case _ => false
       }.asInstanceOf[Option[ValDef]]
     }

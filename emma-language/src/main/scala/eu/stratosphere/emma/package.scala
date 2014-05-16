@@ -64,9 +64,9 @@ package object emma {
   // program macros
   // -----------------------------------------------------
 
-  final def dataflow(e: Any): Dataflow = macro ProgramMacros.liftDataflow
+  final def dataflow(e: Any): Dataflow = macro ProgramMacros.dataflow
 
-  final def toybox(e: Any): String = macro ProgramMacros.liftToybox
+  final def toybox(e: Any): String = macro ProgramMacros.toybox
 
   final def desugar(e: Any): String = macro UtilMacros.desugar
 
