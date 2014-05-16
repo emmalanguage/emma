@@ -4,17 +4,22 @@ object App {
 
   def main(args: Array[String]) {
 
-    val X1 = dataflow {
-      val A = read("file:///tmp/emma/A.txt", new InputFormat[Int])
-      val B = join[Int, Int, Int](a => a, a => a)(A, A).map(x => x._1 + x._2).withFilter(_ > 7)
+    val dataflow01 = dataflow {
 
-      write("file:///tmp/emma/C.txt", new OutputFormat[(Int)])(B)
+      val A = read("hdf://tmp/files/A.csv", new InputFormat[(Int, Int, String, String)]);
+      val B = for (a <- A; if a._1 + a._2 < 42) yield a._3
+      val C = write("file:///tmp/emma/C.txt", new OutputFormat[(String)])(B)
+
+      C
     }
 
-    val X2 = reference()
+    val dataflow02 = reference()
 
     println("// plan")
-    X1.print()
+    dataflow01.print()
+    println("")
+    println("// plan")
+    dataflow02.print()
     println("")
   }
 
@@ -24,7 +29,7 @@ object App {
     import _root_.scala.collection.mutable.ListBuffer
     import _root_.scala.reflect.runtime.universe._
 
-    val sinks = ListBuffer[Comprehension[AlgExists, Boolean, Boolean]]()
+    val sinks = ListBuffer[Comprehension]()
 
     val _MC_00000_C = {
       val _MC_00001_B = {
@@ -32,16 +37,16 @@ object App {
         val y = null.asInstanceOf[Int]
 
         val _MC_00002_A = {
-          val bind_bytes = DirectGenerator.apply[Seq[Byte], List[Seq[Byte]]]("bytes", {
+          val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr({
             val ifmt = new InputFormat[Int]()
             val dop = 20
 
             reify {
               ifmt.split("file:///tmp/emma/A.txt", dop)
             }
-          })
+          }))
 
-          val head = Head[Seq[Byte], Seq[Int]]({
+          val head = ScalaExpr({
             val ifmt = new InputFormat[Int]()
             val bytes = null.asInstanceOf[Seq[Byte]]
 
@@ -50,20 +55,20 @@ object App {
             }
           })
 
-          Comprehension[AlgBag[Int], Int, List[Int]](head, bind_bytes)
+          Comprehension(monad.Bag[Int], head, bind_bytes)
         }
 
         val _MC_00003_A = {
-          val bind_bytes = DirectGenerator.apply[Seq[Byte], List[Seq[Byte]]]("bytes", {
+          val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr({
             val ifmt = new InputFormat[Int]()
             val dop = 20
 
             reify {
               ifmt.split("file:///tmp/emma/A.txt", dop)
             }
-          })
+          }))
 
-          val head = Head[Seq[Byte], Seq[Int]]({
+          val head = ScalaExpr({
             val ifmt = new InputFormat[Int]()
             val bytes = null.asInstanceOf[Seq[Byte]]
 
@@ -72,31 +77,31 @@ object App {
             }
           })
 
-          Comprehension[AlgBag[Int], Int, List[Int]](head, bind_bytes)
+          Comprehension(monad.Bag[Int], head, bind_bytes)
         }
 
         val qualifiers = ListBuffer[Qualifier]()
-        qualifiers += ComprehensionGenerator[AlgBag[Int], Int, List[Int]]("x", _MC_00002_A)
-        qualifiers += ComprehensionGenerator[AlgBag[Int], Int, List[Int]]("y", _MC_00003_A)
+        qualifiers += ComprehensionGenerator("x", _MC_00002_A)
+        qualifiers += ComprehensionGenerator("y", _MC_00003_A)
 
-        val head = Head[Int, Int](reify {
-          3 * x * y
+        val head = ScalaExpr(reify {
+          (x, y)
         })
 
-        Comprehension[AlgBag[Int], Int, List[Int]](head, qualifiers.toList)
+        Comprehension(monad.Bag[(Int, Int)], head, qualifiers.toList)
       }
 
-      val bind_record = ComprehensionGenerator[AlgBag[Int], Int, List[Int]]("record", _MC_00001_B)
-      val head = Head[Int, Seq[Boolean]]({
-        val ofmt = new OutputFormat[Int]()
-        val record = null.asInstanceOf[Int]
+      val bind_record = ComprehensionGenerator("record", _MC_00001_B)
+      val head = ScalaExpr({
+        val ofmt = new OutputFormat[(Int, Int)]()
+        val record = null.asInstanceOf[(Int, Int)]
 
         reify {
           ofmt.write(record)
         }
       })
 
-      Comprehension[AlgExists, Boolean, Boolean](head, bind_record)
+      Comprehension(monad.All, head, bind_record)
     }
 
     sinks += _MC_00000_C
