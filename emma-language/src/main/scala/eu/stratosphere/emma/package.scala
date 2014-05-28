@@ -37,7 +37,7 @@ package object emma {
   def join[T1, T2, K](k1: T1 => K, k2: T2 => K)(in1: DataBag[T1], in2: DataBag[T2]): DataBag[(T1, T2)] = macro AlgebraMacros.join[T1, T2, K]
 
   // grouping
-  def groupBy[T, K](k: T => K)(in: DataBag[T]): DataSet[DataBag[T]] = macro AlgebraMacros.groupBy[T, K]
+  def groupBy[T, K](k: T => K)(in: DataBag[T]): DataBag[DataBag[T]] = macro AlgebraMacros.groupBy[T, K]
 
   //  // reduce without grouping
   //  def reduce[T](f: (T, T) => T): DataBag[T]

@@ -162,6 +162,7 @@
                         <javacArg>-Xlint:deprecation</javacArg>
                     </jvmArgs>
                     <args>
+                        <arg>-unchecked</arg>
                         <arg>-deprecation</arg>
                         <arg>-feature</arg>
                     </args>
