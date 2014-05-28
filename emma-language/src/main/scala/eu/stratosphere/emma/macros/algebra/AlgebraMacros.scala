@@ -1,9 +1,9 @@
 package eu.stratosphere.emma.macros.algebra
 
-import scala.language.existentials
-import scala.language.experimental.macros
-import scala.reflect.macros.blackbox.Context
-import eu.stratosphere.emma._
+import _root_.scala.language.existentials
+import _root_.scala.language.experimental.macros
+import _root_.scala.reflect.macros.blackbox.Context
+import _root_.eu.stratosphere.emma._
 
 class AlgebraMacros(val c: Context) {
 
@@ -58,11 +58,26 @@ class AlgebraMacros(val c: Context) {
   def groupBy[T, K](k: c.Expr[T => K])(in: c.Expr[DataBag[T]]): c.Expr[DataSet[DataBag[T]]] = {
     val lhs = replaceVparams(k.tree.asInstanceOf[Function], List[ValDef](q"val i: T".asInstanceOf[ValDef])).body
     val rhs = replaceVparams(k.tree.asInstanceOf[Function], List[ValDef](q"val x: T".asInstanceOf[ValDef])).body
-    val tree = q"(for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i).toSet()"
+    //val tree = q"(for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i).toSet()"
+    val tree = q"for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i"
     c.Expr[DataSet[DataBag[T]]](tree)
   }
 
-  def replaceVparams(fn: Function, vparams: List[ValDef]): Function = {
+  // grouping: for (x <- in) yield for (i <- in; if k(i) == k(x)) yield i
+  def groupByMethod[T, K](k: c.Expr[T => K]): c.Expr[DataSet[DataBag[T]]] = {
+    val in = c.prefix.tree
+    val lhs = replaceVparams(k.tree.asInstanceOf[Function], List[ValDef](q"val i: T".asInstanceOf[ValDef])).body
+    val rhs = replaceVparams(k.tree.asInstanceOf[Function], List[ValDef](q"val x: T".asInstanceOf[ValDef])).body
+    //val tree = q"(for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i).toSet()"
+    val tree = q"for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i"
+    c.Expr[DataSet[DataBag[T]]](tree)
+  }
+
+  // ---------------------------------------------------
+  // Helper methods.
+  // ---------------------------------------------------
+
+  private def replaceVparams(fn: Function, vparams: List[ValDef]): Function = {
     val transformer = new VparamsRelacer(fn.vparams zip vparams)
     transformer.transform(fn).asInstanceOf[Function]
   }

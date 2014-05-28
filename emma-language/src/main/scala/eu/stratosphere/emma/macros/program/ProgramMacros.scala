@@ -1,10 +1,11 @@
 package eu.stratosphere.emma.macros.program
 
-import scala.language.existentials
-import scala.language.experimental.macros
-import scala.reflect.macros.blackbox.Context
-import scala.collection.mutable.ListBuffer
-import eu.stratosphere.emma.mc._
+import _root_.eu.stratosphere.emma.mc.Dataflow
+
+import _root_.scala.collection.mutable.ListBuffer
+import _root_.scala.language.existentials
+import _root_.scala.language.experimental.macros
+import _root_.scala.reflect.macros.blackbox.Context
 
 class ProgramMacros(val c: Context) {
 
@@ -65,7 +66,7 @@ class ProgramMacros(val c: Context) {
     private def liftRootBlock(e: Block): Block = {
 
       // recursively lift to MC syntax starting from the sinks
-      val sinks = (for (s <- extractSinkExprs(e.expr)) yield translate(e)(s)._1).toList
+      val sinks = (for (s <- extractSinkExprs(e.expr)) yield lift(e, Nil)(resolve(e)(s))).toList
 
       // a list of statements for the root block of the translated MC expression
       val stats = ListBuffer[Tree]()
@@ -76,286 +77,149 @@ class ProgramMacros(val c: Context) {
       // 2) initialize translated sinks list
       stats += c.parse("val sinks = ListBuffer[Comprehension]()")
       // 3) add the translated MC expressions for all sinks
-      stats ++= sinks
+      for (s <- sinks) {
+        stats += q"sinks += ${serialize(s)}"
+      }
 
       // construct and return a block that returns a Dataflow using the above list of sinks
       Block(stats.toList, c.parse( """Dataflow("Emma Dataflow", sinks.toList)"""))
     }
 
     // ---------------------------------------------------
-    // Translation methods.
+    // Lift methods.
     // ---------------------------------------------------
 
-    private def translate(scope: Tree)(expr: Tree): (Tree, TermName) = {
-      val stats = ListBuffer[Tree]()
+    private def lift(scope: Tree, env: List[ValDef])(tree: Tree): Expression = {
 
-      val t: TermTree = ((expr match {
-        // resolve term definition
-        case Ident(n: TermName) => findValDef(scope)(n).getOrElse(c.abort(scope.pos, "Could not find definition of val '" + n + "' within this scope")).rhs.asInstanceOf[TermTree]
-        case t: TermTree => t
-        case _ => c.abort(expr.pos, "Unexpected expression with is neither TermName nor TermTree.")
-      }) match {
-        // ignore a top-level Typed node (side-effect of the Algebra inlining macros)
-        case Typed(apply@Apply(_, _), _) => apply
-        case term@_ => term
-      }).asInstanceOf[TermTree]
-
-      val n: TermName = expr match {
-        case Ident(n: TermName) => nextMCName(Some(n))
-        case _: TermTree => nextMCName(None)
+      // ignore a top-level Typed node (side-effect of the Algebra inlining macros)
+      val t = tree match {
+        case Typed(inner, _) => inner
+        case _ => tree
       }
 
+      // match expression type
       t match {
-        case Apply(Select(parent, TermName("withFilter")), List(f)) =>
-          stats += translateMonad(scope)(t, n)
         case Apply(TypeApply(Select(parent, TermName("map")), List(_)), List(f)) =>
-          stats += translateMonad(scope)(t, n)
+          liftMap(scope, env)(t.asInstanceOf[TermTree])
         case Apply(TypeApply(Select(parent, TermName("flatMap")), List(_)), List(f)) =>
-          stats += translateMonad(scope)(t, n)
+          liftFlatMap(scope, env)(t.asInstanceOf[TermTree])
+        case Apply(Select(parent, TermName("withFilter")), List(f)) =>
+          liftWithFilter(scope, env)(t.asInstanceOf[TermTree])
         case Apply(Apply(TypeApply(q"emma.this.`package`.write", List(_)), _), _) =>
-          stats += translateSink(scope)(t, n)
+          liftSink(scope, env)(t.asInstanceOf[TermTree])
         case Apply(TypeApply(q"emma.this.`package`.read", List(_)), _) =>
-          stats += translateSource(scope)(t, n)
+          liftSource(scope, env)(t.asInstanceOf[TermTree])
         case _ =>
-          c.abort(t.pos, "Unsupported expression. Cannot apply MC translation scheme.")
-      }
-
-      (q"val $n = { ..${stats.toList} }", n)
-    }
-
-    private def translateSource(scope: Tree)(term: TermTree, name: TermName): Tree = {
-      term match {
-        case Apply(TypeApply(fn, List(outTpe)), location :: ifmt :: Nil) =>
-          q"""
-          {
-            val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr({
-              val ifmt: InputFormat[$outTpe] = $ifmt
-              val dop = null.asInstanceOf[Int]
-
-              reify{ ifmt.split($location, dop) }
-            }))
-
-            val bind_record = ScalaExprGenerator("record", ScalaExpr({
-              val ifmt: InputFormat[$outTpe] = $ifmt
-              val bytes = null.asInstanceOf[Seq[Byte]]
-
-              reify{ ifmt.read(bytes) }
-            }))
-
-            val head = ScalaExpr({
-              val record = null.asInstanceOf[$outTpe]
-
-              reify {
-                record
-              }
-            })
-
-            Comprehension(monad.Bag[$outTpe], head, bind_bytes, bind_record)
-          }
-          """
-        case _ =>
-          c.abort(term.pos, "Unexpected source expression. Cannot apply MC translation scheme.")
+          ScalaExpr(c.Expr( q"""{ ..${env}; reify { ${freeEnv(t, env)} } }"""))
       }
     }
 
-    private def translateSink(scope: Tree)(term: TermTree, name: TermName): Tree = {
-      term match {
-        case Apply(Apply(TypeApply(fn, List(t)), location :: ofmt :: Nil), List(in: Tree)) =>
-          val (inTerm, inName) = translate(scope)(in)
-          q"""
-          {
-            $inTerm
+    private def liftSource(scope: Tree, env: List[ValDef])(term: TermTree) = term match {
+      case Apply(TypeApply(q"emma.this.`package`.read", List(outTpe)), location :: ifmt :: Nil) =>
+        val bind_bytes = ScalaExprGenerator(TermName("bytes"), ScalaExpr(c.Expr( q"""{
+            val ifmt: InputFormat[$outTpe] = $ifmt
+            val dop = null.asInstanceOf[Int]
 
-            val bind_record = ComprehensionGenerator("record", $inName)
+            reify{ ifmt.split($location, dop) }
+          }""")))
 
-            val head = ScalaExpr({
-              val ofmt = $ofmt
-              val record = null.asInstanceOf[$t]
+        val bind_record = ScalaExprGenerator(TermName("record"), ScalaExpr(c.Expr( q"""{
+            val ifmt: InputFormat[$outTpe] = $ifmt
+            val bytes = null.asInstanceOf[Seq[Byte]]
 
-              reify { ofmt.write(record) }
-            })
+            reify{ ifmt.read(bytes) }
+          }""")))
 
-            val comp = Comprehension(monad.All, head, bind_record)
-            sinks += comp
-            comp
-          }
-          """
-        case _ =>
-          c.abort(term.pos, "Unexpected sink expression. Cannot apply MC translation scheme.")
-      }
+        val head = ScalaExpr(c.Expr( q"""{
+            val record = null.asInstanceOf[$outTpe]
+            reify { record }
+          }"""))
+
+        Comprehension(q"monad.Bag[$outTpe]", head, bind_bytes :: bind_record :: Nil)
+      case _ =>
+        c.abort(term.pos, "Unexpected source expression. Cannot apply MC translation scheme.")
     }
 
-    private def translateMonad(scope: Tree)(term: TermTree, name: TermName): Tree = {
+    private def liftSink(scope: Tree, env: List[ValDef])(term: TermTree) = term match {
+      case Apply(Apply(TypeApply(fn, List(t)), location :: ofmt :: Nil), List(in: Tree)) =>
+        val bind_record = ComprehensionGenerator(TermName("record"), lift(scope, env)(resolve(scope)(in)).asInstanceOf[MonadExpression])
 
+        val head = ScalaExpr(c.Expr( q"""{
+            val ofmt = $ofmt
+            val record = null.asInstanceOf[$t]
+
+            reify { ofmt.write(record) }
+          }"""))
+
+        Comprehension(q"monad.All", head, bind_record :: Nil)
+      case _ =>
+        c.abort(term.pos, "Unexpected pattern. Expecting sink expression. Cannot apply MC translation scheme.")
+    }
+
+    private def liftMap(scope: Tree, env: List[ValDef])(term: TermTree) = {
       if (!typeUtils.isCollectionType(term.tpe.widen.typeSymbol)) {
         c.abort(term.pos, "Unsupported expression. Cannot apply MC translation scheme to non-collection type.")
       }
 
       term match {
-        case Apply(Select(parent, TermName("withFilter")), _) =>
-          val (in, predicates) = collectPredicates(term)
-          val (inTerm, inName) = translate(scope)(in)
-
-          val inTpe = in.tpe.widen.typeArgs.head
-          val inVar = nextVarName(None)
-          val inVars = List(q"val $inVar: $inTpe".asInstanceOf[ValDef])
-
-          // construct qualifier
-          val qualifierTerms = ListBuffer[Tree](q"val qualifiers = ListBuffer[Qualifier]()")
-          // add input generator
-          qualifierTerms += q"qualifiers += ComprehensionGenerator(${inVar.toString}, $inName)"
-          // add filters with unified parameter names
-          for (p <- predicates) {
-            val filterExpr = freeIdents(replaceVparams(p, List(q"val $inVar: $inTpe".asInstanceOf[ValDef])), inVars.toList).body
-            qualifierTerms += q"qualifiers += Filter(ScalaExpr(reify { $filterExpr }))"
-          }
-
-          q"""
-          {
-            $inTerm
-            ..$qualifierTerms
-            val head = ScalaExpr({
-              val $inVar: $inTpe = null.asInstanceOf[$inTpe]
-              reify{ $inVar }
-            })
-            Comprehension(monad.Bag[$inTpe], head, qualifiers.toList)
-          }
-          """
         case Apply(TypeApply(Select(parent, TermName("map")), List(outTpe)), List(fn@Function(List(arg), body))) =>
-          val (in, predicates) = collectPredicates(parent)
-          val (inTerm, inName) = translate(scope)(in)
+          val valdef = q"val ${arg.name} = null.asInstanceOf[${parent.tpe.widen.typeArgs.head}]".asInstanceOf[ValDef]
 
-          val inTpe = in.tpe.widen.typeArgs.head
-          val inVar = arg.name
-          val inVars = List(q"val $inVar: $inTpe".asInstanceOf[ValDef])
+          val bind = ComprehensionGenerator(arg.name, lift(scope, env)(resolve(scope)(parent)).asInstanceOf[MonadExpression])
+          val head = lift(scope, valdef :: env)(body)
 
-          // construct qualifier
-          val qualifierTerms = ListBuffer[Tree](q"val qualifiers = ListBuffer[Qualifier]()")
-          // add input generator
-          qualifierTerms += q"qualifiers += ComprehensionGenerator(${inVar.toString}, $inName)"
-          // add filters with unified parameter names
-          for (p <- predicates) {
-            val filterExpr = freeIdents(replaceVparams(p, List(q"val $inVar: ${arg.tpe}".asInstanceOf[ValDef])), inVars.toList).body
-            qualifierTerms += q"qualifiers += Filter(ScalaExpr(reify { $filterExpr }))"
-          }
-
-          q"""
-          {
-            $inTerm
-            ..$qualifierTerms
-            val head = ScalaExpr(reify{ ${replaceVparams(fn, List(q"val $inVar: ${arg.tpe}".asInstanceOf[ValDef])).body} })
-            Comprehension(monad.Bag[$outTpe], head, qualifiers.toList)
-          }
-          """
-        case Apply(TypeApply(Select(parent, TermName("flatMap")), List(outTpe)), List(fn@Function(List(arg), body))) =>
-          val inVars = ListBuffer[ValDef]()
-          val inTerms = ListBuffer[Tree]()
-          val qualifierTerms = ListBuffer[Tree](q"val qualifiers = ListBuffer[Qualifier]()")
-          val finalTerms = ListBuffer[Tree]()
-
-          var currParent = parent
-          var currTpe = outTpe
-          var currFn = fn
-          var currArg = arg
-          var currBody = body
-          var hasNext = true
-
-          while (hasNext) {
-            val (in, predicates) = collectPredicates(currParent)
-            val (inTerm, inName) = translate(scope)(in)
-
-            val inTpe = in.tpe.widen.typeArgs.head
-            val inVar = currArg.name
-
-            inVars += q"val $inVar = null.asInstanceOf[$inTpe]".asInstanceOf[ValDef]
-            inTerms += inTerm
-            // add input generator
-            qualifierTerms += q"qualifiers += ComprehensionGenerator(${inVar.toString}, $inName)"
-            // add filters with unified parameter names
-            for (p <- predicates) {
-              val filterExpr = freeIdents(replaceVparams(p, List(q"val $inVar: ${arg.tpe}".asInstanceOf[ValDef])), inVars.toList).body
-              qualifierTerms += q"qualifiers += Filter(ScalaExpr(reify { $filterExpr }))"
-            }
-
-            currBody match {
-              case Apply(TypeApply(Select(nextParent, TermName("map")), List(nextOutTpe)), List(nextFn@Function(List(nextArg), nextBody))) =>
-                currParent = nextParent
-                currTpe = nextOutTpe
-                currFn = nextFn
-                currArg = nextArg
-                currBody = nextBody
-                hasNext = true
-              case Apply(TypeApply(Select(nextParent, TermName("flatMap")), List(nextOutTpe)), List(nextFn@Function(List(nextArg), nextBody))) =>
-                currParent = nextParent
-                currTpe = nextOutTpe
-                currFn = nextFn
-                currArg = nextArg
-                currBody = nextBody
-                hasNext = true
-              case _ =>
-                val headExpr = freeIdents(replaceVparams(currFn, List(q"val $inVar: ${arg.tpe}".asInstanceOf[ValDef])), inVars.toList).body
-                finalTerms += q"val head = ScalaExpr(reify{ $headExpr })"
-                finalTerms += q"Comprehension(monad.Bag[$outTpe], head, qualifiers.toList)"
-                hasNext = false
-            }
-          }
-
-          q"""
-          {
-            ..$inTerms
-            ..$qualifierTerms
-            ..$finalTerms
-          }
-          """
-
+          Comprehension(q"monad.Bag[$outTpe]", head, bind :: Nil)
         case _ =>
-          c.abort(term.pos, "Unexpected map expression. Cannot apply MC translation scheme.")
+          c.abort(term.pos, "Unexpected pattern. Expecting map expression. Cannot apply MC translation scheme.")
       }
+    }
+
+    private def liftFlatMap(scope: Tree, env: List[ValDef])(term: TermTree) = {
+      if (!typeUtils.isCollectionType(term.tpe.widen.typeSymbol)) {
+        c.abort(term.pos, "Unsupported expression. Cannot apply MC translation scheme to non-collection type.")
+      }
+
+      term match {
+        case Apply(TypeApply(Select(parent, TermName("flatMap")), List(outTpe)), List(fn@Function(List(arg), body))) =>
+          val valdef = q"val ${arg.name} = null.asInstanceOf[${parent.tpe.widen.typeArgs.head}]".asInstanceOf[ValDef]
+
+          val bind = ComprehensionGenerator(arg.name, lift(scope, env)(resolve(scope)(parent)).asInstanceOf[MonadExpression])
+          val head = lift(scope, valdef :: env)(body)
+
+          MonadJoin(Comprehension(q"monad.Bag[$outTpe]", head, bind :: Nil))
+        case _ =>
+          c.abort(term.pos, "Unexpected pattern. Expecting map expression. Cannot apply MC translation scheme.")
+      }
+    }
+
+    private def liftWithFilter(scope: Tree, env: List[ValDef])(term: TermTree) = {
+      if (!typeUtils.isCollectionType(term.tpe.widen.typeSymbol)) {
+        c.abort(term.pos, "Unsupported expression. Cannot apply MC translation scheme to non-collection type.")
+      }
+
+      term match {
+        case Apply(Select(parent, TermName("withFilter")), List(fn@Function(List(arg), body))) =>
+          val valdef = q"val ${arg.name}: ${parent.tpe.widen.typeArgs.head} = null.asInstanceOf[${parent.tpe.widen.typeArgs.head}]".asInstanceOf[ValDef]
+
+          val bind = ComprehensionGenerator(arg.name, lift(scope, env)(resolve(scope)(parent)).asInstanceOf[MonadExpression])
+          val filter = Filter(lift(scope, valdef :: env)(body))
+          val head = lift(scope, valdef :: env)(q"${valdef.name}")
+
+          Comprehension(q"monad.Bag[${parent.tpe.widen.typeArgs.head}]", head, bind ::  filter :: Nil)
+        case _ =>
+          c.abort(term.pos, "Unexpected pattern. Expecting map expression. Cannot apply MC translation scheme.")
+      }
+    }
+
+    private def resolve(scope: Tree)(tree: Tree) = tree match {
+      // resolve term definition
+      case Ident(n: TermName) => findValDef(scope)(n).getOrElse(c.abort(scope.pos, "Could not find definition of val '" + n + "' within scope")).rhs
+      case _ => tree
     }
 
     // ---------------------------------------------------
     // Helper methods.
     // ---------------------------------------------------
-
-    private def nextMCName(suffix: Option[TermName]): TermName = {
-      mcCount += 1
-      suffix match {
-        case Some(x) => TermName(f"_MC_$mcCount%05d_$x")
-        case _ => TermName(f"_MC_$mcCount%05d")
-      }
-    }
-
-    private def nextVarName(suffix: Option[TermName]): TermName = {
-      varCount += 1
-      suffix match {
-        case Some(x) => TermName(f"_x_$varCount%05d_$x")
-        case _ => TermName(f"_x_$varCount%05d")
-      }
-    }
-
-    /**
-     * Eates-up and accumulates the predicates passed to a chain of DataBag[T].withFilter applications.
-     *
-     * @param term The term tree to consume
-     * @return A pair consisting of the residual term tree and the accumulated predicate functions.
-     */
-    private def collectPredicates(term: Tree): (Tree, List[Function]) = term match {
-      case Apply(Select(parent: Tree, TermName("withFilter")), List(fn@Function(List(arg), body))) =>
-        val (rest, tail) = collectPredicates(parent)
-        (rest, (fn :: tail).reverse)
-      case Apply(TypeApply(Select(parent, TermName("map")), _), _) =>
-        (term, List())
-      case Apply(TypeApply(Select(parent, TermName("flatMap")), _), _) =>
-        (term, List())
-      case Apply(TypeApply(Select(parent, TermName("map")), _), _) =>
-        (term, List())
-      case Ident(_) =>
-        (term, List())
-      case Typed(apply@Apply(_, _), _) =>
-        collectPredicates(apply) // ignore a top-level Typed node (side-effect of the Algebra inlining macros)
-      case _ =>
-        c.abort(term.pos, "Oppps! Something went horribly wrong here...")
-    }
 
     /**
      * Extracts the symbols of the sinks returned by an Emma program.
@@ -374,24 +238,6 @@ class ProgramMacros(val c: Context) {
     }
 
     /**
-     * Validates that an identifier has the given type and extracts its term name.
-     *
-     * @param id The identifier.
-     * @tparam T The type of the term expected for the given identifier.
-     * @return
-     */
-    private def extractTermName[T: TypeTag](id: Ident): TermName = {
-      if (!id.isTerm || id.tpe != typeOf[T]) {
-        c.abort(id.pos, "Identifier should be of type " + typeOf[T].toString)
-      }
-      val termSymbol = id.symbol.asInstanceOf[TermSymbol]
-      if (!termSymbol.isVal) {
-        c.abort(id.pos, "Identifier should be introduced as val")
-      }
-      id.name.asInstanceOf[TermName]
-    }
-
-    /**
      * Find the ValDef scope for the given TermName.
      *
      * @param scope The enclosing search scope.
@@ -405,24 +251,9 @@ class ProgramMacros(val c: Context) {
       }.asInstanceOf[Option[ValDef]]
     }
 
-    /**
-     * Extracts the MC dependencies referred in a TermTree.
-     * TODO: remove
-     */
-    private def extractDependencyTerms(scope: Tree)(term: TermTree): List[(TermTree, Option[TermName])] = {
-      val t = new DependencyTermExtractor(scope, term)
-      t.traverse(term)
-      t.result.toList
-    }
-
-    def replaceVparams(fn: Function, vparams: List[ValDef]) = {
-      val transformer = new VparamsRelacer(fn.vparams zip vparams)
-      transformer.transform(fn).asInstanceOf[Function]
-    }
-
-    def freeIdents(fn: Function, idents: List[ValDef]) = {
-      val transformer = new VparamsRelacer(idents zip idents)
-      transformer.transform(fn).asInstanceOf[Function]
+    private def freeEnv(tree: Tree, env: List[ValDef]) = {
+      val transformer = new VparamsRelacer(env zip env)
+      transformer.transform(tree)
     }
 
     // ---------------------------------------------------
@@ -479,4 +310,70 @@ class ProgramMacros(val c: Context) {
     def isCollectionType(typeSymbol: Symbol) = collTypeSymbols.contains(typeSymbol)
   }
 
+
+  // ---------------------------------------------------
+  // Compile-time mirror of eu.stratosphere.emma.mc
+  // ---------------------------------------------------
+
+  abstract class Expression() {
+  }
+
+  abstract class MonadExpression() extends Expression {
+  }
+
+  case class MonadJoin(expr: Expression) extends MonadExpression {
+  }
+
+  case class MonadUnit(expr: Expression) extends MonadExpression {
+  }
+
+  abstract class Qualifier extends Expression {
+  }
+
+  case class Filter(expr: Expression) extends Qualifier {
+  }
+
+  abstract class Generator(val lhs: TermName) extends Qualifier {
+  }
+
+  case class ScalaExprGenerator(override val lhs: TermName, rhs: ScalaExpr) extends Generator(lhs) {
+  }
+
+  case class ComprehensionGenerator(override val lhs: TermName, rhs: MonadExpression) extends Generator(lhs) {
+  }
+
+  case class ScalaExpr(var expr: Expr[Any]) extends Expression {
+  }
+
+  case class Comprehension(monad: Tree, head: Expression, qualifiers: List[Qualifier]) extends MonadExpression {
+  }
+
+  private def serialize(e: Expression): Tree = e match {
+    case MonadUnit(expr) =>
+      q"MonadUnit(${serialize(expr)})"
+    case MonadJoin(expr) =>
+      q"MonadJoin(${serialize(expr)})"
+    case Filter(expr) =>
+      q"Filter(${serialize(expr)})"
+    case ScalaExprGenerator(lhs, rhs) =>
+      q"ScalaExprGenerator(${lhs.toString}, ${serialize(rhs)})"
+    case ComprehensionGenerator(lhs, rhs: MonadExpression) =>
+      q"{ val rhs = ${serialize(rhs)}; ComprehensionGenerator(${lhs.toString}, rhs) }"
+    case ScalaExpr(expr) =>
+      q"ScalaExpr($expr)"
+    case Comprehension(monad, head, qualifiers) =>
+      q"""
+      {
+        // MC qualifiers
+        val qualifiers = ListBuffer[Qualifier]()
+        ..${for (q <- qualifiers) yield q"qualifiers += ${serialize(q)}"}
+
+        // MC head
+        val head = ${serialize(head)}
+
+        // MC constructor
+        Comprehension($monad, head, qualifiers.toList)
+      }
+       """
+  }
 }
