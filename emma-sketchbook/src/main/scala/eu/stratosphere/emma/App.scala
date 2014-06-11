@@ -18,9 +18,9 @@ object App {
     println("// plan")
     dataflow01.print()
     println("")
-    println("// plan")
-    dataflow02.print()
-    println("")
+//    println("// plan")
+//    dataflow02.print()
+//    println("")
   }
 
   def reference() = {
@@ -39,45 +39,61 @@ object App {
         val _MC_00002_A = {
           val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr({
             val ifmt = new InputFormat[Int]()
-            val dop = 20
+            val dop = null.asInstanceOf[Int]
 
             reify {
               ifmt.split("file:///tmp/emma/A.txt", dop)
             }
           }))
 
-          val head = ScalaExpr({
+          val bind_record = ScalaExprGenerator("record", ScalaExpr({
             val ifmt = new InputFormat[Int]()
             val bytes = null.asInstanceOf[Seq[Byte]]
 
             reify {
               ifmt.read(bytes)
             }
+          }))
+
+          val head = ScalaExpr({
+            val record = null.asInstanceOf[Int]
+
+            reify {
+              record
+            }
           })
 
-          Comprehension(monad.Bag[Int], head, bind_bytes)
+          Comprehension(monad.Bag[Int], head, bind_bytes, bind_record)
         }
 
         val _MC_00003_A = {
           val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr({
             val ifmt = new InputFormat[Int]()
-            val dop = 20
+            val dop = null.asInstanceOf[Int]
 
             reify {
               ifmt.split("file:///tmp/emma/A.txt", dop)
             }
           }))
 
-          val head = ScalaExpr({
+          val bind_record = ScalaExprGenerator("record", ScalaExpr({
             val ifmt = new InputFormat[Int]()
             val bytes = null.asInstanceOf[Seq[Byte]]
 
             reify {
               ifmt.read(bytes)
             }
+          }))
+
+          val head = ScalaExpr({
+            val record = null.asInstanceOf[Int]
+
+            reify {
+              record
+            }
           })
 
-          Comprehension(monad.Bag[Int], head, bind_bytes)
+          Comprehension(monad.Bag[Int], head, bind_bytes, bind_record)
         }
 
         val qualifiers = ListBuffer[Qualifier]()
