@@ -130,19 +130,27 @@ class ProgramMacros(val c: Context) {
           {
             val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr({
               val ifmt: InputFormat[$outTpe] = $ifmt
-              val dop = 20
+              val dop = null.asInstanceOf[Int]
 
               reify{ ifmt.split($location, dop) }
             }))
 
-            val head = ScalaExpr({
+            val bind_record = ScalaExprGenerator("record", ScalaExpr({
               val ifmt: InputFormat[$outTpe] = $ifmt
               val bytes = null.asInstanceOf[Seq[Byte]]
 
               reify{ ifmt.read(bytes) }
+            }))
+
+            val head = ScalaExpr({
+              val record = null.asInstanceOf[$outTpe]
+
+              reify {
+                record
+              }
             })
 
-            Comprehension(monad.Bag[$outTpe], head, bind_bytes)
+            Comprehension(monad.Bag[$outTpe], head, bind_bytes, bind_record)
           }
           """
         case _ =>
