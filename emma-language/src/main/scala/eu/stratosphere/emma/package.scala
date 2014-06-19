@@ -3,7 +3,7 @@ package eu.stratosphere
 import emma.mc.Dataflow
 import emma.macros.utility.UtilMacros
 import emma.macros.algebra.AlgebraMacros
-import emma.macros.program.ProgramMacros
+import emma.macros.program.DataflowMacros
 
 /**
  * This is e playground specification of e function-oriented algebra for the Emma language. The following
@@ -64,9 +64,7 @@ package object emma {
   // program macros
   // -----------------------------------------------------
 
-  final def dataflow(e: Any): Dataflow = macro ProgramMacros.dataflow
-
-  final def toybox(e: Any): String = macro ProgramMacros.toybox
+  final def dataflow(e: Any): Dataflow = macro DataflowMacros.dataflow
 
   final def desugar(e: Any): String = macro UtilMacros.desugar
 

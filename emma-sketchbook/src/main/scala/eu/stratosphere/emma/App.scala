@@ -21,62 +21,65 @@ object App {
 //      df.print()
 //      println("")
 //    }
-//
-//    // dataflow #01
-//    {
-//      val df = dataflow {
-//        val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
-//        val B = for (a <- A; if a.children < 1 && a.age > 30) yield s"${a.name} ${a.surname}"
-//        val C = write("file:///tmp/emma/result.csv", new OutputFormat[String])(B)
-//
-//        C
-//      }
-//      println("// dataflow #01")
-//      df.print()
-//      println("")
-//    }
-//
-//    // dataflow #02
-//    {
-//      val df = dataflow {
-//        val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
-//        val B = join[Person, Person, Int](a => a.age, a => a.age)(A, A).map(x => Math.max(x._1.children, x._1.children))
-//        val C = write("file:///tmp/emma/result.csv", new OutputFormat[Int])(B)
-//
-//        C
-//      }
-//      println("// dataflow #02")
-//      df.print()
-//      println("")
-//    }
-//
-//    // dataflow #03
-//    {
-//      val df = dataflow {
-//        val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
-//        val B = cross(A, A).withFilter(x => x._1.age == x._2.age).map(x => Math.max(x._1.children, x._1.children))
-//        val C = write("file:///tmp/emma/result.csv", new OutputFormat[Int])(B)
-//
-//        C
-//      }
-//      println("// dataflow #03")
-//      df.print()
-//      println("")
-//    }
-//
-//    // dataflow #04
-//    {
-//      val df = dataflow {
-//        val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
-//        val B = cross(A, A).withFilter(x => x._1.age == x._2.age)
-//        val C = write("file:///tmp/emma/result.csv", new OutputFormat[(Person, Person)])(B)
-//
-//        C
-//      }
-//      println("// dataflow #04")
-//      df.print()
-//      println("")
-//    }
+
+    // dataflow #01
+    //   src(A) — map — filter — filter — sink(C)
+    {
+      val df = dataflow {
+        val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
+        val B = for (a <- A; if a.children < 1; if a.age > 30) yield s"${a.name} ${a.surname}"
+        val C = write("file:///tmp/emma/result.csv", new OutputFormat[String])(B)
+
+        C
+      }
+      println("// dataflow #01")
+      df.print()
+      println("")
+    }
+
+    // dataflow #02
+    //   src(A) — cross — map — B
+    //   src(A) —’
+    {
+      val df = dataflow {
+        val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
+        val B = cross(A, A).map(x => Math.max(x._1.children, x._2.children))
+        val C = write("file:///tmp/emma/result.csv", new OutputFormat[Int])(B)
+
+        C
+      }
+      println("// dataflow #02")
+      df.print()
+      println("")
+    }
+
+    // dataflow #03
+    {
+      val df = dataflow {
+        val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
+        val B = cross(A, A).withFilter(x => x._1.age == x._2.age)
+        val C = write("file:///tmp/emma/result.csv", new OutputFormat[(Person, Person)])(B)
+
+        C
+      }
+      println("// dataflow #03")
+      df.print()
+      println("")
+    }
+
+    // dataflow #04
+    {
+      val df = dataflow {
+        val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
+        val B = join[Person, Person, Int](a => a.age, a => a.age)(A, A).map(x => Math.max(x._1.children, x._1.children))
+        val C = write("file:///tmp/emma/result.csv", new OutputFormat[Int])(B)
+
+        C
+      }
+      println("// dataflow #04")
+      df.print()
+      println("")
+    }
 
     // dataflow #05
     {
