@@ -16,9 +16,9 @@ class DataBag[T] {
 
   def flatMap[B](f: (T) => DataBag[B]): DataBag[B] = ???
 
-  def toSet(): DataSet[T] = ???
+  def distinct(): DataSet[T] = ???
 
-  def groupBy[K](k: T => K): DataBag[DataBag[T]] = macro AlgebraMacros.groupByMethod[T, K]
+  def groupBy[K](k: T => K): DataSet[DataBag[T]] = macro AlgebraMacros.groupByMethod[T, K]
 }
 
 object DataBag {

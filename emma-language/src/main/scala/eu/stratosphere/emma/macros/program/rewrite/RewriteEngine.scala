@@ -2,11 +2,12 @@ package eu.stratosphere.emma.macros.program.rewrite
 
 import _root_.eu.stratosphere.emma.macros.program.ContextHolder
 import _root_.eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
-import eu.stratosphere.emma.macros.program.util.ProgramUtils
-
+import _root_.eu.stratosphere.emma.macros.program.util.ProgramUtils
 import _root_.scala.reflect.macros.blackbox.Context
 
 trait RewriteEngine[C <: Context] extends ContextHolder[C] with IntermediateRepresentation[C] with ProgramUtils[C] {
+
+  import c.universe._
 
   val rules: List[Rule] = List(UnnestHead, UnnestGenerator)
 
@@ -51,7 +52,19 @@ trait RewriteEngine[C <: Context] extends ContextHolder[C] with IntermediateRepr
       }
     }
 
-    override protected def guard(r: ExpressionRoot, m: RuleMatch) = true
+    override protected def guard(r: ExpressionRoot, m: RuleMatch) = {
+      val parentIsSink = m.parent.qualifiers.size == 1 && m.parent.head.isInstanceOf[ScalaExpr] && (m.parent.head.asInstanceOf[ScalaExpr].tree match {
+        case Apply(Select(Ident(TermName("ofmt")), TermName("write")), Ident(TermName(name)) :: Nil) => name.startsWith("snk$record$")
+        case _ => false
+      })
+
+      val childIsSource = m.child.qualifiers.size == 2 && m.child.head.isInstanceOf[ScalaExpr] && (m.child.head.asInstanceOf[ScalaExpr].tree match {
+        case Ident(TermName(name)) => name.startsWith("src$record$")
+        case _ => false
+      })
+
+      !(childIsSource || parentIsSink)
+    }
 
     override protected def fire(r: ExpressionRoot, m: RuleMatch) = {
       val name = m.generator.lhs

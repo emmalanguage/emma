@@ -6,21 +6,21 @@ object App {
 
   def main(args: Array[String]) {
 
-//    // reference dataflow #01
-//    {
-//      val df = reference01()
-//      println("// reference dataflow #01")
-//      df.print()
-//      println("")
-//    }
-//
-//    // reference dataflow #02
-//    {
-//      val df = reference02()
-//      println("// reference dataflow #02")
-//      df.print()
-//      println("")
-//    }
+    // reference dataflow #01
+    {
+      val df = reference01()
+      println("// reference dataflow #01")
+      df.print()
+      println("")
+    }
+
+    // reference dataflow #02
+    {
+      val df = reference02()
+      println("// reference dataflow #02")
+      df.print()
+      println("")
+    }
 
     // dataflow #01
     //   src(A) — map — filter — filter — sink(C)
@@ -38,13 +38,14 @@ object App {
     }
 
     // dataflow #02
-    //   src(A) — cross — map — B
+    //   src(A) — cross — filter — B
+    //            /
     //   src(A) —’
     {
       val df = dataflow {
         val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
-        val B = cross(A, A).map(x => Math.max(x._1.children, x._2.children))
-        val C = write("file:///tmp/emma/result.csv", new OutputFormat[Int])(B)
+        val B = cross(A, A).withFilter(x => x._1.age == x._2.age)
+        val C = write("file:///tmp/emma/result.csv", new OutputFormat[(Person, Person)])(B)
 
         C
       }
@@ -54,11 +55,14 @@ object App {
     }
 
     // dataflow #03
+    //   src(A) — cross — map — B
+    //            /
+    //   src(A) —’
     {
       val df = dataflow {
         val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
-        val B = cross(A, A).withFilter(x => x._1.age == x._2.age)
-        val C = write("file:///tmp/emma/result.csv", new OutputFormat[(Person, Person)])(B)
+        val B = cross(A, A).map(x => Math.max(x._1.children, x._2.children))
+        val C = write("file:///tmp/emma/result.csv", new OutputFormat[Int])(B)
 
         C
       }
@@ -68,6 +72,9 @@ object App {
     }
 
     // dataflow #04
+    //   src(A) — join — map — B
+    //            /
+    //   src(A) —’
     {
       val df = dataflow {
         val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
@@ -82,6 +89,23 @@ object App {
     }
 
     // dataflow #05
+    //   src(A) — distinct — distinct — sink(C)
+    {
+      val df = dataflow {
+        val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
+        val B = distinct { A.map(x => x.surname).distinct() }
+        val C = write("file:///tmp/emma/result.csv", new OutputFormat[String])(B)
+
+        C
+      }
+
+      println("// dataflow #05")
+      df.print()
+      println("")
+    }
+
+    // dataflow #06
+    //   src(A) — groupBy — sink(C)
     {
       val df = dataflow {
         val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
@@ -91,7 +115,7 @@ object App {
         C
       }
 
-      println("// dataflow #05")
+      println("// dataflow #06")
       df.print()
       println("")
     }

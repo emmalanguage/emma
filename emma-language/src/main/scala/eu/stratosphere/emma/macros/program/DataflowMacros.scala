@@ -31,6 +31,7 @@ class DataflowMacros(val c: Context) {
 
     val srcCount = new Counter()
     var snkCount = new Counter()
+    var tmpCount = new Counter()
 
     /**
      * Lifts the root block of an Emma program into a monatic comprehension intermediate representation.
@@ -132,6 +133,26 @@ class DataflowMacros(val c: Context) {
 
           Comprehension(q"monad.Bag[${parent.tpe.widen.typeArgs.head}]", head, bind :: filter :: Nil)
 
+        // in.asSet()
+        case Apply(Select(parent, TermName("distinct")), Nil) =>
+          if (!isCollectionType(t.tpe.widen.typeSymbol)) {
+            c.abort(t.pos, "Unsupported expression. Cannot apply MC translation scheme to non-collection type.")
+          }
+
+          // get the child expression
+          val child = lift(scope, env)(resolve(scope)(parent)).asInstanceOf[MonadExpression]
+
+          // change the monad type of the first Comprehension descendant
+          var descendant = child
+          while (!descendant.isInstanceOf[Comprehension]) descendant match {
+            case MonadJoin(expr) => descendant = expr
+            case MonadUnit(expr) => descendant = expr
+            case _ => c.abort(t.pos, "Unexpected non-MonadExpression node returned from recursive MC translation")
+          }
+          descendant.asInstanceOf[Comprehension].monad = q"monad.Set[${parent.tpe.widen.typeArgs.head}]"
+
+          child
+
         // write[T](location, ofmt)(in)
         case Apply(Apply(TypeApply(q"emma.this.`package`.write", List(inTpe)), location :: ofmt :: Nil), List(in: Tree)) =>
           val recordID = nextTermName("snk$record$", snkCount)
@@ -211,8 +232,8 @@ class DataflowMacros(val c: Context) {
     /**
      * Constructs a fresh TermName with the given prefix, incrementing the corresponding counter.
      *
-     * @param prefix
-     * @param counter
+     * @param prefix A previx to prepend to the TermName
+     * @param counter A counter whose current value will be appended to the TermName
      * @return
      */
     private def nextTermName(prefix: String, counter: Counter) = TermName(f"${prefix}${counter.get}")
