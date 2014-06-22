@@ -39,6 +39,9 @@ package object emma {
   // grouping
   def groupBy[T, K](k: T => K)(in: DataBag[T]): DataBag[DataBag[T]] = macro AlgebraMacros.groupBy[T, K]
 
+  // collection conversions
+  def distinct[T](in: DataBag[T]): DataSet[T] = macro AlgebraMacros.distinct[T]
+
   //  // reduce without grouping
   //  def reduce[T](f: (T, T) => T): DataBag[T]
   //

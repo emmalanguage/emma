@@ -39,7 +39,7 @@ package object monad {
 
   case class Bag[T]()(implicit m: scala.reflect.Manifest[T]) extends CommutativeMonad[T]("bag")(m)
 
-  case class Set[T <: Numeric[T]]()(implicit m: scala.reflect.Manifest[T], n: Numeric[T]) extends LeftIdempotentMonad[T]("set")(m)
+  case class Set[T]()(implicit m: scala.reflect.Manifest[T]) extends LeftIdempotentMonad[T]("set")(m)
 
   case class Sum[T <: Numeric[T]]()(implicit m: scala.reflect.Manifest[T], n: Numeric[T]) extends CommutativeMonad[T]("sum")(m)
 

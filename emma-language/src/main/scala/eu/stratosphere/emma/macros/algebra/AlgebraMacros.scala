@@ -25,6 +25,11 @@ class AlgebraMacros(val c: Context) {
     c.Expr[DataBag[T]](tree)
   }
 
+  def distinct[T](in: c.Expr[DataBag[T]]): c.Expr[DataSet[T]] = {
+    val tree = q"$in.distinct()"
+    c.Expr[DataSet[T]](tree)
+  }
+
   // cross
   def cross2[T1, T2](in1: c.Expr[DataBag[T1]], in2: c.Expr[DataBag[T1]]) = {
     val tree = q"for (i1 <- $in1; i2 <- $in2) yield (i1, i2)"
@@ -47,7 +52,7 @@ class AlgebraMacros(val c: Context) {
   }
 
   // join: for (i1 <- in1; i2 <- in2; if k1(i1) == k2(i2)) yield (i1, i2)
-  def join[T1: c.WeakTypeTag, T2:  c.WeakTypeTag, K:  c.WeakTypeTag](k1: c.Expr[T1 => K], k2: c.Expr[T2 => K])(in1: c.Expr[DataBag[T1]], in2: c.Expr[DataBag[T2]]): c.Expr[DataBag[(T1, T2)]] = {
+  def join[T1, T2, K](k1: c.Expr[T1 => K], k2: c.Expr[T2 => K])(in1: c.Expr[DataBag[T1]], in2: c.Expr[DataBag[T2]]): c.Expr[DataBag[(T1, T2)]] = {
     val lhs = replaceVparams(k1.tree.asInstanceOf[Function], List[ValDef](q"val i1: T1".asInstanceOf[ValDef])).body
     val rhs = replaceVparams(k2.tree.asInstanceOf[Function], List[ValDef](q"val i2: T2".asInstanceOf[ValDef])).body
     val tree = q"for (i1 <- $in1; i2 <- $in2; if $lhs == $rhs) yield (i1, i2)"
@@ -58,8 +63,7 @@ class AlgebraMacros(val c: Context) {
   def groupBy[T, K](k: c.Expr[T => K])(in: c.Expr[DataBag[T]]): c.Expr[DataSet[DataBag[T]]] = {
     val lhs = replaceVparams(k.tree.asInstanceOf[Function], List[ValDef](q"val i: T".asInstanceOf[ValDef])).body
     val rhs = replaceVparams(k.tree.asInstanceOf[Function], List[ValDef](q"val x: T".asInstanceOf[ValDef])).body
-    //val tree = q"(for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i).toSet()"
-    val tree = q"for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i"
+    val tree = q"(for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i).distinct()"
     c.Expr[DataSet[DataBag[T]]](tree)
   }
 
@@ -68,8 +72,7 @@ class AlgebraMacros(val c: Context) {
     val in = c.prefix.tree
     val lhs = replaceVparams(k.tree.asInstanceOf[Function], List[ValDef](q"val i: T".asInstanceOf[ValDef])).body
     val rhs = replaceVparams(k.tree.asInstanceOf[Function], List[ValDef](q"val x: T".asInstanceOf[ValDef])).body
-    //val tree = q"(for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i).toSet()"
-    val tree = q"for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i"
+    val tree = q"(for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i).distinct()"
     c.Expr[DataSet[DataBag[T]]](tree)
   }
 
@@ -88,8 +91,9 @@ class AlgebraMacros(val c: Context) {
 
   private class VparamsRelacer(valdefs: List[(ValDef, ValDef)]) extends Transformer {
 
-    val defsmap = Map() ++ { for (v <- valdefs) yield
-      (v._1.name , v)
+    val defsmap = Map() ++ {
+      for (v <- valdefs) yield
+        (v._1.name, v)
     }
 
     override def transform(tree: Tree): Tree = tree match {
@@ -102,4 +106,5 @@ class AlgebraMacros(val c: Context) {
         super.transform(tree)
     }
   }
+
 }
