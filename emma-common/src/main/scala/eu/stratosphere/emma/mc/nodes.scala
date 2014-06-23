@@ -14,7 +14,7 @@ object Dataflow {
   }
 }
 
-abstract class Expression() {
+trait Expression {
 }
 
 object Expression {
@@ -23,46 +23,47 @@ object Expression {
   def printHelper(e: Any, offset: String = ""): Unit = e match {
     case MonadJoin(expr) => print("join("); printHelper(expr, offset + "     "); print(")")
     case MonadUnit(expr) => print("unit("); printHelper(expr, offset + "     "); print(")")
-    case Comprehension(t, h, qs) => print("[ "); printHelper(h, offset + " " * 3); println(" | "); printHelper(qs, offset + ident); print("\n" + offset + "]^" + t.name + "")
+    case Comprehension(t, h, qs) => print("[ "); printHelper(h, offset + " " * 2); println(" | "); printHelper(qs, offset + ident); print("\n" + offset + "]^" + t.name + "")
     case ComprehensionGenerator(lhs, rhs) => print(lhs); print(" ← "); printHelper(rhs, offset + "   " + " " * lhs.length)
     case ScalaExprGenerator(lhs, rhs) => print(lhs); print(" ← "); print(rhs.expr.tree)
     case Filter(expr) => printHelper(expr)
     case Nil => println("")
     case (q: Qualifier) :: Nil => print(offset); printHelper(q, offset)
     case (q: Qualifier) :: qs => print(offset); printHelper(q, offset); println(", "); printHelper(qs, offset)
-    case ScalaExpr(expr) => print(expr.tree)
+    case ScalaExpr(freeVars, expr) => print(expr.tree); print(" <" + freeVars + "> ")
     case _ => print("〈unknown expression〉")
   }
 }
 
-abstract class MonadExpression() extends Expression {
+trait MonadExpression extends Expression {
 }
 
-final case class MonadJoin(expr: Expression) extends MonadExpression {
+final case class MonadJoin(var expr: Expression) extends MonadExpression {
 }
 
-final case class MonadUnit(expr: Expression) extends MonadExpression {
+final case class MonadUnit(var expr: Expression) extends MonadExpression {
 }
 
-abstract class Qualifier extends Expression {
+trait Qualifier extends Expression {
 }
 
-final case class Filter(expr: Expression) extends Qualifier {
+final case class Filter(var expr: Expression) extends Qualifier {
 }
 
-abstract class Generator(val lhs: String) extends Qualifier {
+trait Generator extends Qualifier {
+  var lhs: String
 }
 
-final case class ScalaExprGenerator(override val lhs: String, rhs: ScalaExpr) extends Generator(lhs) {
+final case class ScalaExprGenerator(var lhs: String, var rhs: ScalaExpr) extends Generator {
 }
 
-final case class ComprehensionGenerator(override val lhs: String, rhs: MonadExpression) extends Generator(lhs) {
+final case class ComprehensionGenerator(var lhs: String, var rhs: MonadExpression) extends Generator {
 }
 
-final case class ScalaExpr(var expr: Expr[Any]) extends Expression {
+final case class ScalaExpr(var env: List[String], var expr: Expr[Any]) extends Expression {
 }
 
-final case class Comprehension(tpe: monad.Monad[Any], head: Expression, qualifiers: List[Qualifier]) extends MonadExpression {
+final case class Comprehension(var tpe: monad.Monad[Any], var head: Expression, var qualifiers: List[Qualifier]) extends MonadExpression {
 }
 
 object Comprehension {
