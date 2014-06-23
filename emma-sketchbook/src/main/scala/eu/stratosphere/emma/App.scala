@@ -32,6 +32,7 @@ object App {
 
         C
       }
+
       println("// dataflow #01")
       df.print()
       println("")
@@ -140,7 +141,7 @@ object App {
         val y = null.asInstanceOf[Int]
 
         val _MC_00002_A = {
-          val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr({
+          val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr("ifmt" :: "dop" :: Nil, {
             val ifmt = new InputFormat[Int]()
             val dop = null.asInstanceOf[Int]
 
@@ -149,7 +150,7 @@ object App {
             }
           }))
 
-          val bind_record = ScalaExprGenerator("record", ScalaExpr({
+          val bind_record = ScalaExprGenerator("record", ScalaExpr("ifmt" :: "bytes" :: Nil, {
             val ifmt = new InputFormat[Int]()
             val bytes = null.asInstanceOf[Seq[Byte]]
 
@@ -158,7 +159,7 @@ object App {
             }
           }))
 
-          val head = ScalaExpr({
+          val head = ScalaExpr("record" :: Nil, {
             val record = null.asInstanceOf[Int]
 
             reify {
@@ -170,7 +171,7 @@ object App {
         }
 
         val _MC_00003_A = {
-          val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr({
+          val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr("ifmt" :: "dop" :: Nil, {
             val ifmt = new InputFormat[Int]()
             val dop = null.asInstanceOf[Int]
 
@@ -179,7 +180,7 @@ object App {
             }
           }))
 
-          val bind_record = ScalaExprGenerator("record", ScalaExpr({
+          val bind_record = ScalaExprGenerator("record", ScalaExpr("ifmt" :: "bytes" :: Nil, {
             val ifmt = new InputFormat[Int]()
             val bytes = null.asInstanceOf[Seq[Byte]]
 
@@ -188,7 +189,7 @@ object App {
             }
           }))
 
-          val head = ScalaExpr({
+          val head = ScalaExpr("record" :: Nil, {
             val record = null.asInstanceOf[Int]
 
             reify {
@@ -203,7 +204,7 @@ object App {
         qualifiers += ComprehensionGenerator("x", _MC_00002_A)
         qualifiers += ComprehensionGenerator("y", _MC_00003_A)
 
-        val head = ScalaExpr(reify {
+        val head = ScalaExpr("y" :: "x" :: Nil, reify {
           (x, y)
         })
 
@@ -211,7 +212,7 @@ object App {
       }
 
       val bind_record = ComprehensionGenerator("record", _MC_00001_B)
-      val head = ScalaExpr({
+      val head = ScalaExpr("ofmt" :: "record" :: Nil, {
         val ofmt = new OutputFormat[(Int, Int)]()
         val record = null.asInstanceOf[(Int, Int)]
 
@@ -246,7 +247,7 @@ object App {
         val x = null.asInstanceOf[Int]
 
         val _MC_00002_A = {
-          val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr({
+          val bind_bytes = ScalaExprGenerator("bytes", ScalaExpr("ifmt" :: "dop" :: Nil, {
             val ifmt = new InputFormat[Int]()
             val dop = null.asInstanceOf[Int]
 
@@ -255,7 +256,7 @@ object App {
             }
           }))
 
-          val bind_record = ScalaExprGenerator("record", ScalaExpr({
+          val bind_record = ScalaExprGenerator("record", ScalaExpr("ifmt" :: "bytes" :: Nil, {
             val ifmt = new InputFormat[Int]()
             val bytes = null.asInstanceOf[Seq[Byte]]
 
@@ -264,7 +265,7 @@ object App {
             }
           }))
 
-          val head = ScalaExpr({
+          val head = ScalaExpr("record" :: Nil, {
             val record = null.asInstanceOf[Int]
 
             reify {
@@ -278,13 +279,13 @@ object App {
         val qualifiers = ListBuffer[Qualifier]()
         qualifiers += ComprehensionGenerator("x", _MC_00002_A)
 
-        val head = ScalaExpr(reify { x })
+        val head = ScalaExpr(Nil, reify { x })
 
         Comprehension(monad.Bag[Int], head, qualifiers.toList)
       }
 
       val bind_record = ComprehensionGenerator("record", _MC_00001_B)
-      val head = ScalaExpr({
+      val head = ScalaExpr("ofmt" :: "record" :: Nil, {
         val ofmt = new OutputFormat[Int]()
         val record = null.asInstanceOf[Int]
 

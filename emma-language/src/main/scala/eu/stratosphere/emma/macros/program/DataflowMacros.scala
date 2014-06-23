@@ -212,7 +212,7 @@ class DataflowMacros(val c: Context) {
       case ComprehensionGenerator(lhs, rhs: MonadExpression) =>
         q"{ val rhs = ${serialize(rhs)}; ComprehensionGenerator(${lhs.toString}, rhs) }"
       case ScalaExpr(env, t) =>
-        q"ScalaExpr({ ..$env; reify { ${freeEnv(t, env)} } })"
+        q"ScalaExpr(${for (v <- env) yield v.name.toString}, { ..$env; reify { ${freeEnv(t, env)} } })"
       case Comprehension(monad, head, qualifiers) =>
         q"""
       {
