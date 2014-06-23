@@ -2,6 +2,7 @@ package eu.stratosphere.emma.macros.program.util
 
 import _root_.eu.stratosphere.emma.macros.program.ContextHolder
 import _root_.eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
+import eu.stratosphere.emma.api.{DataSet, DataBag}
 
 import _root_.scala.collection.mutable.ListBuffer
 import _root_.scala.reflect.macros.blackbox.Context
@@ -11,8 +12,8 @@ trait ProgramUtils[C <: Context] extends ContextHolder[C] with IntermediateRepre
   import c.universe._
 
   val collTypeSymbols = List[Symbol](
-    typeOf[eu.stratosphere.emma.DataBag[_]].typeSymbol,
-    typeOf[eu.stratosphere.emma.DataSet[_]].typeSymbol
+    typeOf[DataBag[_]].typeSymbol,
+    typeOf[DataSet[_]].typeSymbol
   )
 
   /**

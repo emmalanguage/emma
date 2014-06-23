@@ -3,25 +3,24 @@ package eu.stratosphere.emma.macros.program
 import _root_.eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
 import _root_.eu.stratosphere.emma.macros.program.rewrite.MacroRewriteEngine
 import _root_.eu.stratosphere.emma.macros.program.util.{Counter, ProgramUtils}
-import _root_.eu.stratosphere.emma.ir.Dataflow
+import _root_.eu.stratosphere.emma.ir.Workflow
 
 import _root_.scala.collection.mutable.ListBuffer
 import _root_.scala.language.existentials
 import _root_.scala.language.experimental.macros
-import _root_.scala.reflect.macros.blackbox.Context
 
-class DataflowMacros(val c: Context) {
+class WorkflowMacros(val c: scala.reflect.macros.blackbox.Context) {
 
   /**
    * Lifts the root block of an Emma program into a monatic comprehension intermediate representation.
    *
    * @return
    */
-  def dataflow(e: c.Expr[Any]): c.Expr[Dataflow] = {
+  def workflow(e: c.Expr[Any]): c.Expr[Workflow] = {
     new LiftHelper[c.type](c).execute(e)
   }
 
-  private class LiftHelper[C <: Context](val c: C)
+  private class LiftHelper[C <: scala.reflect.macros.blackbox.Context](val c: C)
     extends ContextHolder[c.type]
     with IntermediateRepresentation[c.type]
     with ProgramUtils[c.type]
@@ -39,12 +38,11 @@ class DataflowMacros(val c: Context) {
      *
      * @return
      */
-    def execute(root: Expr[Any]): Expr[Dataflow] = root.tree match {
+    def execute(root: Expr[Any]): Expr[Workflow] = root.tree match {
       case _: Block =>
         c.Expr(liftRootBlock(root.tree.asInstanceOf[Block]))
       case _ =>
         c.abort(c.enclosingPosition, "Emma programs may consist only of term expressions")
-
     }
 
     /**
@@ -71,8 +69,8 @@ class DataflowMacros(val c: Context) {
         stats += q"sinks += ${serialize(rewrite(s).expr)}"
       }
 
-      // construct and return a block that returns a Dataflow using the above list of sinks
-      Block(stats.toList, c.parse( """Dataflow("Emma Dataflow", sinks.toList)"""))
+      // construct and return a block that returns a Workflow using the above list of sinks
+      Block(stats.toList, c.parse( """Workflow("Emma Workflow", sinks.toList)"""))
     }
 
     /**

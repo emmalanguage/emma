@@ -1,4 +1,4 @@
-package eu.stratosphere.emma
+package eu.stratosphere.emma.api
 
 //TODO: as abstract class
 class InputFormat[T] {

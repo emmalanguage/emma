@@ -11,11 +11,11 @@ package object ir {
   // Base traits and classes.
   // ---------------------------------------------------
 
-  final class Dataflow(val name: String, val sinks: List[Comprehension]) {
+  final class Workflow(val name: String, val sinks: List[Comprehension]) {
   }
 
-  object Dataflow {
-    def apply(name: String, sinks: List[Comprehension]): Dataflow = new Dataflow(name, sinks)
+  object Workflow {
+    def apply(name: String, sinks: List[Comprehension]): Workflow = new Workflow(name, sinks)
   }
 
   case class ExpressionRoot(var expr: Expression)
@@ -112,10 +112,10 @@ package object ir {
   }
 
   /**
-   * Pretty-print a dataflow.
+   * Pretty-print a workflow.
    *
-   * @param df The dataflow to print.
+   * @param df The workflow to print.
    * @return
    */
-  def prettyprint(df: Dataflow): Unit = for (sink <- df.sinks) prettyprint(sink)
+  def prettyprint(df: Workflow): Unit = for (sink <- df.sinks) prettyprint(sink)
 }
