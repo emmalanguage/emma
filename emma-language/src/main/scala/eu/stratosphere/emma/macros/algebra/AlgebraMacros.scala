@@ -1,10 +1,12 @@
 package eu.stratosphere.emma.macros.algebra
 
-import _root_.scala.language.existentials
-import _root_.scala.language.experimental.macros
-import _root_.scala.reflect.macros.blackbox.Context
-import _root_.eu.stratosphere.emma._
+import eu.stratosphere.emma.api.{DataBag}
 
+import scala.language.existentials
+import scala.language.experimental.macros
+import scala.reflect.macros.blackbox.Context
+
+// TODO: remove
 class AlgebraMacros(val c: Context) {
 
   import c.universe._
@@ -25,9 +27,9 @@ class AlgebraMacros(val c: Context) {
     c.Expr[DataBag[T]](tree)
   }
 
-  def distinct[T](in: c.Expr[DataBag[T]]): c.Expr[DataSet[T]] = {
+  def distinct[T](in: c.Expr[DataBag[T]]): c.Expr[DataBag[T]] = {
     val tree = q"$in.distinct()"
-    c.Expr[DataSet[T]](tree)
+    c.Expr[DataBag[T]](tree)
   }
 
   // cross
@@ -57,23 +59,6 @@ class AlgebraMacros(val c: Context) {
     val rhs = replaceVparams(k2.tree.asInstanceOf[Function], List[ValDef](q"val i2: T2".asInstanceOf[ValDef])).body
     val tree = q"for (i1 <- $in1; i2 <- $in2; if $lhs == $rhs) yield (i1, i2)"
     c.Expr[DataBag[(T1, T2)]](tree)
-  }
-
-  // grouping: for (x <- in) yield for (i <- in; if k(i) == k(x)) yield i
-  def groupBy[T, K](k: c.Expr[T => K])(in: c.Expr[DataBag[T]]): c.Expr[DataSet[DataBag[T]]] = {
-    val lhs = replaceVparams(k.tree.asInstanceOf[Function], List[ValDef](q"val i: T".asInstanceOf[ValDef])).body
-    val rhs = replaceVparams(k.tree.asInstanceOf[Function], List[ValDef](q"val x: T".asInstanceOf[ValDef])).body
-    val tree = q"(for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i).distinct()"
-    c.Expr[DataSet[DataBag[T]]](tree)
-  }
-
-  // grouping: for (x <- in) yield for (i <- in; if k(i) == k(x)) yield i
-  def groupByMethod[T, K](k: c.Expr[T => K]): c.Expr[DataSet[DataBag[T]]] = {
-    val in = c.prefix.tree
-    val lhs = replaceVparams(k.tree.asInstanceOf[Function], List[ValDef](q"val i: T".asInstanceOf[ValDef])).body
-    val rhs = replaceVparams(k.tree.asInstanceOf[Function], List[ValDef](q"val x: T".asInstanceOf[ValDef])).body
-    val tree = q"(for (x <- $in) yield for (i <- $in; if $lhs == $rhs) yield i).distinct()"
-    c.Expr[DataSet[DataBag[T]]](tree)
   }
 
   // ---------------------------------------------------
