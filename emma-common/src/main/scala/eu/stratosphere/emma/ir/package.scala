@@ -52,7 +52,7 @@ package object ir {
   final case class ComprehensionGenerator(var lhs: String, var rhs: MonadExpression) extends Generator {
   }
 
-  final case class ScalaExpr(var env: List[String], var expr: Expr[Any]) extends Expression {
+  final case class ScalaExpr(var freeVars: List[String], var expr: Expr[Any]) extends Expression {
   }
 
   final case class Comprehension(var tpe: monad.Monad[Any], var head: Expression, var qualifiers: List[Qualifier]) extends MonadExpression {

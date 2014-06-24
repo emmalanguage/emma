@@ -2,6 +2,7 @@ package eu.stratosphere.emma.macros.program.util
 
 import _root_.eu.stratosphere.emma.macros.program.ContextHolder
 import _root_.eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
+
 import _root_.scala.collection.mutable.ListBuffer
 import _root_.scala.reflect.macros.blackbox.Context
 
@@ -74,7 +75,21 @@ trait ProgramUtils[C <: Context] extends ContextHolder[C] with IntermediateRepre
    * @return
    */
   def freeEnv(tree: Tree, env: List[ValDef]) = {
-    new VparamsRelacer(env zip env).transform(tree)
+    new IdentReplacer(env).transform(tree)
+  }
+
+  /**
+   * Filter all environment entries referenced at least once in a given given tree.
+   *
+   * @param tree The tree to be checked
+   * @param env An environment consisting of a list of ValDefs.
+   * @return
+   */
+  def referencedEnv(tree: Tree, env: List[ValDef]) = {
+    val checker = new IdentChecker(env)
+    checker.traverse(tree)
+    val result = env.filter(x => checker.referenced.contains(x.name))
+    result
   }
 
   /**
@@ -117,7 +132,6 @@ trait ProgramUtils[C <: Context] extends ContextHolder[C] with IntermediateRepre
   // ---------------------------------------------------
 
   private class DependencyTermExtractor(val scope: Tree, val term: TermTree) extends Traverser {
-
     val result = ListBuffer[(TermTree, Option[TermName])]()
 
     override def traverse(tree: Tree): Unit = {
@@ -134,21 +148,27 @@ trait ProgramUtils[C <: Context] extends ContextHolder[C] with IntermediateRepre
     }
   }
 
-  private class VparamsRelacer(valdefs: List[(ValDef, ValDef)]) extends Transformer {
-
-    val defsmap = Map() ++ {
-      for (v <- valdefs) yield
-        (v._1.name, v)
-    }
+  private class IdentReplacer(valdefs: List[ValDef]) extends Transformer {
+    val defsmap = (for (v <- valdefs) yield v.name).toSet
 
     override def transform(tree: Tree): Tree = tree match {
       case ident@Ident(name: TermName) =>
         if (defsmap.contains(name))
-          Ident(defsmap(name)._2.name)
+          Ident(name)
         else
           ident
       case _ =>
         super.transform(tree)
+    }
+  }
+
+  private class IdentChecker(valdefs: List[ValDef]) extends Traverser {
+    val defsmap = (for (v <- valdefs) yield v.name).toSet
+    var referenced = Set[TermName]()
+
+    override def traverse(tree: Tree): Unit = tree match {
+      case ident@Ident(name: TermName) => referenced = referenced + name
+      case _ => super.traverse(tree)
     }
   }
 
