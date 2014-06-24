@@ -2,8 +2,8 @@ package eu.stratosphere.emma.macros.program
 
 import _root_.eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
 import _root_.eu.stratosphere.emma.macros.program.rewrite.MacroRewriteEngine
-import _root_.eu.stratosphere.emma.mc.Dataflow
-import eu.stratosphere.emma.macros.program.util.{Counter, ProgramUtils}
+import _root_.eu.stratosphere.emma.macros.program.util.{Counter, ProgramUtils}
+import _root_.eu.stratosphere.emma.ir.Dataflow
 
 import _root_.scala.collection.mutable.ListBuffer
 import _root_.scala.language.existentials
@@ -34,7 +34,7 @@ class DataflowMacros(val c: Context) {
     var tmpCount = new Counter()
 
     /**
-     * Lifts the root block of an Emma program into a monatic comprehension intermediate representation.
+     * Lifts the root block of an Emma program into an intermediate representation.
      *
      * @return
      */
@@ -60,7 +60,7 @@ class DataflowMacros(val c: Context) {
       // a list of statements for the root block of the translated MC expression
       val stats = ListBuffer[Tree]()
       // 1) add required imports
-      stats += c.parse("import _root_.eu.stratosphere.emma.mc._")
+      stats += c.parse("import _root_.eu.stratosphere.emma.ir._")
       stats += c.parse("import _root_.scala.collection.mutable.ListBuffer")
       stats += c.parse("import _root_.scala.reflect.runtime.universe._")
       // 2) initialize translated sinks list
@@ -195,7 +195,7 @@ class DataflowMacros(val c: Context) {
     // ---------------------------------------------------
 
     /**
-     * Serializes the IR tree as a program constructing an equivalent tree of eu.stratosphere.emma.mc.* nodes.
+     * Serializes a macro-level IR tree as code constructing an equivalent runtime-level IR tree.
      *
      * @param e The expression in IR to be serialized.
      * @return

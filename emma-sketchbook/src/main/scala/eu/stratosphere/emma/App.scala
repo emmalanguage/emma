@@ -1,5 +1,10 @@
 package eu.stratosphere.emma
 
+import _root_.eu.stratosphere.emma.ir._
+
+import _root_.scala.collection.mutable.ListBuffer
+import _root_.scala.reflect.runtime.universe._
+
 object App {
 
   case class Person(age: Int, children: Int, name: String, surname: String)
@@ -10,7 +15,7 @@ object App {
     {
       val df = reference01()
       println("// reference dataflow #01")
-      df.print()
+      prettyprint(df)
       println("")
     }
 
@@ -18,7 +23,7 @@ object App {
     {
       val df = reference02()
       println("// reference dataflow #02")
-      df.print()
+      prettyprint(df)
       println("")
     }
 
@@ -34,7 +39,7 @@ object App {
       }
 
       println("// dataflow #01")
-      df.print()
+      prettyprint(df)
       println("")
     }
 
@@ -51,7 +56,7 @@ object App {
         C
       }
       println("// dataflow #02")
-      df.print()
+      prettyprint(df)
       println("")
     }
 
@@ -68,7 +73,7 @@ object App {
         C
       }
       println("// dataflow #03")
-      df.print()
+      prettyprint(df)
       println("")
     }
 
@@ -85,7 +90,7 @@ object App {
         C
       }
       println("// dataflow #04")
-      df.print()
+      prettyprint(df)
       println("")
     }
 
@@ -94,14 +99,16 @@ object App {
     {
       val df = dataflow {
         val A = read("file:///tmp/emma/people.csv", new InputFormat[Person])
-        val B = distinct { A.map(x => x.surname).distinct() }
+        val B = distinct {
+          A.map(x => x.surname).distinct()
+        }
         val C = write("file:///tmp/emma/result.csv", new OutputFormat[String])(B)
 
         C
       }
 
       println("// dataflow #05")
-      df.print()
+      prettyprint(df)
       println("")
     }
 
@@ -117,7 +124,7 @@ object App {
       }
 
       println("// dataflow #06")
-      df.print()
+      prettyprint(df)
       println("")
     }
   }
@@ -128,10 +135,6 @@ object App {
    * @return
    */
   private def reference01() = {
-
-    import _root_.eu.stratosphere.emma.mc._
-    import _root_.scala.collection.mutable.ListBuffer
-    import _root_.scala.reflect.runtime.universe._
 
     val sinks = ListBuffer[Comprehension]()
 
@@ -167,7 +170,7 @@ object App {
             }
           })
 
-          Comprehension(monad.Bag[Int], head, bind_bytes, bind_record)
+          new Comprehension(monad.Bag[Int], head, bind_bytes :: bind_record :: Nil)
         }
 
         val _MC_00003_A = {
@@ -197,7 +200,7 @@ object App {
             }
           })
 
-          Comprehension(monad.Bag[Int], head, bind_bytes, bind_record)
+          Comprehension(monad.Bag[Int], head, bind_bytes :: bind_record :: Nil)
         }
 
         val qualifiers = ListBuffer[Qualifier]()
@@ -221,7 +224,7 @@ object App {
         }
       })
 
-      Comprehension(monad.All, head, bind_record)
+      Comprehension(monad.All, head, bind_record :: Nil)
     }
 
     sinks += _MC_00000_C
@@ -234,11 +237,7 @@ object App {
    *
    * @return
    */
-  private def reference02() = {
-
-    import _root_.eu.stratosphere.emma.mc._
-    import _root_.scala.collection.mutable.ListBuffer
-    import _root_.scala.reflect.runtime.universe._
+  private def reference02(): Dataflow = {
 
     val sinks = ListBuffer[Comprehension]()
 
@@ -273,13 +272,15 @@ object App {
             }
           })
 
-          Comprehension(monad.Bag[Int], head, bind_bytes, bind_record)
+          Comprehension(monad.Bag[Int], head, bind_bytes :: bind_record :: Nil)
         }
 
         val qualifiers = ListBuffer[Qualifier]()
         qualifiers += ComprehensionGenerator("x", _MC_00002_A)
 
-        val head = ScalaExpr(Nil, reify { x })
+        val head = ScalaExpr(Nil, reify {
+          x
+        })
 
         Comprehension(monad.Bag[Int], head, qualifiers.toList)
       }
@@ -294,7 +295,7 @@ object App {
         }
       })
 
-      Comprehension(monad.All, head, bind_record)
+      Comprehension(monad.All, head, bind_record :: Nil)
     }
 
     sinks += _MC_00000_C
