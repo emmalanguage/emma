@@ -15,7 +15,7 @@ trait MacroRewriteEngine[C <: Context]
 
   import c.universe._
 
-  val rules: List[Rule] = List(UnnestHead, UnnestGenerator)
+  val rules: List[Rule] = List(SimplifyTupleProjection, UnnestHead, UnnestGenerator)
 
   object UnnestGenerator extends Rule {
 
@@ -86,6 +86,79 @@ trait MacroRewriteEngine[C <: Context]
       m.parent.monad = m.child.monad
       r.expr = substitute(r.expr, m.join, m.parent)
     }
+  }
+
+  object SimplifyTupleProjection extends Rule {
+
+    val projectionPattern = "_(\\d{1,2})".r
+
+    case class RuleMatch(expr: ScalaExpr)
+
+    override protected def bind(r: ExpressionRoot) = new Traversable[RuleMatch] {
+      override def foreach[U](f: (RuleMatch) => U) = {
+        for (x <- sequence(r.expr)) x match {
+          case expr@ScalaExpr(_, _) =>
+            f(RuleMatch(expr))
+          case _ =>
+            Unit
+        }
+      }
+    }
+
+    override protected def guard(r: ExpressionRoot, m: RuleMatch) = containsPattern(m.expr.tree)
+
+    override protected def fire(r: ExpressionRoot, m: RuleMatch) = {
+      m.expr.tree = simplify(m.expr.tree)
+    }
+
+    object containsPattern extends Traverser with (Tree => Boolean) {
+
+      var result = false
+
+      override def traverse(tree: Tree): Unit = tree match {
+        case Select(Apply(TypeApply(Select(tuple@Select(Ident(TermName("scala")), _), TermName("apply")), types), args), TermName(_)) =>
+          val isTupleConstructor = tuple.name.toString.startsWith("Tuple") && tuple.symbol.isModule && tuple.symbol.companion.asClass.baseClasses.contains(symbolOf[Product])
+          val isProjectionMethod = tree.symbol.isMethod && projectionPattern.findFirstIn(tree.symbol.name.toString).isDefined
+          if (isTupleConstructor && isProjectionMethod) {
+            result = true
+          } else {
+            super.traverse(tree)
+          }
+        case _ =>
+          super.traverse(tree)
+      }
+
+      override def apply(tree: Tree): Boolean = {
+        containsPattern.result = false
+        containsPattern.traverse(tree)
+        containsPattern.result
+      }
+    }
+
+    object simplify extends Transformer with (Tree => Tree) {
+
+      var result = false
+
+      override def transform(tree: Tree): Tree = tree match {
+        case Select(Apply(TypeApply(Select(tuple@Select(Ident(TermName("scala")), _), TermName("apply")), types), args), TermName(_)) =>
+          val isTupleConstructor = tuple.name.toString.startsWith("Tuple") && tuple.symbol.isModule && tuple.symbol.companion.asClass.baseClasses.contains(symbolOf[Product])
+          val projectionMatch = projectionPattern.findFirstMatchIn(tree.symbol.name.toString)
+          if (isTupleConstructor && tree.symbol.isMethod && projectionMatch.isDefined) {
+            val offset = projectionMatch.get.group(1).toInt
+            if (args.size >= offset && types.size >= offset)
+              q"${args(offset - 1)}"
+            else
+              super.transform(tree)
+          } else {
+            super.transform(tree)
+          }
+        case _ =>
+          super.transform(tree)
+      }
+
+      override def apply(tree: Tree): Tree = transform(tree)
+    }
+
   }
 
 }
