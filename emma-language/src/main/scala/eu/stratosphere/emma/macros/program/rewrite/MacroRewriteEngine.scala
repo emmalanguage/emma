@@ -3,36 +3,19 @@ package eu.stratosphere.emma.macros.program.rewrite
 import _root_.eu.stratosphere.emma.macros.program.ContextHolder
 import _root_.eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
 import _root_.eu.stratosphere.emma.macros.program.util.ProgramUtils
+import _root_.eu.stratosphere.emma.rewrite.RewriteEngine
+
 import _root_.scala.reflect.macros.blackbox.Context
 
-trait RewriteEngine[C <: Context] extends ContextHolder[C] with IntermediateRepresentation[C] with ProgramUtils[C] {
+trait MacroRewriteEngine[C <: Context]
+  extends ContextHolder[C]
+  with IntermediateRepresentation[C]
+  with ProgramUtils[C]
+  with RewriteEngine {
 
   import c.universe._
 
   val rules: List[Rule] = List(UnnestHead, UnnestGenerator)
-
-  def rewrite(root: ExpressionRoot): ExpressionRoot = {
-    while ((for (r <- rules) yield r.apply(root)).fold(false)(_ || _)) {} // apply rules while possible
-    root
-  }
-
-  abstract class Rule {
-
-    type RuleMatch
-
-    protected def bind(r: ExpressionRoot): Traversable[RuleMatch]
-
-    protected def guard(r: ExpressionRoot, m: RuleMatch): Boolean
-
-    protected def fire(r: ExpressionRoot, m: RuleMatch): Unit
-
-    final def apply(e: ExpressionRoot) =
-      (for (m <- bind(e)) yield // for each match
-        if (guard(e, m)) // fire rule and return true if guard passes
-          (fire(e, m) -> true)._2
-        else // don't fire rule and return false otherwise
-          false).fold(false)(_ || _) // compute if fired rule exists
-  }
 
   object UnnestGenerator extends Rule {
 

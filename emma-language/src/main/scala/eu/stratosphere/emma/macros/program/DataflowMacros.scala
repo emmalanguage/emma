@@ -1,7 +1,7 @@
 package eu.stratosphere.emma.macros.program
 
 import _root_.eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
-import _root_.eu.stratosphere.emma.macros.program.rewrite.RewriteEngine
+import _root_.eu.stratosphere.emma.macros.program.rewrite.MacroRewriteEngine
 import _root_.eu.stratosphere.emma.mc.Dataflow
 import eu.stratosphere.emma.macros.program.util.{Counter, ProgramUtils}
 
@@ -25,7 +25,7 @@ class DataflowMacros(val c: Context) {
     extends ContextHolder[c.type]
     with IntermediateRepresentation[c.type]
     with ProgramUtils[c.type]
-    with RewriteEngine[c.type] {
+    with MacroRewriteEngine[c.type] {
 
     import c.universe._
 
