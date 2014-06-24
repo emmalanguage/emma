@@ -5,7 +5,7 @@ import _root_.eu.stratosphere.emma.macros.program.ContextHolder
 import _root_.scala.reflect.macros.blackbox.Context
 
 /**
- * Compile-time mirror of eu.stratosphere.emma.mc.* used in the macro implementations.
+ * Mirror of eu.stratosphere.emma.ir.* used in the macro implementations.
  */
 trait IntermediateRepresentation[C <: Context] extends ContextHolder[C] {
 
@@ -13,10 +13,10 @@ trait IntermediateRepresentation[C <: Context] extends ContextHolder[C] {
 
   case class ExpressionRoot(var expr: Expression)
 
-  abstract class Expression() {
+  trait Expression {
   }
 
-  abstract class MonadExpression() extends Expression {
+  trait MonadExpression extends Expression {
   }
 
   case class MonadJoin(var expr: MonadExpression) extends MonadExpression {
@@ -25,19 +25,20 @@ trait IntermediateRepresentation[C <: Context] extends ContextHolder[C] {
   case class MonadUnit(var expr: MonadExpression) extends MonadExpression {
   }
 
-  abstract class Qualifier extends Expression {
+  trait Qualifier extends Expression {
   }
 
   case class Filter(var expr: Expression) extends Qualifier {
   }
 
-  abstract class Generator(val lhs: TermName) extends Qualifier {
+  trait Generator extends Qualifier {
+    var lhs: TermName
   }
 
-  case class ScalaExprGenerator(override val lhs: TermName, var rhs: ScalaExpr) extends Generator(lhs) {
+  case class ScalaExprGenerator(var lhs: TermName, var rhs: ScalaExpr) extends Generator {
   }
 
-  case class ComprehensionGenerator(override val lhs: TermName, var rhs: MonadExpression) extends Generator(lhs) {
+  case class ComprehensionGenerator(var lhs: TermName, var rhs: MonadExpression) extends Generator {
   }
 
   case class ScalaExpr(var env: List[ValDef], var tree: Tree) extends Expression {
@@ -46,6 +47,16 @@ trait IntermediateRepresentation[C <: Context] extends ContextHolder[C] {
   case class Comprehension(var monad: Tree, var head: Expression, var qualifiers: List[Qualifier]) extends MonadExpression {
   }
 
+  // ---------------------------------------------------
+  // Helper methods.
+  // ---------------------------------------------------
+
+  /**
+   * Construct a list containing the nodes of an IR tree using depth-first, bottom-up traversal.
+   *
+   * @param root The root of the traversed tree.
+   * @return
+   */
   def sequence(root: Expression): List[Expression] = root match {
     case MonadUnit(expr) => sequence(expr) ++ List(root)
     case MonadJoin(expr) => sequence(expr) ++ List(root)

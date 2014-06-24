@@ -1,9 +1,9 @@
 package eu.stratosphere
 
-import emma.mc.Dataflow
-import emma.macros.utility.UtilMacros
-import emma.macros.algebra.AlgebraMacros
-import emma.macros.program.DataflowMacros
+import _root_.eu.stratosphere.emma.ir.Dataflow
+import _root_.eu.stratosphere.emma.macros.utility.UtilMacros
+import _root_.eu.stratosphere.emma.macros.algebra.AlgebraMacros
+import _root_.eu.stratosphere.emma.macros.program.DataflowMacros
 
 /**
  * This is e playground specification of e function-oriented algebra for the Emma language. The following

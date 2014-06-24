@@ -1,4 +1,4 @@
-package eu.stratosphere.emma.mc
+package eu.stratosphere.emma.ir
 
 package object monad {
 
