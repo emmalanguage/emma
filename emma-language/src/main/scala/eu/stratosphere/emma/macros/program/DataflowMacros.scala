@@ -29,9 +29,10 @@ class DataflowMacros(val c: Context) {
 
     import c.universe._
 
+    val emmaModule = rootMirror.staticModule("eu.stratosphere.emma.package")
     val srcCount = new Counter()
-    var snkCount = new Counter()
-    var tmpCount = new Counter()
+    val snkCount = new Counter()
+    val tmpCount = new Counter()
 
     /**
      * Lifts the root block of an Emma program into an intermediate representation.
@@ -154,7 +155,7 @@ class DataflowMacros(val c: Context) {
           child
 
         // write[T](location, ofmt)(in)
-        case Apply(Apply(TypeApply(q"emma.this.`package`.write", List(inTpe)), location :: ofmt :: Nil), List(in: Tree)) =>
+        case Apply(Apply(TypeApply(PackageMethod("write"), List(inTpe)), location :: ofmt :: Nil), List(in: Tree)) => Some((inTpe, location, ofmt, in))
           val recordID = nextTermName("snk$record$", snkCount)
 
           val vd_ofmt = q"val ofmt = $ofmt".asInstanceOf[ValDef]
@@ -167,7 +168,7 @@ class DataflowMacros(val c: Context) {
           Comprehension(q"monad.All", head, bind_record :: Nil)
 
         // read[T](location, ifmt)
-        case Apply(TypeApply(q"emma.this.`package`.read", List(outTpe)), location :: ifmt :: Nil) =>
+        case Apply(TypeApply(PackageMethod("read"), List(outTpe)), location :: ifmt :: Nil) =>
           val bytesID = nextTermName("src$bytes$", srcCount.advance)
           val recordID = nextTermName("src$record$", srcCount)
 
@@ -195,12 +196,22 @@ class DataflowMacros(val c: Context) {
     // ---------------------------------------------------
 
     /**
+     * Custom matcher for eu.stratosphere.emma.package.* method applications.
+     */
+    private object PackageMethod {
+      def unapply(t: Tree): Option[String] = t match {
+        case Select(quantifier, TermName(method)) => if (quantifier.symbol == emmaModule) Some(method) else None
+        case _ => None
+      }
+    }
+
+    /**
      * Serializes a macro-level IR tree as code constructing an equivalent runtime-level IR tree.
      *
      * @param e The expression in IR to be serialized.
      * @return
      */
-    def serialize(e: Expression): Tree = e match {
+    private def serialize(e: Expression): Tree = e match {
       case MonadUnit(expr) =>
         q"MonadUnit(${serialize(expr)})"
       case MonadJoin(expr) =>
@@ -215,18 +226,18 @@ class DataflowMacros(val c: Context) {
         q"ScalaExpr(${for (v <- referencedEnv(t, env)) yield v.name.toString}, { ..${referencedEnv(t, env)}; reify { ${freeEnv(t, env)} } })"
       case Comprehension(monad, head, qualifiers) =>
         q"""
-      {
-        // MC qualifiers
-        val qualifiers = ListBuffer[Qualifier]()
-        ..${for (q <- qualifiers) yield q"qualifiers += ${serialize(q)}"}
+        {
+          // MC qualifiers
+          val qualifiers = ListBuffer[Qualifier]()
+          ..${for (q <- qualifiers) yield q"qualifiers += ${serialize(q)}"}
 
-        // MC head
-        val head = ${serialize(head)}
+          // MC head
+          val head = ${serialize(head)}
 
-        // MC constructor
-        Comprehension($monad, head, qualifiers.toList)
-      }
-       """
+          // MC constructor
+          Comprehension($monad, head, qualifiers.toList)
+        }
+         """
     }
 
     /**
