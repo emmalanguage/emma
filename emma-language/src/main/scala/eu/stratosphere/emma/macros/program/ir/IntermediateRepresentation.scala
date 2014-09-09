@@ -1,8 +1,8 @@
 package eu.stratosphere.emma.macros.program.ir
 
-import _root_.eu.stratosphere.emma.macros.program.ContextHolder
+import eu.stratosphere.emma.macros.program.ContextHolder
 
-import _root_.scala.reflect.macros.blackbox.Context
+import scala.reflect.macros.blackbox.Context
 
 /**
  * Mirror of eu.stratosphere.emma.ir.* used in the macro implementations.

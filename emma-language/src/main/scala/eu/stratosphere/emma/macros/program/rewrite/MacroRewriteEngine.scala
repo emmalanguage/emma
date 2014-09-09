@@ -1,11 +1,11 @@
 package eu.stratosphere.emma.macros.program.rewrite
 
-import _root_.eu.stratosphere.emma.macros.program.ContextHolder
-import _root_.eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
-import _root_.eu.stratosphere.emma.macros.program.util.ProgramUtils
-import _root_.eu.stratosphere.emma.rewrite.RewriteEngine
+import eu.stratosphere.emma.macros.program.ContextHolder
+import eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
+import eu.stratosphere.emma.macros.program.util.ProgramUtils
+import eu.stratosphere.emma.rewrite.RewriteEngine
 
-import _root_.scala.reflect.macros.blackbox.Context
+import scala.reflect.macros.blackbox.Context
 
 trait MacroRewriteEngine[C <: Context]
   extends ContextHolder[C]
