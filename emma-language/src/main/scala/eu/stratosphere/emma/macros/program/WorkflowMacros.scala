@@ -1,13 +1,13 @@
 package eu.stratosphere.emma.macros.program
 
-import _root_.eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
-import _root_.eu.stratosphere.emma.macros.program.rewrite.MacroRewriteEngine
-import _root_.eu.stratosphere.emma.macros.program.util.{Counter, ProgramUtils}
-import _root_.eu.stratosphere.emma.ir.Workflow
+import eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
+import eu.stratosphere.emma.macros.program.rewrite.MacroRewriteEngine
+import eu.stratosphere.emma.macros.program.util.{Counter, ProgramUtils}
+import eu.stratosphere.emma.ir.Workflow
 
-import _root_.scala.collection.mutable.ListBuffer
-import _root_.scala.language.existentials
-import _root_.scala.language.experimental.macros
+import scala.collection.mutable.ListBuffer
+import scala.language.existentials
+import scala.language.experimental.macros
 
 class WorkflowMacros(val c: scala.reflect.macros.blackbox.Context) {
 
@@ -59,9 +59,9 @@ class WorkflowMacros(val c: scala.reflect.macros.blackbox.Context) {
       // a list of statements for the root block of the translated MC expression
       val stats = ListBuffer[Tree]()
       // 1) add required imports
-      stats += c.parse("import _root_.eu.stratosphere.emma.ir._")
-      stats += c.parse("import _root_.scala.collection.mutable.ListBuffer")
-      stats += c.parse("import _root_.scala.reflect.runtime.universe._")
+      stats += c.parse("import eu.stratosphere.emma.ir._")
+      stats += c.parse("import scala.collection.mutable.ListBuffer")
+      stats += c.parse("import scala.reflect.runtime.universe._")
       // 2) initialize translated sinks list
       stats += c.parse("val sinks = ListBuffer[Comprehension]()")
       // 3) add the translated MC expressions for all sinks
