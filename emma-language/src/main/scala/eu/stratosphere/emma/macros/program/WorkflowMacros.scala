@@ -1,13 +1,17 @@
 package eu.stratosphere.emma.macros.program
 
-import eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
+
+import eu.stratosphere.emma.api.Algorithm
+import eu.stratosphere.emma.ir.Workflow
+import eu.stratosphere.emma.macros.program.controlflow.ControlFlow
+import eu.stratosphere.emma.macros.program.dataflow.IntermediateRepresentation
 import eu.stratosphere.emma.macros.program.rewrite.MacroRewriteEngine
 import eu.stratosphere.emma.macros.program.util.{Counter, ProgramUtils}
-import eu.stratosphere.emma.ir.Workflow
 
 import scala.collection.mutable.ListBuffer
 import scala.language.existentials
 import scala.language.experimental.macros
+
 
 class WorkflowMacros(val c: scala.reflect.macros.blackbox.Context) {
 
@@ -20,18 +24,86 @@ class WorkflowMacros(val c: scala.reflect.macros.blackbox.Context) {
     new LiftHelper[c.type](c).execute(e)
   }
 
+  /**
+   * Entry macro for emma algorithms.
+   */
+  def parallelize[T: c.WeakTypeTag](e: c.Expr[T]): c.Expr[Algorithm[T]] = {
+    new LiftHelper[c.type](c).parallelize[T](e)
+  }
+
   private class LiftHelper[C <: scala.reflect.macros.blackbox.Context](val c: C)
     extends ContextHolder[c.type]
-    with IntermediateRepresentation[c.type]
     with ProgramUtils[c.type]
+    with ControlFlow[c.type]
+    with IntermediateRepresentation[c.type]
     with MacroRewriteEngine[c.type] {
 
     import c.universe._
 
-    val emmaModule = rootMirror.staticModule("eu.stratosphere.emma.package")
+    val apiModule = rootMirror.staticModule("eu.stratosphere.emma.api.package")
     val srcCount = new Counter()
     val snkCount = new Counter()
-    val tmpCount = new Counter()
+    val loopCount = new Counter()
+
+    /**
+     * Translates an Emma expression to an Algorithm.
+     *
+     * @return
+     */
+    def parallelize[T: c.WeakTypeTag](root: Expr[T]): Expr[Algorithm[T]] = {
+
+      val rootTree = c.untypecheck(root.tree)
+
+      // ----------------------------------------------------------------------
+      // Code analysis
+      // ----------------------------------------------------------------------
+
+      // 1. Create control flow graph
+      val cfGraph = createCFG(rootTree)
+
+      // 2. Identify and isolate maximal comprehensions (TODO)
+
+      // 3. Analyze variable usage
+
+      // ----------------------------------------------------------------------
+      // Code optimizations
+      // ----------------------------------------------------------------------
+
+      // 1. Comprehension rewrite (TODO)
+
+      // 2. Derive logical plans (TODO)
+
+      // ----------------------------------------------------------------------
+      // Final object assembly
+      // ----------------------------------------------------------------------
+
+      // construct algorithm object
+      val algorithmCode =
+        q"""
+        object __emmaAlgorithm extends eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
+
+           // required imports
+           import eu.stratosphere.emma.api._
+           import eu.stratosphere.emma.ir
+
+           def run(engine: runtime.Engine): ${c.weakTypeOf[T]} = engine match {
+             case runtime.Native => runNative()
+             case _ => runParallel(engine)
+           }
+
+           private def runNative(): ${c.weakTypeOf[T]} = $rootTree
+
+           private def runParallel(engine: runtime.Engine): ${c.weakTypeOf[T]} = { ..${compileDriver[T](cfGraph)} }
+        }
+        """
+
+      // algorithm driver (original algorithm)
+      // def run(): ${c.weakTypeOf[T]} = ${root.tree}
+
+      // construct and return a block that returns a Workflow using the above list of sinks
+      val block = Block(List(algorithmCode), c.parse("__emmaAlgorithm"))
+      c.Expr[Algorithm[T]](c.typecheck(block))
+    }
 
     /**
      * Lifts the root block of an Emma program into an intermediate representation.
@@ -194,16 +266,6 @@ class WorkflowMacros(val c: scala.reflect.macros.blackbox.Context) {
     // ---------------------------------------------------
 
     /**
-     * Custom matcher for eu.stratosphere.emma.package.* method applications.
-     */
-    private object PackageMethod {
-      def unapply(t: Tree): Option[String] = t match {
-        case Select(quantifier, TermName(method)) => if (quantifier.symbol == emmaModule) Some(method) else None
-        case _ => None
-      }
-    }
-
-    /**
      * Serializes a macro-level IR tree as code constructing an equivalent runtime-level IR tree.
      *
      * @param e The expression in IR to be serialized.
@@ -246,6 +308,16 @@ class WorkflowMacros(val c: scala.reflect.macros.blackbox.Context) {
      * @return
      */
     private def nextTermName(prefix: String, counter: Counter) = TermName(f"${prefix}${counter.get}")
+
+    /**
+     * Custom matcher for eu.stratosphere.emma.package.* method applications.
+     */
+    private object PackageMethod {
+      def unapply(t: Tree): Option[String] = t match {
+        case Select(quantifier, TermName(method)) => if (quantifier.symbol == apiModule) Some(method) else None
+        case _ => None
+      }
+    }
 
   }
 

@@ -26,6 +26,7 @@
         <!-- Scala -->
         <scala.version>2.11.0</scala.version>
         <scala.tools.version>2.11</scala.tools.version>
+        <scala.graph-core.version>1.9.0</scala.graph-core.version>
 
         <!-- Testing -->
         <junit.version>4.11</junit.version>
@@ -63,6 +64,11 @@
                 <groupId>org.scala-lang</groupId>
                 <artifactId>scala-reflect</artifactId>
                 <version>${scala.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.assembla.scala-incubator</groupId>
+                <artifactId>graph-core_${scala.tools.version}</artifactId>
+                <version>${scala.graph-core.version}</version>
             </dependency>
 
             <!-- Emma -->
