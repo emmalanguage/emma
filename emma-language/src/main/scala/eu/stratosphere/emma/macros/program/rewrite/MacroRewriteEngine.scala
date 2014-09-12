@@ -1,7 +1,7 @@
 package eu.stratosphere.emma.macros.program.rewrite
 
 import eu.stratosphere.emma.macros.program.ContextHolder
-import eu.stratosphere.emma.macros.program.ir.IntermediateRepresentation
+import eu.stratosphere.emma.macros.program.dataflow.IntermediateRepresentation
 import eu.stratosphere.emma.macros.program.util.ProgramUtils
 import eu.stratosphere.emma.rewrite.RewriteEngine
 

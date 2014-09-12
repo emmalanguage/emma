@@ -1,4 +1,4 @@
-package eu.stratosphere.emma.macros.program.ir
+package eu.stratosphere.emma.macros.program.dataflow
 
 import eu.stratosphere.emma.macros.program.ContextHolder
 
