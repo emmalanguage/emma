@@ -1,32 +1,54 @@
-package eu.stratosphere.emma.macros.program.rewrite
+package eu.stratosphere.emma.macros.program.comprehension.rewrite
 
 import eu.stratosphere.emma.macros.program.ContextHolder
-import eu.stratosphere.emma.macros.program.dataflow.IntermediateRepresentation
+import eu.stratosphere.emma.macros.program.comprehension.ComprehensionModel
 import eu.stratosphere.emma.macros.program.util.ProgramUtils
 import eu.stratosphere.emma.rewrite.RewriteEngine
 
-import scala.reflect.macros.blackbox.Context
+import scala.reflect.macros.blackbox
 
-trait MacroRewriteEngine[C <: Context]
+trait ComprehensionNormalization[C <: blackbox.Context]
   extends ContextHolder[C]
-  with IntermediateRepresentation[C]
+  with ComprehensionModel[C]
   with ProgramUtils[C]
   with RewriteEngine {
 
   import c.universe._
 
-  val rules: List[Rule] = List(SimplifyTupleProjection, UnnestHead, UnnestGenerator)
+  val rules: List[Rule] = List()
 
+  private val rulesV1: List[Rule] = List(SimplifyTupleProjection, UnnestHead, UnnestGenerator)
+
+  private val rulesV2: List[Rule] = List(FuseFoldMap)
+
+  override def rewrite(root: ExpressionRoot): ExpressionRoot = {
+    while ((for (r <- rulesV1) yield r.apply(root)).fold(false)(_ || _)) {} // apply rules while possible
+    while ((for (r <- rulesV2) yield r.apply(root)).fold(false)(_ || _)) {} // apply rules while possible
+    root
+  }
+
+  def normalize(root: ExpressionRoot) = rewrite(root)
+
+  /** Unnests a comprehended head in its parent.
+    *
+    * ==Rule Description==
+    *
+    * '''Matching Pattern''':
+    * {{{ [[ e | qs, x ← [[ e' | qs' ]], qs'' ]] }}}
+    *
+    * '''Rewrite''':
+    * {{{ [[ e[e'\x] | qs,  qs', qs''[e'\x] ]] }}}
+    */
   object UnnestGenerator extends Rule {
 
-    case class RuleMatch(parent: Comprehension, generator: ComprehensionGenerator, child: Comprehension)
+    case class RuleMatch(parent: Comprehension, generator: Generator, child: Comprehension)
 
     override protected def bind(r: ExpressionRoot) = new Traversable[RuleMatch] {
       override def foreach[U](f: (RuleMatch) => U) = {
-        for (x <- sequence(r.expr)) x match {
+        for (x <- globalSeq(r.expr)) x match {
           case parent@Comprehension(_, _, qualifiers) =>
             for (y <- qualifiers) y match {
-              case generator@ComprehensionGenerator(_, child@Comprehension(_, ScalaExpr(_, _), _)) =>
+              case generator@Generator(_, child@Comprehension(_, ScalaExpr(_, _), _)) =>
                 f(RuleMatch(parent, generator, child))
               case _ => Unit
             }
@@ -35,26 +57,14 @@ trait MacroRewriteEngine[C <: Context]
       }
     }
 
-    override protected def guard(r: ExpressionRoot, m: RuleMatch) = {
-      val parentIsSink = m.parent.qualifiers.size == 1 && m.parent.head.isInstanceOf[ScalaExpr] && (m.parent.head.asInstanceOf[ScalaExpr].tree match {
-        case Apply(Select(Ident(TermName("ofmt")), TermName("write")), Ident(TermName(name)) :: Nil) => name.startsWith("snk$record$")
-        case _ => false
-      })
-
-      val childIsSource = m.child.qualifiers.size == 2 && m.child.head.isInstanceOf[ScalaExpr] && (m.child.head.asInstanceOf[ScalaExpr].tree match {
-        case Ident(TermName(name)) => name.startsWith("src$record$")
-        case _ => false
-      })
-
-      !(childIsSource || parentIsSink)
-    }
+    override protected def guard(r: ExpressionRoot, m: RuleMatch) = true
 
     override protected def fire(r: ExpressionRoot, m: RuleMatch) = {
       val name = m.generator.lhs
       val term = m.child.head.asInstanceOf[ScalaExpr]
-      val rest = sequence(m.parent)
+      val rest = localSeq(m.parent)
         .span(_ != m.generator)._2.tail // trim prefix
-        .span(x => !x.isInstanceOf[ComprehensionGenerator] || x.asInstanceOf[ComprehensionGenerator].lhs.toString != m.generator.toString)._1 // trim suffix
+        .span(x => !x.isInstanceOf[Generator] || x.asInstanceOf[Generator].lhs.toString != m.generator.toString)._1 // trim suffix
 
       val (xs, ys) = m.parent.qualifiers.span(_ != m.generator)
       m.parent.qualifiers = xs ++ m.child.qualifiers ++ ys.tail
@@ -63,13 +73,23 @@ trait MacroRewriteEngine[C <: Context]
     }
   }
 
+  /** Unnests a comprehended head in its parent.
+    *
+    * Rule Description
+    *
+    * '''Matching Pattern''':
+    * {{{ [[ [[ e | qs' ]] | qs ]] }}}
+    *
+    * '''Rewrite''':
+    * {{{ [[ e | qs, qs' ]] }}}
+    */
   object UnnestHead extends Rule {
 
     case class RuleMatch(join: MonadJoin, parent: Comprehension, child: Comprehension)
 
     override protected def bind(r: ExpressionRoot) = new Traversable[RuleMatch] {
       override def foreach[U](f: (RuleMatch) => U) = {
-        for (x <- sequence(r.expr)) x match {
+        for (x <- globalSeq(r.expr)) x match {
           case join@MonadJoin(parent@Comprehension(_, child@Comprehension(_, _, _), _)) =>
             f(RuleMatch(join, parent, child))
           case _ =>
@@ -83,7 +103,7 @@ trait MacroRewriteEngine[C <: Context]
     override protected def fire(r: ExpressionRoot, m: RuleMatch) = {
       m.parent.qualifiers = m.parent.qualifiers ++ m.child.qualifiers
       m.parent.head = m.child.head
-      m.parent.monad = m.child.monad
+      m.parent.tpt = m.child.tpt
       r.expr = substitute(r.expr, m.join, m.parent)
     }
   }
@@ -96,7 +116,7 @@ trait MacroRewriteEngine[C <: Context]
 
     override protected def bind(r: ExpressionRoot) = new Traversable[RuleMatch] {
       override def foreach[U](f: (RuleMatch) => U) = {
-        for (x <- sequence(r.expr)) x match {
+        for (x <- globalSeq(r.expr)) x match {
           case expr@ScalaExpr(_, _) =>
             f(RuleMatch(expr))
           case _ =>
@@ -161,4 +181,44 @@ trait MacroRewriteEngine[C <: Context]
 
   }
 
+  /** Fuses a fold with a child comprehension consisting of a single generator.
+    *
+    * Rule Description
+    *
+    * '''Matching Pattern''':
+    * {{{ fold( empty, sng, union, [[ e | x ← e' ]] ) }}}
+    *
+    * '''Rewrite''':
+    * {{{ fold( empty, sng[e[x\z]\x], union[e[x\z]\x, e[y\z]\y], e' ]] ) }}}
+    */
+  object FuseFoldMap extends Rule {
+
+    case class RuleMatch(fold: Fold, map: Comprehension, child: Generator)
+
+    override protected def bind(r: ExpressionRoot) = new Traversable[RuleMatch] {
+      override def foreach[U](f: (RuleMatch) => U) = {
+        for (x <- globalSeq(r.expr)) x match {
+          case fold@Fold(_, _, _, _, map@Comprehension(_, ScalaExpr(_, _), List(child@Generator(_, _)))) =>
+            f(RuleMatch(fold, map, child))
+          case _ =>
+            Unit
+        }
+      }
+    }
+
+    override protected def guard(r: ExpressionRoot, m: RuleMatch) = true //FIXME
+
+    override protected def fire(r: ExpressionRoot, m: RuleMatch) = {
+
+      val z = m.child.lhs
+      val head = m.map.head.asInstanceOf[ScalaExpr]
+
+      val x = substitute(head.tree, z.toString, q"x")
+      val y = substitute(head.tree, z.toString, q"y")
+
+      m.fold.sng.tree = substitute(m.fold.sng.tree, "x", x)
+      m.fold.union.tree = substitute(m.fold.union.tree, Map("x" -> x, "y" -> y))
+      m.fold.in = m.child.rhs
+    }
+  }
 }

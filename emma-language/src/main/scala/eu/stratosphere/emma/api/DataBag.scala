@@ -66,6 +66,10 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
    */
   def withFilter(p: (A) => Boolean): DataBag[A] = DataBag(impl.filter(p))
 
+  // -----------------------------------------------------
+  // Grouping and Set operations
+  // -----------------------------------------------------
+
   /**
    * Groups the bag by key.
    *
@@ -128,13 +132,13 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
     else for (u <- x; v <- y) yield if (p(u, v)) v else u
   })
 
-  def min[B >: A]()(implicit m: scala.reflect.Manifest[B], n: Numeric[B], l: Limits[B]): B = fold[B](l.max, identity, n.min)
+  def min[B >: A]()(implicit n: Numeric[B], l: Limits[B]): B = fold[B](l.max, identity, n.min)
 
-  def max[B >: A]()(implicit m: scala.reflect.Manifest[B], n: Numeric[B], l: Limits[B]): B = fold[B](l.min, identity, n.max)
+  def max[B >: A]()(implicit n: Numeric[B], l: Limits[B]): B = fold[B](l.min, identity, n.max)
 
-  def sum[B >: A]()(implicit m: scala.reflect.Manifest[B], n: Numeric[B]): B = fold[B](n.zero, identity, n.plus)
+  def sum[B >: A]()(implicit n: Numeric[B]): B = fold[B](n.zero, identity, n.plus)
 
-  def product[B >: A]()(implicit m: scala.reflect.Manifest[B], n: Numeric[B]): B = fold[B](n.one, identity, n.times)
+  def product[B >: A]()(implicit n: Numeric[B]): B = fold[B](n.one, identity, n.times)
 
   def count(): Long = fold[Long](0, x => 1, (x, y) => x + y)
 

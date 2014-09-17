@@ -4,7 +4,7 @@ import scala.collection.Set
 import scala.collection.mutable.ListBuffer
 import scala.reflect.macros._
 
-trait ControlFlowCompiler[C <: blackbox.Context] extends ControlFlowModel[C] {
+private[emma] trait ControlFlowCompiler[C <: blackbox.Context] extends ControlFlowModel[C] {
   this: ControlFlowModel[C] =>
 
   import c.universe._

@@ -1,9 +1,9 @@
 package eu.stratosphere.emma.macros.utility
 
 import scala.language.experimental.macros
-import scala.reflect.macros.blackbox.Context
+import scala.reflect.macros.blackbox
 
-class UtilMacros(val c: Context) {
+class UtilMacros(val c: blackbox.Context) {
 
   import c.universe._
 

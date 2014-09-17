@@ -8,7 +8,7 @@ import scala.reflect.macros._
 import scalax.collection.edge.LkDiEdge
 import scalax.collection.mutable.Graph
 
-trait ControlFlowModel[C <: blackbox.Context] extends ContextHolder[C] {
+private[emma] trait ControlFlowModel[C <: blackbox.Context] extends ContextHolder[C] {
 
   import c.universe._
 
