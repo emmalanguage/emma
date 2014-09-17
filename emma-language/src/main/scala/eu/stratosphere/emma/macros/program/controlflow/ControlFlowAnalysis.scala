@@ -7,7 +7,7 @@ import scalax.collection.GraphPredef._
 import scalax.collection.edge.LkDiEdge
 import scalax.collection.mutable.Graph
 
-trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFlowModel[C] {
+private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFlowModel[C] {
   this: ControlFlowModel[C] =>
 
   import c.universe._

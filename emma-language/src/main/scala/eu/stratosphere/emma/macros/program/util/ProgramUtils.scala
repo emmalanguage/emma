@@ -1,13 +1,13 @@
 package eu.stratosphere.emma.macros.program.util
 
 import eu.stratosphere.emma.macros.program.ContextHolder
-import eu.stratosphere.emma.macros.program.dataflow.IntermediateRepresentation
+import eu.stratosphere.emma.macros.program.comprehension.ComprehensionModel
 import eu.stratosphere.emma.api.DataBag
 
 import scala.collection.mutable.ListBuffer
-import scala.reflect.macros.blackbox.Context
+import scala.reflect.macros.blackbox
 
-trait ProgramUtils[C <: Context] extends ContextHolder[C] with IntermediateRepresentation[C] {
+private[emma] trait ProgramUtils[C <: blackbox.Context] extends ContextHolder[C] with ComprehensionModel[C] {
 
   import c.universe._
 
@@ -106,6 +106,42 @@ trait ProgramUtils[C <: Context] extends ContextHolder[C] with IntermediateRepre
   }
 
   /**
+   * Simultaneously substitutes all occurrences of `x` with `y` in the given context `t` and adapts its environment.
+   *
+   * @param t The context to be modified
+   * @param x The old node to be substituted
+   * @param y The new node to substituted in place of the old
+   * @return
+   */
+  def substitute(t: ScalaExpr, x: TermName, y: ScalaExpr) = {
+    t.env = t.env.filter(_.name != x) ++ y.env.filterNot(t.env.contains(_))
+    t.tree = new TermSubstituter(x.toString, y.tree).transform(t.tree)
+  }
+
+  /**
+   * Simultaneously substitutes all occurrences of `x` with `y` in the given context `t`.
+   *
+   * @param t The term tree to be modified
+   * @param x The identifier to be substituted
+   * @param y The new term tree to be substituted in place of 'x'
+   * @return
+   */
+  def substitute(t: Tree, x: String, y: Tree) = {
+    new TermSubstituter(x, y).transform(t)
+  }
+
+  /**
+   * Simultaneously substitutes all occurrences of `x` with `y` in the given context `t`.
+   *
+   * @param t The term tree to be modified
+   * @param map A map of `x` identifiers and their corresponding `y` substitutions.
+   * @return
+   */
+  def substitute(t: Tree, map: Map[String, Tree]) = {
+    new TermSubstituter(map).transform(t)
+  }
+
+  /**
    * Simultaneously substitutes all occurrences of a `x` with `y` in the given IR tree `t`.
    *
    * @param t The context to be modified
@@ -120,11 +156,10 @@ trait ProgramUtils[C <: Context] extends ContextHolder[C] with IntermediateRepre
       t match {
         case z@MonadUnit(expr) => z.expr = substitute(expr, x, y).asInstanceOf[MonadExpression]; z
         case z@MonadJoin(expr) => z.expr = substitute(expr, x, y).asInstanceOf[MonadExpression]; z
+        case z@Comprehension(tpe, head, qualifiers) => z.head = substitute(head, x, y); z.qualifiers = for (q <- qualifiers) yield substitute(q, x, y).asInstanceOf[Qualifier]; z
         case z@Filter(expr) => z.expr = substitute(expr, x, y); z
-        case z@ScalaExprGenerator(lhs, rhs) => z.rhs = substitute(rhs, x, y).asInstanceOf[ScalaExpr]; z
-        case z@ComprehensionGenerator(lhs, rhs) => z.rhs = substitute(rhs, x, y).asInstanceOf[MonadExpression]; z
+        case z@Generator(lhs, rhs) => z.rhs = substitute(rhs, x, y); z
         case z@ScalaExpr(_, _) => z
-        case z@Comprehension(monad, head, qualifiers) => z.head = substitute(head, x, y); z.qualifiers = for (q <- qualifiers) yield substitute(q, x, y).asInstanceOf[Qualifier]; z
       }
 
   // ---------------------------------------------------
@@ -172,9 +207,12 @@ trait ProgramUtils[C <: Context] extends ContextHolder[C] with IntermediateRepre
     }
   }
 
-  private class TermSubstituter(val name: String, val term: Tree) extends Transformer {
+  private class TermSubstituter(val map: Map[String, Tree]) extends Transformer {
+
+    def this(name: String, term: Tree) = this(Map[String, Tree](name -> term))
+
     override def transform(tree: Tree): Tree = tree match {
-      case Ident(TermName(x)) => if (x == name) term else tree
+      case Ident(TermName(x)) => if (map.contains(x)) map(x) else tree
       case _ => super.transform(tree)
     }
   }

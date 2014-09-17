@@ -1,8 +1,8 @@
 package eu.stratosphere.emma.macros.program
 
-import scala.reflect.macros.blackbox.Context
+import scala.reflect.macros.blackbox
 
-abstract class ContextHolder[C <: Context] {
+abstract class ContextHolder[C <: blackbox.Context] {
 
-  val c: Context
+  val c: blackbox.Context
 }

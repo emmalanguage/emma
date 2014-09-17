@@ -4,10 +4,10 @@ import eu.stratosphere.emma.api.{DataBag}
 
 import scala.language.existentials
 import scala.language.experimental.macros
-import scala.reflect.macros.blackbox.Context
+import scala.reflect.macros.blackbox
 
 // TODO: remove
-class AlgebraMacros(val c: Context) {
+class AlgebraMacros(val c: blackbox.Context) {
 
   import c.universe._
 
