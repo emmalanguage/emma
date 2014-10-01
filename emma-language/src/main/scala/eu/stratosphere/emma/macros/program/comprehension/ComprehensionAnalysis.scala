@@ -1,7 +1,7 @@
 package eu.stratosphere.emma.macros.program.comprehension
 
 import eu.stratosphere.emma.macros.program.comprehension.rewrite.ComprehensionNormalization
-import eu.stratosphere.emma.macros.program.util.{Counter, ProgramUtils}
+import eu.stratosphere.emma.macros.program.util.ProgramUtils
 
 import scala.collection.mutable
 import eu.stratosphere.emma.macros.program.ContextHolder
@@ -69,7 +69,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
    *
    * @param cfGraph The control flow graph for the comprehended algorithm.
    */
-  def createComprehensionStore(cfGraph: CFGraph): Unit = {
+  def createComprehensionStore(cfGraph: CFGraph) = {
 
     // step #1: compute the set of maximal terms that can be translated to comprehension syntax
     val root = cfGraph.nodes.find(_.inDegree == 0).get
@@ -104,11 +104,10 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
     // step #2: create ComprehendedTerm entries for the identified terms
     val comprehendedTerms = mutable.Seq((for (t <- terms) yield {
       val id = TermName(c.freshName("comprehension"))
-      val name = comprehendedTermName(t)
-      val original = t.asInstanceOf[TermTree]
-      val comprehension = normalize(ExpressionRoot(comprehend(Nil)(original)))
+      val definition = comprehendedTermDefinition(t)
+      val comprehension = normalize(ExpressionRoot(comprehend(Nil)(t)))
 
-      ComprehendedTerm(id, name, original, comprehension)
+      ComprehendedTerm(id, t, comprehension, definition)
     }).toSeq: _*)
 
     // step #3: build the comprehension store
@@ -148,18 +147,21 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
   }
 
   /**
-   * Looks up a ValDef name for a comprehended term.
+   * Looks up a definition term (ValDef or Assign) for a comprehended term.
    *
    * @param t The term to lookup.
-   * @return The optional TermName of the found ValDef.
+   * @return The (optional) definition for the term.
    */
-  private def comprehendedTermName(t: Tree)(implicit cfBlockTraverser: TraversableOnce[CFBlock]) = {
-    var optName = Option.empty[TermName]
+  private def comprehendedTermDefinition(t: Tree)(implicit cfBlockTraverser: TraversableOnce[CFBlock]) = {
+    var optSymbol = Option.empty[Tree]
     for (block <- cfBlockTraverser; s <- block.stats) s.foreach({
-      case ValDef(mods, name, _, rhs) if t == rhs => optName = Some(name)
+      case ValDef(_, name, _, rhs) if t == rhs =>
+        optSymbol = Some(s)
+      case Assign(lhs, rhs) if t == rhs =>
+        optSymbol = Some(s)
       case _ =>
     })
-    optName
+    optSymbol
   }
 
   // --------------------------------------------------------------------------
@@ -351,25 +353,6 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       // interpret as black box Scala expression (default)
       case _ =>
         ScalaExpr(env, t)
-    }
-  }
-
-  /**
-   * Constructs a fresh TermName with the given prefix, incrementing the corresponding counter.
-   *
-   * @param prefix A previx to prepend to the TermName
-   * @param counter A counter whose current value will be appended to the TermName
-   * @return
-   */
-  private def nextTermName(prefix: String, counter: Counter) = TermName(f"${prefix}${counter.get}")
-
-  /**
-   * Custom matcher for eu.stratosphere.emma.package.* method applications.
-   */
-  private object PackageMethod {
-    def unapply(t: Tree): Option[String] = t match {
-      case Select(quantifier, TermName(method)) => if (quantifier.symbol == api.moduleSymbol) Some(method) else None
-      case _ => None
     }
   }
 
