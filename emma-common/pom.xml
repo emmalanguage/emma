@@ -31,12 +31,10 @@
         <dependency>
             <groupId>org.specs2</groupId>
             <artifactId>specs2_${scala.tools.version}</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.scalatest</groupId>
             <artifactId>scalatest_${scala.tools.version}</artifactId>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 </project>
