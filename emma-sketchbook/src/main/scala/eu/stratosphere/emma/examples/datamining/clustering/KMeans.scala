@@ -98,32 +98,30 @@ class KMeans(k: Int, epsilon: Double, inputUrl: String, outputUrl: String, rt: r
       var change = 0.0
 
       // initialize solution
-      var solution = for (p <- points) yield {
-        val closestMean = means.minBy((m1, m2) => (p.pos squaredDist m1.pos) < (p.pos squaredDist m2.pos)).get
-        Solution(p, closestMean.id)
-      }
+      var solution: DataBag[Solution] = null
 
       do {
-        // re-compute means
-        val newMeans = for (cluster <- solution.groupBy(_.clusterID)) yield {
-          val sum = (for (p <- cluster.values) yield p.point.pos).fold[Vector](Vector.zeros(3), identity, (x, y) => x + y)
-          val cnt = (for (p <- cluster.values) yield p.point.pos).fold[Int](0, _ => 1, (x, y) => x + y)
-          Point(cluster.key, sum / cnt)
-        }
-
-        change = {
-          val distances = for (mean <- means; newMean <- newMeans; if mean.id == newMean.id) yield mean.pos squaredDist newMean.pos
-          distances.sum()
-        }
-
-        means = newMeans
-
         // update solution: re-assign clusters
         solution = for (s <- solution) yield {
           val closestMean = means.minBy((m1, m2) => (s.point.pos squaredDist m1.pos) < (s.point.pos squaredDist m2.pos)).get
           s.copy(clusterID = closestMean.id)
         }
 
+        // update means
+        val newMeans = for (cluster <- solution.groupBy(_.clusterID)) yield {
+          val sum = (for (p <- cluster.values) yield p.point.pos).fold[Vector](Vector.zeros(3), identity, (x, y) => x + y)
+          val cnt = (for (p <- cluster.values) yield p.point.pos).fold[Int](0, _ => 1, (x, y) => x + y)
+          Point(cluster.key, sum / cnt)
+        }
+
+        // compute change between the old and the new means
+        change = {
+          val distances = for (mean <- means; newMean <- newMeans; if mean.id == newMean.id) yield mean.pos squaredDist newMean.pos
+          distances.sum()
+        }
+
+        // use new means for the next iteration
+        means = newMeans
       } while (change < epsilon)
 
       // write result
