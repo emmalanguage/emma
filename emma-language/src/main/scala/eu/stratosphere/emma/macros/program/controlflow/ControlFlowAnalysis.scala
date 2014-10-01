@@ -16,11 +16,10 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
 
   def emptyVarStack = List[TermName]()
 
-  def createCFG(nCurr: Tree): CFGraph = {
+  def createCFG(tree: Tree): CFGraph = {
 
     // loop ID counter
     val loopCounter = new Counter()
-    val testCounter = new Counter()
 
     // vertex ID counter and an implicit next nodeID provider
     val vertexCounter = new Counter()
@@ -43,79 +42,86 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
       // val `name`: `tpt` = `rhs`
       case ValDef(mods, name, tpt, rhs) =>
         if (containsBranches(rhs)) {
+          c.error(c.enclosingPosition, "Emma does not support assignments with conditionals on the rhs at the moment!")
           currBlock.stats += ValDef(Modifiers(Flag.MUTABLE | mods.flags), name, tpt, Literal(Constant(null)))
           _createCFG(rhs, currBlock, name :: X)
         }
         else {
-          currBlock.stats += q"$currTree"
+          currBlock.stats += currTree
           currBlock
         }
 
       // `name` = `rhs`
       case Assign(Ident(name: TermName), rhs) =>
         if (containsBranches(rhs)) {
+          c.error(c.enclosingPosition, "Emma does not support assignments with conditionals on the rhs at the moment!")
           _createCFG(rhs, currBlock, name :: X)
         }
         else {
-          currBlock.stats += q"$currTree"
+          currBlock.stats += currTree
           currBlock
         }
 
       // do  { `body` } while (`cond`)
       case LabelDef(_, _, Block(b, If(cond, _, _))) =>
-        val condStartBlock = new CFBlock()
-        val bodyStartBlock = new CFBlock()
-        val nextBlock = new CFBlock()
+        // ensure that the `cond` tree is a simple identifier
+        if (cond match {
+          case Ident(_: TermName) => true
+          case _ => false
+        }) c.error(c.enclosingPosition, "Attempting to create CFGraph on unnormalized tree")
 
+        // create body block
         val body = if (b.size > 1) Block(b.slice(0, b.size - 1).toList, b.last) else b.head
-
-        val currEndBlock = currBlock
+        val bodyStartBlock = new CFBlock()
         val bodyEndBlock = _createCFG(body, bodyStartBlock, emptyVarStack)
+
+        // create condition block with the `cond` term
+        val condBlock = new CFBlock()
+        condBlock.stats += cond
+
+        // create next block
+        val nextBlock = new CFBlock()
 
         // fix block type
         val loopID = loopCounter.advance.get
         bodyStartBlock.kind = DoWhileBegin(loopID)
         bodyEndBlock.kind = DoWhileEnd(loopID)
 
-        graph += LkDiEdge(currEndBlock, bodyStartBlock)(true)
-        graph += LkDiEdge(bodyEndBlock, bodyStartBlock)(true)
-        graph += LkDiEdge(bodyEndBlock, nextBlock)(false)
+        graph += LkDiEdge(currBlock, bodyStartBlock)(true)
+        graph += LkDiEdge(bodyEndBlock, condBlock)(true)
+        graph += LkDiEdge(condBlock, bodyStartBlock)(true)
+        graph += LkDiEdge(condBlock, nextBlock)(false)
 
         nextBlock
 
       // while (`cond`) { `body` }
       case LabelDef(_, _, If(cond, Block(b, _), _)) =>
-        // create condition block
+        // ensure that the `cond` tree is a simple identifier
+        if (cond match {
+          case Ident(_: TermName) => true
+          case _ => false
+        }) c.error(c.enclosingPosition, "Attempting to create CFGraph on unnormalized tree")
+
+        // create condition block with the `cond` term
         val condBlock = new CFBlock()
-        val (condVar, currEndBlock) = cond match {
-          case Ident(condVar: TermName) =>
-            (condVar, currBlock)
-          case _ =>
-            // introduce condition variable and move the complex test outside the condition block
-            val condVar = TermName(f"test${testCounter.advance.get}%03d")
-            (condVar, _createCFG(q"var $condVar = $cond", currBlock, emptyVarStack))
-        }
-        condBlock.stats += Ident(condVar)
+        condBlock.stats += cond
 
         // create body block
         val body = if (b.size > 1) Block(b.slice(0, b.size - 1).toList, b.last) else b.head
         val bodyStartBlock = new CFBlock()
-        val bodyEndBlock = cond match {
-          case Ident(condVar: TermName) =>
-            _createCFG(body, bodyStartBlock, emptyVarStack)
-          case _ =>
-            _createCFG(q"{ $body; $condVar = $cond}", bodyStartBlock, emptyVarStack)
-        }
+        val bodyEndBlock = _createCFG(body, bodyStartBlock, emptyVarStack)
 
+        // create next block
         val nextBlock = new CFBlock()
 
         // fix block type
         val loopID = loopCounter.advance.get
 
+        // fix block kinds
         condBlock.kind = WhileBegin(loopID)
         bodyEndBlock.kind = WhileEnd(loopID)
 
-        graph += LkDiEdge(currEndBlock, condBlock)(true)
+        graph += LkDiEdge(currBlock, condBlock)(true)
         graph += LkDiEdge(condBlock, bodyStartBlock)(true)
         graph += LkDiEdge(condBlock, nextBlock)(false)
         graph += LkDiEdge(bodyEndBlock, condBlock)(true)
@@ -124,17 +130,15 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
 
       // if (`cond`) `thenp` else `elsep`
       case If(cond, thenp, elsep) =>
-        // create condition block
+        // ensure that the `cond` tree is a simple identifier
+        if (cond match {
+          case Ident(_: TermName) => true
+          case _ => false
+        }) c.error(c.enclosingPosition, "Attempting to create CFGraph on unnormalized tree")
+
+        // create condition block with the `cond` term
         val condBlock = new CFBlock()
-        val (condVar, currEndBlock) = cond match {
-          case Ident(condVar: TermName) =>
-            (condVar, currBlock)
-          case _ =>
-            // introduce condition variable and move the complex test outside the condition block
-            val condVar = TermName(f"test${testCounter.advance.get}%03d")
-            (condVar, _createCFG(q"val $condVar = $cond", currBlock, emptyVarStack))
-        }
-        condBlock.stats += Ident(condVar)
+        condBlock.stats += cond
 
         // create thenp block
         val thenpStartBlock = new CFBlock()
@@ -147,10 +151,10 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
         // create new current block
         val currNewBlock = new CFBlock()
 
-        // fix block type
+        // fix block kind
         condBlock.kind = Cond
 
-        graph += LkDiEdge(currEndBlock, condBlock)(true)
+        graph += LkDiEdge(condBlock, condBlock)(true)
         graph += LkDiEdge(condBlock, thenpStartBlock)(true)
         graph += LkDiEdge(condBlock, elsepStartBlock)(false)
         graph += LkDiEdge(thenpEndBlock, currNewBlock)(true)
@@ -169,7 +173,8 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
     }
 
     // call recursive helper
-    _createCFG(nCurr, vCurr, emptyVarStack)
+    val nCurr = c.typecheck(new TreeNormalizer().transform(c.untypecheck(tree)))
+    _createCFG(tree, vCurr, emptyVarStack)
 
     // remove empty blocks from the end of the graph (might result from tailing if (c) e1 else e2 return statements)
     var emptyBlocks = graph.nodes filter { x => x.diSuccessors.isEmpty && x.stats.isEmpty}
@@ -194,4 +199,63 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
     case _ =>
       false
   }
+
+  /**
+   * Normalizes an expression tree.
+   *
+   * This process includes:
+   *
+   * - unnesting of compex trees ouside while loop tests.
+   * - unnesting of compex trees ouside do-while loop tests.
+   * - unnesting of compex trees ouside if-then-else conditions.
+   */
+  private class TreeNormalizer() extends Transformer {
+
+    val testCounter = new Counter()
+
+    override def transform(tree: Tree): Tree = tree match {
+      // while (`cond`) { `body` }
+      case LabelDef(_, _, If(cond, Block(body, _), _)) =>
+        cond match {
+          case Ident(_: TermName) =>
+            // if condition is a simple identifier, no normalization needed
+            super.transform(tree)
+          case _ =>
+            // introduce condition variable
+            val condVar = TermName(f"testA${testCounter.advance.get}%03d")
+            // move the complex test outside the condition
+            q"{ var $condVar = $cond; while ($condVar) { $body; $condVar = $cond } }"
+        }
+
+      // do { `body` } while (`cond`)
+      case LabelDef(_, _, Block(body, If(cond, _, _))) =>
+        cond match {
+          case Ident(_: TermName) =>
+            // if condition is a simple identifier, no normalization needed
+            super.transform(tree)
+          case _ =>
+            // introduce condition variable
+            val condVar = TermName(f"testB${testCounter.advance.get}%03d")
+            // move the complex test outside the condition
+            q"{ var $condVar = null.asInstanceOf[Boolean]; do { $body; $condVar = $cond } while ($condVar) }"
+        }
+
+      // if (`cond`) `thenp` else `elsep`
+      case If(cond, thenp, elsep) =>
+        cond match {
+          case Ident(_: TermName) =>
+            // if condition is a simple identifier, no normalization needed
+            super.transform(tree)
+          case _ =>
+            // introduce condition value
+            val condVal = TermName(f"testC${testCounter.advance.get}%03d")
+            // move the complex test outside the condition
+            q"val $condVal = $cond; ${If(Ident(condVal), thenp, elsep)}"
+        }
+
+      case _ =>
+        super.transform(tree)
+    }
+  }
+
 }
