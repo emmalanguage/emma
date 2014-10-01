@@ -34,14 +34,12 @@ class WorkflowMacros(val c: blackbox.Context) {
      */
     def parallelize[T: c.WeakTypeTag](root: Expr[T]): Expr[Algorithm[T]] = {
 
-      val rootTree = c.untypecheck(root.tree)
-
       // ----------------------------------------------------------------------
       // Code analysis
       // ----------------------------------------------------------------------
 
       // 1. Create control flow graph
-      val cfGraph = createCFG(rootTree)
+      val cfGraph = createCFG(root.tree)
 
       // 2. Identify and isolate maximal comprehensions
       val comprehensionStore = createComprehensionStore(cfGraph)
@@ -74,11 +72,13 @@ class WorkflowMacros(val c: blackbox.Context) {
              case _ => runParallel(engine)
            }
 
-           private def runNative(): ${c.weakTypeOf[T]} = $rootTree
+           private def runNative(): ${c.weakTypeOf[T]} = ${c.untypecheck(root.tree)}
 
-           private def runParallel(engine: runtime.Engine): ${c.weakTypeOf[T]} = { ..${compileDriver[T](cfGraph)} }
+           private def runParallel(engine: runtime.Engine): ${c.weakTypeOf[T]} = ${c.untypecheck(root.tree)}
         }
         """
+
+        // private def runParallel(engine: runtime.Engine): ${c.weakTypeOf[T]} = { ..${compileDriver[T](cfGraph)} }
 
       // construct and return a block that returns a Workflow using the above list of sinks
       val block = Block(List(algorithmCode), c.parse("__emmaAlgorithm"))
