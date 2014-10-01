@@ -12,10 +12,6 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
 
   import c.universe._
 
-  private type VarStack = List[TermName]
-
-  def emptyVarStack = List[TermName]()
-
   def createCFG(tree: Tree): CFGraph = {
 
     // loop ID counter
@@ -30,37 +26,40 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
     val graph = Graph[CFBlock, LkDiEdge](vCurr)
 
     // recursive helper function
-    def _createCFG(currTree: Tree, currBlock: CFBlock, X: VarStack): CFBlock = currTree match {
+    def _createCFG(currTree: Tree, currBlock: CFBlock): CFBlock = currTree match {
       // { `stats`; `expr` }
       case Block(stats, expr) =>
         var _currBlock = currBlock
         for (s <- stats) {
-          _currBlock = _createCFG(s, _currBlock, emptyVarStack)
+          _currBlock = _createCFG(s, _currBlock)
         }
-        _createCFG(expr, _currBlock, X)
+        _createCFG(expr, _currBlock)
 
       // val `name`: `tpt` = `rhs`
       case ValDef(mods, name, tpt, rhs) =>
-        if (containsBranches(rhs)) {
-          c.error(c.enclosingPosition, "Emma does not support assignments with conditionals on the rhs at the moment!")
-          currBlock.stats += ValDef(Modifiers(Flag.MUTABLE | mods.flags), name, tpt, Literal(Constant(null)))
-          _createCFG(rhs, currBlock, name :: X)
-        }
-        else {
-          currBlock.stats += currTree
-          currBlock
-        }
+        // ensure that the `rhs` tree is a "simple" term (no blocks or conditionals)
+        if (rhs match {
+          case Block(_, _) => true
+          case If(_, _, _) => true
+          case _ => false
+        }) c.error(c.enclosingPosition, "Emma does not support assignments with conditionals on the rhs at the moment!")
+
+        // add assignment to the current block
+        currBlock.stats += currTree
+        currBlock
 
       // `name` = `rhs`
       case Assign(Ident(name: TermName), rhs) =>
-        if (containsBranches(rhs)) {
-          c.error(c.enclosingPosition, "Emma does not support assignments with conditionals on the rhs at the moment!")
-          _createCFG(rhs, currBlock, name :: X)
-        }
-        else {
-          currBlock.stats += currTree
-          currBlock
-        }
+        // ensure that the `rhs` tree is a "simple" term (no blocks or conditionals)
+        if (rhs match {
+          case Block(_, _) => true
+          case If(_, _, _) => true
+          case _ => false
+        }) c.error(c.enclosingPosition, "Emma does not support assignments with conditionals on the rhs at the moment!")
+
+        // add assignment to the current block
+        currBlock.stats += currTree
+        currBlock
 
       // do  { `body` } while (`cond`)
       case LabelDef(_, _, Block(b, If(cond, _, _))) =>
@@ -68,12 +67,12 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
         if (cond match {
           case Ident(_: TermName) => true
           case _ => false
-        }) c.error(c.enclosingPosition, "Attempting to create CFGraph on unnormalized tree")
+        }) c.error(c.enclosingPosition, "Invalid do-while test expression!") // should not happen after normalization
 
         // create body block
         val body = if (b.size > 1) Block(b.slice(0, b.size - 1).toList, b.last) else b.head
         val bodyStartBlock = new CFBlock()
-        val bodyEndBlock = _createCFG(body, bodyStartBlock, emptyVarStack)
+        val bodyEndBlock = _createCFG(body, bodyStartBlock)
 
         // create condition block with the `cond` term
         val condBlock = new CFBlock()
@@ -100,7 +99,7 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
         if (cond match {
           case Ident(_: TermName) => true
           case _ => false
-        }) c.error(c.enclosingPosition, "Attempting to create CFGraph on unnormalized tree")
+        }) c.error(c.enclosingPosition, "Invalid while test expression!") // should not happen after normalization
 
         // create condition block with the `cond` term
         val condBlock = new CFBlock()
@@ -109,7 +108,7 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
         // create body block
         val body = if (b.size > 1) Block(b.slice(0, b.size - 1).toList, b.last) else b.head
         val bodyStartBlock = new CFBlock()
-        val bodyEndBlock = _createCFG(body, bodyStartBlock, emptyVarStack)
+        val bodyEndBlock = _createCFG(body, bodyStartBlock)
 
         // create next block
         val nextBlock = new CFBlock()
@@ -134,7 +133,7 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
         if (cond match {
           case Ident(_: TermName) => true
           case _ => false
-        }) c.error(c.enclosingPosition, "Attempting to create CFGraph on unnormalized tree")
+        }) c.error(c.enclosingPosition, "Invalid if-then-else test expression!") // should not happen after normalization
 
         // create condition block with the `cond` term
         val condBlock = new CFBlock()
@@ -142,11 +141,11 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
 
         // create thenp block
         val thenpStartBlock = new CFBlock()
-        val thenpEndBlock = _createCFG(thenp, thenpStartBlock, X)
+        val thenpEndBlock = _createCFG(thenp, thenpStartBlock)
 
         // create elsep block
         val elsepStartBlock = new CFBlock()
-        val elsepEndBlock = _createCFG(elsep, elsepStartBlock, X)
+        val elsepEndBlock = _createCFG(elsep, elsepStartBlock)
 
         // create new current block
         val currNewBlock = new CFBlock()
@@ -164,17 +163,13 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
 
       // default: a term expression
       case _ =>
-        if (X.nonEmpty)
-          currBlock.stats += Assign(Ident(X.head), q"$currTree")
-        else
-          currBlock.stats += q"$currTree"
-
+        currBlock.stats += currTree
         currBlock
     }
 
     // call recursive helper
     val nCurr = c.typecheck(new TreeNormalizer().transform(c.untypecheck(tree)))
-    _createCFG(tree, vCurr, emptyVarStack)
+    _createCFG(nCurr, vCurr)
 
     // remove empty blocks from the end of the graph (might result from tailing if (c) e1 else e2 return statements)
     var emptyBlocks = graph.nodes filter { x => x.diSuccessors.isEmpty && x.stats.isEmpty}
@@ -185,19 +180,6 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
 
     // return the graph
     graph
-  }
-
-  def analyzeVariables(block: CFBlock) = {
-  }
-
-  // FIXME: exclude UDFs in comprehended expressions
-  private def containsBranches(tree: Tree): Boolean = tree match {
-    case Block(_, expr) =>
-      containsBranches(expr)
-    case If(_, _, _) =>
-      true
-    case _ =>
-      false
   }
 
   /**
