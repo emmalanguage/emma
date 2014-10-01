@@ -1,30 +1,33 @@
 package eu.stratosphere.emma.examples
 
-import _root_.scala.io.Source
-import _root_.scala.collection.JavaConversions._
-import _root_.net.sourceforge.argparse4j.inf.Subparser
+import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
+
+import eu.stratosphere.emma.api.runtime
 
 object Algorithm {
 
-  // argument names
-  val KEY_INPUT = "input-file"
-  val KEY_OUTPUT = "output-file"
-  val KEY_DIMENSIONS = "dimensions"
+  object Command {
+    // argument names
+    val KEY_RT_TYPE = "rt-type"
+    val KEY_RT_HOST = "rt-host"
+    val KEY_RT_PORT = "rt-port"
+    // default values
+    val KEY_RT_TYPE_DEFAULT = "aura"
+    val KEY_RT_HOST_DEFAULT = "localhost"
+    val KEY_RT_PORT_DEFAULT = 51342
+  }
 
-  // constants
-  val DELIMITER = ","
-
-  abstract class Config[A <: Algorithm](implicit val m: scala.reflect.Manifest[A]) {
+  abstract class Command[A <: Algorithm](implicit val m: scala.reflect.Manifest[A]) {
 
     /**
      * Algorithm key.
      */
-    val CommandName: String
+    def name: String
 
     /**
      * Algorithm name.
      */
-    val Name: String
+    def description: String
 
     /**
      * Algorithm subparser configuration.
@@ -32,64 +35,52 @@ object Algorithm {
      * @param parser The subparser for this algorithm.
      */
     def setup(parser: Subparser): Unit = {
-      // add arguments
-      parser.addArgument(Algorithm.KEY_INPUT)
+      // runtime type
+      parser.addArgument(s"--${Command.KEY_RT_TYPE}")
         .`type`[String](classOf[String])
-        .dest(Algorithm.KEY_INPUT)
-        .metavar("INPUT")
-        .help("input file")
-      parser.addArgument(Algorithm.KEY_OUTPUT)
+        .choices("local", "aura", "spark")
+        .dest(Command.KEY_RT_TYPE)
+        .metavar("RT")
+        .help(s"runtime type (default ${Command.KEY_RT_TYPE_DEFAULT}})")
+      // runtime host
+      parser.addArgument(s"--${Command.KEY_RT_HOST}")
         .`type`[String](classOf[String])
-        .dest(Algorithm.KEY_OUTPUT)
-        .metavar("OUTPUT")
-        .help("output file ")
-
-      // add options (prefixed with --)
-      parser.addArgument(s"--${Algorithm.KEY_DIMENSIONS}")
+        .dest(Command.KEY_RT_HOST)
+        .metavar("HOST")
+        .help(s"runtime host (default ${Command.KEY_RT_HOST_DEFAULT}})")
+      // runtime port
+      parser.addArgument(s"--${Command.KEY_RT_PORT}")
         .`type`[Integer](classOf[Integer])
-        .dest(Algorithm.KEY_DIMENSIONS)
-        .metavar("N")
-        .help("input dimensions")
+        .dest(Command.KEY_RT_PORT)
+        .metavar("PORT")
+        .help(s"runtime port (default ${Command.KEY_RT_PORT_DEFAULT}})")
 
-      // add defaults for options
-      parser.setDefault(Algorithm.KEY_DIMENSIONS, new Integer(3))
+      parser.setDefault(Command.KEY_RT_TYPE, Command.KEY_RT_TYPE_DEFAULT)
+      parser.setDefault(Command.KEY_RT_HOST, Command.KEY_RT_HOST_DEFAULT)
+      parser.setDefault(Command.KEY_RT_PORT, Command.KEY_RT_PORT_DEFAULT)
     }
 
     /**
      * Create an instance of the algorithm.
      *
-     * @param arguments The parsed arguments to be passed to the algorithm constructor.
+     * @param ns The parsed arguments to be passed to the algorithm constructor.
      * @return
      */
-    def instantiate(arguments: java.util.Map[String, Object]): Algorithm = {
-      val constructor = m.runtimeClass.getConstructor(classOf[Map[String, Object]])
-      constructor.newInstance(arguments.toMap).asInstanceOf[Algorithm]
+    def instantiate(ns: Namespace): Algorithm = {
+      // instantiate runtime
+      val rt = runtime.factory(
+        ns.get[String](Command.KEY_RT_TYPE),
+        ns.get[String](Command.KEY_RT_HOST),
+        ns.get[Integer](Command.KEY_RT_PORT))
+      // instantiate and return algorithm
+      val constructor = m.runtimeClass.getConstructor(classOf[Namespace], classOf[runtime.Engine])
+      constructor.newInstance(ns, rt).asInstanceOf[Algorithm]
     }
   }
 
 }
 
-abstract class Algorithm(val arguments: Map[String, Object]) {
-
-  // common parameters for all algorithms
-  val inputPath = arguments.get(Algorithm.KEY_INPUT).get.asInstanceOf[String]
-  val outputPath = arguments.get(Algorithm.KEY_OUTPUT).get.asInstanceOf[String]
-
-  val dimensions = arguments.get(Algorithm.KEY_DIMENSIONS).get.asInstanceOf[Int]
-
-  def iterator() = new Iterator[(List[Double], List[Double], String)] {
-    val reader = Source.fromFile(inputPath).bufferedReader()
-
-    override def hasNext = reader.ready()
-
-    override def next() = {
-      val line = reader.readLine().split( """\""" + Algorithm.DELIMITER)
-      val vector = (for (i <- 0 until dimensions) yield line(i).trim.toDouble).toList
-      val center = (for (i <- dimensions until dimensions * 2) yield line(i).trim.toDouble).toList
-      val identifier = line(dimensions * 2).trim
-      (vector, center, identifier)
-    }
-  }
+abstract class Algorithm(val rt: runtime.Engine) {
 
   def run(): Unit
 }

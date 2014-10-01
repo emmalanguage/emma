@@ -72,6 +72,13 @@ package object api {
     case class Aura(host: String, port: Int) extends Engine
 
     case class Spark(host: String, port: Int) extends Engine
+
+    def factory(rt: String, host: String, port: Int): Engine = rt match {
+      case "local" => runtime.Native
+      case "aura" => runtime.Aura(host, port)
+      case "spark" => runtime.Spark(host, port)
+      case _ => throw new RuntimeException(s"Unknown runtime type: '$rt'")
+    }
   }
 
   // -----------------------------------------------------
