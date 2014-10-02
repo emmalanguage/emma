@@ -1,5 +1,8 @@
 package eu.stratosphere.emma.api
 
+/**
+ * TODO: inline.
+ */
 trait Collection[+A] {
 
   // structural recursion

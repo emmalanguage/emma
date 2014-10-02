@@ -79,7 +79,7 @@ class ConnectedComponents(inputUrl: String, outputUrl: String, rt: runtime.Engin
 
     import eu.stratosphere.emma.examples.graphs.ConnectedComponents.Schema._
 
-    val algorithm = /*parallelize*/ {
+    val algorithm = /*emma.parallelize*/ {
 
       //val vertices = DataBag(
       //  List(

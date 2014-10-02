@@ -1,8 +1,6 @@
 package eu.stratosphere.emma
 
 import eu.stratosphere.emma.api.model.Identity
-import eu.stratosphere.emma.macros.utility.UtilMacros
-import eu.stratosphere.emma.macros.program.WorkflowMacros
 
 /**
  * This is e playground specification of e function-oriented algebra for the Emma language.
@@ -34,7 +32,7 @@ package object api {
    * @tparam A The type of the DataSet elements.
    * @return Unit
    */
-  def write[A](url: String, format: OutputFormat[A])(in: Collection[A]): Unit = ???
+  def write[A](url: String, format: OutputFormat[A])(in: DataBag[A]): Unit = ???
 
   /**
    * Converts an immutable DataBag into a stateful version which permits in-place pointwise updates.
@@ -80,16 +78,6 @@ package object api {
       case _ => throw new RuntimeException(s"Unknown runtime type: '$rt'")
     }
   }
-
-  // -----------------------------------------------------
-  // program macros
-  // -----------------------------------------------------
-
-  final def parallelize[T](e: T): api.Algorithm[T] = macro WorkflowMacros.parallelize[T]
-
-  final def desugar(e: Any): String = macro UtilMacros.desugar
-
-  final def desugarRaw(e: Any): String = macro UtilMacros.desugarRaw
 
   // -----------------------------------------------------
   // limits
