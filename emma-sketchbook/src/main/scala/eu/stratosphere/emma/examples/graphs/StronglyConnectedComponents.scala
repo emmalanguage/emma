@@ -83,7 +83,7 @@ class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: runti
 
     import eu.stratosphere.emma.examples.graphs.StronglyConnectedComponents.Schema._
 
-    val algorithm = /*parallelize*/ {
+    val algorithm = /*emma.parallelize*/ {
 
       //val vertices = DataBag(
       //  List(

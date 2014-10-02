@@ -88,7 +88,7 @@ class KMeans(k: Int, epsilon: Double, inputUrl: String, outputUrl: String, rt: r
 
     import eu.stratosphere.emma.examples.datamining.clustering.KMeans.Schema._
 
-    val algorithm = /*parallelize*/ {
+    val algorithm = /*emma.parallelize*/ {
       // read input
       val points = read(inputUrl, new InputFormat[Point])
 

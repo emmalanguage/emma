@@ -21,17 +21,31 @@ object TranslationPrototype {
    *
    */
   def main(args: Array[String]): Unit = {
-    val algorithm = new TranslationPrototype(runtime.Native)
+    val algorithm = new TranslationPrototype(runtime.Aura("localhost", 31431))
     algorithm.run()
   }
 }
 
 class TranslationPrototype(rt: runtime.Engine) extends Algorithm(rt) {
 
-  def run() = runGlobalAggregates()
+  def run() = testSerialization()
+
+  private def testSerialization() = {
+    val algorithm = emma.parallelize {
+      val N = 100000
+      val A = DataBag(1 to N)
+      val B = read[Int]("file://hello.txt", new InputFormat[Int])
+      val C = write("file://hellotimesthree.txt", new OutputFormat[Int])(for (x <- read[Int]("file://hello.txt", new InputFormat[Int])) yield 3*x)
+      //val B = (for (a <- read[Int]("file://hello.txt", new InputFormat[Int])) yield (a, 3*a)) //.minBy(_._1 < _._1)
+
+      //println(B)
+    }
+
+    algorithm.run(rt)
+  }
 
   private def runGlobalAggregates() = {
-    val algorithm = /*parallelize*/ {
+    val algorithm = /*emma.parallelize*/ {
       val N = 10000
       val A = DataBag(1 to N)
 
@@ -51,7 +65,7 @@ class TranslationPrototype(rt: runtime.Engine) extends Algorithm(rt) {
   }
 
   private def runTest() = {
-    val algorithm = /*parallelize*/ {
+    val algorithm = /*emma.parallelize*/ {
       val N = 10000
 
       val A = for (a <- DataBag(1 to N)) yield (a, 2 * a, 3 * a)
@@ -63,7 +77,7 @@ class TranslationPrototype(rt: runtime.Engine) extends Algorithm(rt) {
   }
 
   private def runMinimal() = {
-    val algorithm = /*parallelize*/ {
+    val algorithm = /*emma.parallelize*/ {
       val N = 10000
       val M = Math.sqrt(N).ceil.toInt
 
@@ -117,7 +131,7 @@ class TranslationPrototype(rt: runtime.Engine) extends Algorithm(rt) {
     import eu.stratosphere.emma.examples.datamining.clustering.KMeans
     import eu.stratosphere.emma.examples.datamining.clustering.KMeans.Schema._
 
-    val algorithm = parallelize {
+    val algorithm = /*emma.parallelize*/ {
       // read input
       val points = read(inputUrl, new InputFormat[Point])
 
@@ -157,6 +171,6 @@ class TranslationPrototype(rt: runtime.Engine) extends Algorithm(rt) {
       write(outputUrl, new OutputFormat[(PID, PID)])(for (s <- solution) yield (s.point.id, s.clusterID))
     }
 
-    algorithm.run(rt)
+    //algorithm.run(rt)
   }
 }
