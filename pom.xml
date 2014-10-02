@@ -271,6 +271,7 @@
         <module>emma-language</module>
         <module>emma-optimizer</module>
         <module>emma-sketchbook</module>
+        <module>emma-codegen</module>
     </modules>
 
 </project>

@@ -154,12 +154,23 @@ private[emma] trait ProgramUtils[C <: blackbox.Context] extends ContextHolder[C]
       y
     else
       t match {
+        // Monads
         case z@MonadUnit(expr) => z.expr = substitute(expr, x, y).asInstanceOf[MonadExpression]; z
         case z@MonadJoin(expr) => z.expr = substitute(expr, x, y).asInstanceOf[MonadExpression]; z
         case z@Comprehension(tpe, head, qualifiers) => z.head = substitute(head, x, y); z.qualifiers = for (q <- qualifiers) yield substitute(q, x, y).asInstanceOf[Qualifier]; z
+        // Qualifiers
         case z@Filter(expr) => z.expr = substitute(expr, x, y); z
         case z@Generator(lhs, rhs) => z.rhs = substitute(rhs, x, y); z
-        case z@ScalaExpr(_, _) => z
+        // Environment & Host Language Connectors
+        case z@ScalaExpr(_, _) => z // FIXME
+        case z@Read(_, _, _) =>  z
+        case z@Write(_, _, _) =>  z
+        // Logical Operators:
+        case z@Group(_, _) => z
+        case z@Fold(_, empty, sng, union, in) => z
+        case z@Distinct(in) => z
+        case z@Union(l, r) => z
+        case z@Diff(l, r) => z
       }
 
   // ---------------------------------------------------

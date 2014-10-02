@@ -12,7 +12,7 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
 
   import c.universe._
 
-  def createCFG(tree: Tree): CFGraph = {
+  def createControlFlowGraph(tree: Tree): CFGraph = {
 
     // loop ID counter
     val loopCounter = new Counter()

@@ -197,7 +197,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
         val bind = Generator(arg.name, comprehend(env)(in))
         val head = comprehend(vd_arg :: env)(body)
 
-        Comprehension(q"eu.stratosphere.emma.api.DataBag[$tpt]", head, bind :: Nil)
+        Comprehension(tpt.tpe, head, bind :: Nil)
 
       // in.flatMap(fn)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(fn@Function(List(arg), body))) if select.symbol == api.flatMap =>
@@ -206,7 +206,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
         val bind = Generator(arg.name, comprehend(env)(in))
         val head = comprehend(vd_arg :: env)(body)
 
-        MonadJoin(Comprehension(q"eu.stratosphere.emma.api.DataBag[$tpt]", head, bind :: Nil))
+        MonadJoin(Comprehension(tpt.tpe, head, bind :: Nil))
 
       // in.withFilter(fn)
       case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.withFilter =>
@@ -216,7 +216,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
         val filter = Filter(comprehend(vd_arg :: env)(body))
         val head = comprehend(vd_arg :: env)(q"${arg.name}")
 
-        Comprehension(q"eu.stratosphere.emma.api.DataBag[${arg.tpt}]", head, bind :: filter :: Nil)
+        Comprehension(arg.tpt.tpe, head, bind :: filter :: Nil)
 
       // -----------------------------------------------------
       // Grouping and Set operations
@@ -260,7 +260,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
           else for (u <- x; v <- y) yield if ($bodyNew) u else v
         }"""
 
-        Fold(tpt, ScalaExpr(Nil, empty), ScalaExpr(vd_x :: Nil, sng), ScalaExpr(vd_x :: vd_y :: Nil, union), comprehend(Nil)(in))
+        Fold(tpt.tpe, ScalaExpr(Nil, empty), ScalaExpr(vd_x :: Nil, sng), ScalaExpr(vd_x :: vd_y :: Nil, union), comprehend(Nil)(in))
 
       // in.maxBy()(n)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(Function(List(x, y), body))) if select.symbol == api.maxBy =>
@@ -280,63 +280,63 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
           else for (u <- x; v <- y) yield if ($bodyNew) v else u
         }"""
 
-        Fold(tpt, ScalaExpr(Nil, empty), ScalaExpr(vd_x :: Nil, sng), ScalaExpr(vd_x :: vd_y :: Nil, union), comprehend(Nil)(in))
+        Fold(tpt.tpe, ScalaExpr(Nil, empty), ScalaExpr(vd_x :: Nil, sng), ScalaExpr(vd_x :: vd_y :: Nil, union), comprehend(Nil)(in))
 
       // in.min()(n)
       case Apply(Apply(TypeApply(select@Select(in, _), List(tpt)), Nil), n :: l :: Nil) if select.symbol == api.min =>
         val vd_x = q"val x: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
         val vd_y = q"val y: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
 
-        Fold(tpt, ScalaExpr(Nil, q"$l.max"), ScalaExpr(vd_x :: Nil, q"x"), ScalaExpr(vd_x :: vd_y :: Nil, q"$n.min(x, y)"), comprehend(Nil)(in))
+        Fold(tpt.tpe, ScalaExpr(Nil, q"$l.max"), ScalaExpr(vd_x :: Nil, q"x"), ScalaExpr(vd_x :: vd_y :: Nil, q"$n.min(x, y)"), comprehend(Nil)(in))
 
       // in.max()(n)
       case Apply(Apply(TypeApply(select@Select(in, _), List(tpt)), Nil), n :: l :: Nil) if select.symbol == api.max =>
         val vd_x = q"val x: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
         val vd_y = q"val y: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
 
-        Fold(tpt, ScalaExpr(Nil, q"$l.min"), ScalaExpr(vd_x :: Nil, q"x"), ScalaExpr(vd_x :: vd_y :: Nil, q"$n.max(x, y)"), comprehend(Nil)(in))
+        Fold(tpt.tpe, ScalaExpr(Nil, q"$l.min"), ScalaExpr(vd_x :: Nil, q"x"), ScalaExpr(vd_x :: vd_y :: Nil, q"$n.max(x, y)"), comprehend(Nil)(in))
 
       // in.sum()(n)
       case Apply(Apply(TypeApply(select@Select(in, _), List(tpt)), Nil), n :: Nil) if select.symbol == api.sum =>
         val vd_x = q"val x: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
         val vd_y = q"val y: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
 
-        Fold(tpt, ScalaExpr(Nil, q"$n.zero"), ScalaExpr(vd_x :: Nil, q"x"), ScalaExpr(vd_x :: vd_y :: Nil, q"$n.plus(x, y)"), comprehend(Nil)(in))
+        Fold(tpt.tpe, ScalaExpr(Nil, q"$n.zero"), ScalaExpr(vd_x :: Nil, q"x"), ScalaExpr(vd_x :: vd_y :: Nil, q"$n.plus(x, y)"), comprehend(Nil)(in))
 
       // in.product()(n)
       case Apply(Apply(TypeApply(select@Select(in, _), List(tpt)), Nil), n :: Nil) if select.symbol == api.product =>
         val vd_x = q"val x: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
         val vd_y = q"val y: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
 
-        Fold(tpt, ScalaExpr(Nil, q"$n.one"), ScalaExpr(vd_x :: Nil, q"x"), ScalaExpr(vd_x :: vd_y :: Nil, q"$n.times(x, y)"), comprehend(Nil)(in))
+        Fold(tpt.tpe, ScalaExpr(Nil, q"$n.one"), ScalaExpr(vd_x :: Nil, q"x"), ScalaExpr(vd_x :: vd_y :: Nil, q"$n.times(x, y)"), comprehend(Nil)(in))
 
       // in.count()(n)
       case Apply(select@Select(in, _), Nil) if select.symbol == api.count =>
         val vd_x = q"val x: Long = null.asInstanceOf[Long]".asInstanceOf[ValDef]
         val vd_y = q"val y: Long = null.asInstanceOf[Long]".asInstanceOf[ValDef]
 
-        Fold(q"Long", ScalaExpr(Nil, q"0L"), ScalaExpr(vd_x :: Nil, q"1L"), ScalaExpr(vd_x :: vd_y :: Nil, q"x + y"), comprehend(Nil)(in))
+        Fold(c.typeOf[Long], ScalaExpr(Nil, q"0L"), ScalaExpr(vd_x :: Nil, q"1L"), ScalaExpr(vd_x :: vd_y :: Nil, q"x + y"), comprehend(Nil)(in))
 
       // in.exists()(n)
       case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.exists =>
         val vd_x = q"val x: Boolean = null.asInstanceOf[Long]".asInstanceOf[ValDef]
         val vd_y = q"val y: Boolean = null.asInstanceOf[Long]".asInstanceOf[ValDef]
 
-        Fold(q"Boolean", ScalaExpr(Nil, q"false"), ScalaExpr(vd_x :: Nil, substitute(body, arg.toString(), q"x")), ScalaExpr(vd_x :: vd_y :: Nil, q"x || y"), comprehend(Nil)(in))
+        Fold(c.typeOf[Boolean], ScalaExpr(Nil, q"false"), ScalaExpr(vd_x :: Nil, substitute(body, arg.toString(), q"x")), ScalaExpr(vd_x :: vd_y :: Nil, q"x || y"), comprehend(Nil)(in))
 
       // in.forall()(n)
       case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.forall =>
         val vd_x = q"val x: Boolean = null.asInstanceOf[Long]".asInstanceOf[ValDef]
         val vd_y = q"val y: Boolean = null.asInstanceOf[Long]".asInstanceOf[ValDef]
 
-        Fold(q"Boolean", ScalaExpr(Nil, q"true"), ScalaExpr(vd_x :: Nil, substitute(body, arg.toString(), q"x")), ScalaExpr(vd_x :: vd_y :: Nil, q"x && y"), comprehend(Nil)(in))
+        Fold(c.typeOf[Boolean], ScalaExpr(Nil, q"true"), ScalaExpr(vd_x :: Nil, substitute(body, arg.toString(), q"x")), ScalaExpr(vd_x :: vd_y :: Nil, q"x && y"), comprehend(Nil)(in))
 
       // in.empty()(n)
       case Apply(select@Select(in, _), Nil) if select.symbol == api.empty =>
         val vd_x = q"val x: Boolean = null.asInstanceOf[Long]".asInstanceOf[ValDef]
         val vd_y = q"val y: Boolean = null.asInstanceOf[Long]".asInstanceOf[ValDef]
 
-        Fold(q"Boolean", ScalaExpr(Nil, q"false"), ScalaExpr(vd_x :: Nil, q"true"), ScalaExpr(vd_x :: vd_y :: Nil, q"x || y"), comprehend(Nil)(in))
+        Fold(c.typeOf[Boolean], ScalaExpr(Nil, q"false"), ScalaExpr(vd_x :: Nil, q"true"), ScalaExpr(vd_x :: vd_y :: Nil, q"x || y"), comprehend(Nil)(in))
 
       // ----------------------------------------------------------------------
       // Environment & Host Language Connectors
@@ -348,7 +348,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
 
       // read[T](location, ifmt)
       case Apply(TypeApply(method, List(tpt)), location :: ifmt :: Nil) if method.symbol == api.read =>
-        Read(tpt, location, ifmt)
+        Read(tpt.tpe, location, ifmt)
 
       // interpret as black box Scala expression (default)
       case _ =>

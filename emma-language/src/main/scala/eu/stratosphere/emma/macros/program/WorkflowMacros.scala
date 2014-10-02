@@ -71,12 +71,6 @@ class WorkflowMacros(val c: blackbox.Context) {
         q"""
         object __emmaAlgorithm extends eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
 
-           // required Emma imports
-           import eu.stratosphere.emma.api._
-           import eu.stratosphere.emma.ir
-           // required Scala imports
-           import scala.reflect.runtime.universe._
-
            def run(engine: runtime.Engine): ${c.weakTypeOf[T]} = engine match {
              case runtime.Native => runNative()
              case _ => runParallel(engine)
