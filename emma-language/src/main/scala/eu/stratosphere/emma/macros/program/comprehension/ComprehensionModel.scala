@@ -86,7 +86,11 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
 
     private val defIndex = mutable.Map((for (t <- terms; d <- t.definition) yield d -> t): _*)
 
+    private val termIndex = mutable.Map((for (t <- terms) yield t.term -> t): _*)
+
     def comprehendedDef(defintion: Tree) = defIndex.get(defintion)
+
+    def getByTerm(term: Tree) = termIndex.get(term)
   }
 
   case class ComprehendedTerm(id: TermName, term: Tree, comprehension: ExpressionRoot, definition: Option[Tree])
@@ -137,6 +141,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     // Logical Operators: Skip!
     case Group(key, in) => globalSeq(in) ++ globalSeq(key) ++ List(root)
     case Fold(_, empty, sng, union, in) => globalSeq(in) ++ globalSeq(empty) ++ globalSeq(sng) ++ globalSeq(union) ++ List(root)
+    // TODO: add other operators
   }
 
   /** Pretty-print an IR tree.

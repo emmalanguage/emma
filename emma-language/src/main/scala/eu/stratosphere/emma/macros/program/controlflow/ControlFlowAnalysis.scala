@@ -168,8 +168,7 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
     }
 
     // call recursive helper
-    val nCurr = c.typecheck(new TreeNormalizer().transform(c.untypecheck(tree)))
-    _createCFG(nCurr, vCurr)
+    _createCFG(tree, vCurr)
 
     // remove empty blocks from the end of the graph (might result from tailing if (c) e1 else e2 return statements)
     var emptyBlocks = graph.nodes filter { x => x.diSuccessors.isEmpty && x.stats.isEmpty}
@@ -191,7 +190,7 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
    * - unnesting of compex trees ouside do-while loop tests.
    * - unnesting of compex trees ouside if-then-else conditions.
    */
-  private class TreeNormalizer() extends Transformer {
+  object normalize extends Transformer with (Tree => Tree) {
 
     val testCounter = new Counter()
 
@@ -238,6 +237,8 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
       case _ =>
         super.transform(tree)
     }
+
+    def apply(tree: Tree): Tree = c.typecheck(transform(c.untypecheck(tree)))
   }
 
 }

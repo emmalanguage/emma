@@ -22,8 +22,7 @@ class WorkflowMacros(val c: blackbox.Context) {
   private class LiftHelper[C <: blackbox.Context](val c: C)
     extends ContextHolder[c.type]
     with ControlFlow[c.type]
-    with Comprehension[c.type]
-    with ComprehensionNormalization[c.type] {
+    with Comprehension[c.type] {
 
     import c.universe._
 
@@ -34,12 +33,15 @@ class WorkflowMacros(val c: blackbox.Context) {
      */
     def parallelize[T: c.WeakTypeTag](root: Expr[T]): Expr[Algorithm[T]] = {
 
+      // Create a normalized version of the original tree
+      val normalizedTree = normalize(root.tree)
+
       // ----------------------------------------------------------------------
       // Code analysis
       // ----------------------------------------------------------------------
 
       // 1. Create control flow graph
-      val cfGraph = createCFG(root.tree)
+      val cfGraph = createControlFlowGraph(normalizedTree)
 
       // 2. Identify and isolate maximal comprehensions
       val comprehensionStore = createComprehensionStore(cfGraph)
@@ -52,6 +54,12 @@ class WorkflowMacros(val c: blackbox.Context) {
 
       // 1. Comprehension rewrite (TODO)
 
+      // Sufficient conditions to rewrite folds using banana-split + fusion
+      // 0) Let `f` be a fold expression
+      // 1) Fold input should be a shared comprehended identifier (say `A`, or `A.values` where `A` is a group)
+      // 2) Reaching defititions of A should be a singleton set at all folds (say, with definition `d`)
+      // 3) There should be no terms that reference `A` which contain `d` in its reaching definitions
+
       // 2. Derive logical plans (TODO)
 
       // ----------------------------------------------------------------------
@@ -63,9 +71,11 @@ class WorkflowMacros(val c: blackbox.Context) {
         q"""
         object __emmaAlgorithm extends eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
 
-           // required imports
+           // required Emma imports
            import eu.stratosphere.emma.api._
            import eu.stratosphere.emma.ir
+           // required Scala imports
+           import scala.reflect.runtime.universe._
 
            def run(engine: runtime.Engine): ${c.weakTypeOf[T]} = engine match {
              case runtime.Native => runNative()
@@ -74,44 +84,38 @@ class WorkflowMacros(val c: blackbox.Context) {
 
            private def runNative(): ${c.weakTypeOf[T]} = ${c.untypecheck(root.tree)}
 
-           private def runParallel(engine: runtime.Engine): ${c.weakTypeOf[T]} = ${c.untypecheck(root.tree)}
+           private def runParallel(engine: runtime.Engine): ${c.weakTypeOf[T]} = ${compile(normalizedTree, cfGraph, comprehensionStore)}
         }
         """
-
-        // private def runParallel(engine: runtime.Engine): ${c.weakTypeOf[T]} = { ..${compileDriver[T](cfGraph)} }
 
       // construct and return a block that returns a Workflow using the above list of sinks
       val block = Block(List(algorithmCode), c.parse("__emmaAlgorithm"))
       c.Expr[Algorithm[T]](c.typecheck(block))
     }
 
-//    /**
-//     * Lifts the root block of an Emma program.
-//     *
-//     * @param e The root block AST to be lifted.
-//     * @return
-//     */
-//    private def liftRootBlock(e: Block): Block = {
-//
-//      // recursively lift to MC syntax starting from the sinks
-//      val sinks = (for (s <- extractSinkExprs(e.expr)) yield ExpressionRoot(lift(e, Nil)(resolve(e)(s)))).toList
-//
-//      // a list of statements for the root block of the translated MC expression
-//      val stats = ListBuffer[Tree]()
-//      // 1) add required imports
-//      stats += c.parse("import eu.stratosphere.emma.ir._")
-//      stats += c.parse("import scala.collection.mutable.ListBuffer")
-//      stats += c.parse("import scala.reflect.runtime.universe._")
-//      // 2) initialize translated sinks list
-//      stats += c.parse("val sinks = ListBuffer[Comprehension]()")
-//      // 3) add the translated MC expressions for all sinks
-//      for (s <- sinks) {
-//        stats += q"sinks += ${serialize(rewrite(s).expr)}"
-//      }
-//
-//      // construct and return a block that returns a Workflow using the above list of sinks
-//      Block(stats.toList, c.parse( """Workflow("Emma Workflow", sinks.toList)"""))
-//    }
+    /**
+     * Compiles a generic driver for a data-parallel runtime.
+     *
+     * @param tree The original program tree.
+     * @param cfGraph The control flow graph representation of the tree.
+     * @param comprehensionStore A store containing the comprehended terms in the tree.
+     * @return A tree representing the compiled triver.
+     */
+    def compile(tree: Tree, cfGraph: CFGraph, comprehensionStore: ComprehensionStore): Tree = {
+
+      object expandComprehendedTerms extends Transformer with (Tree => Tree) {
+        override def transform(tree: Tree): Tree = comprehensionStore.getByTerm(tree) match {
+          case Some(t) =>
+            expand(tree, cfGraph, comprehensionStore)(t)
+          case _ =>
+            super.transform(tree)
+        }
+
+        override def apply(tree: Tree): Tree = transform(tree)
+      }
+
+      c.untypecheck(expandComprehendedTerms(tree))
+    }
 
   }
 
