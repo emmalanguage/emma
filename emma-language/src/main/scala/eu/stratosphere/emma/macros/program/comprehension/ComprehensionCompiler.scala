@@ -24,7 +24,22 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
    * @return A tree representing the expanded comprehension.
    */
   def expand(tree: Tree, cfGraph: CFGraph, comprehensionStore: ComprehensionStore)(t: ComprehendedTerm) = {
-    t.term
+    // FIXME: avoid name collisions by explicitly prefixing ir types with ir.*
+    q"""{
+      val comprehension = {
+
+        // required imports
+        import scala.reflect.runtime.universe._
+        import eu.stratosphere.emma.ir._
+
+        val root = ExpressionRoot(${serialize(t.comprehension.expr)})
+
+        val waaa = eu.stratosphere.emma.optimizer.rewrite.OptimizerRewriteEngine().rewrite(root)
+        println(prettyprint(waaa.expr))
+      }
+
+      0
+    }"""
   }
 
   /**
@@ -34,29 +49,59 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
    * @return
    */
   private def serialize(e: Expression): Tree = e match {
+    // Monads
     case MonadUnit(expr) =>
-      q"MonadUnit(${serialize(expr)})"
+      val canonicalTpe = e.tpe.dealias
+      q"MonadUnit(${serialize(expr)})(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
+
     case MonadJoin(expr) =>
-      q"MonadJoin(${serialize(expr)})"
+      val canonicalTpe = e.tpe.dealias
+      q"MonadJoin(${serialize(expr)})(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
+
+    case Comprehension(_, head, qualifiers) =>
+      val headTpe = head.tpe
+      val canonicalTpe = e.tpe.dealias
+      q"""
+      {
+        // MC qualifiers
+        val qualifiers = scala.collection.mutable.ListBuffer[Qualifier]()
+        ..${for (q <- qualifiers) yield q"qualifiers += ${serialize(q)}"}
+
+        // MC head
+        val head = ${serialize(head)}
+
+        // MC constructor
+        Comprehension(head, qualifiers.toList)(scala.reflect.runtime.universe.typeTag[$canonicalTpe])
+      }
+      """
+
+    // Qualifiers
     case Filter(expr) =>
       q"Filter(${serialize(expr)})"
-    case Generator(lhs, rhs) =>
-      q"{ val rhs = ${serialize(rhs)}; ComprehensionGenerator(${lhs.toString}, rhs) }"
+
+    case Generator(lhs, rhs: ScalaExpr) =>
+      val canonicalTpe = e.tpe.dealias
+      q"ScalaExprGenerator(${lhs.toString}, ${serialize(rhs)})(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
+
+    case Generator(lhs, rhs: Expression) =>
+      val canonicalTpe = e.tpe.dealias
+      q"ComprehensionGenerator(${lhs.toString}, ${serialize(rhs)})(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
+
+    // Environment & Host Language Connectors
     case ScalaExpr(env, t) =>
-      q"ScalaExpr(${for (v <- referencedEnv(t, env)) yield v.name.toString}, { ..${referencedEnv(t, env)}; reify { ${freeEnv(t, env)} } })"
-    case Comprehension(tpe, head, qualifiers) =>
-      q"""
-        {
-          // MC qualifiers
-          val qualifiers = ListBuffer[Qualifier]()
-          ..${for (q <- qualifiers) yield q"qualifiers += ${serialize(q)}"}
+      val tps = (for (e <- referencedEnv(t, env)) yield e match {
+        case v@ValDef(m, name, t, rhs) => name.toString -> q"reify( {$v; $name} )"
+        case _ => throw new IllegalStateException()
+      }).toMap
+      val canonicalTpe = e.tpe.dealias
+      q"ScalaExpr($tps, { ..${referencedEnv(t, env)}; reify { ${freeEnv(t, env)} } })(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
 
-          // MC head
-          val head = ${serialize(head)}
+    case Read(tpe, location, format) =>
+      val canonicalTpe = tpe.dealias
+      q"Read[$canonicalTpe]($location, $format)(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
 
-          // MC constructor
-          Comprehension($tpe, head, qualifiers.toList)
-        }
-         """
+    case Write(location, format, in) =>
+      val canonicalTpe = format.tpe.dealias.typeArgs.head
+      q"Write[$canonicalTpe]($location, $format, ${serialize(in)})(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
   }
 }

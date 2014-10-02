@@ -103,7 +103,7 @@ trait ComprehensionNormalization[C <: blackbox.Context]
     override protected def fire(r: ExpressionRoot, m: RuleMatch) = {
       m.parent.qualifiers = m.parent.qualifiers ++ m.child.qualifiers
       m.parent.head = m.child.head
-      m.parent.tpt = m.child.tpt
+      m.parent.tpe = m.child.tpe
       r.expr = substitute(r.expr, m.join, m.parent)
     }
   }

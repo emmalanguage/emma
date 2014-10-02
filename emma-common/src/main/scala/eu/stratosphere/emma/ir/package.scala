@@ -1,121 +1,255 @@
 package eu.stratosphere.emma
 
+import eu.stratosphere.emma.api.{OutputFormat, InputFormat}
+
+import scala.collection.mutable
+
 /**
  * Nodes for building an intermediate representation of an Emma programs.
  */
 package object ir {
 
   import scala.reflect.runtime.universe._
+  import scala.language.existentials // TODO: required for Read[+A], see why
 
   // ---------------------------------------------------
-  // Base traits and classes.
+  // Thunks.
   // ---------------------------------------------------
 
-  final class Workflow(val name: String, val sinks: List[Comprehension]) {
+  trait Env {
+    def get[A](name: String): A
+
+    //    def put[A](value: DataSet[A]): A
+    //
+    //    def execute
   }
 
-  object Workflow {
-    def apply(name: String, sinks: List[Comprehension]): Workflow = new Workflow(name, sinks)
+  def force[A](thunk: Thunk[A])(implicit env: Env) = env.get(thunk.name)
+
+  final class Thunk[A](val name: String) {
   }
 
-  case class ExpressionRoot(var expr: Expression)
+  // --------------------------------------------------------------------------
+  // Comprehension Model
+  // --------------------------------------------------------------------------
 
-  trait Expression {
+  case class ExpressionRoot(var expr: Expression) {
+    override def toString = prettyprint(expr)
   }
 
-  // ---------------------------------------------------
-  // Monad comprehensions.
-  // ---------------------------------------------------
-
-  trait MonadExpression extends Expression {
+  sealed trait Expression {
   }
 
-  final case class MonadJoin(var expr: Expression) extends MonadExpression {
+  // Monads
+
+  sealed trait MonadExpression extends Expression {
   }
 
-  final case class MonadUnit(var expr: Expression) extends MonadExpression {
+  final case class MonadJoin[+A](var expr: MonadExpression)(implicit val tag: TypeTag[_ <: A]) extends MonadExpression {
   }
 
-  trait Qualifier extends Expression {
+  final case class MonadUnit[+A](var expr: MonadExpression)(implicit val tag: TypeTag[_ <: A]) extends MonadExpression {
+  }
+
+  final case class Comprehension[+A](var head: Expression, var qualifiers: List[Qualifier])(implicit val tag: TypeTag[_ <: A]) extends MonadExpression {
+  }
+
+  // Qualifiers
+
+  sealed trait Qualifier extends Expression {
   }
 
   final case class Filter(var expr: Expression) extends Qualifier {
   }
 
-  trait Generator extends Qualifier {
+  // TODO: try using a single generator like the one defined below instead of the generator family
+  // case class Generator(var lhs: String, var rhs: Expression) extends Qualifier {
+  // }
+
+  sealed trait Generator extends Qualifier {
     var lhs: String
   }
 
-  final case class ScalaExprGenerator(var lhs: String, var rhs: ScalaExpr) extends Generator {
+  final case class ScalaExprGenerator[+A](var lhs: String, var rhs: ScalaExpr[Any])(implicit val tag: TypeTag[_ <: A]) extends Generator {
   }
 
-  final case class ComprehensionGenerator(var lhs: String, var rhs: MonadExpression) extends Generator {
+  final case class ComprehensionGenerator[+A](var lhs: String, var rhs: Expression)(implicit val tag: TypeTag[_ <: A]) extends Generator {
   }
 
-  final case class ScalaExpr(var freeVars: List[String], var expr: Expr[Any]) extends Expression {
+  // Environment & Host Language Connectors
+
+  // TODO: rename freeVars to env
+  case class ScalaExpr[+A](var freeVars: Map[String, Expr[Any]], var expr: Expr[Any])(implicit val tag: TypeTag[_ <: A])  extends Expression {
   }
 
-  final case class Comprehension(var tpe: monad.Monad[Any], var head: Expression, var qualifiers: List[Qualifier]) extends MonadExpression {
+  case class Read[+A](location: String, format: InputFormat[_ <: A])(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  }
+
+  case class Write[+A](location: String, format: OutputFormat[_ <: A], in: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  }
+
+  // Logical Operators
+
+  case class Group[+A](var key: ScalaExpr[Any], var in: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  }
+
+  case class Fold[+A](var empty: ScalaExpr[Any], var sng: ScalaExpr[Any], var union: ScalaExpr[Any], var in: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  }
+
+  case class Distinct[+A](var in: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  }
+
+  case class Union[+A](var l: Expression, var r: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  }
+
+  case class Diff[+A](var l: Expression, var r: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
   }
 
   // ---------------------------------------------------
   // Combinators.
   // ---------------------------------------------------
 
+  case class FilterCombinator(p: Filter, xs: Generator) extends Generator {
+    var lhs = xs.lhs
+
+    override def toString = "Filter"
+  }
+
+  case class EquiJoinCombinator(var lhs: String, p: Filter, xs: Generator, ys: Generator) extends Generator {
+    override def toString = s"Join(lhs = $lhs)"
+  }
+
+  case class ThetaJoinCombinator(var lhs: String, p: Filter, xs: Generator, ys: Generator) extends Generator {
+    override def toString = s"Join(lhs = $lhs)"
+  }
+
+  case class CrossCombinator(var lhs: String, qs: List[Generator]) extends Generator {
+    override def toString = s"Cross(lhs = $lhs)"
+  }
+
+  case class MapCombinator(var body: ScalaExpr[Any], var input: Qualifier) extends MonadExpression {
+    override def toString = s"Map"
+  }
+
+  case class FlatMapCombinator(var body: ScalaExpr[Any], var input: Qualifier) extends MonadExpression {
+    override def toString = s"FlatMap"
+  }
+
   // ---------------------------------------------------
   // Helper methods.
   // ---------------------------------------------------
 
   /**
-   * Construct a list containing the nodes of an IR tree using depth-first, bottom-up traversal.
+   * Construct a list containing the nodes of a local comprehension tree using depth-first, bottom-up traversal.
+   *
+   * This method will trim subtrees with nodes which represent
+   *
+   * - Logical Operators or
+   * - Environment & Host Language Connectors.
    *
    * @param root The root of the traversed tree.
    * @return
    */
-  def sequence(root: Expression): List[Expression] = root match {
-    case MonadUnit(expr) => sequence(expr) ++ List(root)
-    case MonadJoin(expr) => sequence(expr) ++ List(root)
-    case Filter(expr) => sequence(expr) ++ List(root)
-    case ScalaExprGenerator(_, rhs) => sequence(rhs) ++ List(root)
-    case ComprehensionGenerator(_, rhs: MonadExpression) => sequence(rhs) ++ List(root)
-    case ScalaExpr(_, _) => List(root)
-    case Comprehension(_, head, qualifiers) => qualifiers.flatMap(q => sequence(q)) ++ sequence(head) ++ List(root)
+  def localSeq(root: Expression): List[Expression] = root match {
+    // Monads
+    case MonadUnit(expr) => localSeq(expr) ++ List(root)
+    case MonadJoin(expr) => localSeq(expr) ++ List(root)
+    case Comprehension(head, qualifiers) => qualifiers.flatMap(q => localSeq(q)) ++ localSeq(head) ++ List(root)
+    // Qualifiers
+    case Filter(expr) => localSeq(expr) ++ List(root)
+    case ScalaExprGenerator(_, rhs) => localSeq(rhs) ++ List(root)
+    case ComprehensionGenerator(_, rhs) => localSeq(rhs) ++ List(root)
+    // Environment & Host Language Connectors, Logical Operators: Skip!
+    case _ => List(root)
   }
 
-  /**
-   * Pretty-print an IR tree.
-   *
-   * @param root The root of the printed tree.
-   * @return
-   */
-  def prettyprint(root: Expression, debug: Boolean = false): Unit = {
-    import scala.Predef.{print => p, println => pln}
+  /** Construct a list containing the nodes of an IR tree using depth-first, bottom-up traversal.
+    *
+    * @param root The root of the traversed tree.
+    * @return
+    */
+  def globalSeq(root: Expression): List[Expression] = root match {
+    // Monads
+    case MonadUnit(expr) => globalSeq(expr) ++ List(root)
+    case MonadJoin(expr) => globalSeq(expr) ++ List(root)
+    case Comprehension(head, qualifiers) => qualifiers.flatMap(q => globalSeq(q)) ++ globalSeq(head) ++ List(root)
+    // Qualifiers
+    case Filter(expr) => globalSeq(expr) ++ List(root)
+    case ScalaExprGenerator(_, rhs) => localSeq(rhs) ++ List(root)
+    case ComprehensionGenerator(_, rhs) => localSeq(rhs) ++ List(root)
+    // Environment & Host Language Connectors
+    case ScalaExpr(_, _) => List(root)
+    case Read(_, _) => List(root)
+    case Write(_, _, in) => globalSeq(in) ++ List(root)
+    // Logical Operators: Skip!
+    case Group(key, in) => globalSeq(in) ++ globalSeq(key) ++ List(root)
+    case Fold(empty, sng, union, in) => globalSeq(in) ++ globalSeq(empty) ++ globalSeq(sng) ++ globalSeq(union) ++ List(root)
+    case Distinct(in) => globalSeq(in) ++ List(root)
+    case Union(l, r) => globalSeq(l) ++ globalSeq(r) ++ List(root)
+    case Diff(l, r) => globalSeq(l) ++ globalSeq(r) ++ List(root)
+    // Combinators
+    case FilterCombinator(p, xs) => globalSeq(xs) ++ globalSeq(p) ++ List(root)
+    case EquiJoinCombinator(_, p, xs, ys) => globalSeq(ys) ++ globalSeq(xs) ++ globalSeq(p) ++ List(root)
+    case ThetaJoinCombinator(_, p, xs, ys) => globalSeq(ys) ++ globalSeq(xs) ++ globalSeq(p) ++ List(root)
+    case CrossCombinator(_, qs) => qs.flatMap(q => globalSeq(q)) ++ List(root)
+    case MapCombinator(e, qs) => globalSeq(qs) ++ List(root)
+  }
+
+  /** Pretty-print an IR tree.
+    *
+    * @param root The root of the printed tree.
+    * @return
+    */
+  def prettyprint(root: Expression, debug: Boolean = false) = {
+    val sb = new mutable.StringBuilder()
+
+    def p(v: Any) = v match {
+      case x: TermName => sb.append(x.encodedName.toString)
+      case x: Tree => sb.append(x.toString())
+      case x: String => sb.append(x)
+      case _ => sb.append("<unknown>")
+    }
+
+    def pln(v: String) = sb.append(v + sys.props("line.separator"))
+
+    def printType(tpe: Tree) = tpe.toString().stripPrefix("eu.stratosphere.emma.api.")
 
     val ident = "        "
 
     def printHelper(e: Any, offset: String = ""): Unit = e match {
+      // Monads
       case MonadJoin(expr) => p("join("); printHelper(expr, offset + "     "); p(")")
       case MonadUnit(expr) => p("unit("); printHelper(expr, offset + "     "); p(")")
-      case Comprehension(t, h, qs) => p("[ "); printHelper(h, offset + " " * 2); pln(" | "); printHelper(qs, offset + ident); p("\n" + offset + "]^" + t.name + "")
+      case Comprehension(h, qs) => p("[ "); printHelper(h, offset + " " * 2); pln(" | "); printHelper(qs, offset + ident); p("\n" + offset + "]^" /*+ printType(t)*/ + "") // TODO: print
+      // Qualifiers
       case ComprehensionGenerator(lhs, rhs) => p(lhs); p(" ← "); printHelper(rhs, offset + "   " + " " * lhs.length)
-      case ScalaExprGenerator(lhs, rhs) => p(lhs); p(" ← "); p(rhs.expr.tree)
+      case ScalaExprGenerator(lhs, rhs) => p(lhs); p(" ← "); printHelper(rhs, offset + "   " + " " * lhs.length)
       case Filter(expr) => printHelper(expr)
+      // Environment & Host Language Connectors
+      case ScalaExpr(freeVars, expr) => p(expr); if (debug) p(" <" + freeVars + "> ")
+      case Read(location, format) => p("read("); p(location); p(")")
+      case Write(location, format, in) => p("write("); p(location); p(")("); printHelper(in, offset + ident); p(")")
+      // Logical Operators
+      case Group(key, in) => p("group("); printHelper(key); p(")("); printHelper(in); p(")")
+      case Fold(empty, sng, union, in) => p("fold(〈"); printHelper(empty); p(", "); printHelper(sng); p(", "); printHelper(union); p("〉, "); printHelper(in); p(")")
+      case Distinct(in) => p("distinct("); printHelper(in); p(")");
+      case Union(l, r) => p("union("); printHelper(l); p(")("); printHelper(r); p(")")
+      case Diff(l, r) => p("diff("); printHelper(l); p(")("); printHelper(r); p(")")
+      // Combinators
+      case EquiJoinCombinator(l, p, x, y) => print(s"$l ← ("); printHelper(p); print(s")(${x.lhs}) ⋈ "); print(s"(${y.lhs})")
+      case ThetaJoinCombinator(l, p, x, y) => print(s"$l ← ("); printHelper(p); print(s")(${x.lhs}) ⋈ "); print(s"(${y.lhs})")
+      case CrossCombinator(l, qs) => print(s"$l ← "); val b = StringBuilder.newBuilder; qs.map(q => q.lhs).addString(b, "(", ") ⨯ (", ")"); print(b.result())
+      case FilterCombinator(p, xs) => print(s"${xs.lhs} ← σ ("); printHelper(p); print(")("); printHelper(xs); print(")")
+      case MapCombinator(e, qs) => print("map ("); printHelper(e); print(")("); printHelper(qs); print(")")
+      // Lists
       case Nil => pln("")
-      case (q: Qualifier) :: Nil => p(offset); printHelper(q, offset)
-      case (q: Qualifier) :: qs => p(offset); printHelper(q, offset); pln(", "); printHelper(qs, offset)
-      case ScalaExpr(freeVars, expr) => p(expr.tree); if (debug) p(" <" + freeVars + "> ")
+      case q :: Nil => p(offset); printHelper(q, offset)
+      case q :: qs => p(offset); printHelper(q, offset); pln(", "); printHelper(qs, offset)
       case _ => p("〈unknown expression〉")
     }
 
     printHelper(root)
-    pln("")
+    sb.toString()
   }
 
-  /**
-   * Pretty-print a workflow.
-   *
-   * @param df The workflow to print.
-   * @return
-   */
-  def prettyprint(df: Workflow): Unit = for (sink <- df.sinks) prettyprint(sink)
 }
