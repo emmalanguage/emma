@@ -29,16 +29,17 @@ trait ComprehensionNormalization[C <: blackbox.Context]
 
   def normalize(root: ExpressionRoot) = rewrite(root)
 
-  /** Unnests a comprehended head in its parent.
-    *
-    * ==Rule Description==
-    *
-    * '''Matching Pattern''':
-    * {{{ [[ e | qs, x ← [[ e' | qs' ]], qs'' ]] }}}
-    *
-    * '''Rewrite''':
-    * {{{ [[ e[e'\x] | qs,  qs', qs''[e'\x] ]] }}}
-    */
+  /**
+   * Unnests a comprehended head in its parent.
+   *
+   * ==Rule Description==
+   *
+   * '''Matching Pattern''':
+   * {{{ [[ e | qs, x ← [[ e' | qs' ]], qs'' ]] }}}
+   *
+   * '''Rewrite''':
+   * {{{ [[ e[e'\x] | qs,  qs', qs''[e'\x] ]] }}}
+   */
   object UnnestGenerator extends Rule {
 
     case class RuleMatch(parent: Comprehension, generator: Generator, child: Comprehension)
@@ -73,16 +74,17 @@ trait ComprehensionNormalization[C <: blackbox.Context]
     }
   }
 
-  /** Unnests a comprehended head in its parent.
-    *
-    * Rule Description
-    *
-    * '''Matching Pattern''':
-    * {{{ [[ [[ e | qs' ]] | qs ]] }}}
-    *
-    * '''Rewrite''':
-    * {{{ [[ e | qs, qs' ]] }}}
-    */
+  /**
+   * Unnests a comprehended head in its parent.
+   *
+   * Rule Description
+   *
+   * '''Matching Pattern''':
+   * {{{ [[ [[ e | qs' ]] | qs ]] }}}
+   *
+   * '''Rewrite''':
+   * {{{ [[ e | qs, qs' ]] }}}
+   */
   object UnnestHead extends Rule {
 
     case class RuleMatch(join: MonadJoin, parent: Comprehension, child: Comprehension)
@@ -181,16 +183,17 @@ trait ComprehensionNormalization[C <: blackbox.Context]
 
   }
 
-  /** Fuses a fold with a child comprehension consisting of a single generator.
-    *
-    * Rule Description
-    *
-    * '''Matching Pattern''':
-    * {{{ fold( empty, sng, union, [[ e | x ← e' ]] ) }}}
-    *
-    * '''Rewrite''':
-    * {{{ fold( empty, sng[e[x\z]\x], union[e[x\z]\x, e[y\z]\y], e' ]] ) }}}
-    */
+  /**
+   * Fuses a fold with a child comprehension consisting of a single generator.
+   *
+   * Rule Description
+   *
+   * '''Matching Pattern''':
+   * {{{ fold( empty, sng, union, [[ e | x ← e' ]] ) }}}
+   *
+   * '''Rewrite''':
+   * {{{ fold( empty, sng[e[x\z]\x], union[e[x\z]\x, e[y\z]\y], e' ]] ) }}}
+   */
   object FuseFoldMap extends Rule {
 
     case class RuleMatch(fold: Fold, map: Comprehension, child: Generator)
@@ -221,4 +224,5 @@ trait ComprehensionNormalization[C <: blackbox.Context]
       m.fold.in = m.child.rhs
     }
   }
+
 }

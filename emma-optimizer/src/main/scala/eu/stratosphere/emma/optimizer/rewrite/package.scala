@@ -58,7 +58,7 @@ package object rewrite {
     }
 
     for (x <- exprs) x match {
-      case g: Generator =>
+      case g: Generator[Any] =>
         for (v <- freeVars if (v == g.lhs)) {
           g.lhs = identifierPattern.replaceAllIn(g.lhs, s"${freeVars.head}._${freeVars.indexOf(v)}")
         }
@@ -66,7 +66,7 @@ package object rewrite {
       case s@ScalaExpr(_, scalaExpr) =>
         val typeTag = mkTypeTag(scalaExpr.mirror)(scalaExpr)
         s.expr = mkExpr(scalaExpr.mirror)(new VarTransformer(replacement).transform(scalaExpr.tree))(typeTag)
-        s.freeVars = s.freeVars.map(x => replacement.get(x._1) match {
+        s.env = s.env.map(x => replacement.get(x._1) match {
           case Some(r) => (r.toString, x._2)
           case None => x
         })

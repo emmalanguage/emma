@@ -31,11 +31,12 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         // required imports
         import scala.reflect.runtime.universe._
         import eu.stratosphere.emma.ir._
+        import eu.stratosphere.emma.optimizer._
 
-        val root = ExpressionRoot(${serialize(t.comprehension.expr)})
+        val engine = new rewrite.OptimizerRewriteEngine()
+        val root = engine.rewrite(ExpressionRoot(${serialize(t.comprehension.expr)}))
 
-        val waaa = eu.stratosphere.emma.optimizer.rewrite.OptimizerRewriteEngine().rewrite(root)
-        println(prettyprint(waaa.expr))
+        println(prettyprint(root.expr))
       }
 
       0
@@ -48,20 +49,17 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
    * @param e The expression in IR to be serialized.
    * @return
    */
-  private def serialize(e: Expression): Tree = e match {
-    // Monads
-    case MonadUnit(expr) =>
-      val canonicalTpe = e.tpe.dealias
-      q"MonadUnit(${serialize(expr)})(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
+  private def serialize(e: Expression): Tree = {
+    e match {
+      // Monads
+      case MonadUnit(expr) =>
+        q"MonadUnit(${serialize(expr)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
 
-    case MonadJoin(expr) =>
-      val canonicalTpe = e.tpe.dealias
-      q"MonadJoin(${serialize(expr)})(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
+      case MonadJoin(expr) =>
+        q"MonadJoin(${serialize(expr)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
 
-    case Comprehension(_, head, qualifiers) =>
-      val headTpe = head.tpe
-      val canonicalTpe = e.tpe.dealias
-      q"""
+      case Comprehension(_, head, qualifiers) =>
+        q"""
       {
         // MC qualifiers
         val qualifiers = scala.collection.mutable.ListBuffer[Qualifier]()
@@ -71,37 +69,30 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         val head = ${serialize(head)}
 
         // MC constructor
-        Comprehension(head, qualifiers.toList)(scala.reflect.runtime.universe.typeTag[$canonicalTpe])
+        Comprehension(head, qualifiers.toList)(scala.reflect.runtime.universe.typeTag[${e.tpe}])
       }
       """
 
-    // Qualifiers
-    case Filter(expr) =>
-      q"Filter(${serialize(expr)})"
+      // Qualifiers
+      case Filter(expr) =>
+        q"Filter(${serialize(expr)})"
 
-    case Generator(lhs, rhs: ScalaExpr) =>
-      val canonicalTpe = e.tpe.dealias
-      q"ScalaExprGenerator(${lhs.toString}, ${serialize(rhs)})(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
+      case Generator(lhs, rhs) =>
+        q"Generator(${lhs.toString}, ${serialize(rhs)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
 
-    case Generator(lhs, rhs: Expression) =>
-      val canonicalTpe = e.tpe.dealias
-      q"ComprehensionGenerator(${lhs.toString}, ${serialize(rhs)})(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
+      // Environment & Host Language Connectors
+      case ScalaExpr(env, t) =>
+        val tps = (for (e <- referencedEnv(t, env)) yield e match {
+          case v@ValDef(m, name, t, rhs) => name.toString -> q"reify( {$v; $name} )"
+          case _ => throw new IllegalStateException()
+        }).toMap
+        q"ScalaExpr($tps, { ..${referencedEnv(t, env)}; reify { ${freeEnv(t, env)} } })(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
 
-    // Environment & Host Language Connectors
-    case ScalaExpr(env, t) =>
-      val tps = (for (e <- referencedEnv(t, env)) yield e match {
-        case v@ValDef(m, name, t, rhs) => name.toString -> q"reify( {$v; $name} )"
-        case _ => throw new IllegalStateException()
-      }).toMap
-      val canonicalTpe = e.tpe.dealias
-      q"ScalaExpr($tps, { ..${referencedEnv(t, env)}; reify { ${freeEnv(t, env)} } })(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
+      case Read(_, location, format) =>
+        q"Read[${e.tpe}]($location, $format)(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
 
-    case Read(tpe, location, format) =>
-      val canonicalTpe = tpe.dealias
-      q"Read[$canonicalTpe]($location, $format)(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
-
-    case Write(location, format, in) =>
-      val canonicalTpe = format.tpe.dealias.typeArgs.head
-      q"Write[$canonicalTpe]($location, $format, ${serialize(in)})(scala.reflect.runtime.universe.typeTag[$canonicalTpe])"
+      case Write(location, format, in) =>
+        q"Write[${e.tpe}]($location, $format, ${serialize(in)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
+    }
   }
 }
