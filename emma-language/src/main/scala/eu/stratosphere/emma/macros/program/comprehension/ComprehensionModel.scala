@@ -19,6 +19,10 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     override def toString = prettyprint(expr)
   }
 
+  case class Variable(name: TermName, tpt: Tree) {
+    def tpe = c.typecheck(tpt, c.TYPEmode).tpe
+  }
+
   sealed trait Expression {
     def tpe: Type
   }
@@ -33,10 +37,11 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
   }
 
   case class MonadUnit(var expr: MonadExpression) extends MonadExpression {
-    def tpe = expr.tpe
+    def tpe = c.typecheck(tq"DataBag[${expr.tpe}]", c.TYPEmode).tpe
   }
 
-  case class Comprehension(var tpe: Type, var head: Expression, var qualifiers: List[Qualifier]) extends MonadExpression {
+  case class Comprehension(var head: Expression, var qualifiers: List[Qualifier]) extends MonadExpression {
+    def tpe = c.typecheck(tq"DataBag[${head.tpe}]", c.TYPEmode).tpe
   }
 
   // Qualifiers
@@ -49,41 +54,148 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
   }
 
   case class Generator(var lhs: TermName, var rhs: Expression) extends Qualifier {
-    def tpe = rhs.tpe
+    def tpe = rhs.tpe.typeArgs.head
   }
 
   // Environment & Host Language Connectors
 
-  case class ScalaExpr(var env: List[ValDef], var tree: Tree) extends Expression {
-    def tpe = tree.tpe.dealias
+  case class ScalaExpr(var vars: List[Variable], var tree: Tree) extends Expression {
+    def tpe = tree.tpe
   }
 
-  case class Read(tpe: Type, location: Tree, format: Tree) extends Expression {
+  // Combinators
+
+  object combinator {
+    sealed trait Combinator extends Expression {
+    }
+
+    case class Read(location: Tree, format: Tree) extends Combinator {
+      def tpe = c.typecheck(tq"DataBag[(${format.tpe.typeArgs.head})]", c.TYPEmode).tpe
+    }
+
+    case class Write(location: Tree, format: Tree, in: Expression) extends Combinator {
+      def tpe = typeOf[Unit]
+    }
+
+    case class Map(f: Tree, xs: Expression) extends Combinator {
+      def tpe = c.typecheck(tq"DataBag[(${f.tpe.typeArgs.reverse.head})]", c.TYPEmode).tpe
+    }
+
+    case class FlatMap(f: Tree, xs: Expression) extends Combinator {
+      def tpe = c.typecheck(tq"DataBag[(${f.tpe.typeArgs.reverse.head})]", c.TYPEmode).tpe
+    }
+
+    case class Filter(var p: Tree, var xs: Expression) extends Combinator {
+      def tpe = xs.tpe
+    }
+
+    case class EquiJoin(p: Tree, xs: Expression, ys: Expression) extends Combinator {
+      def tpe = c.typecheck(tq"DataBag[(${xs.tpe.typeArgs.head}, ${ys.tpe.typeArgs.head})]", c.TYPEmode).tpe
+    }
+
+    case class Cross(xs: Expression, ys: Expression) extends Combinator {
+      def tpe = c.typecheck(tq"DataBag[(${xs.tpe.typeArgs.head}, ${ys.tpe.typeArgs.head})]", c.TYPEmode).tpe
+    }
+
+    case class Group(var key: Tree, var xs: Expression) extends Combinator {
+      def tpe = c.typecheck(tq"Group[${key.tpe.typeArgs.tail.head}, DataBag[${xs.tpe.typeArgs.head}]]", c.TYPEmode).tpe
+    }
+
+    case class Fold(var empty: Tree, var sng: Tree, var union: Tree, var xs: Expression) extends Combinator {
+      def tpe = sng.tpe.typeArgs.tail.head // Function[A, B]#B
+    }
+
+    case class FoldGroup(var key: Tree, var empty: Tree, var sng: Tree, var union: Tree, var xs: Expression) extends Combinator {
+      def tpe = sng.tpe.typeArgs.tail.head // Function[A, B]#B
+    }
+
+    case class Distinct(var xs: Expression) extends Combinator {
+      def tpe = xs.tpe
+    }
+
+    case class Union(var xs: Expression, var ys: Expression) extends Combinator {
+      def tpe = xs.tpe
+    }
+
+    case class Diff(var xs: Expression, var ys: Expression) extends Combinator {
+      def tpe = xs.tpe
+    }
+
+    case class TempSource(ident: Ident) extends Combinator {
+      val tpe = ident.symbol.info
+    }
   }
 
-  case class Write(location: Tree, format: Tree, in: Expression) extends Expression {
-    def tpe = in.tpe
+  // --------------------------------------------------------------------------
+  // Traversal
+  // --------------------------------------------------------------------------
+
+  trait ExpressionTransformer {
+
+    def transform(e: Expression): Expression = e match {
+      // Monads
+      case MonadUnit(in) => MonadUnit(transformMonadExpression(in))
+      case MonadJoin(in) => MonadJoin(transformMonadExpression(in))
+      case Comprehension(head, qualifiers) => Comprehension(transform(head), transformQualifiers(qualifiers))
+      // Qualifiers
+      case Filter(in) => Filter(transform(in))
+      case Generator(lhs, rhs) => Generator(lhs, transform(rhs))
+      // Environment & Host Language Connectors
+      case ScalaExpr(vars, tree) => ScalaExpr(vars, tree)
+      // Combinators
+      case combinator.Read(location, format) => combinator.Read(location, format)
+      case combinator.Write(location, format, in) => combinator.Write(location, format, transform(in))
+      case combinator.Map(f, xs) => combinator.Map(f, transform(xs))
+      case combinator.FlatMap(f, xs) => combinator.FlatMap(f, transform(xs))
+      case combinator.Filter(p, xs) => combinator.Filter(p, transform(xs))
+      case combinator.EquiJoin(p, xs, ys) => combinator.EquiJoin(p, transform(xs), transform(ys))
+      case combinator.Cross(xs, ys) => combinator.Cross(transform(xs), transform(ys))
+      case combinator.Group(key, xs) => combinator.Group(key, transform(xs))
+      case combinator.Fold(empty, sng, union, xs) => combinator.Fold(empty, sng, union, transform(xs))
+      case combinator.FoldGroup(key, empty, sng, union, xs) => combinator.FoldGroup(key, empty, sng, union, transform(xs))
+      case combinator.Distinct(xs) => combinator.Distinct(transform(xs))
+      case combinator.Union(xs, ys) => combinator.Union(transform(xs), transform(ys))
+      case combinator.Diff(xs, ys) => combinator.Diff(transform(xs), transform(ys))
+      case combinator.TempSource(ident) => combinator.TempSource(ident)
+    }
+
+    def transformMonadExpression(e: MonadExpression) = transform(e).asInstanceOf[MonadExpression]
+
+    def transformQualifiers(qs: List[Qualifier]) = for (q <- qs) yield transformQualifier(q)
+
+    def transformQualifier(e: Qualifier) = transform(e).asInstanceOf[Qualifier]
+
+    def transformScalaExpr(e: ScalaExpr) = transform(e).asInstanceOf[ScalaExpr]
   }
 
-  // Logical Operators
+  trait ExpressionDepthFirstTraverser {
 
-  case class Group(var key: ScalaExpr, var in: Expression) extends Expression {
-    def tpe = q"Group[${key.tpe}, DataBag[${in.tpe}]]".tpe
-  }
-
-  case class Fold(var tpe: Type, var empty: ScalaExpr, var sng: ScalaExpr, var union: ScalaExpr, var in: Expression) extends Expression {
-  }
-
-  case class Distinct(var in: Expression) extends Expression {
-    def tpe = in.tpe
-  }
-
-  case class Union(var l: Expression, var r: Expression) extends Expression {
-    def tpe = l.tpe
-  }
-
-  case class Diff(var l: Expression, var r: Expression) extends Expression {
-    def tpe = l.tpe
+    def traverse(e: Expression): Unit = e match {
+      // Monads
+      case MonadUnit(expr) => traverse(expr)
+      case MonadJoin(expr) => traverse(expr)
+      case Comprehension(head, qualifiers) => qualifiers foreach traverse; traverse(head)
+      // Qualifiers
+      case Filter(expr) => traverse(expr)
+      case Generator(_, rhs) => traverse(rhs)
+      // Environment & Host Language Connectors
+      case ScalaExpr(_, _) => Unit
+      // Combinators
+      case combinator.Read(_, _) => Unit
+      case combinator.Write(_, _, xs) => traverse(xs)
+      case combinator.Map(f, xs) => traverse(xs)
+      case combinator.FlatMap(f, xs) => traverse(xs)
+      case combinator.Filter(p, xs) => traverse(xs)
+      case combinator.EquiJoin(p, xs, ys) => traverse(xs); traverse(xs)
+      case combinator.Cross(xs, ys) => traverse(xs); traverse(xs)
+      case combinator.Group(_, xs) => traverse(xs)
+      case combinator.Fold(_, _, _, xs) => traverse(xs)
+      case combinator.FoldGroup(key, empty, sng, union, xs) => traverse(xs)
+      case combinator.Distinct(xs) => traverse(xs)
+      case combinator.Union(xs, ys) => traverse(xs); traverse(ys)
+      case combinator.Diff(xs, ys) => traverse(xs); traverse(ys)
+      case combinator.TempSource(ident) => Unit
+    }
   }
 
   // --------------------------------------------------------------------------
@@ -122,38 +234,12 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     // Monads
     case MonadUnit(expr) => localSeq(expr) ++ List(root)
     case MonadJoin(expr) => localSeq(expr) ++ List(root)
-    case Comprehension(_, head, qualifiers) => qualifiers.flatMap(q => localSeq(q)) ++ localSeq(head) ++ List(root)
+    case Comprehension(head, qualifiers) => qualifiers.flatMap(q => localSeq(q)) ++ localSeq(head) ++ List(root)
     // Qualifiers
     case Filter(expr) => localSeq(expr) ++ List(root)
     case Generator(_, rhs) => localSeq(rhs) ++ List(root)
-    // Environment & Host Language Connectors, Logical Operators: Skip!
+    // Environment & Host Language Connectors, Combinators: Skip!
     case _ => List(root)
-  }
-
-  /**
-   * Construct a list containing the nodes of an IR tree using depth-first, bottom-up traversal.
-   *
-   * @param root The root of the traversed tree.
-   * @return
-   */
-  def globalSeq(root: Expression): List[Expression] = root match {
-    // Monads
-    case MonadUnit(expr) => globalSeq(expr) ++ List(root)
-    case MonadJoin(expr) => globalSeq(expr) ++ List(root)
-    case Comprehension(_, head, qualifiers) => qualifiers.flatMap(q => globalSeq(q)) ++ globalSeq(head) ++ List(root)
-    // Qualifiers
-    case Filter(expr) => globalSeq(expr) ++ List(root)
-    case Generator(_, rhs) => globalSeq(rhs) ++ List(root)
-    // Environment & Host Language Connectors
-    case ScalaExpr(_, _) => List(root)
-    case Read(_, _, _) => List(root)
-    case Write(_, _, in) => globalSeq(in) ++ List(root)
-    // Logical Operators: Skip!
-    case Group(key, in) => globalSeq(in) ++ globalSeq(key) ++ List(root)
-    case Fold(_, empty, sng, union, in) => globalSeq(in) ++ globalSeq(empty) ++ globalSeq(sng) ++ globalSeq(union) ++ List(root)
-    case Distinct(in) => globalSeq(in) ++ List(root)
-    case Union(l, r) => globalSeq(l) ++ globalSeq(r) ++ List(root)
-    case Diff(l, r) => globalSeq(l) ++ globalSeq(r) ++ List(root)
   }
 
   /**
@@ -164,43 +250,46 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
    */
   def prettyprint(root: Expression, debug: Boolean = false) = {
     val sb = new mutable.StringBuilder()
+    val ident = "        "
 
-    def p(v: Any) = v match {
+    def print(v: Any) = v match {
       case x: TermName => sb.append(x.encodedName.toString)
       case x: Tree => sb.append(x.toString())
       case x: String => sb.append(x)
       case _ => sb.append("<unknown>")
     }
 
-    def pln(v: String) = sb.append(v + sys.props("line.separator"))
-
-    def printType(tpe: Tree) = tpe.toString().stripPrefix("eu.stratosphere.emma.api.")
-
-    val ident = "        "
+    def println(v: String) = sb.append(v + sys.props("line.separator"))
 
     def printHelper(e: Any, offset: String = ""): Unit = e match {
       // Monads
-      case MonadJoin(expr) => p("join("); printHelper(expr, offset + "     "); p(")")
-      case MonadUnit(expr) => p("unit("); printHelper(expr, offset + "     "); p(")")
-      case Comprehension(t, h, qs) => p("[ "); printHelper(h, offset + " " * 2); pln(" | "); printHelper(qs, offset + ident); p("\n" + offset + "]^Bag[" + t.toString + "]")
+      case e@MonadJoin(expr) => print("join("); printHelper(expr, offset + ident); print(")")
+      case e@MonadUnit(expr) => print("unit("); printHelper(expr, offset + ident); print(")")
+      case e@Comprehension(h, qs) => print("[ "); printHelper(h, offset + " " * 2); println(" | "); printHelper(qs, offset + ident); print("\n" + offset + "]^" + e.tpe.toString)
       // Qualifiers
-      case Filter(expr) => printHelper(expr)
-      case Generator(lhs, rhs) => p(lhs); p(" ← "); printHelper(rhs, offset + "   " + " " * lhs.encodedName.toString.length)
+      case e@Filter(expr) => printHelper(expr)
+      case e@Generator(lhs, rhs) => print(lhs); print(" ← "); printHelper(rhs, offset + "   " + " " * lhs.encodedName.toString.length)
       // Environment & Host Language Connectors
-      case ScalaExpr(freeVars, expr) => p(expr); if (debug) p(" <" + freeVars + "> ")
-      case Read(_, location, format) => p("read("); p(location); p(")")
-      case Write(location, format, in) => p("write("); p(location); p(")("); printHelper(in, offset + ident); p(")")
-      // Logical Operators
-      case Group(key, in) => p("group("); printHelper(key); p(")("); printHelper(in); p(")")
-      case Fold(_, empty, sng, union, in) => p("fold(〈"); printHelper(empty); p(", "); printHelper(sng); p(", "); printHelper(union); p("〉, "); printHelper(in); p(")")
-      case Distinct(in) => p("distinct("); printHelper(in); p(")");
-      case Union(l, r) => p("union("); printHelper(l); p(")("); printHelper(r); p(")")
-      case Diff(l, r) => p("diff("); printHelper(l); p(")("); printHelper(r); p(")")
+      case e@ScalaExpr(freeVars, expr) => print(expr); if (debug) print(" <" + freeVars + "> ")
+      // Combinators
+      case e@combinator.Read(location, format) => print("read ("); print(location); print(")")
+      case e@combinator.Write(location, format, in) => print("write ("); print(location); print(")("); printHelper(in, offset + ident); print(")")
+      case e@combinator.Map(f, xs) => print("map "); print(f); print("("); printHelper(xs); print(")")
+      case e@combinator.FlatMap(f, xs) => print("flatMap "); print(f); print("("); printHelper(xs); print(")")
+      case e@combinator.Filter(p, xs) => print("filter "); print(p); print("("); printHelper(xs); print(")")
+      case e@combinator.EquiJoin(p, xs, ys) => print("join "); print(p); print("("); printHelper(xs); print(")")
+      case e@combinator.Cross(xs, ys) => print("cross "); print("("); printHelper(xs); print(")")
+      case e@combinator.Group(key, xs) => print("group "); print(key); print("("); printHelper(xs); print(")")
+      case e@combinator.Fold(empty, sng, union, xs) => print("fold〈"); print(empty); print(", "); print(sng); print(", "); print(union); print("〉("); printHelper(xs); print(")")
+      case e@combinator.Distinct(xs) => print("distinct "); printHelper(xs); print(")");
+      case e@combinator.Union(xs, ys) => print("union "); printHelper(xs); print(")("); printHelper(ys); print(")")
+      case e@combinator.Diff(xs, ys) => print("diff "); printHelper(xs); print(")("); printHelper(ys); print(")")
+      case e@combinator.TempSource(id) => print("temp ("); print(id); print(")")
       // Lists
-      case Nil => pln("")
-      case q :: Nil => p(offset); printHelper(q, offset)
-      case q :: qs => p(offset); printHelper(q, offset); pln(", "); printHelper(qs, offset)
-      case _ => p("〈unknown expression〉")
+      case Nil => println("")
+      case q :: Nil => print(offset); printHelper(q, offset)
+      case q :: qs => print(offset); printHelper(q, offset); println(", "); printHelper(qs, offset)
+      case _ => print("〈unknown expression〉")
     }
 
     printHelper(root)

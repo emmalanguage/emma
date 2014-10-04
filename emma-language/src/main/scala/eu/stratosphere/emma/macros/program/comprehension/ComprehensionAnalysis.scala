@@ -171,11 +171,11 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
   /**
    * Recursive comprehend method.
    *
-   * @param env The ValDef environment for the currently lifted tree
+   * @param vars The Variable environment for the currently lifted tree
    * @param tree The tree to be lifted
    * @return A lifted, MC syntax version of the given tree
    */
-  private def comprehend(env: List[ValDef])(tree: Tree): Expression = {
+  private def comprehend(vars: List[Variable])(tree: Tree): Expression = {
 
     // ignore a top-level Typed node (side-effect of the Algebra inlining macros)
     val t = tree match {
@@ -192,31 +192,31 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
 
       // in.map(fn)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(fn@Function(List(arg), body))) if select.symbol == api.map =>
-        val vd_arg = q"val ${arg.name} = null.asInstanceOf[${arg.tpt}]".asInstanceOf[ValDef]
+        val v = Variable(arg.name, arg.tpt)
 
-        val bind = Generator(arg.name, comprehend(env)(in))
-        val head = comprehend(vd_arg :: env)(body)
+        val bind = Generator(arg.name, comprehend(vars)(in))
+        val head = comprehend(v :: vars)(body)
 
-        Comprehension(tpt.tpe.dealias, head, bind :: Nil)
+        Comprehension(head, bind :: Nil)
 
       // in.flatMap(fn)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(fn@Function(List(arg), body))) if select.symbol == api.flatMap =>
-        val vd_arg = q"val ${arg.name} = null.asInstanceOf[${arg.tpt}]".asInstanceOf[ValDef]
+        val v = Variable(arg.name, arg.tpt)
 
-        val bind = Generator(arg.name, comprehend(env)(in))
-        val head = comprehend(vd_arg :: env)(body)
+        val bind = Generator(arg.name, comprehend(vars)(in))
+        val head = comprehend(v :: vars)(body)
 
-        MonadJoin(Comprehension(tpt.tpe.dealias, head, bind :: Nil))
+        MonadJoin(Comprehension(head, bind :: Nil))
 
       // in.withFilter(fn)
       case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.withFilter =>
-        val vd_arg = q"val ${arg.name}: ${arg.tpt} = null.asInstanceOf[${arg.tpt}]".asInstanceOf[ValDef]
+        val v = Variable(arg.name, arg.tpt)
 
-        val bind = Generator(arg.name, comprehend(env)(in))
-        val filter = Filter(comprehend(vd_arg :: env)(body))
-        val head = comprehend(vd_arg :: env)(q"${arg.name}")
+        val bind = Generator(arg.name, comprehend(vars)(in))
+        val filter = Filter(comprehend(v :: vars)(body))
+        val head = comprehend(v :: vars)(q"${arg.name}")
 
-        Comprehension(arg.tpt.tpe.dealias, head, bind :: filter :: Nil)
+        Comprehension(head, bind :: filter :: Nil)
 
       // -----------------------------------------------------
       // Grouping and Set operations
@@ -224,19 +224,19 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
 
       // in.groupBy(k)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(k@Function(List(arg), body))) if select.symbol == api.groupBy =>
-        Group(comprehend(Nil)(k).asInstanceOf[ScalaExpr], comprehend(Nil)(in))
+        combinator.Group(k, comprehend(Nil)(in))
 
       // in.minus(subtrahend)
       case Apply(TypeApply(select@Select(in, _), List(_)), List(subtrahend)) if select.symbol == api.minus =>
-        Diff(comprehend(Nil)(in), comprehend(Nil)(subtrahend))
+        combinator.Diff(comprehend(Nil)(in), comprehend(Nil)(subtrahend))
 
       // in.plus(addend)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(addend)) if select.symbol == api.minus =>
-        Union(comprehend(Nil)(in), comprehend(Nil)(addend))
+        combinator.Union(comprehend(Nil)(in), comprehend(Nil)(addend))
 
       // in.distinct()
       case Apply(select@Select(in, _), Nil) if select.symbol == api.distinct =>
-        Distinct(comprehend(Nil)(in))
+        combinator.Distinct(comprehend(Nil)(in))
 
       // -----------------------------------------------------
       // Aggregates
@@ -244,99 +244,73 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
 
       // in.minBy()(n)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(Function(List(x, y), body))) if select.symbol == api.minBy =>
-        val vd_x = q"val x: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
-        val vd_y = q"val y: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
-
         // replace the body of the fn to use 'u', 'v' parameters instead of the given arguments
         // FIXME: changes semantics if 'u' and 'v' are definen in the body
         val bodyNew = substitute(body, Map(x.name.toString -> Ident(TermName("u")), y.name.toString -> Ident(TermName("v"))))
 
         // quasiquote fold operators using the minBy parameter function
-        val empty = q"Option.empty[$tpt]"
-        val sng = q"Some[$tpt](x)"
-        val union = q"""{
-          if (x.isEmpty && y.isDefined) y
-          else if (x.isDefined && y.isEmpty) x
-          else for (u <- x; v <- y) yield if ($bodyNew) u else v
-        }"""
+        val empty = c.typecheck(q"Option.empty[$tpt]")
+        val sng = c.typecheck(q"(x: $tpt) => Some(x)")
+        val union = c.typecheck(q"""(x: Option[$tpt], y: Option[$tpt]) =>
+            if (x.isEmpty && y.isDefined) y
+            else if (x.isDefined && y.isEmpty) x
+            else for (u <- x; v <- y) yield if ($bodyNew) u else v
+        """)
 
-        Fold(tpt.tpe.dealias, ScalaExpr(Nil, empty), ScalaExpr(vd_x :: Nil, sng), ScalaExpr(vd_x :: vd_y :: Nil, union), comprehend(Nil)(in))
+        combinator.Fold(empty, sng, union, comprehend(Nil)(in))
 
       // in.maxBy()(n)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(Function(List(x, y), body))) if select.symbol == api.maxBy =>
-        val vd_x = q"val x: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
-        val vd_y = q"val y: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
-
         // replace the body of the fn to use 'u', 'v' parameters instead of the given arguments
         // FIXME: changes semantics if 'u' and 'v' are definen in the body
         val bodyNew = substitute(body, Map(x.name.toString -> Ident(TermName("u")), y.name.toString -> Ident(TermName("v"))))
 
         // quasiquote fold operators using the minBy parameter function
-        val empty = q"Option.empty[$tpt]"
-        val sng = q"Some[$tpt](x)"
-        val union = q"""{
+        val empty = c.typecheck(q"Option.empty[$tpt]")
+        val sng = c.typecheck(q"(x: $tpt) => Some(x)")
+        val union = c.typecheck(q"""(x: Option[$tpt], y: Option[$tpt]) =>
           if (x.isEmpty && y.isDefined) y
           else if (x.isDefined && y.isEmpty) x
           else for (u <- x; v <- y) yield if ($bodyNew) v else u
-        }"""
+        """)
 
-        Fold(tpt.tpe.dealias, ScalaExpr(Nil, empty), ScalaExpr(vd_x :: Nil, sng), ScalaExpr(vd_x :: vd_y :: Nil, union), comprehend(Nil)(in))
+        combinator.Fold(empty, sng, union, comprehend(Nil)(in))
 
       // in.min()(n)
       case Apply(Apply(TypeApply(select@Select(in, _), List(tpt)), Nil), n :: l :: Nil) if select.symbol == api.min =>
-        val vd_x = q"val x: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
-        val vd_y = q"val y: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
-
-        Fold(tpt.tpe.dealias, ScalaExpr(Nil, q"$l.max"), ScalaExpr(vd_x :: Nil, q"x"), ScalaExpr(vd_x :: vd_y :: Nil, q"$n.min(x, y)"), comprehend(Nil)(in))
+        combinator.Fold(c.typecheck(q"$l.max"), c.typecheck(q"(x: $tpt) => x"), c.typecheck(q"(x: $tpt, y: $tpt) => $n.min(x, y)"), comprehend(Nil)(in))
 
       // in.max()(n)
       case Apply(Apply(TypeApply(select@Select(in, _), List(tpt)), Nil), n :: l :: Nil) if select.symbol == api.max =>
-        val vd_x = q"val x: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
-        val vd_y = q"val y: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
-
-        Fold(tpt.tpe.dealias, ScalaExpr(Nil, q"$l.min"), ScalaExpr(vd_x :: Nil, q"x"), ScalaExpr(vd_x :: vd_y :: Nil, q"$n.max(x, y)"), comprehend(Nil)(in))
+        combinator.Fold(c.typecheck(q"$l.min"), c.typecheck(q"(x: $tpt) => x"), c.typecheck(q"(x: $tpt, y: $tpt) => $n.max(x, y)"), comprehend(Nil)(in))
 
       // in.sum()(n)
       case Apply(Apply(TypeApply(select@Select(in, _), List(tpt)), Nil), n :: Nil) if select.symbol == api.sum =>
-        val vd_x = q"val x: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
-        val vd_y = q"val y: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
-
-        Fold(tpt.tpe.dealias, ScalaExpr(Nil, q"$n.zero"), ScalaExpr(vd_x :: Nil, q"x"), ScalaExpr(vd_x :: vd_y :: Nil, q"$n.plus(x, y)"), comprehend(Nil)(in))
+        combinator.Fold(c.typecheck(q"$n.zero"), c.typecheck(q"(x: $tpt) => x"), c.typecheck(q"(x: $tpt, y: $tpt) => $n.plus(x, y)"), comprehend(Nil)(in))
 
       // in.product()(n)
       case Apply(Apply(TypeApply(select@Select(in, _), List(tpt)), Nil), n :: Nil) if select.symbol == api.product =>
-        val vd_x = q"val x: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
-        val vd_y = q"val y: $tpt = null.asInstanceOf[$tpt]".asInstanceOf[ValDef]
-
-        Fold(tpt.tpe.dealias, ScalaExpr(Nil, q"$n.one"), ScalaExpr(vd_x :: Nil, q"x"), ScalaExpr(vd_x :: vd_y :: Nil, q"$n.times(x, y)"), comprehend(Nil)(in))
+        combinator.Fold(c.typecheck(q"$n.one"), c.typecheck(q"(x: $tpt) => x"), c.typecheck(q"(x: $tpt, y: $tpt) => $n.times(x, y)"), comprehend(Nil)(in))
 
       // in.count()(n)
       case Apply(select@Select(in, _), Nil) if select.symbol == api.count =>
-        val vd_x = q"val x: Long = null.asInstanceOf[Long]".asInstanceOf[ValDef]
-        val vd_y = q"val y: Long = null.asInstanceOf[Long]".asInstanceOf[ValDef]
-
-        Fold(c.typeOf[Long], ScalaExpr(Nil, q"0L"), ScalaExpr(vd_x :: Nil, q"1L"), ScalaExpr(vd_x :: vd_y :: Nil, q"x + y"), comprehend(Nil)(in))
+        val comprehendedIn = comprehend(Nil)(in)
+        combinator.Fold(c.typecheck(q"0L"), c.typecheck(q"(x: ${comprehendedIn.tpe}) => 1L"), c.typecheck(q"(x: Long, y: Long) => x + y"), comprehendedIn)
 
       // in.exists()(n)
       case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.exists =>
-        val vd_x = q"val x: Boolean = null.asInstanceOf[Long]".asInstanceOf[ValDef]
-        val vd_y = q"val y: Boolean = null.asInstanceOf[Long]".asInstanceOf[ValDef]
-
-        Fold(c.typeOf[Boolean], ScalaExpr(Nil, q"false"), ScalaExpr(vd_x :: Nil, substitute(body, arg.toString(), q"x")), ScalaExpr(vd_x :: vd_y :: Nil, q"x || y"), comprehend(Nil)(in))
+        val comprehendedIn = comprehend(Nil)(in)
+        combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe}) => ${substitute(body, arg.name, q"x")}"), c.typecheck(q"(x: Boolean, y: Boolean) => x || y"), comprehendedIn)
 
       // in.forall()(n)
       case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.forall =>
-        val vd_x = q"val x: Boolean = null.asInstanceOf[Long]".asInstanceOf[ValDef]
-        val vd_y = q"val y: Boolean = null.asInstanceOf[Long]".asInstanceOf[ValDef]
-
-        Fold(c.typeOf[Boolean], ScalaExpr(Nil, q"true"), ScalaExpr(vd_x :: Nil, substitute(body, arg.toString(), q"x")), ScalaExpr(vd_x :: vd_y :: Nil, q"x && y"), comprehend(Nil)(in))
+        val comprehendedIn = comprehend(Nil)(in)
+        combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe}) => ${substitute(body, arg.name, q"x")}"), c.typecheck(q"(x: Boolean, y: Boolean) => x && y"), comprehendedIn)
 
       // in.empty()(n)
       case Apply(select@Select(in, _), Nil) if select.symbol == api.empty =>
-        val vd_x = q"val x: Boolean = null.asInstanceOf[Long]".asInstanceOf[ValDef]
-        val vd_y = q"val y: Boolean = null.asInstanceOf[Long]".asInstanceOf[ValDef]
-
-        Fold(c.typeOf[Boolean], ScalaExpr(Nil, q"false"), ScalaExpr(vd_x :: Nil, q"true"), ScalaExpr(vd_x :: vd_y :: Nil, q"x || y"), comprehend(Nil)(in))
+        val comprehendedIn = comprehend(Nil)(in)
+        combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe}) => true"), c.typecheck(q"(x: Boolean, y: Boolean) => x || y"), comprehendedIn)
 
       // ----------------------------------------------------------------------
       // Environment & Host Language Connectors
@@ -344,15 +318,19 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
 
       // write[T](location, ofmt)(in)
       case Apply(Apply(TypeApply(method, List(_)), location :: ofmt :: Nil), List(in: Tree)) if method.symbol == api.write =>
-        Write(location, ofmt, comprehend(env)(in))
+        combinator.Write(location, ofmt, comprehend(vars)(in))
 
       // read[T](location, ifmt)
       case Apply(TypeApply(method, List(tpt)), location :: ifmt :: Nil) if method.symbol == api.read =>
-        Read(tpt.tpe.dealias, location, ifmt)
+        combinator.Read(location, ifmt)
 
       // interpret as black box Scala expression (default)
       case _ =>
-        ScalaExpr(env, t)
+        // trees created by the caller with q"..." have to be explicitly typechecked
+        if (t.tpe == null)
+          ScalaExpr(vars, c.typecheck(q"{ ..${for (v <- vars) yield q"val ${v.name}: ${v.tpt} = null.asInstanceOf[${v.tpt}]".asInstanceOf[ValDef]}; $t }").asInstanceOf[Block].expr)
+        else
+          ScalaExpr(vars, t)
     }
   }
 
