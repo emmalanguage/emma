@@ -65,8 +65,8 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
       case LabelDef(_, _, Block(b, If(cond, _, _))) =>
         // ensure that the `cond` tree is a simple identifier
         if (cond match {
-          case Ident(_: TermName) => true
-          case _ => false
+          case Ident(_: TermName) => false
+          case _ => true
         }) c.error(c.enclosingPosition, "Invalid do-while test expression!") // should not happen after normalization
 
         // create body block
@@ -97,8 +97,8 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
       case LabelDef(_, _, If(cond, Block(b, _), _)) =>
         // ensure that the `cond` tree is a simple identifier
         if (cond match {
-          case Ident(_: TermName) => true
-          case _ => false
+          case Ident(_: TermName) => false
+          case _ => true
         }) c.error(c.enclosingPosition, "Invalid while test expression!") // should not happen after normalization
 
         // create condition block with the `cond` term

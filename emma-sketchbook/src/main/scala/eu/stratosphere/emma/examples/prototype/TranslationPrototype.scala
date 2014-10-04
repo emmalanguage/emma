@@ -31,15 +31,15 @@ class TranslationPrototype(rt: runtime.Engine) extends Algorithm(rt) {
   def run() = testSerialization()
 
   private def testSerialization() = {
+    val z = 7
     val algorithm = emma.parallelize {
       val N = 100000
-      val A = DataBag(1 to N)
-      //val B =
-      val C = for (x <- read[Int]("file://hello.txt", new InputFormat[Int]) if x % 7 != 0) yield 5*x
-      //val D = write("file://hellotimesthree.txt", new OutputFormat[Int])(C)
-      //val B = (for (a <- read[Int]("file://hello.txt", new InputFormat[Int])) yield (a, 3*a)) //.minBy(_._1 < _._1)
-
-      //println(B)
+      val K = read[Int]("file://hello.txt", new InputFormat[Int])
+      val A = (for (k <- K; l <- K; if l == k) yield (k, l)).groupBy(_._1 % 10) // DataBag(1 to N).groupBy(_ % 10) FIXME
+//      val B = for (a <- A; if a.key % 7 != 0) yield (a.key, a.values.map(_._2).sum())
+//      val C = for (x <- read[Int]("file://hello.txt", new InputFormat[Int]) if x % z != 0) yield 5*x
+//      val D = write("file://hellotimesthree.txt", new OutputFormat[Int])(C)
+//      val E = for (a <- read[Int]("file://hello.txt", new InputFormat[Int])) yield (a, 3*a) //.minBy(_._1 < _._1)
     }
 
     algorithm.run(rt)
@@ -142,7 +142,10 @@ class TranslationPrototype(rt: runtime.Engine) extends Algorithm(rt) {
       var change = 0.0
 
       // initialize solution
-      var solution: DataBag[Solution] = null
+      var solution = for (p <- points) yield {
+        val closestMean = means.minBy((m1, m2) => (p.pos squaredDist m1.pos) < (p.pos squaredDist m2.pos)).get
+        Solution(p, closestMean.id)
+      }
 
       do {
         // update solution: re-assign clusters

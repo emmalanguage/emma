@@ -68,7 +68,7 @@ class WorkflowMacros(val c: blackbox.Context) {
       // construct algorithm object
       val algorithmCode =
         q"""
-        object __emmaAlgorithm extends eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
+        new eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
 
            def run(engine: runtime.Engine): ${c.weakTypeOf[T]} = engine match {
              case runtime.Native => runNative()
@@ -81,9 +81,18 @@ class WorkflowMacros(val c: blackbox.Context) {
         }
         """
 
-      // construct and return a block that returns a Workflow using the above list of sinks
-      val block = Block(List(algorithmCode), c.parse("__emmaAlgorithm"))
-      c.Expr[Algorithm[T]](c.typecheck(block))
+      c.Expr[Algorithm[T]](c.typecheck(algorithmCode))
+
+//      c.Expr[Algorithm[T]](
+//        q"""
+//        new eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
+//
+//           def run(engine: runtime.Engine): ${c.weakTypeOf[T]} = {
+//             println(${Literal(Constant(show(algorithmCode)))})
+//             ${c.untypecheck(root.tree)}
+//           }
+//        }
+//        """)
     }
 
     /**

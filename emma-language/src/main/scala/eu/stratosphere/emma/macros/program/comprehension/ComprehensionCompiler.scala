@@ -1,6 +1,7 @@
 package eu.stratosphere.emma.macros.program.comprehension
 
 import eu.stratosphere.emma.macros.program.ContextHolder
+import eu.stratosphere.emma.macros.program.comprehension.rewrite.CombinatorRewrite
 import eu.stratosphere.emma.macros.program.controlflow.ControlFlowModel
 import eu.stratosphere.emma.macros.program.util.ProgramUtils
 
@@ -10,6 +11,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
   extends ContextHolder[C]
   with ControlFlowModel[C]
   with ComprehensionModel[C]
+  with CombinatorRewrite[C]
   with ProgramUtils[C] {
 
   import c.universe._
@@ -24,23 +26,33 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
    * @return A tree representing the expanded comprehension.
    */
   def expand(tree: Tree, cfGraph: CFGraph, comprehensionStore: ComprehensionStore)(t: ComprehendedTerm) = {
-    // FIXME: avoid name collisions by explicitly prefixing ir types with ir.*
-    q"""{
-      val comprehension = {
+    q"""
+    {
+      // required imports
+      import scala.reflect.runtime.universe._
+      import eu.stratosphere.emma.ir
+      import eu.stratosphere.emma.optimizer._
 
-        // required imports
-        import scala.reflect.runtime.universe._
-        import eu.stratosphere.emma.ir._
-        import eu.stratosphere.emma.optimizer._
+      println("~" * 80)
+      println("~ Comprehension `" + ${t.id.toString} + "` before:")
+      println("~" * 80)
+      println(${t.comprehension.toString})
+      println("~" * 80)
+      println("")
 
-        val engine = new rewrite.OptimizerRewriteEngine()
-        val root = engine.rewrite(ExpressionRoot(${serialize(t.comprehension.expr)}))
+      println("~" * 80)
+      println("~ Comprehension `" + ${t.id.toString} + "` after:")
+      println("~" * 80)
+      println(${rewrite(t.comprehension).toString})
+      println("~" * 80)
 
-        println(prettyprint(root.expr))
-      }
+      // the plan to be optimized in parallel
+      val plan = ${serialize(rewrite(t.comprehension).expr)}
 
-      0
-    }"""
+      // the thunk object representing the plan result
+      ir.Temp[${t.comprehension.expr.tpe}](${t.id.toString})
+    }
+    """
   }
 
   /**
@@ -51,48 +63,52 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
    */
   private def serialize(e: Expression): Tree = {
     e match {
-      // Monads
-      case MonadUnit(expr) =>
-        q"MonadUnit(${serialize(expr)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
-
-      case MonadJoin(expr) =>
-        q"MonadJoin(${serialize(expr)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
-
-      case Comprehension(_, head, qualifiers) =>
-        q"""
-      {
-        // MC qualifiers
-        val qualifiers = scala.collection.mutable.ListBuffer[Qualifier]()
-        ..${for (q <- qualifiers) yield q"qualifiers += ${serialize(q)}"}
-
-        // MC head
-        val head = ${serialize(head)}
-
-        // MC constructor
-        Comprehension(head, qualifiers.toList)(scala.reflect.runtime.universe.typeTag[${e.tpe}])
-      }
-      """
-
-      // Qualifiers
-      case Filter(expr) =>
-        q"Filter(${serialize(expr)})"
-
-      case Generator(lhs, rhs) =>
-        q"Generator(${lhs.toString}, ${serialize(rhs)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
-
-      // Environment & Host Language Connectors
-      case ScalaExpr(env, t) =>
-        val tps = (for (e <- referencedEnv(t, env)) yield e match {
-          case v@ValDef(m, name, t, rhs) => name.toString -> q"reify( {$v; $name} )"
-          case _ => throw new IllegalStateException()
-        }).toMap
-        q"ScalaExpr($tps, { ..${referencedEnv(t, env)}; reify { ${freeEnv(t, env)} } })(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
-
-      case Read(_, location, format) =>
-        q"Read[${e.tpe}]($location, $format)(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
-
-      case Write(location, format, in) =>
-        q"Write[${e.tpe}]($location, $format, ${serialize(in)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
+      case combinator.Read(location, format) =>
+        q"ir.Read($location, $format)(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.Write(location, format, xs) =>
+        q"ir.Write($location, $format, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.Map(f, xs) =>
+        q"ir.Map(${serialize(f)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.FlatMap(f, xs) =>
+        q"ir.FlatMap(${serialize(f)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.Filter(p, xs) =>
+        q"ir.Filter(${serialize(p)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.EquiJoin(p, xs, ys) =>
+        q"ir.EquiJoin(${serialize(p)}, ${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.Cross(xs, ys) =>
+        q"ir.Cross(${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.Group(key, xs) =>
+        q"ir.Group(${serialize(key)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.Fold(empty, sng, union, xs) =>
+        q"ir.Fold(${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
+      case combinator.FoldGroup(key, empty, sng, union, xs) =>
+        q"ir.FoldGroup(${serialize(key)}, ${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
+      case combinator.Distinct(xs) =>
+        q"ir.Distinct(${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.Union(xs, ys) =>
+        q"ir.Union(${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.Diff(xs, ys) =>
+        q"ir.Diff(${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.TempSource(ident) =>
+        q"ir.TempSource($ident)(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case _ =>
+        throw new RuntimeException("Unsupported serialization of non-combinator expression:\n" + prettyprint(e) + "\n")
     }
   }
+
+  /**
+   * Emits a reified version of the given term tree.
+   *
+   * @param e The tree to be serialized.
+   * @return
+   */
+  private def serialize(e: Tree): Tree = q"scala.reflect.runtime.universe.reify { $e }"
+
+  /**
+   * Fetches the element type `A` of a `DataBag[A]` type.
+   *
+   * @param t The reflected `DataBag[A]` type.
+   * @return The `A` type.
+   */
+  private def elementType(t: Type): Type = t.typeArgs.head
 }
