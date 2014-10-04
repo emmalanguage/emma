@@ -34,8 +34,9 @@ class TranslationPrototype(rt: runtime.Engine) extends Algorithm(rt) {
     val algorithm = emma.parallelize {
       val N = 100000
       val A = DataBag(1 to N)
-      val B = read[Int]("file://hello.txt", new InputFormat[Int])
-      val C = write("file://hellotimesthree.txt", new OutputFormat[Int])(for (x <- read[Int]("file://hello.txt", new InputFormat[Int])) yield 3*x)
+      //val B =
+      val C = for (x <- read[Int]("file://hello.txt", new InputFormat[Int]) if x % 7 != 0) yield 5*x
+      //val D = write("file://hellotimesthree.txt", new OutputFormat[Int])(C)
       //val B = (for (a <- read[Int]("file://hello.txt", new InputFormat[Int])) yield (a, 3*a)) //.minBy(_._1 < _._1)
 
       //println(B)

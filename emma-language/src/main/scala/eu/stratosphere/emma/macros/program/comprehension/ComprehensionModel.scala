@@ -55,7 +55,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
   // Environment & Host Language Connectors
 
   case class ScalaExpr(var env: List[ValDef], var tree: Tree) extends Expression {
-    def tpe = tree.tpe
+    def tpe = tree.tpe.dealias
   }
 
   case class Read(tpe: Type, location: Tree, format: Tree) extends Expression {
@@ -182,7 +182,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       // Monads
       case MonadJoin(expr) => p("join("); printHelper(expr, offset + "     "); p(")")
       case MonadUnit(expr) => p("unit("); printHelper(expr, offset + "     "); p(")")
-      case Comprehension(t, h, qs) => p("[ "); printHelper(h, offset + " " * 2); pln(" | "); printHelper(qs, offset + ident); p("\n" + offset + "]^" + t.getClass.getCanonicalName + "")
+      case Comprehension(t, h, qs) => p("[ "); printHelper(h, offset + " " * 2); pln(" | "); printHelper(qs, offset + ident); p("\n" + offset + "]^Bag[" + t.toString + "]")
       // Qualifiers
       case Filter(expr) => printHelper(expr)
       case Generator(lhs, rhs) => p(lhs); p(" ← "); printHelper(rhs, offset + "   " + " " * lhs.encodedName.toString.length)

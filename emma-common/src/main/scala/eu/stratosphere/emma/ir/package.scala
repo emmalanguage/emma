@@ -10,7 +10,9 @@ import scala.collection.mutable
 package object ir {
 
   import scala.reflect.runtime.universe._
-  import scala.language.existentials // TODO: required for Read[+A], see why
+  import scala.language.existentials
+
+  // TODO: required for Read[+A], see why
 
   // ---------------------------------------------------
   // Thunks.
@@ -62,76 +64,65 @@ package object ir {
   final case class Filter(var expr: Expression) extends Qualifier {
   }
 
-  // TODO: try using a single generator like the one defined below instead of the generator family
-  // case class Generator(var lhs: String, var rhs: Expression) extends Qualifier {
-  // }
-
-  sealed trait Generator extends Qualifier {
-    var lhs: String
-  }
-
-  final case class ScalaExprGenerator[+A](var lhs: String, var rhs: ScalaExpr[Any])(implicit val tag: TypeTag[_ <: A]) extends Generator {
-  }
-
-  final case class ComprehensionGenerator[+A](var lhs: String, var rhs: Expression)(implicit val tag: TypeTag[_ <: A]) extends Generator {
+  final case class Generator[+A](var lhs: String, var rhs: Expression)(implicit val tag: TypeTag[_ <: A]) extends Qualifier {
   }
 
   // Environment & Host Language Connectors
 
-  // TODO: rename freeVars to env
-  case class ScalaExpr[+A](var freeVars: Map[String, Expr[Any]], var expr: Expr[Any])(implicit val tag: TypeTag[_ <: A])  extends Expression {
+  final case class ScalaExpr[+A](var env: Map[String, Expr[Any]], var expr: Expr[Any])(implicit val tag: TypeTag[_ <: A]) extends Expression {
   }
 
-  case class Read[+A](location: String, format: InputFormat[_ <: A])(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  final case class Read[+A](location: String, format: InputFormat[_ <: A])(implicit val tag: TypeTag[_ <: A]) extends Expression {
   }
 
-  case class Write[+A](location: String, format: OutputFormat[_ <: A], in: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  final case class Write[+A](location: String, format: OutputFormat[_ <: A], in: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
   }
 
   // Logical Operators
 
-  case class Group[+A](var key: ScalaExpr[Any], var in: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  final case class Group[+A](var key: ScalaExpr[Any], var in: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
   }
 
-  case class Fold[+A](var empty: ScalaExpr[Any], var sng: ScalaExpr[Any], var union: ScalaExpr[Any], var in: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  final case class Fold[+A](var empty: ScalaExpr[Any], var sng: ScalaExpr[Any], var union: ScalaExpr[Any], var in: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
   }
 
-  case class Distinct[+A](var in: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  final case class Distinct[+A](var in: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
   }
 
-  case class Union[+A](var l: Expression, var r: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  final case class Union[+A](var l: Expression, var r: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
   }
 
-  case class Diff[+A](var l: Expression, var r: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
+  final case class Diff[+A](var l: Expression, var r: Expression)(implicit val tag: TypeTag[_ <: A]) extends Expression {
   }
 
   // ---------------------------------------------------
   // Combinators.
   // ---------------------------------------------------
 
-  case class FilterCombinator(p: Filter, xs: Generator) extends Generator {
-    var lhs = xs.lhs
+  sealed trait Combinator extends Expression {
+  }
 
+  case class FilterCombinator(p: Tree, xs: Expression) extends Combinator {
     override def toString = "Filter"
   }
 
-  case class EquiJoinCombinator(var lhs: String, p: Filter, xs: Generator, ys: Generator) extends Generator {
+  case class EquiJoinCombinator(var lhs: String, p: Filter, xs: Generator[Any], ys: Generator[Any]) extends Combinator {
     override def toString = s"Join(lhs = $lhs)"
   }
 
-  case class ThetaJoinCombinator(var lhs: String, p: Filter, xs: Generator, ys: Generator) extends Generator {
+  case class ThetaJoinCombinator(var lhs: String, p: Filter, xs: Generator[Any], ys: Generator[Any]) extends Combinator {
     override def toString = s"Join(lhs = $lhs)"
   }
 
-  case class CrossCombinator(var lhs: String, qs: List[Generator]) extends Generator {
+  case class CrossCombinator(var lhs: String, qs: List[Generator[Any]]) extends Combinator {
     override def toString = s"Cross(lhs = $lhs)"
   }
 
-  case class MapCombinator(var body: ScalaExpr[Any], var input: Qualifier) extends MonadExpression {
+  case class MapCombinator(var body: ScalaExpr[Any], var input: Qualifier) extends Combinator {
     override def toString = s"Map"
   }
 
-  case class FlatMapCombinator(var body: ScalaExpr[Any], var input: Qualifier) extends MonadExpression {
+  case class FlatMapCombinator(var body: ScalaExpr[Any], var input: Qualifier) extends Combinator {
     override def toString = s"FlatMap"
   }
 
@@ -157,17 +148,17 @@ package object ir {
     case Comprehension(head, qualifiers) => qualifiers.flatMap(q => localSeq(q)) ++ localSeq(head) ++ List(root)
     // Qualifiers
     case Filter(expr) => localSeq(expr) ++ List(root)
-    case ScalaExprGenerator(_, rhs) => localSeq(rhs) ++ List(root)
-    case ComprehensionGenerator(_, rhs) => localSeq(rhs) ++ List(root)
+    case Generator(_, rhs) => localSeq(rhs) ++ List(root)
     // Environment & Host Language Connectors, Logical Operators: Skip!
     case _ => List(root)
   }
 
-  /** Construct a list containing the nodes of an IR tree using depth-first, bottom-up traversal.
-    *
-    * @param root The root of the traversed tree.
-    * @return
-    */
+  /**
+   * Construct a list containing the nodes of an IR tree using depth-first, bottom-up traversal.
+   *
+   * @param root The root of the traversed tree.
+   * @return
+   */
   def globalSeq(root: Expression): List[Expression] = root match {
     // Monads
     case MonadUnit(expr) => globalSeq(expr) ++ List(root)
@@ -175,8 +166,7 @@ package object ir {
     case Comprehension(head, qualifiers) => qualifiers.flatMap(q => globalSeq(q)) ++ globalSeq(head) ++ List(root)
     // Qualifiers
     case Filter(expr) => globalSeq(expr) ++ List(root)
-    case ScalaExprGenerator(_, rhs) => localSeq(rhs) ++ List(root)
-    case ComprehensionGenerator(_, rhs) => localSeq(rhs) ++ List(root)
+    case Generator(_, rhs) => localSeq(rhs) ++ List(root)
     // Environment & Host Language Connectors
     case ScalaExpr(_, _) => List(root)
     case Read(_, _) => List(root)
@@ -188,11 +178,12 @@ package object ir {
     case Union(l, r) => globalSeq(l) ++ globalSeq(r) ++ List(root)
     case Diff(l, r) => globalSeq(l) ++ globalSeq(r) ++ List(root)
     // Combinators
-    case FilterCombinator(p, xs) => globalSeq(xs) ++ globalSeq(p) ++ List(root)
+    case FilterCombinator(p, xs) => globalSeq(xs) ++ List(root)
     case EquiJoinCombinator(_, p, xs, ys) => globalSeq(ys) ++ globalSeq(xs) ++ globalSeq(p) ++ List(root)
     case ThetaJoinCombinator(_, p, xs, ys) => globalSeq(ys) ++ globalSeq(xs) ++ globalSeq(p) ++ List(root)
     case CrossCombinator(_, qs) => qs.flatMap(q => globalSeq(q)) ++ List(root)
     case MapCombinator(e, qs) => globalSeq(qs) ++ List(root)
+    case FlatMapCombinator(e, qs) => globalSeq(qs) ++ List(root)
   }
 
   /** Pretty-print an IR tree.
@@ -204,8 +195,9 @@ package object ir {
     val sb = new mutable.StringBuilder()
 
     def p(v: Any) = v match {
+      case x: Expr[_] => sb.append(x.tree)
+      case x: Tree => sb.append(x)
       case x: TermName => sb.append(x.encodedName.toString)
-      case x: Tree => sb.append(x.toString())
       case x: String => sb.append(x)
       case _ => sb.append("<unknown>")
     }
@@ -220,15 +212,14 @@ package object ir {
       // Monads
       case MonadJoin(expr) => p("join("); printHelper(expr, offset + "     "); p(")")
       case MonadUnit(expr) => p("unit("); printHelper(expr, offset + "     "); p(")")
-      case Comprehension(h, qs) => p("[ "); printHelper(h, offset + " " * 2); pln(" | "); printHelper(qs, offset + ident); p("\n" + offset + "]^" /*+ printType(t)*/ + "") // TODO: print
+      case c@Comprehension(h, qs) => p("[ "); printHelper(h, offset + " " * 2); pln(" | "); printHelper(qs, offset + ident); p("\n" + offset + "]^Bag[" + c.tag.tpe + "]")
       // Qualifiers
-      case ComprehensionGenerator(lhs, rhs) => p(lhs); p(" ← "); printHelper(rhs, offset + "   " + " " * lhs.length)
-      case ScalaExprGenerator(lhs, rhs) => p(lhs); p(" ← "); printHelper(rhs, offset + "   " + " " * lhs.length)
+      case Generator(lhs, rhs) => p(lhs); p(" ← "); printHelper(rhs, offset + "   " + " " * lhs.length)
       case Filter(expr) => printHelper(expr)
       // Environment & Host Language Connectors
       case ScalaExpr(freeVars, expr) => p(expr); if (debug) p(" <" + freeVars + "> ")
-      case Read(location, format) => p("read("); p(location); p(")")
-      case Write(location, format, in) => p("write("); p(location); p(")("); printHelper(in, offset + ident); p(")")
+      case Read(location, format) => p(s"read('$location')")
+      case Write(location, format, in) => p(s"write('$location')("); printHelper(in, offset + ident); p(")")
       // Logical Operators
       case Group(key, in) => p("group("); printHelper(key); p(")("); printHelper(in); p(")")
       case Fold(empty, sng, union, in) => p("fold(〈"); printHelper(empty); p(", "); printHelper(sng); p(", "); printHelper(union); p("〉, "); printHelper(in); p(")")
@@ -236,11 +227,11 @@ package object ir {
       case Union(l, r) => p("union("); printHelper(l); p(")("); printHelper(r); p(")")
       case Diff(l, r) => p("diff("); printHelper(l); p(")("); printHelper(r); p(")")
       // Combinators
-      case EquiJoinCombinator(l, p, x, y) => print(s"$l ← ("); printHelper(p); print(s")(${x.lhs}) ⋈ "); print(s"(${y.lhs})")
-      case ThetaJoinCombinator(l, p, x, y) => print(s"$l ← ("); printHelper(p); print(s")(${x.lhs}) ⋈ "); print(s"(${y.lhs})")
-      case CrossCombinator(l, qs) => print(s"$l ← "); val b = StringBuilder.newBuilder; qs.map(q => q.lhs).addString(b, "(", ") ⨯ (", ")"); print(b.result())
-      case FilterCombinator(p, xs) => print(s"${xs.lhs} ← σ ("); printHelper(p); print(")("); printHelper(xs); print(")")
-      case MapCombinator(e, qs) => print("map ("); printHelper(e); print(")("); printHelper(qs); print(")")
+      //      case EquiJoinCombinator(l, p, x, y) => p(s"$l ← ("); printHelper(p); p(s")(${x.lhs}) ⋈ "); p(s"(${y.lhs})")
+      //      case ThetaJoinCombinator(l, p, x, y) => p(s"$l ← ("); printHelper(p); p(s")(${x.lhs}) ⋈ "); p(s"(${y.lhs})")
+      //      case CrossCombinator(l, qs) => p(s"$l ← "); val b = StringBuilder.newBuilder; qs.map(q => q.lhs).addString(b, "(", ") ⨯ (", ")"); p(b.result())
+      case FilterCombinator(f, xs) => p("filter"); p(f); p("("); printHelper(xs); p(")")
+      case MapCombinator(body, qs) => p("map("); printHelper(body); p(")("); printHelper(qs); p(")")
       // Lists
       case Nil => pln("")
       case q :: Nil => p(offset); printHelper(q, offset)

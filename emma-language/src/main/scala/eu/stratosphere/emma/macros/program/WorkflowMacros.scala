@@ -4,7 +4,6 @@ package eu.stratosphere.emma.macros.program
 import eu.stratosphere.emma.api.Algorithm
 import eu.stratosphere.emma.macros.program.controlflow.ControlFlow
 import eu.stratosphere.emma.macros.program.comprehension.Comprehension
-import eu.stratosphere.emma.macros.program.comprehension.rewrite.ComprehensionNormalization
 
 import scala.language.existentials
 import scala.language.experimental.macros
