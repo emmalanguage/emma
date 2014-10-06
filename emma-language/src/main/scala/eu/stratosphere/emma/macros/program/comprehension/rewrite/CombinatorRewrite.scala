@@ -18,7 +18,6 @@ trait CombinatorRewrite[C <: blackbox.Context]
   def rewrite(root: ExpressionRoot) = {
     exhaust(MatchJoin, MatchFilter)(root) // combine qualifiers
     exhaust(MatchMap, MatchFlatMap)(root) // combine single qualifier heads
-    exhaust(MatchTempSource)(root) // combine sources
     root
   }
 
@@ -326,35 +325,5 @@ trait CombinatorRewrite[C <: blackbox.Context]
   //      substituteVars(heads.keySet.toList, toSubstitute)
   //    }
   //  }
-
-
-  /**
-   * Creates a TempSource combinator. Applied at last, eliminates all ScalaExpr nodes with a single identifier.
-   *
-   * ==Rule Description==
-   *
-   * '''Matching Pattern''':
-   * {{{ ScalaExpr(_, ident@Ident(TermName(_))) }}}
-   *
-   * '''Rewrite''':
-   * {{{ TempSource(ident)) }}}
-   */
-  object MatchTempSource extends Rule {
-
-    case class RuleMatch(ident: Ident)
-
-    override protected def bind(r: Expression) = r match {
-      case ScalaExpr(_, ident@Ident(TermName(_))) =>
-        Some(RuleMatch(ident))
-      case _ =>
-        Option.empty[RuleMatch]
-    }
-
-    override protected def guard(r: Expression, m: RuleMatch) = true
-
-    override protected def fire(r: Expression, m: RuleMatch) = {
-      combinator.TempSource(m.ident)
-    }
-  }
 
 }

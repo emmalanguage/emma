@@ -77,6 +77,18 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       def tpe = typeOf[Unit]
     }
 
+    case class TempSource(id: Ident) extends Combinator {
+      val tpe = id.symbol.info
+    }
+
+    case class TempSink(id: TermName, var xs: Expression) extends Combinator {
+      val tpe = xs.tpe
+    }
+
+    case class FoldSink(id: TermName, xs: Fold) extends Combinator {
+      val tpe = xs.tpe
+    }
+
     case class Map(f: Tree, xs: Expression) extends Combinator {
       def tpe = c.typecheck(tq"DataBag[(${f.tpe.typeArgs.reverse.head})]", c.TYPEmode).tpe
     }
@@ -120,10 +132,6 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     case class Diff(var xs: Expression, var ys: Expression) extends Combinator {
       def tpe = xs.tpe
     }
-
-    case class TempSource(ident: Ident) extends Combinator {
-      val tpe = ident.symbol.info
-    }
   }
 
   // --------------------------------------------------------------------------
@@ -145,6 +153,9 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       // Combinators
       case combinator.Read(location, format) => combinator.Read(location, format)
       case combinator.Write(location, format, in) => combinator.Write(location, format, transform(in))
+      case combinator.TempSource(id) => combinator.TempSource(id)
+      case combinator.TempSink(id, xs) => combinator.TempSink(id, transform(xs))
+      case combinator.FoldSink(id, xs) => combinator.FoldSink(id, transformFold(xs))
       case combinator.Map(f, xs) => combinator.Map(f, transform(xs))
       case combinator.FlatMap(f, xs) => combinator.FlatMap(f, transform(xs))
       case combinator.Filter(p, xs) => combinator.Filter(p, transform(xs))
@@ -156,7 +167,6 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       case combinator.Distinct(xs) => combinator.Distinct(transform(xs))
       case combinator.Union(xs, ys) => combinator.Union(transform(xs), transform(ys))
       case combinator.Diff(xs, ys) => combinator.Diff(transform(xs), transform(ys))
-      case combinator.TempSource(ident) => combinator.TempSource(ident)
     }
 
     def transformMonadExpression(e: MonadExpression) = transform(e).asInstanceOf[MonadExpression]
@@ -166,6 +176,8 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     def transformQualifier(e: Qualifier) = transform(e).asInstanceOf[Qualifier]
 
     def transformScalaExpr(e: ScalaExpr) = transform(e).asInstanceOf[ScalaExpr]
+
+    def transformFold(e: combinator.Fold) = transform(e).asInstanceOf[combinator.Fold]
   }
 
   trait ExpressionDepthFirstTraverser {
@@ -183,6 +195,9 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       // Combinators
       case combinator.Read(_, _) => Unit
       case combinator.Write(_, _, xs) => traverse(xs)
+      case combinator.TempSource(id) => Unit
+      case combinator.TempSink(id, xs) => traverse(xs)
+      case combinator.FoldSink(id, xs) => traverse(xs)
       case combinator.Map(f, xs) => traverse(xs)
       case combinator.FlatMap(f, xs) => traverse(xs)
       case combinator.Filter(p, xs) => traverse(xs)
@@ -194,7 +209,6 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       case combinator.Distinct(xs) => traverse(xs)
       case combinator.Union(xs, ys) => traverse(xs); traverse(ys)
       case combinator.Diff(xs, ys) => traverse(xs); traverse(ys)
-      case combinator.TempSource(ident) => Unit
     }
   }
 
@@ -274,17 +288,19 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       // Combinators
       case e@combinator.Read(location, format) => print("read ("); print(location); print(")")
       case e@combinator.Write(location, format, in) => print("write ("); print(location); print(")("); printHelper(in, offset + ident); print(")")
+      case e@combinator.TempSource(id) => print("tmpsrc ("); print(id); print(")")
+      case e@combinator.TempSink(id, xs) => print("tmpsnk ("); print(id); print(")("); printHelper(xs, offset + ident); print(")")
+      case e@combinator.FoldSink(id, xs) => print("foldsnk ("); print(id); print(")("); printHelper(xs, offset + ident); print(")")
       case e@combinator.Map(f, xs) => print("map "); print(f); print("("); printHelper(xs); print(")")
       case e@combinator.FlatMap(f, xs) => print("flatMap "); print(f); print("("); printHelper(xs); print(")")
       case e@combinator.Filter(p, xs) => print("filter "); print(p); print("("); printHelper(xs); print(")")
-      case e@combinator.EquiJoin(p, xs, ys) => print("join "); print(p); print("("); printHelper(xs); print(")")
-      case e@combinator.Cross(xs, ys) => print("cross "); print("("); printHelper(xs); print(")")
+      case e@combinator.EquiJoin(p, xs, ys) => print("join "); print(p); print("("); printHelper(xs); print(", "); printHelper(ys); print(")")
+      case e@combinator.Cross(xs, ys) => print("cross "); print("("); printHelper(xs); print(", "); printHelper(ys); print(")")
       case e@combinator.Group(key, xs) => print("group "); print(key); print("("); printHelper(xs); print(")")
       case e@combinator.Fold(empty, sng, union, xs) => print("fold〈"); print(empty); print(", "); print(sng); print(", "); print(union); print("〉("); printHelper(xs); print(")")
       case e@combinator.Distinct(xs) => print("distinct "); printHelper(xs); print(")");
       case e@combinator.Union(xs, ys) => print("union "); printHelper(xs); print(")("); printHelper(ys); print(")")
       case e@combinator.Diff(xs, ys) => print("diff "); printHelper(xs); print(")("); printHelper(ys); print(")")
-      case e@combinator.TempSource(id) => print("temp ("); print(id); print(")")
       // Lists
       case Nil => println("")
       case q :: Nil => print(offset); printHelper(q, offset)

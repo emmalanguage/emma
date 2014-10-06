@@ -17,6 +17,13 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
   import c.universe._
 
   /**
+   * Expands a local collection constructor as a scatter call to the underlying engine.
+   *
+   * @param values A Seq[T] typed term that provides the values for the local constructor call.
+   */
+  def expandScatter(values: Tree) = q"engine.scatter($values)"
+
+  /**
    * Expands a comprehended term in the compiled driver.
    *
    * @param tree The original program tree.
@@ -25,7 +32,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
    * @param t The comprehended term to be expanded.
    * @return A tree representing the expanded comprehension.
    */
-  def expand(tree: Tree, cfGraph: CFGraph, comprehensionStore: ComprehensionStore)(t: ComprehendedTerm) = {
+  def expandComprehension(tree: Tree, cfGraph: CFGraph, comprehensionStore: ComprehensionStore)(t: ComprehendedTerm) = {
     q"""
     {
       // required imports
@@ -33,26 +40,24 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
       import eu.stratosphere.emma.ir
       import eu.stratosphere.emma.optimizer._
 
-      println("~" * 80)
-      println("~ Comprehension `" + ${t.id.toString} + "` before:")
-      println("~" * 80)
-      println(${t.comprehension.toString})
-      println("~" * 80)
-      println("")
-
-      println("~" * 80)
-      println("~ Comprehension `" + ${t.id.toString} + "` after:")
-      println("~" * 80)
-      println(${rewrite(t.comprehension).toString})
-      println("~" * 80)
-
-      // the plan to be optimized in parallel
-      val plan = ${serialize(rewrite(t.comprehension).expr)}
-
-      // the thunk object representing the plan result
-      ir.Temp[${t.comprehension.expr.tpe}](${t.id.toString})
+      // execute the plan and return a reference to the result
+      engine.execute(${serialize(rewrite(t.comprehension).expr)})
     }
     """
+
+//    println("~" * 80)
+//    println("~ Comprehension `" + ${t.id.toString} + "` before:")
+//    println("~" * 80)
+//    println(${t.comprehension.toString})
+//    println("~" * 80)
+//    println("")
+//
+//    println("~" * 80)
+//    println("~ Comprehension `" + ${t.id.toString} + "` after:")
+//    println("~" * 80)
+//    println(${rewrite(t.comprehension).toString})
+//    println("~" * 80)
+
   }
 
   /**
@@ -66,7 +71,13 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
       case combinator.Read(location, format) =>
         q"ir.Read($location, $format)(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
       case combinator.Write(location, format, xs) =>
-        q"ir.Write($location, $format, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.Write($location, $format, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
+      case combinator.TempSource(ident) =>
+        q"ir.TempSource($ident)(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.TempSink(name, xs) =>
+        q"ir.TempSink(${name.toString}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.FoldSink(name, xs) =>
+        q"ir.FoldSink(${name.toString}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
       case combinator.Map(f, xs) =>
         q"ir.Map(${serialize(f)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
       case combinator.FlatMap(f, xs) =>
@@ -89,8 +100,6 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         q"ir.Union(${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
       case combinator.Diff(xs, ys) =>
         q"ir.Diff(${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
-      case combinator.TempSource(ident) =>
-        q"ir.TempSource($ident)(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
       case _ =>
         throw new RuntimeException("Unsupported serialization of non-combinator expression:\n" + prettyprint(e) + "\n")
     }

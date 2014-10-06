@@ -3,6 +3,7 @@ package eu.stratosphere.emma.examples.graphs
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.api.model._
 import eu.stratosphere.emma.examples.Algorithm
+import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
 object StronglyConnectedComponents {
@@ -72,9 +73,9 @@ object StronglyConnectedComponents {
 
 }
 
-class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: runtime.Engine) extends Algorithm(rt) {
+class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: Engine) extends Algorithm(rt) {
 
-  def this(ns: Namespace, rt: runtime.Engine) = this(
+  def this(ns: Namespace, rt: Engine) = this(
     ns.get[String](StronglyConnectedComponents.Command.KEY_INPUT),
     ns.get[String](StronglyConnectedComponents.Command.KEY_OUTPUT),
     rt)

@@ -5,6 +5,7 @@ import java.util.Date
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.api.model._
 import eu.stratosphere.emma.examples.Algorithm
+import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
 object CompareStoreSales {
@@ -66,9 +67,9 @@ object CompareStoreSales {
 
 }
 
-class CompareStoreSales(salesLUrl: String, salesRUrl: String, outputUrl: String, rt: runtime.Engine) extends Algorithm(rt) {
+class CompareStoreSales(salesLUrl: String, salesRUrl: String, outputUrl: String, rt: Engine) extends Algorithm(rt) {
 
-  def this(ns: Namespace, rt: runtime.Engine) = this(
+  def this(ns: Namespace, rt: Engine) = this(
     ns.get[String](CompareStoreSales.Command.KEY_SALES_L),
     ns.get[String](CompareStoreSales.Command.KEY_SALES_R),
     ns.get[String](CompareStoreSales.Command.KEY_OUTPUT),

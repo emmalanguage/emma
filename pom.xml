@@ -80,23 +80,33 @@
             <!-- Emma -->
             <dependency>
                 <groupId>eu.stratosphere</groupId>
+                <artifactId>emma-aura</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.stratosphere</groupId>
+                <artifactId>emma-codegen</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.stratosphere</groupId>
                 <artifactId>emma-common</artifactId>
-                <version>1.0-SNAPSHOT</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>eu.stratosphere</groupId>
                 <artifactId>emma-language</artifactId>
-                <version>1.0-SNAPSHOT</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>eu.stratosphere</groupId>
                 <artifactId>emma-optimizer</artifactId>
-                <version>1.0-SNAPSHOT</version>
+                <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>eu.stratosphere</groupId>
                 <artifactId>emma-sketchbook</artifactId>
-                <version>1.0-SNAPSHOT</version>
+                <version>${project.version}</version>
             </dependency>
 
             <!-- Logging -->
@@ -104,19 +114,16 @@
                 <groupId>log4j</groupId>
                 <artifactId>log4j</artifactId>
                 <version>${log4j.version}</version>
-                <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-api</artifactId>
                 <version>${slf4j.version}</version>
-                <scope>provided</scope>
             </dependency>
             <dependency>
                 <groupId>org.slf4j</groupId>
                 <artifactId>slf4j-log4j12</artifactId>
                 <version>${slf4j.version}</version>
-                <scope>provided</scope>
             </dependency>
 
             <!-- Test -->
@@ -267,11 +274,12 @@
     </build>
 
     <modules>
+        <module>emma-aura</module>
+        <module>emma-codegen</module>
         <module>emma-common</module>
         <module>emma-language</module>
         <module>emma-optimizer</module>
         <module>emma-sketchbook</module>
-        <module>emma-codegen</module>
     </modules>
 
 </project>

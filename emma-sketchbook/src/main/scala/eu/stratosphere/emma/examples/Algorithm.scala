@@ -2,7 +2,7 @@ package eu.stratosphere.emma.examples
 
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
-import eu.stratosphere.emma.api.runtime
+import eu.stratosphere.emma.runtime
 
 object Algorithm {
 
