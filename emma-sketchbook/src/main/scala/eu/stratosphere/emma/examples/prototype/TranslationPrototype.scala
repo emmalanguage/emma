@@ -1,7 +1,11 @@
 package eu.stratosphere.emma.examples.prototype
 
+import de.tuberlin.aura.client.executors.LocalClusterSimulator
+import de.tuberlin.aura.core.config.{IConfig, IConfigFactory}
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
+import eu.stratosphere.emma.runtime.Engine
+import eu.stratosphere.emma.runtime.factory
 import org.apache.spark.util.Vector
 
 import scala.util.Random
@@ -21,28 +25,41 @@ object TranslationPrototype {
    *
    */
   def main(args: Array[String]): Unit = {
-    val algorithm = new TranslationPrototype(runtime.Aura("localhost", 31431))
-    algorithm.run()
+    val lcs = new LocalClusterSimulator(IConfigFactory.load(IConfig.Type.SIMULATOR))
+    val engine = factory("aura", "localhost", 31431)
+
+    new TranslationPrototype(factory("aura", "localhost", 31431)).run()
+
+    if (engine != null) engine.closeSession()
+    if (lcs != null) lcs.shutdown()
   }
 }
 
-class TranslationPrototype(rt: runtime.Engine) extends Algorithm(rt) {
+class TranslationPrototype(rt: Engine) extends Algorithm(rt) {
 
   def run() = testSerialization()
 
   private def testSerialization() = {
     val z = 7
     val algorithm = emma.parallelize {
-      val N = 100000
-      val K = read[Int]("file://hello.txt", new InputFormat[Int])
-      val A = (for (k <- K; l <- K; if l == k) yield (k, l)).groupBy(_._1 % 10) // DataBag(1 to N).groupBy(_ % 10) FIXME
+      val N = 10000
+      val M = Math.sqrt(N).ceil.toInt
+
+      val X = DataBag(1 to N)
+      val Y = DataBag(1 to M)
+      val Z = for (x <- X; y <- Y; if x == y) yield (x, y)
+
+      //val A = (for (x <- X; y <- Y; if x == z) yield (x, y)).groupBy(_._1)
+
+//      val K = read[Int]("file://hello.txt", new InputFormat[Int])
+//      val A = (for (k <- K; l <- K; if l == k) yield (k, l)).groupBy(_._1 % 10) // DataBag(1 to N).groupBy(_ % 10) FIXME
 //      val B = for (a <- A; if a.key % 7 != 0) yield (a.key, a.values.map(_._2).sum())
 //      val C = for (x <- read[Int]("file://hello.txt", new InputFormat[Int]) if x % z != 0) yield 5*x
 //      val D = write("file://hellotimesthree.txt", new OutputFormat[Int])(C)
 //      val E = for (a <- read[Int]("file://hello.txt", new InputFormat[Int])) yield (a, 3*a) //.minBy(_._1 < _._1)
     }
 
-    algorithm.run(rt)
+    val x = algorithm.run(rt)
   }
 
   private def runGlobalAggregates() = {

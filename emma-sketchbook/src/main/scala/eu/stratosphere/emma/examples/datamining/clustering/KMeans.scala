@@ -1,8 +1,9 @@
 package eu.stratosphere.emma.examples.datamining.clustering
 
-import eu.stratosphere.emma.api.model._
 import eu.stratosphere.emma.api._
+import eu.stratosphere.emma.api.model._
 import eu.stratosphere.emma.examples.Algorithm
+import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 import org.apache.spark.util.Vector
 
@@ -75,9 +76,9 @@ object KMeans {
 
 }
 
-class KMeans(k: Int, epsilon: Double, inputUrl: String, outputUrl: String, rt: runtime.Engine) extends Algorithm(rt) {
+class KMeans(k: Int, epsilon: Double, inputUrl: String, outputUrl: String, rt: Engine) extends Algorithm(rt) {
 
-  def this(ns: Namespace, rt: runtime.Engine) = this(
+  def this(ns: Namespace, rt: Engine) = this(
     ns.get[Int](KMeans.Command.KEY_K),
     ns.get[Double](KMeans.Command.KEY_EPSILON),
     ns.get[String](KMeans.Command.KEY_INPUT),

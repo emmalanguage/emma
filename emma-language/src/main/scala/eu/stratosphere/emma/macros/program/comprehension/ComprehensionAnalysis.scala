@@ -21,10 +21,11 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
   /**
    * A set of API method symbols to be comprehended.
    */
-  private object api {
+  protected object api {
     val moduleSymbol = rootMirror.staticModule("eu.stratosphere.emma.api.package")
     val bagSymbol = rootMirror.staticClass("eu.stratosphere.emma.api.DataBag")
 
+    val apply = bagSymbol.companion.info.decl(TermName("apply"))
     val read = moduleSymbol.info.decl(TermName("read"))
     val write = moduleSymbol.info.decl(TermName("write"))
     val stateful = moduleSymbol.info.decl(TermName("stateful"))
@@ -105,7 +106,11 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
     val comprehendedTerms = mutable.Seq((for (t <- terms) yield {
       val id = TermName(c.freshName("comprehension"))
       val definition = comprehendedTermDefinition(t)
-      val comprehension = normalize(ExpressionRoot(comprehend(Nil)(t)))
+      val comprehension = normalize(ExpressionRoot(comprehend(Nil)(t) match {
+        case root@combinator.Write(_, _, _) => root
+        case root@combinator.Fold(_, _, _, _) => combinator.FoldSink(comprehendedTermName(definition, id), root)
+        case root: Expression => combinator.TempSink(comprehendedTermName(definition, id), root)
+      }))
 
       ComprehendedTerm(id, t, comprehension, definition)
     }).toSeq: _*)
@@ -153,15 +158,27 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
    * @return The (optional) definition for the term.
    */
   private def comprehendedTermDefinition(t: Tree)(implicit cfBlockTraverser: TraversableOnce[CFBlock]) = {
-    var optSymbol = Option.empty[Tree]
+    var optTree = Option.empty[Tree]
     for (block <- cfBlockTraverser; s <- block.stats) s.foreach({
-      case ValDef(_, name, _, rhs) if t == rhs =>
-        optSymbol = Some(s)
-      case Assign(lhs, rhs) if t == rhs =>
-        optSymbol = Some(s)
+      case ValDef(_, name: TermName, _, rhs) if t == rhs =>
+        optTree = Some(s)
+      case Assign(Ident(name: TermName), rhs) if t == rhs =>
+        optTree = Some(s)
       case _ =>
     })
-    optSymbol
+    optTree
+  }
+
+  /**
+   * Looks up a definition term (ValDef or Assign) for a comprehended term.
+   *
+   * @param t The term to lookup.
+   * @return The (optional) definition for the term.
+   */
+  private def comprehendedTermName(t: Option[Tree], default: TermName) = t.getOrElse(default) match {
+    case ValDef(_, name: TermName, _, rhs) => name
+    case Assign(Ident(name: TermName), rhs) => name
+    case _ => default
   }
 
   // --------------------------------------------------------------------------
@@ -175,7 +192,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
    * @param tree The tree to be lifted
    * @return A lifted, MC syntax version of the given tree
    */
-  private def comprehend(vars: List[Variable])(tree: Tree): Expression = {
+  private def comprehend(vars: List[Variable])(tree: Tree, input: Boolean = true): Expression = {
 
     // ignore a top-level Typed node (side-effect of the Algebra inlining macros)
     val t = tree match {
@@ -195,7 +212,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
         val v = Variable(arg.name, arg.tpt)
 
         val bind = Generator(arg.name, comprehend(vars)(in))
-        val head = comprehend(v :: vars)(body)
+        val head = comprehend(v :: vars)(body, input = false)
 
         Comprehension(head, bind :: Nil)
 
@@ -204,7 +221,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
         val v = Variable(arg.name, arg.tpt)
 
         val bind = Generator(arg.name, comprehend(vars)(in))
-        val head = comprehend(v :: vars)(body)
+        val head = comprehend(v :: vars)(body, input = false)
 
         MonadJoin(Comprehension(head, bind :: Nil))
 
@@ -214,7 +231,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
 
         val bind = Generator(arg.name, comprehend(vars)(in))
         val filter = Filter(comprehend(v :: vars)(body))
-        val head = comprehend(v :: vars)(q"${arg.name}")
+        val head = comprehend(v :: vars)(q"${arg.name}", input = false)
 
         Comprehension(head, bind :: filter :: Nil)
 
@@ -323,6 +340,10 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       // read[T](location, ifmt)
       case Apply(TypeApply(method, List(tpt)), location :: ifmt :: Nil) if method.symbol == api.read =>
         combinator.Read(location, ifmt)
+
+      // temp result identifier
+      case ident@Ident(TermName(_)) if input =>
+        combinator.TempSource(ident)
 
       // interpret as black box Scala expression (default)
       case _ =>

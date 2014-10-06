@@ -70,14 +70,18 @@ class WorkflowMacros(val c: blackbox.Context) {
         q"""
         new eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
 
-           def run(engine: runtime.Engine): ${c.weakTypeOf[T]} = engine match {
-             case runtime.Native => runNative()
+           def run(engine: eu.stratosphere.emma.runtime.Engine): ${c.weakTypeOf[T]} = engine match {
+             case eu.stratosphere.emma.runtime.Native => runNative()
              case _ => runParallel(engine)
            }
 
-           private def runNative(): ${c.weakTypeOf[T]} = ${c.untypecheck(root.tree)}
+           private def runNative(): ${c.weakTypeOf[T]} = {
+             ${c.untypecheck(root.tree)}
+           }
 
-           private def runParallel(engine: runtime.Engine): ${c.weakTypeOf[T]} = ${compile(normalizedTree, cfGraph, comprehensionStore)}
+           private def runParallel(engine: eu.stratosphere.emma.runtime.Engine): ${c.weakTypeOf[T]} = {
+             ${compile(normalizedTree, cfGraph, comprehensionStore)}
+           }
         }
         """
 
@@ -87,7 +91,7 @@ class WorkflowMacros(val c: blackbox.Context) {
 //        q"""
 //        new eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
 //
-//           def run(engine: runtime.Engine): ${c.weakTypeOf[T]} = {
+//           def run(engine: eu.stratosphere.emma.runtime.Engine): ${c.weakTypeOf[T]} = {
 //             println(${Literal(Constant(show(algorithmCode)))})
 //             ${c.untypecheck(root.tree)}
 //           }
@@ -108,9 +112,13 @@ class WorkflowMacros(val c: blackbox.Context) {
       object expandComprehendedTerms extends Transformer with (Tree => Tree) {
         override def transform(tree: Tree): Tree = comprehensionStore.getByTerm(tree) match {
           case Some(t) =>
-            expand(tree, cfGraph, comprehensionStore)(t)
-          case _ =>
-            super.transform(tree)
+            expandComprehension(tree, cfGraph, comprehensionStore)(t)
+          case _ => tree match {
+            case Apply(fn, List(values)) if api.apply.alternatives.contains(fn.symbol) =>
+              expandScatter(values)
+            case _ =>
+              super.transform(tree)
+          }
         }
 
         override def apply(tree: Tree): Tree = transform(tree)
