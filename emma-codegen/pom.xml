@@ -13,6 +13,11 @@
     <artifactId>emma-codegen</artifactId>
     <version>1.0-SNAPSHOT</version>
 
+    <properties>
+        <!-- Aura -->
+        <aura.version>1.0-SNAPSHOT</aura.version>
+    </properties>
+
     <dependencies>
         <!-- Scala -->
         <dependency>
@@ -36,28 +41,6 @@
         <dependency>
             <groupId>eu.stratosphere</groupId>
             <artifactId>emma-language</artifactId>
-        </dependency>
-
-        <!-- AURA -->
-        <dependency>
-            <groupId>de.tuberlin.aura</groupId>
-            <artifactId>aura-core</artifactId>
-            <version>1.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>de.tuberlin.aura</groupId>
-            <artifactId>aura-client</artifactId>
-            <version>1.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>de.tuberlin.aura</groupId>
-            <artifactId>aura-tm</artifactId>
-            <version>1.0-SNAPSHOT</version>
-        </dependency>
-        <dependency>
-            <groupId>de.tuberlin.aura</groupId>
-            <artifactId>aura-wm</artifactId>
-            <version>1.0-SNAPSHOT</version>
         </dependency>
 
         <!-- Test -->
