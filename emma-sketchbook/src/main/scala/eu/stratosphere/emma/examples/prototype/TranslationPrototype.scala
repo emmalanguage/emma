@@ -2,11 +2,15 @@ package eu.stratosphere.emma.examples.prototype
 
 import de.tuberlin.aura.client.executors.LocalClusterSimulator
 import de.tuberlin.aura.core.config.{IConfig, IConfigFactory}
+
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
 import eu.stratosphere.emma.runtime.Engine
 import eu.stratosphere.emma.runtime.factory
 import org.apache.spark.util.Vector
+
+import de.tuberlin.aura.core.record.tuples.Tuple1
+import de.tuberlin.aura.core.record.tuples.Tuple2
 
 import scala.util.Random
 
@@ -40,7 +44,22 @@ object TranslationPrototype {
 
 class TranslationPrototype(rt: Engine) extends Algorithm(rt) {
 
-  def run() = testSerialization()
+  def run() = auraTest()
+
+  private def auraTest() = {
+    val algorithm = emma.parallelize {
+      //      val A = read[Int]("file://hello.txt", new InputFormat[Int])
+      //      val B = for (k <- A) yield k * 2
+      //      write("file://output.txt", new OutputFormat[Int])(B)
+
+      val A = read[Tuple2[Int, String]]("file://hello.txt", new InputFormat[Tuple2[Int, String]])
+      val B = for (k <- A) yield new Tuple2(k._1 * 2, "hallo")
+      write("file://output.txt", new OutputFormat[Tuple2[Int, String]])(B)
+    }
+
+    val x = algorithm.run(rt)
+    println(x)
+  }
 
   private def testSerialization() = {
     val z = 7
@@ -52,6 +71,7 @@ class TranslationPrototype(rt: Engine) extends Algorithm(rt) {
       val Y = DataBag(1 to M)
       val Z = for (x <- X; y <- Y; if x == y) yield (x, y)
 
+      Z
       //val A = (for (x <- X; y <- Y; if x == z) yield (x, y)).groupBy(_._1)
 
 //      val K = read[Int]("file://hello.txt", new InputFormat[Int])

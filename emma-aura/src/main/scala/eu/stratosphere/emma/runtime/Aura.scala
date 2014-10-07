@@ -6,6 +6,7 @@ import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.ir.{FoldSink, TempSink, ValueRef, Write}
 import eu.stratosphere.emma.macros.program.util.Counter
 import eu.stratosphere.emma.runtime.Aura.{DataBagRef, ScalarRef}
+import eu.stratosphere.emma.runtime.codegen.aura
 
 case class Aura(host: String, port: Int) extends Engine {
 
@@ -13,26 +14,41 @@ case class Aura(host: String, port: Int) extends Engine {
     closeSession()
   }
 
-  val counter = new Counter()
+  val tmpCounter = new Counter()
+
+  val plnCounter = new Counter()
 
   val client = new AuraClient(IConfigFactory.load(IConfig.Type.CLIENT))
 
-  override def execute[A](root: FoldSink[A]): ValueRef[A] = {
-    // TODO: execute plan
+  private implicit def topologyBuilder = client.createTopologyBuilder()
 
-    // FIXME: map from root.id
+  override def execute[A](root: FoldSink[A]): ValueRef[A] = {
+    println("----------------------------------- fold sink START")
+
+    client.submitTopology(aura.generate(root, nextPlnName), null)
+    client.awaitSubmissionResult(1)
+
+    println("----------------------------------- fold sink STOP")
     ScalarRef[A](root.name, this)
   }
 
   override def execute[A](root: TempSink[A]): ValueRef[DataBag[A]] = {
-    // TODO: execute plan
+    println("----------------------------------- temp sink START")
 
-    // FIXME: map from root.id
+    client.submitTopology(aura.generate(root, nextPlnName), null)
+    client.awaitSubmissionResult(1)
+
+    println("----------------------------------- temp sink STOP")
     DataBagRef[A](root.name, this)
   }
 
   override def execute[A](root: Write[A]): Unit = {
-    // TODO: execute plan
+    println("----------------------------------- sink START")
+
+    client.submitTopology(aura.generate(root, nextPlnName), null)
+    client.awaitSubmissionResult(1)
+
+    println("----------------------------------- sink STOP")
   }
 
   override def scatter[A](values: Seq[A]): ValueRef[DataBag[A]] = {
@@ -55,11 +71,11 @@ case class Aura(host: String, port: Int) extends Engine {
     collection.JavaConversions.collectionAsScalaIterable(client.getDataset[A](ref.uuid)).head
   }
 
-  override def closeSession() = {
-    if (client != null) client.closeSession()
-  }
+  override def closeSession() = if (client != null) client.closeSession()
 
-  private def nextTmpName = f"tmp-${counter.advance.get}%05d-${client.clientSessionID}"
+  private def nextTmpName = f"tmp-${tmpCounter.advance.get}%05d-${client.clientSessionID}"
+
+  private def nextPlnName = f"topology-${plnCounter.advance.get}%05d-${client.clientSessionID}"
 }
 
 object Aura {
