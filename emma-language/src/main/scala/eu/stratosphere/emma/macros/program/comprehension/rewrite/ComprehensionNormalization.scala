@@ -1,58 +1,21 @@
 package eu.stratosphere.emma.macros.program.comprehension.rewrite
 
 import eu.stratosphere.emma.macros.program.ContextHolder
-import eu.stratosphere.emma.macros.program.comprehension.ComprehensionModel
 import eu.stratosphere.emma.macros.program.util.ProgramUtils
-import eu.stratosphere.emma.rewrite.RewriteEngine
 
 import scala.reflect.macros.blackbox
 
 trait ComprehensionNormalization[C <: blackbox.Context]
   extends ContextHolder[C]
-  with ComprehensionModel[C]
-  with ProgramUtils[C]
-  with RewriteEngine {
+  with ComprehensionRewriteEngine[C]
+  with ProgramUtils[C] {
 
   import c.universe._
 
   def normalize(root: ExpressionRoot) = {
-    exhaust(UnnestHead, UnnestGenerator, SimplifyTupleProjection)(root)
-    exhaust(FoldFusion)(root)
+    applyExhaustively(UnnestHead, UnnestGenerator, SimplifyTupleProjection)(root)
+    applyExhaustively(FoldFusion)(root)
     root
-  }
-
-  /**
-   * Exhaustively applies a set to a tree and all its subtrees.
-   *
-   * @param rules A set of rules to be applied.
-   * @param root The root of the expression tree to be transformed.
-   * @return The root of the transformed expression.
-   */
-  private def exhaust(rules: Rule*)(root: ExpressionRoot) = {
-    object apply extends (ExpressionRoot => Boolean) with ExpressionTransformer {
-      var changed = false
-
-      override def transform(e: Expression): Expression = apply(rules, e) match {
-        case Some(x) => changed = true; x
-        case _ => super.transform(e)
-      }
-
-      private def apply(rules: Seq[Rule], e: Expression) = rules.foldLeft(Option.empty[Expression])((x: Option[Expression], r: Rule) => x match {
-        case Some(_) => x
-        case _ => r.apply(e)
-      })
-
-      override def apply(root: ExpressionRoot) = {
-        changed = false
-        root.expr = transform(root.expr)
-        changed
-      }
-    }
-
-    var changed = false
-    do {
-      changed = apply(root)
-    } while (changed)
   }
 
   /**
@@ -83,12 +46,12 @@ trait ComprehensionNormalization[C <: blackbox.Context]
         Option.empty[RuleMatch]
     }
 
-    override protected def guard(r: Expression, m: RuleMatch) = true
+    override protected def guard(m: RuleMatch) = true
 
-    override protected def fire(r: Expression, m: RuleMatch) = {
+    override protected def fire(m: RuleMatch) = {
       val name = m.generator.lhs
       val term = m.child.head.asInstanceOf[ScalaExpr]
-      val rest = localSeq(m.parent)
+      val rest = m.parent.sequence()
         .span(_ != m.generator)._2.tail // trim prefix
         .span(x => !x.isInstanceOf[Generator] || x.asInstanceOf[Generator].lhs.toString != m.generator.toString)._1 // trim suffix
 
@@ -124,9 +87,9 @@ trait ComprehensionNormalization[C <: blackbox.Context]
         Option.empty[RuleMatch]
     }
 
-    override protected def guard(r: Expression, m: RuleMatch) = true //FIXME
+    override protected def guard(m: RuleMatch) = true //FIXME
 
-    override protected def fire(r: Expression, m: RuleMatch) = {
+    override protected def fire(m: RuleMatch) = {
       m.parent.qualifiers = m.parent.qualifiers ++ m.child.qualifiers
       m.parent.head = m.child.head
 
@@ -148,9 +111,9 @@ trait ComprehensionNormalization[C <: blackbox.Context]
         Option.empty[RuleMatch]
     }
 
-    override protected def guard(r: Expression, m: RuleMatch) = containsPattern(m.expr.tree)
+    override protected def guard(m: RuleMatch) = containsPattern(m.expr.tree)
 
-    override protected def fire(r: Expression, m: RuleMatch) = {
+    override protected def fire(m: RuleMatch) = {
       m.expr.tree = simplify(m.expr.tree)
 
       // return new root
@@ -229,9 +192,9 @@ trait ComprehensionNormalization[C <: blackbox.Context]
         Option.empty[RuleMatch]
     }
 
-    override protected def guard(r: Expression, m: RuleMatch) = true //FIXME
+    override protected def guard(m: RuleMatch) = true //FIXME
 
-    override protected def fire(r: Expression, m: RuleMatch) = {
+    override protected def fire(m: RuleMatch) = {
       val head = substitute(m.map.head.asInstanceOf[ScalaExpr].tree, m.child.lhs, q"x")
       val sng = c.typecheck(q"(x: ${m.child.tpe}) => ${substitute(m.fold.sng.asInstanceOf[Function].body, TermName("x"), head)}")
 

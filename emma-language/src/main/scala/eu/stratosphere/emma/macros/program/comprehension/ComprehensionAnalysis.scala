@@ -106,6 +106,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
     val comprehendedTerms = mutable.Seq((for (t <- terms) yield {
       val id = TermName(c.freshName("comprehension"))
       val definition = comprehendedTermDefinition(t)
+      val z = prettyprint(comprehend(Nil)(t))
       val comprehension = normalize(ExpressionRoot(comprehend(Nil)(t) match {
         case root@combinator.Write(_, _, _) => root
         case root@combinator.Fold(_, _, _, _) => combinator.FoldSink(comprehendedTermName(definition, id), root)
@@ -268,7 +269,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
         // quasiquote fold operators using the minBy parameter function
         val empty = c.typecheck(q"Option.empty[$tpt]")
         val sng = c.typecheck(q"(x: $tpt) => Some(x)")
-        val union = c.typecheck(q"""(x: Option[$tpt], y: Option[$tpt]) =>
+        val union = c.typecheck( q"""(x: Option[$tpt], y: Option[$tpt]) =>
             if (x.isEmpty && y.isDefined) y
             else if (x.isDefined && y.isEmpty) x
             else for (u <- x; v <- y) yield if ($bodyNew) u else v
@@ -285,7 +286,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
         // quasiquote fold operators using the minBy parameter function
         val empty = c.typecheck(q"Option.empty[$tpt]")
         val sng = c.typecheck(q"(x: $tpt) => Some(x)")
-        val union = c.typecheck(q"""(x: Option[$tpt], y: Option[$tpt]) =>
+        val union = c.typecheck( q"""(x: Option[$tpt], y: Option[$tpt]) =>
           if (x.isEmpty && y.isDefined) y
           else if (x.isDefined && y.isEmpty) x
           else for (u <- x; v <- y) yield if ($bodyNew) v else u
@@ -347,11 +348,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
 
       // interpret as black box Scala expression (default)
       case _ =>
-        // trees created by the caller with q"..." have to be explicitly typechecked
-        if (t.tpe == null)
-          ScalaExpr(vars, c.typecheck(q"{ ..${for (v <- vars) yield q"val ${v.name}: ${v.tpt} = null.asInstanceOf[${v.tpt}]".asInstanceOf[ValDef]}; $t }").asInstanceOf[Block].expr)
-        else
-          ScalaExpr(vars, t)
+        ScalaExpr(vars, typechecked(vars, t)) // trees created by the caller with q"..." have to be explicitly typechecked
     }
   }
 

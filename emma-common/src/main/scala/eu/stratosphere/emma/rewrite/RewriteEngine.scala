@@ -10,11 +10,11 @@ trait RewriteEngine {
 
     protected def bind(e: Expression): Option[RuleMatch]
 
-    protected def guard(e: Expression, m: RuleMatch): Boolean
+    protected def guard(m: RuleMatch): Boolean
 
-    protected def fire(e: Expression, m: RuleMatch): Expression
+    protected def fire(m: RuleMatch): Expression
 
-    final def apply(e: Expression): Option[Expression] = for (m <- bind(e); if guard(e, m)) yield fire(e, m)
+    final def apply(e: Expression): Option[Expression] = for (m <- bind(e); if guard(m)) yield fire(m)
   }
 
 }

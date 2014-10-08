@@ -1,7 +1,7 @@
 package eu.stratosphere.emma.macros.program.comprehension
 
 import eu.stratosphere.emma.macros.program.ContextHolder
-import eu.stratosphere.emma.macros.program.comprehension.rewrite.CombinatorRewrite
+import eu.stratosphere.emma.macros.program.comprehension.rewrite.ComprehensionCombination
 import eu.stratosphere.emma.macros.program.controlflow.ControlFlowModel
 import eu.stratosphere.emma.macros.program.util.ProgramUtils
 
@@ -11,7 +11,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
   extends ContextHolder[C]
   with ControlFlowModel[C]
   with ComprehensionModel[C]
-  with CombinatorRewrite[C]
+  with ComprehensionCombination[C]
   with ProgramUtils[C] {
 
   import c.universe._
@@ -40,23 +40,23 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
       import eu.stratosphere.emma.ir
       import eu.stratosphere.emma.optimizer._
 
+      println("~" * 80)
+      println("~ Comprehension `" + ${t.id.toString} + "` before:")
+      println("~" * 80)
+      println(${t.comprehension.toString})
+      println("~" * 80)
+      println("")
+
+      println("~" * 80)
+      println("~ Comprehension `" + ${t.id.toString} + "` after:")
+      println("~" * 80)
+      println(${rewrite(t.comprehension).toString})
+      println("~" * 80)
+
       // execute the plan and return a reference to the result
       engine.execute(${serialize(rewrite(t.comprehension).expr)})
     }
     """
-
-//    println("~" * 80)
-//    println("~ Comprehension `" + ${t.id.toString} + "` before:")
-//    println("~" * 80)
-//    println(${t.comprehension.toString})
-//    println("~" * 80)
-//    println("")
-//
-//    println("~" * 80)
-//    println("~ Comprehension `" + ${t.id.toString} + "` after:")
-//    println("~" * 80)
-//    println(${rewrite(t.comprehension).toString})
-//    println("~" * 80)
 
   }
 

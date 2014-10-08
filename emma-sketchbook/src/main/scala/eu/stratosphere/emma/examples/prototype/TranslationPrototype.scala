@@ -25,6 +25,9 @@ object TranslationPrototype {
    *
    */
   def main(args: Array[String]): Unit = {
+    // disable logging
+    org.apache.log4j.LogManager.getRootLogger().setLevel(org.apache.log4j.Level.ERROR);
+
     val lcs = new LocalClusterSimulator(IConfigFactory.load(IConfig.Type.SIMULATOR))
     val engine = factory("aura", "localhost", 31431)
 

@@ -24,7 +24,20 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
   }
 
   sealed trait Expression {
+
     def tpe: Type
+
+    /** Apply `f` to each subtree */
+    def sequence() = collect({
+      case x => x
+    })
+
+    /** Apply `pf` to each subexpression on which the function is defined and collect the results. */
+    def collect[T](pf: PartialFunction[Expression, T]): List[T] = {
+      val ctt = new CollectTreeTraverser[T](pf)
+      ctt.traverse(this)
+      ctt.results.toList
+    }
   }
 
   // Monads
@@ -66,6 +79,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
   // Combinators
 
   object combinator {
+
     sealed trait Combinator extends Expression {
     }
 
@@ -132,7 +146,25 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     case class Diff(var xs: Expression, var ys: Expression) extends Combinator {
       def tpe = xs.tpe
     }
+
   }
+
+  // --------------------------------------------------------------------------
+  // Comprehension Store
+  // --------------------------------------------------------------------------
+
+  class ComprehensionStore(val terms: mutable.Seq[ComprehendedTerm]) {
+
+    private val defIndex = mutable.Map((for (t <- terms; d <- t.definition) yield d -> t): _*)
+
+    private val termIndex = mutable.Map((for (t <- terms) yield t.term -> t): _*)
+
+    def comprehendedDef(defintion: Tree) = defIndex.get(defintion)
+
+    def getByTerm(term: Tree) = termIndex.get(term)
+  }
+
+  case class ComprehendedTerm(id: TermName, term: Tree, comprehension: ExpressionRoot, definition: Option[Tree])
 
   // --------------------------------------------------------------------------
   // Traversal
@@ -180,7 +212,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     def transformFold(e: combinator.Fold) = transform(e).asInstanceOf[combinator.Fold]
   }
 
-  trait ExpressionDepthFirstTraverser {
+  trait ExpressionTraverser {
 
     def traverse(e: Expression): Unit = e match {
       // Monads
@@ -212,49 +244,27 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     }
   }
 
-  // --------------------------------------------------------------------------
-  // Comprehension Store
-  // --------------------------------------------------------------------------
+  private class CollectTreeTraverser[T](pf: PartialFunction[Expression, T]) extends ExpressionTraverser {
+    val results = mutable.ListBuffer[T]()
 
-  class ComprehensionStore(val terms: mutable.Seq[ComprehendedTerm]) {
-
-    private val defIndex = mutable.Map((for (t <- terms; d <- t.definition) yield d -> t): _*)
-
-    private val termIndex = mutable.Map((for (t <- terms) yield t.term -> t): _*)
-
-    def comprehendedDef(defintion: Tree) = defIndex.get(defintion)
-
-    def getByTerm(term: Tree) = termIndex.get(term)
+    override def traverse(t: Expression) {
+      super.traverse(t)
+      if (pf.isDefinedAt(t)) results += pf(t)
+    }
   }
 
-  case class ComprehendedTerm(id: TermName, term: Tree, comprehension: ExpressionRoot, definition: Option[Tree])
-
-  // ---------------------------------------------------
+  // --------------------------------------------------------------------------
   // Helper methods.
-  // ---------------------------------------------------
+  // --------------------------------------------------------------------------
 
   /**
-   * Construct a list containing the nodes of a local comprehension tree using depth-first, bottom-up traversal.
-   *
-   * This method will trim subtrees with nodes which represent
-   *
-   * - Logical Operators or
-   * - Environment & Host Language Connectors.
-   *
-   * @param root The root of the traversed tree.
-   * @return
+   * Typechecks a `tree` using the given set of environtment `vars`.
    */
-  def localSeq(root: Expression): List[Expression] = root match {
-    // Monads
-    case MonadUnit(expr) => localSeq(expr) ++ List(root)
-    case MonadJoin(expr) => localSeq(expr) ++ List(root)
-    case Comprehension(head, qualifiers) => qualifiers.flatMap(q => localSeq(q)) ++ localSeq(head) ++ List(root)
-    // Qualifiers
-    case Filter(expr) => localSeq(expr) ++ List(root)
-    case Generator(_, rhs) => localSeq(rhs) ++ List(root)
-    // Environment & Host Language Connectors, Combinators: Skip!
-    case _ => List(root)
-  }
+  def typechecked(vars: List[Variable], tree: Tree) =
+    if (tree.tpe == null)
+      c.typecheck(q"{ ..${for (v <- vars.reverse) yield q"val ${v.name}: ${v.tpt} = null.asInstanceOf[${v.tpt}]".asInstanceOf[ValDef]}; $tree }").asInstanceOf[Block].expr
+    else
+      tree
 
   /**
    * Pretty-print an IR tree.
@@ -263,52 +273,127 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
    * @return
    */
   def prettyprint(root: Expression, debug: Boolean = false) = {
-    val sb = new mutable.StringBuilder()
-    val ident = "        "
-
-    def print(v: Any) = v match {
-      case x: TermName => sb.append(x.encodedName.toString)
-      case x: Tree => sb.append(x.toString())
-      case x: String => sb.append(x)
-      case _ => sb.append("<unknown>")
-    }
-
-    def println(v: String) = sb.append(v + sys.props("line.separator"))
-
-    def printHelper(e: Any, offset: String = ""): Unit = e match {
+    def pp(e: Any, offset: String = ""): String = e match {
       // Monads
-      case e@MonadJoin(expr) => print("join("); printHelper(expr, offset + ident); print(")")
-      case e@MonadUnit(expr) => print("unit("); printHelper(expr, offset + ident); print(")")
-      case e@Comprehension(h, qs) => print("[ "); printHelper(h, offset + " " * 2); println(" | "); printHelper(qs, offset + ident); print("\n" + offset + "]^" + e.tpe.toString)
+      case e@MonadJoin(expr) =>
+        s"""
+        |μ ( ${pp(expr, offset + " " * 4)} )
+        """.stripMargin.trim
+      case e@MonadUnit(expr) =>
+        s"""
+        |η ( ${pp(expr, offset + " " * 4)} )
+        """.stripMargin.trim
+      case e@Comprehension(h, qs) =>
+        s"""
+        |[ ${pp(h, offset + " " * 2)} |
+        |  ${offset + pp(qs, offset + " " * 2)} ]
+        """.stripMargin.trim //^${e.tpe.toString}
       // Qualifiers
-      case e@Filter(expr) => printHelper(expr)
-      case e@Generator(lhs, rhs) => print(lhs); print(" ← "); printHelper(rhs, offset + "   " + " " * lhs.encodedName.toString.length)
+      case e@Filter(expr) =>
+        s"""
+        |${pp(expr)}
+        """.stripMargin.trim
+      case e@Generator(lhs, rhs) =>
+        s"""
+        |$lhs ← ${pp(rhs, offset + "   " + " " * lhs.encodedName.toString.length)}
+        """.stripMargin.trim
       // Environment & Host Language Connectors
-      case e@ScalaExpr(freeVars, expr) => print(expr); if (debug) print(" <" + freeVars + "> ")
+      case e@ScalaExpr(freeVars, expr) =>
+        s"""
+        |${pp(expr)}
+        """.stripMargin.trim // if (debug) _pprint(" <" + freeVars + "> ")
       // Combinators
-      case e@combinator.Read(location, format) => print("read ("); print(location); print(")")
-      case e@combinator.Write(location, format, in) => print("write ("); print(location); print(")("); printHelper(in, offset + ident); print(")")
-      case e@combinator.TempSource(id) => print("tmpsrc ("); print(id); print(")")
-      case e@combinator.TempSink(id, xs) => print("tmpsnk ("); print(id); print(")("); printHelper(xs, offset + ident); print(")")
-      case e@combinator.FoldSink(id, xs) => print("foldsnk ("); print(id); print(")("); printHelper(xs, offset + ident); print(")")
-      case e@combinator.Map(f, xs) => print("map "); print(f); print("("); printHelper(xs); print(")")
-      case e@combinator.FlatMap(f, xs) => print("flatMap "); print(f); print("("); printHelper(xs); print(")")
-      case e@combinator.Filter(p, xs) => print("filter "); print(p); print("("); printHelper(xs); print(")")
-      case e@combinator.EquiJoin(p, xs, ys) => print("join "); print(p); print("("); printHelper(xs); print(", "); printHelper(ys); print(")")
-      case e@combinator.Cross(xs, ys) => print("cross "); print("("); printHelper(xs); print(", "); printHelper(ys); print(")")
-      case e@combinator.Group(key, xs) => print("group "); print(key); print("("); printHelper(xs); print(")")
-      case e@combinator.Fold(empty, sng, union, xs) => print("fold〈"); print(empty); print(", "); print(sng); print(", "); print(union); print("〉("); printHelper(xs); print(")")
-      case e@combinator.Distinct(xs) => print("distinct "); printHelper(xs); print(")");
-      case e@combinator.Union(xs, ys) => print("union "); printHelper(xs); print(")("); printHelper(ys); print(")")
-      case e@combinator.Diff(xs, ys) => print("diff "); printHelper(xs); print(")("); printHelper(ys); print(")")
+      case e@combinator.Read(location, format) =>
+        s"""
+        |read (${pp(location)})
+        """.stripMargin.trim
+      case e@combinator.Write(location, format, in) =>
+        s"""
+        |write (${pp(location)}) (
+        |        ${offset + pp(in, offset + " " * 8)} )
+        """.stripMargin.trim
+      case e@combinator.TempSource(id) =>
+        s"""
+        |tmpsrc (${pp(id)})
+        """.stripMargin.trim
+      case e@combinator.TempSink(id, xs) =>
+        s"""
+        |tmpsnk ${pp(id)} (
+        |        ${offset + pp(xs, offset + " " * 8)} )
+        """.stripMargin.trim
+      case e@combinator.FoldSink(id, xs) =>
+        s"""
+        |foldsnk ${pp(id)} (
+        |        ${offset + pp(xs, offset + " " * 8)} )
+        """.stripMargin.trim
+      case e@combinator.Map(f, xs) =>
+        s"""
+        |map ${pp(f)} (
+        |        ${offset + pp(xs, offset + " " * 8)} )
+        """.stripMargin.trim
+      case e@combinator.FlatMap(f, xs) =>
+        s"""
+        |flatMap ${pp(f)} (
+        |        ${offset + pp(xs, offset + " " * 8)} )
+        """.stripMargin.trim
+      case e@combinator.Filter(p, xs) =>
+        s"""
+        |filter ${pp(p)} (
+        |        ${offset + pp(xs, offset + " " * 8)})
+        """.stripMargin.trim
+      case e@combinator.EquiJoin(p, xs, ys) =>
+        s"""
+        |join ${pp(p)} (
+        |        ${offset + pp(xs, offset + " " * 8)} ,
+        |        ${offset + pp(ys, offset + " " * 8)} )
+        """.stripMargin.trim
+      case e@combinator.Cross(xs, ys) =>
+        s"""
+        |cross (
+        |        ${offset + pp(xs, offset + " " * 8)} ,
+        |        ${offset + pp(ys, offset + " " * 8)} )
+        """.stripMargin.trim
+      case e@combinator.Group(key, xs) =>
+        s"""
+        |group ${pp(key)} (
+        |        ${offset + pp(xs, offset + " " * 8)} )
+        """.stripMargin.trim
+      case e@combinator.Fold(empty, sng, union, xs) =>
+        s"""
+        |fold〈${pp(empty)}, ${pp(sng)}, ${pp(union)}〉(
+        |        ${offset + pp(xs, offset + " " * 8)} )
+        """.stripMargin.trim
+      case e@combinator.Distinct(xs) =>
+        s"""
+        |distinct (${pp(xs)})
+        |        ${offset + pp(xs, offset)})
+        """.stripMargin.trim
+      case e@combinator.Union(xs, ys) =>
+        s"""
+        |union (
+        |        ${offset + pp(xs, offset + " " * 8)} ,
+        |        ${offset + pp(ys, offset + " " * 8)} )
+        """.stripMargin.trim
+      case e@combinator.Diff(xs, ys) =>
+        s"""
+        |diff (
+        |        ${offset + pp(xs, offset + " " * 8)} ,
+        |        ${offset + pp(ys, offset + " " * 8)} )
+        """.stripMargin.trim
       // Lists
-      case Nil => println("")
-      case q :: Nil => print(offset); printHelper(q, offset)
-      case q :: qs => print(offset); printHelper(q, offset); println(", "); printHelper(qs, offset)
-      case _ => print("〈unknown expression〉")
+      case qs: List[Any] =>
+        (for (q <- qs) yield pp(q, offset)).mkString(sys.props("line.separator") + offset)
+      // Other types
+      case x: TermName =>
+        x.encodedName.toString
+      case x: Tree =>
+        x.toString()
+      case x: String =>
+        x
+      case _ =>
+        "〈unknown expression〉"
     }
 
-    printHelper(root)
-    sb.toString()
+    pp(root)
   }
 }
