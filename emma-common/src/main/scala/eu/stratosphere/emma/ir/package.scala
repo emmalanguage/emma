@@ -19,7 +19,9 @@ package object ir {
 
   trait ValueRef[A] {
 
-    val uuid: UUID
+    val name: String
+
+    def uuid: UUID = UUID.nameUUIDFromBytes(name.getBytes)
 
     def value: A
   }
