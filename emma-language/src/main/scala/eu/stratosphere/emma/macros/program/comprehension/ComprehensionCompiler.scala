@@ -21,7 +21,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
    *
    * @param values A Seq[T] typed term that provides the values for the local constructor call.
    */
-  def expandScatter(values: Tree) = q"engine.scatter($values)"
+  def expandScatterTerm(values: Tree) = q"engine.scatter($values)"
 
   /**
    * Expands a comprehended term in the compiled driver.
@@ -32,26 +32,13 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
    * @param t The comprehended term to be expanded.
    * @return A tree representing the expanded comprehension.
    */
-  def expandComprehension(tree: Tree, cfGraph: CFGraph, comprehensionStore: ComprehensionStore)(t: ComprehendedTerm) = {
+  def expandComprehensionTerm(tree: Tree, cfGraph: CFGraph, comprehensionStore: ComprehensionStore)(t: ComprehendedTerm) = {
     q"""
     {
       // required imports
       import scala.reflect.runtime.universe._
       import eu.stratosphere.emma.ir
       import eu.stratosphere.emma.optimizer._
-
-      println("~" * 80)
-      println("~ Comprehension `" + ${t.id.toString} + "` before:")
-      println("~" * 80)
-      println(${t.comprehension.toString})
-      println("~" * 80)
-      println("")
-
-      println("~" * 80)
-      println("~ Comprehension `" + ${t.id.toString} + "` after:")
-      println("~" * 80)
-      println(${rewrite(t.comprehension).toString})
-      println("~" * 80)
 
       // execute the plan and return a reference to the result
       engine.execute(${serialize(rewrite(t.comprehension).expr)})
