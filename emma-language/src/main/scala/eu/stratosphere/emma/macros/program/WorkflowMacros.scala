@@ -2,8 +2,8 @@ package eu.stratosphere.emma.macros.program
 
 
 import eu.stratosphere.emma.api.Algorithm
-import eu.stratosphere.emma.macros.program.controlflow.ControlFlow
 import eu.stratosphere.emma.macros.program.comprehension.Comprehension
+import eu.stratosphere.emma.macros.program.controlflow.ControlFlow
 
 import scala.language.existentials
 import scala.language.experimental.macros
@@ -16,6 +16,13 @@ class WorkflowMacros(val c: blackbox.Context) {
    */
   def parallelize[T: c.WeakTypeTag](e: c.Expr[T]): c.Expr[Algorithm[T]] = {
     new LiftHelper[c.type](c).parallelize[T](e)
+  }
+
+  /**
+   * Debug macro: print all comprehensions in an algorithm.
+   */
+  def comprehend[T: c.WeakTypeTag](e: c.Expr[T]): c.Expr[Unit] = {
+    new LiftHelper[c.type](c).comprehend[T](e)
   }
 
   private class LiftHelper[C <: blackbox.Context](val c: C)
@@ -86,17 +93,53 @@ class WorkflowMacros(val c: blackbox.Context) {
         """
 
       c.Expr[Algorithm[T]](c.typecheck(algorithmCode))
+    }
 
-//      c.Expr[Algorithm[T]](
-//        q"""
-//        new eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
-//
-//           def run(engine: eu.stratosphere.emma.runtime.Engine): ${c.weakTypeOf[T]} = {
-//             println(${Literal(Constant(show(algorithmCode)))})
-//             ${c.untypecheck(root.tree)}
-//           }
-//        }
-//        """)
+    /**
+     * Translates an Emma expression to an Algorithm.
+     *
+     * @return
+     */
+    def comprehend[T: c.WeakTypeTag](root: Expr[T]): Expr[Unit] = {
+
+      // Create a normalized version of the original tree
+      val normalizedTree = normalize(root.tree)
+
+      // ----------------------------------------------------------------------
+      // Code analysis
+      // ----------------------------------------------------------------------
+
+      // 1. Create control flow graph
+      val cfGraph = createControlFlowGraph(normalizedTree)
+
+      // 2. Identify and isolate maximal comprehensions
+      val comprehensionStore = createComprehensionStore(cfGraph)
+
+      // ----------------------------------------------------------------------
+      // Final result assembly
+      // ----------------------------------------------------------------------
+
+      val code =
+        q"""
+        { ..${
+          for (t <- comprehensionStore.terms) yield
+            q"""
+            println("~" * 80)
+            println("~ Comprehension `" + ${t.id.toString} + "` (original):")
+            println("~" * 80)
+            println(${t.comprehension.toString})
+            println("~" * 80)
+            println("")
+            println("~" * 80)
+            println("~ Comprehension `" + ${t.id.toString} + "` (combinatros):")
+            println("~" * 80)
+            println(${rewrite(t.comprehension).toString})
+            println("~" * 80)
+            """
+        }
+        }"""
+
+      c.Expr[Unit](c.typecheck(code))
     }
 
     /**
@@ -112,10 +155,10 @@ class WorkflowMacros(val c: blackbox.Context) {
       object expandComprehendedTerms extends Transformer with (Tree => Tree) {
         override def transform(tree: Tree): Tree = comprehensionStore.getByTerm(tree) match {
           case Some(t) =>
-            expandComprehension(tree, cfGraph, comprehensionStore)(t)
+            expandComprehensionTerm(tree, cfGraph, comprehensionStore)(t)
           case _ => tree match {
             case Apply(fn, List(values)) if api.apply.alternatives.contains(fn.symbol) =>
-              expandScatter(values)
+              expandScatterTerm(values)
             case _ =>
               super.transform(tree)
           }

@@ -17,6 +17,8 @@ object emma {
 
   final def parallelize[T](e: T): Algorithm[T] = macro WorkflowMacros.parallelize[T]
 
+  final def comprehend[T](e: T): Unit = macro WorkflowMacros.comprehend[T]
+
   final def desugar(e: Any): String = macro UtilMacros.desugar
 
   final def desugarRaw(e: Any): String = macro UtilMacros.desugarRaw
