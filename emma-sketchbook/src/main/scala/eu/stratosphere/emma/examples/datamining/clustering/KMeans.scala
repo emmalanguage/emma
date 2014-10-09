@@ -95,19 +95,16 @@ class KMeans(k: Int, epsilon: Double, inputUrl: String, outputUrl: String, rt: E
 
       // initialize random cluster means
       val random = new Random(KMeans.SEED)
-      var means = DataBag(for (i <- 1 to k) yield Point(i, Vector(random.nextDouble(), random.nextDouble(), random.nextDouble())))
+      var centroids = DataBag(for (i <- 1 to k) yield Point(i, Vector(random.nextDouble(), random.nextDouble(), random.nextDouble())))
       var change = 0.0
 
       // initialize solution
-      var solution: DataBag[Solution] = null
+      var solution = for (p <- points) yield {
+        val closestCentroid = centroids.minBy((m1, m2) => (p.pos squaredDist m1.pos) < (p.pos squaredDist m2.pos)).get
+        Solution(p, closestCentroid.id)
+      }
 
       do {
-        // update solution: re-assign clusters
-        solution = for (s <- solution) yield {
-          val closestMean = means.minBy((m1, m2) => (s.point.pos squaredDist m1.pos) < (s.point.pos squaredDist m2.pos)).get
-          s.copy(clusterID = closestMean.id)
-        }
-
         // update means
         val newMeans = for (cluster <- solution.groupBy(_.clusterID)) yield {
           val sum = (for (p <- cluster.values) yield p.point.pos).fold[Vector](Vector.zeros(3), identity, (x, y) => x + y)
@@ -117,12 +114,18 @@ class KMeans(k: Int, epsilon: Double, inputUrl: String, outputUrl: String, rt: E
 
         // compute change between the old and the new means
         change = {
-          val distances = for (mean <- means; newMean <- newMeans; if mean.id == newMean.id) yield mean.pos squaredDist newMean.pos
+          val distances = for (mean <- centroids; newMean <- newMeans; if mean.id == newMean.id) yield mean.pos squaredDist newMean.pos
           distances.sum()
         }
 
+        // update solution: re-assign clusters
+        solution = for (s <- solution) yield {
+          val closestMean = centroids.minBy((m1, m2) => (s.point.pos squaredDist m1.pos) < (s.point.pos squaredDist m2.pos)).get
+          s.copy(clusterID = closestMean.id)
+        }
+
         // use new means for the next iteration
-        means = newMeans
+        centroids = newMeans
       } while (change < epsilon)
 
       // write result
