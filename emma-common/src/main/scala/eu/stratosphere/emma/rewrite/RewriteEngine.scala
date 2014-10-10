@@ -8,13 +8,13 @@ trait RewriteEngine {
 
     type RuleMatch
 
-    protected def bind(e: Expression): Option[RuleMatch]
+    protected def bind(e: Expression): Traversable[RuleMatch]
 
     protected def guard(m: RuleMatch): Boolean
 
     protected def fire(m: RuleMatch): Expression
 
-    final def apply(e: Expression): Option[Expression] = for (m <- bind(e); if guard(m)) yield fire(m)
+    final def apply(e: Expression): Option[Expression] = for (m <- bind(e).find(guard)) yield fire(m)
   }
 
 }

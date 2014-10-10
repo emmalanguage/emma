@@ -12,7 +12,7 @@ trait ComprehensionCombination[C <: blackbox.Context]
 
   import c.universe._
 
-  def rewrite(root: ExpressionRoot) = {
+  def combine(root: ExpressionRoot) = {
     // states for the state machine
     sealed trait RewriteState {}
     object Start extends RewriteState
@@ -55,36 +55,33 @@ trait ComprehensionCombination[C <: blackbox.Context]
 
     case class RuleMatch(root: Comprehension, generator: Generator, filter: Filter)
 
-    override protected def bind(r: Expression) = {
-      var m = Option.empty[RuleMatch]
-
-      r match {
-        case parent@Comprehension(_, _) =>
-          for (q <- parent.qualifiers) q match {
-            case filter@Filter(expr) =>
-              for (q <- parent.qualifiers.span(_ != filter)._1) q match {
-                case generator: Generator =>
-                  m = Some(RuleMatch(parent, generator, filter))
-                case _ =>
-              }
-            case _ =>
-          }
-        case _ =>
+    override protected def bind(r: Expression) = new Traversable[RuleMatch] {
+      def foreach[U](f: RuleMatch => U) = {
+        r match {
+          case parent@Comprehension(_, _) =>
+            for (q <- parent.qualifiers) q match {
+              case filter@Filter(expr) =>
+                for (q <- parent.qualifiers.span(_ != filter)._1) q match {
+                  case generator: Generator => f(RuleMatch(parent, generator, filter))
+                  case _ =>
+                }
+              case _ =>
+            }
+          case _ =>
+        }
       }
-
-      m
     }
 
     /**
      * Checks:
      *
-     * - Filter has only 1 free var
-     * - Generator binds the free var of the filter
+     * - Filter uses only 1 variable
+     * - Generator binds the variable of the filter
      */
     override protected def guard(m: RuleMatch) = {
       // TODO: add support for comprehension filter expressions
       m.filter.expr match {
-        case ScalaExpr(vars, _) if vars.size == 1 => vars.head.name == m.generator.lhs
+        case expr: ScalaExpr => expr.usedVars.size == 1 && expr.usedVars.head.name == m.generator.lhs
         case _ => false
       }
     }
@@ -92,8 +89,8 @@ trait ComprehensionCombination[C <: blackbox.Context]
     override protected def fire(m: RuleMatch) = {
       // TODO: add support for comprehension filter expressions
       m.filter.expr match {
-        case ScalaExpr(vars, tree) =>
-          val x = vars.head
+        case filter@ScalaExpr(vars, tree) =>
+          val x = filter.usedVars.head
           val p = c.typecheck(q"(${x.name}: ${x.tpt}) => ${freeEnv(vars)(tree)}")
           m.generator.rhs = combinator.Filter(p, m.generator.rhs)
           m.root.qualifiers = m.root.qualifiers.filter(_ != m.filter)
@@ -121,13 +118,11 @@ trait ComprehensionCombination[C <: blackbox.Context]
     case class RuleMatch(head: ScalaExpr, child: Generator)
 
     override protected def bind(r: Expression) = r match {
-      case Comprehension(head: ScalaExpr, List(child: Generator)) =>
-        Some(RuleMatch(head, child))
-      case _ =>
-        Option.empty[RuleMatch]
+      case Comprehension(head: ScalaExpr, List(child: Generator)) => Some(RuleMatch(head, child))
+      case _ => Option.empty[RuleMatch]
     }
 
-    override protected def guard(m: RuleMatch) = m.head.vars.size == 1
+    override protected def guard(m: RuleMatch) = m.head.usedVars.size == 1
 
     override protected def fire(m: RuleMatch) = {
       val f = c.typecheck(q"(..${for (v <- m.head.vars.reverse) yield q"val ${v.name}: ${v.tpt}"}) => ${freeEnv(m.head.vars)(m.head.tree)}")
@@ -151,13 +146,11 @@ trait ComprehensionCombination[C <: blackbox.Context]
     case class RuleMatch(head: ScalaExpr, child: Generator)
 
     override protected def bind(r: Expression) = r match {
-      case MonadJoin(Comprehension(head: ScalaExpr, List(child: Generator))) =>
-        Some(RuleMatch(head, child))
-      case _ =>
-        Option.empty[RuleMatch]
+      case MonadJoin(Comprehension(head: ScalaExpr, List(child: Generator))) => Some(RuleMatch(head, child))
+      case _ => Option.empty[RuleMatch]
     }
 
-    override protected def guard(m: RuleMatch) = m.head.vars.size == 1
+    override protected def guard(m: RuleMatch) = m.head.usedVars.size == 1
 
     override protected def fire(m: RuleMatch) = {
       val f = c.typecheck(q"(..${for (v <- m.head.vars.reverse) yield q"val ${v.name}: ${v.tpt}"}) => ${freeEnv(m.head.vars)(m.head.tree)}")
@@ -175,80 +168,103 @@ trait ComprehensionCombination[C <: blackbox.Context]
    * ==Rule Description==
    *
    * '''Matching Pattern''':
-   * {{{ [[ e | qs, x ← xs, y ← ys, qs1, p x y, qs2 ]] }}}
+   * {{{ [[ e | qs, x ← xs, y ← ys, qs1, k₁ x == k₂ y, qs2 ]] }}}
    *
    * '''Rewrite''':
-   * {{{ [[ e[v.x/x][v.y/y] | qs, v ← ⋈ p xs ys, qs1[v.x/x][v.y/y], qs2[v.x/x][v.y/y] ]] }}}
+   * {{{ [[ e[v.x/x][v.y/y] | qs, v ← ⋈ k₁ k₂ xs ys, qs1[v.x/x][v.y/y], qs2[v.x/x][v.y/y] ]] }}}
    */
   object MatchEquiJoin extends Rule {
 
-    case class RuleMatch(parent: Comprehension, xs: Generator, ys: Generator, filter: Filter, p: ScalaExpr)
+    case class RuleMatch(parent: Comprehension, xs: Generator, ys: Generator, filter: Filter, keyx: Function, keyy: Function)
 
-    override protected def bind(r: Expression) = r match {
-      case parent@Comprehension(_, _) =>
-        var m = Option.empty[RuleMatch]
-        for (q <- parent.qualifiers) q match {
-          case filter@Filter(p: ScalaExpr) =>
-            for (List(q1, q2) <- parent.qualifiers.span(_ != filter)._1.sliding(2)) (q1, q2) match {
-              case (xs: Generator, ys: Generator) => m = Some(RuleMatch(parent, xs, ys, filter, p))
+    override protected def bind(r: Expression) = new Traversable[RuleMatch] {
+      def foreach[U](f: RuleMatch => U) = {
+        r match {
+          case parent@Comprehension(_, _) =>
+            for (q <- parent.qualifiers) q match {
+              case filter@Filter(p: ScalaExpr) =>
+                // check all generator pairs before the filter
+                for (pair <- parent.qualifiers.span(_ != filter)._1.sliding(2)) pair match {
+                  case (xs: Generator) :: (ys: Generator) :: Nil =>
+                    parseJoinPredicate(xs, ys, p) match {
+                      case Some((keyx, keyy)) => f(RuleMatch(parent, xs, ys, filter, keyx, keyy))
+                      case _ =>
+                    }
+                  case _ =>
+                }
               case _ =>
             }
           case _ =>
         }
-        m
-      case _ => Option.empty[RuleMatch]
+      }
     }
 
-    override protected def guard(m: RuleMatch) = {
-      m.p.vars.size == 2 && isEquiJoin(m.p) &&
-        ((m.xs.lhs == m.p.vars.head.name && m.ys.lhs == m.p.vars.reverse.head.name) ||
-          (m.xs.lhs == m.p.vars.reverse.head.name && m.ys.lhs == m.p.vars.head.name))
-    }
+    override protected def guard(m: RuleMatch) = true
 
     override protected def fire(m: RuleMatch) = {
       val (prefix, suffix) = m.parent.qualifiers.span(_ != m.xs)
-      val p = c.typecheck(q"(..${for (v <- m.p.vars.reverse) yield q"val ${v.name}: ${v.tpt}"}) => ${freeEnv(m.p.vars)(m.p.tree)}")
-
       // construct combinator node with input and predicate sides aligned
-      val join =
-        if (m.xs.lhs == m.p.vars.head.name && m.ys.lhs == m.p.vars.reverse.head.name)
-          combinator.EquiJoin(p, m.ys.rhs, m.xs.rhs)
-        else // (m.xs.lhs == m.p.vars.reverse.head.name && m.ys.lhs == m.p.vars.head.name)
-          combinator.EquiJoin(p, m.xs.rhs, m.ys.rhs)
+      val join = combinator.EquiJoin(m.keyx, m.keyy, m.xs.rhs, m.ys.rhs)
 
       // bind join result to a fresh variable
-      val v = Variable(TermName(c.freshName("x")), tq"(..${for (v <- m.p.vars.reverse) yield v.tpt})")
+      val v = Variable(TermName(c.freshName("x")), tq"(${m.keyx.vparams.head.tpt}, ${m.keyy.vparams.head.tpt})")
       m.parent.qualifiers = prefix ++ List(Generator(v.name, join)) ++ suffix.tail.tail.filter(_ != m.filter)
 
       // substitute [v._1/x] in affected expressions
       for (e <- m.parent.collect({
-        case e@ScalaExpr(vars, expr) if vars.contains(m.p.vars.reverse.head) => e
-      })) substitute(e, m.p.vars.reverse.head.name, ScalaExpr(List(v), q"${v.name}._1"))
+        case e@ScalaExpr(vars, expr) if vars.map(_.name).contains(m.xs.lhs) => e
+      })) substitute(e, m.xs.lhs, ScalaExpr(List(v), q"${v.name}._1"))
 
       // substitute [v._2/y] in affected expressions
       for (e <- m.parent.collect({
-        case e@ScalaExpr(vars, expr) if vars.contains(m.p.vars.head) => e
-      })) substitute(e, m.p.vars.head.name, ScalaExpr(List(v), q"${v.name}._2"))
+        case e@ScalaExpr(vars, expr) if vars.map(_.name).contains(m.ys.lhs) => e
+      })) substitute(e, m.ys.lhs, ScalaExpr(List(v), q"${v.name}._2"))
 
       // return the modified parent
       m.parent
     }
 
-    private def isEquiJoin(expr: ScalaExpr): Boolean = {
-      val traverser = new Traverser with (Tree => Boolean) {
-        var equiJoin: Boolean = false
+    private def parseJoinPredicate(xs: Generator, ys: Generator, p: ScalaExpr): Option[(Function, Function)] = {
+      p.tree match {
+        // check if the predicate expression has the type `lhs == rhs`
+        case Apply(Select(lhs, name), List(rhs)) if name.toString == "$eq$eq" =>
+          // find expr.vars used in the `lhs`
+          val lhsUsedVars = {
+            val used = lhs.collect({
+              case Ident(n: TermName) => n
+            })
+            p.vars.filter(v => used.contains(v.name))
+          }
+          // find expr.vars used in the `rhs`
+          val rhsUsedVars = {
+            val used = rhs.collect({
+              case Ident(n: TermName) => n
+            })
+            p.vars.filter(v => used.contains(v.name))
+          }
 
-        override def traverse(tree: Tree): Unit = tree match {
-          case Apply(Select(_, name), _) if name.toString == "$eq$eq" => equiJoin = true
-          case _ =>
-        }
-
-        override def apply(tree: Tree) = {
-          traverse(tree);
-          equiJoin
-        }
+          if (lhsUsedVars.size != 1 || rhsUsedVars.size != 1) {
+            None // both `lhs` and `rhs` must refer to exactly one variable
+          } else if (lhsUsedVars.map(_.name).contains(xs.lhs) && rhsUsedVars.map(_.name).contains(ys.lhs)) {
+            // filter expression has the type `f(xs.lhs) == h(ys.lhs)`
+            val vx = lhsUsedVars.find(v => v.name == xs.lhs).get
+            val vy = rhsUsedVars.find(v => v.name == ys.lhs).get
+            val keyx = c.typecheck(q"(${vx.name}: ${vx.tpt}) => ${freeEnv(p.vars)(lhs)}").asInstanceOf[Function]
+            val keyy = c.typecheck(q"(${vy.name}: ${vy.tpt}) => ${freeEnv(p.vars)(rhs)}").asInstanceOf[Function]
+            Some((keyx, keyy))
+          } else if (lhsUsedVars.map(_.name).contains(ys.lhs) && rhsUsedVars.map(_.name).contains(xs.lhs)) {
+            // filter expression has the type `f(ys.lhs) == h(xs.lhs)`
+            val vx = rhsUsedVars.find(v => v.name == xs.lhs).get
+            val vy = lhsUsedVars.find(v => v.name == ys.lhs).get
+            val keyx = c.typecheck(q"(${vx.name}: ${vx.tpt}) => ${freeEnv(p.vars)(rhs)}").asInstanceOf[Function]
+            val keyy = c.typecheck(q"(${vy.name}: ${vy.tpt}) => ${freeEnv(p.vars)(lhs)}").asInstanceOf[Function]
+            Some((keyx, keyy))
+          } else {
+            None // something else
+          }
+        case _ =>
+          None // something else
       }
-      traverser(expr.tree)
     }
   }
 
@@ -272,16 +288,17 @@ trait ComprehensionCombination[C <: blackbox.Context]
 
     case class RuleMatch(parent: Comprehension, xs: Generator, ys: Generator)
 
-    override protected def bind(r: Expression) = r match {
-      case parent@Comprehension(_, qs) =>
-        qs.sliding(2).collectFirst({
-          case (xs: Generator) :: (ys: Generator) :: Nil if !qs.exists(equiJoinPredicate(xs, ys)) => (xs, ys)
-        }) match {
-          case Some((xs: Generator, ys: Generator)) => Some(RuleMatch(parent, xs, ys))
-          case None => Option.empty[RuleMatch]
+    override protected def bind(r: Expression) = new Traversable[RuleMatch] {
+      def foreach[U](f: RuleMatch => U) = {
+        r match {
+          case parent@Comprehension(_, qs) =>
+            for (pair <- qs.sliding(2)) pair match {
+              case (xs: Generator) :: (ys: Generator) :: Nil => f(RuleMatch(parent, xs, ys))
+              case _ =>
+            }
+          case _ =>
         }
-      case _ =>
-        Option.empty[RuleMatch]
+      }
     }
 
     override protected def guard(m: RuleMatch) = true
@@ -308,25 +325,6 @@ trait ComprehensionCombination[C <: blackbox.Context]
 
       // return the modified parent
       m.parent
-    }
-
-    private def equiJoinPredicate(xs: Generator, ys: Generator)(q: Qualifier): Boolean = q match {
-      // match a filter node holding a scala expression `e` of the form `lhs` == `rhs`
-      case Filter(ScalaExpr(_, Apply(Select(lhs, TermName("$eq$eq")), rhs))) =>
-        // terms used in the lhs
-        val lhsTermNames = lhs.collect({
-          case Ident(name@TermName(_)) => name
-        })
-        // terms used in the rhs
-        val rhsTermNames = lhs.collect({
-          case Ident(name@TermName(_)) => name
-        })
-        // check condition
-        (lhsTermNames.size == 1 && rhsTermNames.size == 1) && // singleton sets
-          ((lhsTermNames.contains(xs.lhs) && rhsTermNames.contains(xs.rhs)) || // f(xs.lhs) == g(ys.lhs)
-            (lhsTermNames.contains(xs.rhs) && rhsTermNames.contains(xs.lhs))) // f(ys.lhs) == g(xs.lhs)
-      case _ =>
-        false
     }
   }
 

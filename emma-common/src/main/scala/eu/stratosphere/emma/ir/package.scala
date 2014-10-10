@@ -60,7 +60,7 @@ package object ir {
   final case class Filter[+A](p: Expr[Any], xs: Combinator[_ <: A])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
   }
 
-  final case class EquiJoin[+A, +B, +C](p: Expr[Any], xs: Combinator[_ <: B], ys: Combinator[_ <: C])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class EquiJoin[+A, +B, +C](keyx: Expr[Any], keyy: Expr[Any], xs: Combinator[_ <: B], ys: Combinator[_ <: C])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
   }
 
   final case class Cross[+A, +B, +C](xs: Combinator[_ <: B], ys: Combinator[_ <: C])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
