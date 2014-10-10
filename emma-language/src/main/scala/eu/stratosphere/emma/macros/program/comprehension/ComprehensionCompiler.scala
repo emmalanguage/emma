@@ -33,6 +33,9 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
    * @return A tree representing the expanded comprehension.
    */
   def expandComprehensionTerm(tree: Tree, cfGraph: CFGraph, comprehensionStore: ComprehensionStore)(t: ComprehendedTerm) = {
+    // apply combinators to get a purely-functional, logical plan
+    val root = combine(t.comprehension).expr
+
     q"""
     {
       // required imports
@@ -41,7 +44,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
       import eu.stratosphere.emma.optimizer._
 
       // execute the plan and return a reference to the result
-      engine.execute(${serialize(rewrite(t.comprehension).expr)})
+      engine.execute(${serialize(root)})
     }
     """
 
@@ -71,8 +74,8 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         q"ir.FlatMap(${serialize(f)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
       case combinator.Filter(p, xs) =>
         q"ir.Filter(${serialize(p)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
-      case combinator.EquiJoin(p, xs, ys) =>
-        q"ir.EquiJoin(${serialize(p)}, ${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+      case combinator.EquiJoin(keyx, keyy, xs, ys) =>
+        q"ir.EquiJoin(${serialize(keyx)}, ${serialize(keyy)}, ${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
       case combinator.Cross(xs, ys) =>
         q"ir.Cross(${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
       case combinator.Group(key, xs) =>

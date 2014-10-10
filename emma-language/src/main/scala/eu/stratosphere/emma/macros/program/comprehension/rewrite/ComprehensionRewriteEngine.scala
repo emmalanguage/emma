@@ -12,7 +12,7 @@ trait ComprehensionRewriteEngine[C <: blackbox.Context]
   with RewriteEngine {
 
   /**
-   * Constructs a rule application function that breaks after one successfull application.
+   * Constructs a rule application function that breaks after one successful application.
    *
    * @param rules A sequence of rules to be applied.
    */

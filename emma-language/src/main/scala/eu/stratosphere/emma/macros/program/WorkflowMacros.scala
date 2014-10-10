@@ -129,12 +129,11 @@ class WorkflowMacros(val c: blackbox.Context) {
             println("~" * 80)
             println(${t.comprehension.toString})
             println("~" * 80)
-            println("")
-            println("~" * 80)
             println("~ Comprehension `" + ${t.id.toString} + "` (combinatros):")
             println("~" * 80)
-            println(${rewrite(t.comprehension).toString})
+            println(${combine(t.comprehension).toString})
             println("~" * 80)
+            println("")
             """
         }
         }"""

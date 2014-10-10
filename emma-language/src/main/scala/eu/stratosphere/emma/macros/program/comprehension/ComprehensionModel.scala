@@ -5,8 +5,9 @@ import eu.stratosphere.emma.macros.program.ContextHolder
 import scala.collection.mutable
 import scala.reflect.macros.blackbox
 
-/** Model and helper functions for the intermediate representation of comprehended terms.
-  */
+/**
+ * Model and helper functions for the intermediate representation of comprehended terms.
+ */
 private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHolder[C] {
 
   import c.universe._
@@ -38,6 +39,8 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       ctt.traverse(this)
       ctt.results.toList
     }
+
+    override def toString = prettyprint(this)
   }
 
   // Monads
@@ -74,6 +77,15 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
 
   case class ScalaExpr(var vars: List[Variable], var tree: Tree) extends Expression {
     def tpe = tree.tpe
+
+    /** Restrict the `vars` to the ones referenced in the expression `tree`. */
+    def usedVars = {
+      // collecte the termnames
+      val termNames = tree.collect({
+        case Ident(t: TermName) => t
+      }).toSet[TermName]
+      vars.filter(x => termNames.contains(x.name))
+    }
   }
 
   // Combinators
@@ -115,7 +127,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       def tpe = xs.tpe
     }
 
-    case class EquiJoin(p: Tree, xs: Expression, ys: Expression) extends Combinator {
+    case class EquiJoin(keyx: Tree, keyy: Tree, xs: Expression, ys: Expression) extends Combinator {
       def tpe = c.typecheck(tq"DataBag[(${xs.tpe.typeArgs.head}, ${ys.tpe.typeArgs.head})]", c.TYPEmode).tpe
     }
 
@@ -191,7 +203,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       case combinator.Map(f, xs) => combinator.Map(f, transform(xs))
       case combinator.FlatMap(f, xs) => combinator.FlatMap(f, transform(xs))
       case combinator.Filter(p, xs) => combinator.Filter(p, transform(xs))
-      case combinator.EquiJoin(p, xs, ys) => combinator.EquiJoin(p, transform(xs), transform(ys))
+      case combinator.EquiJoin(keyx, keyy, xs, ys) => combinator.EquiJoin(keyx, keyy, transform(xs), transform(ys))
       case combinator.Cross(xs, ys) => combinator.Cross(transform(xs), transform(ys))
       case combinator.Group(key, xs) => combinator.Group(key, transform(xs))
       case combinator.Fold(empty, sng, union, xs) => combinator.Fold(empty, sng, union, transform(xs))
@@ -233,7 +245,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       case combinator.Map(f, xs) => traverse(xs)
       case combinator.FlatMap(f, xs) => traverse(xs)
       case combinator.Filter(p, xs) => traverse(xs)
-      case combinator.EquiJoin(p, xs, ys) => traverse(xs); traverse(xs)
+      case combinator.EquiJoin(keyx, keyy, xs, ys) => traverse(xs); traverse(xs)
       case combinator.Cross(xs, ys) => traverse(xs); traverse(xs)
       case combinator.Group(_, xs) => traverse(xs)
       case combinator.Fold(_, _, _, xs) => traverse(xs)
@@ -341,9 +353,9 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
         |filter ${pp(p)} (
         |        ${offset + pp(xs, offset + " " * 8)})
         """.stripMargin.trim
-      case e@combinator.EquiJoin(p, xs, ys) =>
+      case e@combinator.EquiJoin(keyx, keyy, xs, ys) =>
         s"""
-        |join ${pp(p)} (
+        |join ${pp(keyx)} ${pp(keyy)} (
         |        ${offset + pp(xs, offset + " " * 8)} ,
         |        ${offset + pp(ys, offset + " " * 8)} )
         """.stripMargin.trim

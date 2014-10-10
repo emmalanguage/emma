@@ -263,7 +263,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       // in.minBy()(n)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(Function(List(x, y), body))) if select.symbol == api.minBy =>
         // replace the body of the fn to use 'u', 'v' parameters instead of the given arguments
-        // FIXME: changes semantics if 'u' and 'v' are definen in the body
+        // FIXME: changes semantics if 'u' and 'v' are defined in the body
         val bodyNew = substitute(body, Map(x.name.toString -> Ident(TermName("u")), y.name.toString -> Ident(TermName("v"))))
 
         // quasiquote fold operators using the minBy parameter function
@@ -280,7 +280,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       // in.maxBy()(n)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(Function(List(x, y), body))) if select.symbol == api.maxBy =>
         // replace the body of the fn to use 'u', 'v' parameters instead of the given arguments
-        // FIXME: changes semantics if 'u' and 'v' are definen in the body
+        // FIXME: changes semantics if 'u' and 'v' are defined in the body
         val bodyNew = substitute(body, Map(x.name.toString -> Ident(TermName("u")), y.name.toString -> Ident(TermName("v"))))
 
         // quasiquote fold operators using the minBy parameter function
