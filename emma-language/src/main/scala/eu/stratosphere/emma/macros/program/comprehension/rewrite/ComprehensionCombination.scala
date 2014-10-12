@@ -32,8 +32,9 @@ trait ComprehensionCombination[C <: blackbox.Context]
       case End => root
     }
 
-    // run the state machine
-    process(Start)
+    // (1) run the state machine and (2) simplify UDF parameter names
+    val x = simlifyParameterNames(process(Start))
+    x
   }
 
   //---------------------------------------------------------------------------
@@ -272,7 +273,6 @@ trait ComprehensionCombination[C <: blackbox.Context]
   // CROSS
   //----------------------------------------------------------------------------
 
-
   /**
    * Creates a cross combinator.
    *
@@ -325,6 +325,75 @@ trait ComprehensionCombination[C <: blackbox.Context]
 
       // return the modified parent
       m.parent
+    }
+  }
+
+  //----------------------------------------------------------------------------
+  // UTILITIES
+  //----------------------------------------------------------------------------
+
+  /**
+   * Replace ugly parameter names with more user-friendly variants.
+   */
+  def simlifyParameterNames = new (ExpressionRoot => ExpressionRoot) with ExpressionTransformer {
+
+    private val namesOne = List("x", "y", "z", "u", "v", "w")
+    private val namesTwo = List(("x", "y"), ("u", "v"), ("s", "t"), ("x$1", "y$1"), ("u$1", "v$1"), ("s$1", "t$1"))
+
+    def apply(root: ExpressionRoot) = ExpressionRoot(transform(root.expr))
+
+    override def transform(e: Expression): Expression = e match {
+      // Combinators with UDFs
+      case combinator.Map(f, xs) => combinator.Map(s(f), transform(xs))
+      case combinator.FlatMap(f, xs) => combinator.FlatMap(s(f), transform(xs))
+      case combinator.Filter(p, xs) => combinator.Filter(s(p), transform(xs))
+      case combinator.EquiJoin(keyx, keyy, xs, ys) => val k = s(keyx, keyy); combinator.EquiJoin(k._1, k._2, transform(xs), transform(ys))
+      case combinator.Group(key, xs) => combinator.Group(s(key), transform(xs))
+      case combinator.Fold(empty, sng, union, xs) => combinator.Fold(empty, s(sng), s(union), transform(xs))
+      case combinator.FoldGroup(key, empty, sng, union, xs) => combinator.FoldGroup(s(key), empty, s(sng), s(union), transform(xs))
+      // Other: bypass
+      case _ => super.transform(e)
+    }
+
+    private def s(e: Tree) = e match {
+      case Function(a :: Nil, b) =>
+        // collecte the term names from b
+        val used1 = b.collect({
+          case Ident(t: TermName) if t != a.name => t
+        }).toSet[TermName]
+
+        // find the first name candidate not to be referred in the body
+        val anew = namesOne.collectFirst({
+          case n if !used1.contains(TermName(n)) => TermName(n)
+        }).getOrElse(a.name)
+
+        c.typecheck(q"($anew: ${a.tpt}) => ${substitute(b, a.name, Ident(anew))}")
+      case _ =>
+        e
+    }
+
+    private def s(e1: Tree, e2: Tree) = (e1, e2) match {
+      case (Function(a1 :: Nil, b1), Function(a2 :: Nil, b2)) =>
+        // collecte the term names from b1
+        val used1 = b1.collect({
+          case Ident(t: TermName) if t != a1.name => t
+        }).toSet[TermName]
+
+        // collecte the term names from b2
+        val used2 = b2.collect({
+          case Ident(t: TermName) if t != a2.name => t
+        }).toSet[TermName]
+
+        // find the first pair of name candidates not to be referred in the bodies
+        val anew = namesTwo.collectFirst({
+          case (n1, n2) if !used1.contains(TermName(n1)) && !used2.contains(TermName(n2)) => (TermName(n1), TermName(n2))
+        }).getOrElse(a1.name, a2.name)
+
+        (
+          c.typecheck(q"(${anew._1}: ${a1.tpt}) => ${substitute(b1, a1.name, Ident(anew._1))}"),
+          c.typecheck(q"(${anew._2}: ${a2.tpt}) => ${substitute(b2, a2.name, Ident(anew._2))}"))
+      case _ =>
+        (e1, e2)
     }
   }
 
