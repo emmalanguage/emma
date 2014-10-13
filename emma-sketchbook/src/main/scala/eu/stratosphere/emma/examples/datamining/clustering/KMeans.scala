@@ -95,13 +95,33 @@ class KMeans(k: Int, epsilon: Double, inputUrl: String, outputUrl: String, rt: E
 
       // initialize random cluster means
       val random = new Random(KMeans.SEED)
-      var centroids = DataBag(for (i <- 1 to k) yield Point(i, Vector(random.nextDouble(), random.nextDouble(), random.nextDouble())))
+      var centroids = rt.scatter(for (i <- 1 to k) yield Point(i, Vector(random.nextDouble(), random.nextDouble(), random.nextDouble())))
       var change = 0.0
 
       // initialize solution
       var solution = for (p <- points) yield {
         val closestCentroid = centroids.minBy((m1, m2) => (p.pos squaredDist m1.pos) < (p.pos squaredDist m2.pos)).get
         Solution(p, closestCentroid.id)
+      }
+
+      // initialize solution
+      var solution = {
+        // required imports
+        import scala.reflect.runtime.universe._
+        import eu.stratosphere.emma.ir
+        import eu.stratosphere.emma.optimizer._
+
+        val read = ir.Read(inputUrl, new InputFormat[Point])
+
+        val map = ir.Map(reify { (p: Point) => {
+          val closestCentroid = centroids.minBy((m1, m2) => (p.pos squaredDist m1.pos) < (p.pos squaredDist m2.pos)).get
+          Solution(p, closestCentroid.id)
+        }}, read)
+
+        val sink = ir.TempSink("solution", map)
+
+        // execute the plan and return a reference to the result
+        rt.execute(sink)
       }
 
       do {
