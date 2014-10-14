@@ -59,37 +59,37 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
   private def serialize(e: Expression): Tree = {
     e match {
       case combinator.Read(location, format) =>
-        q"ir.Read($location, $format)(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.Read($location, $format)"
       case combinator.Write(location, format, xs) =>
-        q"ir.Write($location, $format, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
+        q"ir.Write($location, $format, ${serialize(xs)})"
       case combinator.TempSource(ident) =>
-        q"ir.TempSource($ident)(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.TempSource($ident)"
       case combinator.TempSink(name, xs) =>
-        q"ir.TempSink(${name.toString}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.TempSink(${name.toString}, ${serialize(xs)})"
       case combinator.FoldSink(name, xs) =>
-        q"ir.FoldSink(${name.toString}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
+        q"ir.FoldSink(${name.toString}, ${serialize(xs)})"
       case combinator.Map(f, xs) =>
-        q"ir.Map(${serialize(f)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.Map(${serialize(f)}, ${serialize(xs)})"
       case combinator.FlatMap(f, xs) =>
-        q"ir.FlatMap(${serialize(f)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.FlatMap(${serialize(f)}, ${serialize(xs)})"
       case combinator.Filter(p, xs) =>
-        q"ir.Filter(${serialize(p)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.Filter(${serialize(p)}, ${serialize(xs)})"
       case combinator.EquiJoin(keyx, keyy, xs, ys) =>
-        q"ir.EquiJoin(${serialize(keyx)}, ${serialize(keyy)}, ${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.EquiJoin(${serialize(keyx)}, ${serialize(keyy)}, ${serialize(xs)}, ${serialize(ys)})"
       case combinator.Cross(xs, ys) =>
-        q"ir.Cross(${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.Cross(${serialize(xs)}, ${serialize(ys)})"
       case combinator.Group(key, xs) =>
-        q"ir.Group(${serialize(key)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.Group(${serialize(key)}, ${serialize(xs)})"
       case combinator.Fold(empty, sng, union, xs) =>
-        q"ir.Fold(${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
+        q"ir.Fold(${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
       case combinator.FoldGroup(key, empty, sng, union, xs) =>
-        q"ir.FoldGroup(${serialize(key)}, ${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${e.tpe}])"
+        q"ir.FoldGroup(${serialize(key)}, ${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
       case combinator.Distinct(xs) =>
-        q"ir.Distinct(${serialize(xs)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.Distinct(${serialize(xs)})"
       case combinator.Union(xs, ys) =>
-        q"ir.Union(${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.Union(${serialize(xs)}, ${serialize(ys)})"
       case combinator.Diff(xs, ys) =>
-        q"ir.Diff(${serialize(xs)}, ${serialize(ys)})(scala.reflect.runtime.universe.typeTag[${elementType(e.tpe)}])"
+        q"ir.Diff(${serialize(xs)}, ${serialize(ys)})"
       case _ =>
         throw new RuntimeException("Unsupported serialization of non-combinator expression:\n" + prettyprint(e) + "\n")
     }

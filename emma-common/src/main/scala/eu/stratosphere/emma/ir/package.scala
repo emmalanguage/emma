@@ -36,52 +36,68 @@ package object ir {
     implicit val tag: TypeTag[_ <: A]
   }
 
-  final case class Read[+A](location: String, format: InputFormat[_ <: A])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class Read[+A: TypeTag](location: String, format: InputFormat[_ <: A]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Write[+A](location: String, format: OutputFormat[_ <: A], xs: Combinator[_ <: A])(implicit val tag: TypeTag[Unit]) extends Combinator[Unit] {
+  final case class Write[+A: TypeTag](location: String, format: OutputFormat[_ <: A], xs: Combinator[_ <: A]) extends Combinator[Unit] {
+    override val tag: TypeTag[Unit] = typeTag[Unit]
   }
 
-  final case class TempSource[+A](ref: ValueRef[_ <: DataBag[A]])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class TempSource[+A: TypeTag](ref: ValueRef[_ <: DataBag[A]]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class TempSink[+A](name: String, xs: Combinator[_ <: A])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class TempSink[+A: TypeTag](name: String, xs: Combinator[_ <: A]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class FoldSink[+A](name: String, xs: Fold[_ <: A, Any])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class FoldSink[+A: TypeTag](name: String, xs: Fold[_ <: A, Any]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Map[+A, +B](f: Expr[Any], xs: Combinator[_ <: B])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class Map[+A: TypeTag, +B](f: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class FlatMap[+A, +B](f: Expr[Any], xs: Combinator[_ <: B])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class FlatMap[+A: TypeTag, +B](f: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Filter[+A](p: Expr[Any], xs: Combinator[_ <: A])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class Filter[+A: TypeTag](p: Expr[Any], xs: Combinator[_ <: A]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class EquiJoin[+A, +B, +C](keyx: Expr[Any], keyy: Expr[Any], xs: Combinator[_ <: B], ys: Combinator[_ <: C])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class EquiJoin[+A: TypeTag, +B, +C](keyx: Expr[Any], keyy: Expr[Any], xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Cross[+A, +B, +C](xs: Combinator[_ <: B], ys: Combinator[_ <: C])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class Cross[+A: TypeTag, +B, +C](xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Group[+A, +B](key: Expr[Any], xs: Combinator[_ <: B])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class Group[+A: TypeTag, +B](key: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Fold[+A, +B](empty: Expr[Any], sng: Expr[Any], union: Expr[Any], xs: Combinator[_ <: B])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class Fold[+A: TypeTag, +B](empty: Expr[Any], sng: Expr[Any], union: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class FoldGroup[+A, +B](key: Expr[Any], empty: Expr[Any], sng: Expr[Any], union: Expr[Any], xs: Combinator[_ <: B])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class FoldGroup[+A: TypeTag, +B](key: Expr[Any], empty: Expr[Any], sng: Expr[Any], union: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Distinct[+A](xs: Combinator[A])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class Distinct[+A: TypeTag](xs: Combinator[A]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Union[+A, +B, +C](xs: Combinator[_ <: B], ys: Combinator[_ <: C])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class Union[+A: TypeTag, +B, +C](xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Diff[+A, +B, +C](xs: Combinator[_ <: B], ys: Combinator[_ <: C])(implicit val tag: TypeTag[_ <: A]) extends Combinator[A] {
+  final case class Diff[+A: TypeTag, +B, +C](xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
 }
