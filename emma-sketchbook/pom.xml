@@ -30,10 +30,6 @@
         <!-- Emma -->
         <dependency>
             <groupId>eu.stratosphere</groupId>
-            <artifactId>emma-aura</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>eu.stratosphere</groupId>
             <artifactId>emma-language</artifactId>
         </dependency>
 

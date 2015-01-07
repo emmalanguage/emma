@@ -12,9 +12,9 @@ object Algorithm {
     val KEY_RT_HOST = "rt-host"
     val KEY_RT_PORT = "rt-port"
     // default values
-    val KEY_RT_TYPE_DEFAULT = "aura"
+    val KEY_RT_TYPE_DEFAULT = "flink"
     val KEY_RT_HOST_DEFAULT = "localhost"
-    val KEY_RT_PORT_DEFAULT = 51342
+    val KEY_RT_PORT_DEFAULT = 6123
   }
 
   abstract class Command[A <: Algorithm](implicit val m: scala.reflect.Manifest[A]) {
@@ -38,7 +38,7 @@ object Algorithm {
       // runtime type
       parser.addArgument(s"--${Command.KEY_RT_TYPE}")
         .`type`[String](classOf[String])
-        .choices("local", "aura", "spark")
+        .choices("local", "flink", "spark")
         .dest(Command.KEY_RT_TYPE)
         .metavar("RT")
         .help(s"runtime type (default ${Command.KEY_RT_TYPE_DEFAULT}})")
@@ -71,7 +71,7 @@ object Algorithm {
       val rt = runtime.factory(
         ns.get[String](Command.KEY_RT_TYPE),
         ns.get[String](Command.KEY_RT_HOST),
-        ns.get[Integer](Command.KEY_RT_PORT))
+        ns.get[Int](Command.KEY_RT_PORT))
       // instantiate and return algorithm
       val constructor = m.runtimeClass.getConstructor(classOf[Namespace], classOf[runtime.Engine])
       constructor.newInstance(ns, rt).asInstanceOf[Algorithm]

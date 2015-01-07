@@ -13,11 +13,6 @@
     <artifactId>emma-codegen</artifactId>
     <version>1.0-SNAPSHOT</version>
 
-    <properties>
-        <!-- Aura -->
-        <aura.version>1.0-SNAPSHOT</aura.version>
-    </properties>
-
     <dependencies>
         <!-- Scala -->
         <dependency>

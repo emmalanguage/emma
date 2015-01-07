@@ -82,18 +82,18 @@ class ConnectedComponents(inputUrl: String, outputUrl: String, rt: Engine) exten
 
     val algorithm = /*emma.parallelize*/ {
 
-      //val vertices = DataBag(
-      //  List(
-      //    Vertex(1, DataBag(Seq(2, 5, 7))),
-      //    Vertex(2, DataBag(Seq(1, 5, 7))),
-      //    Vertex(3, DataBag(Seq(3))),
-      //    Vertex(4, DataBag(Seq(6))),
-      //    Vertex(5, DataBag(Seq(1, 2))),
-      //    Vertex(6, DataBag(Seq(4))),
-      //    Vertex(7, DataBag(Seq(1, 2)))))
+      val vertices = DataBag(
+        List(
+          Vertex(1, DataBag(Seq(2, 5, 7))),
+          Vertex(2, DataBag(Seq(1, 5, 7))),
+          Vertex(3, DataBag(Seq(3))),
+          Vertex(4, DataBag(Seq(6))),
+          Vertex(5, DataBag(Seq(1, 2))),
+          Vertex(6, DataBag(Seq(4))),
+          Vertex(7, DataBag(Seq(1, 2)))))
 
       // read input
-      val vertices = read(inputUrl, new InputFormat[Vertex])
+      // val vertices = read(inputUrl, new InputFormat[Vertex])
 
       // initialize delta and state
       var delta = for (v <- vertices) yield State(v.id, v.neighborIDs, v.id)
@@ -119,7 +119,7 @@ class ConnectedComponents(inputUrl: String, outputUrl: String, rt: Engine) exten
       // write result
       write(outputUrl, new OutputFormat[Component])(components)
 
-      //println(components.fetch())
+      println(components.fetch())
     }
 
     //algorithm.run(rt)

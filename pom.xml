@@ -80,11 +80,6 @@
             <!-- Emma -->
             <dependency>
                 <groupId>eu.stratosphere</groupId>
-                <artifactId>emma-aura</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>eu.stratosphere</groupId>
                 <artifactId>emma-codegen</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -274,7 +269,6 @@
     </build>
 
     <modules>
-        <module>emma-aura</module>
         <module>emma-codegen</module>
         <module>emma-common</module>
         <module>emma-language</module>
