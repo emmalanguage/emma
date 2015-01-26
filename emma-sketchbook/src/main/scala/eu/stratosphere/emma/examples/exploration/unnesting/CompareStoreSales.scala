@@ -82,8 +82,8 @@ class CompareStoreSales(salesLUrl: String, salesRUrl: String, outputUrl: String,
 
     val algorithm = /* workflow */ {
 
-      val salesL = read(salesLUrl, new InputFormat[SalesHistory])
-      val salesR = read(salesRUrl, new InputFormat[SalesHistory])
+      val salesL = read(salesLUrl, new CSVInputFormat[SalesHistory])
+      val salesR = read(salesRUrl, new CSVInputFormat[SalesHistory])
 
       val comparison = for (l <- salesL.groupBy(x => GroupKey(x.store, x.date));
                             r <- salesR.groupBy(x => GroupKey(x.store, x.date));
@@ -96,7 +96,7 @@ class CompareStoreSales(salesLUrl: String, salesRUrl: String, outputUrl: String,
         SalesBalance(l.key.store, r.key.store, l.key.date, balance.sum())
       }
 
-      write(outputUrl, new OutputFormat[SalesBalance])(comparison)
+      write(outputUrl, new CSVOutputFormat[SalesBalance])(comparison)
     }
 
     // algorithm.run(rt)

@@ -93,7 +93,7 @@ class ConnectedComponents(inputUrl: String, outputUrl: String, rt: Engine) exten
           Vertex(7, DataBag(Seq(1, 2)))))
 
       // read input
-      // val vertices = read(inputUrl, new InputFormat[Vertex])
+      // val vertices = read(inputUrl, new CSVInputFormat[Vertex])
 
       // initialize delta and state
       var delta = for (v <- vertices) yield State(v.id, v.neighborIDs, v.id)
@@ -117,7 +117,7 @@ class ConnectedComponents(inputUrl: String, outputUrl: String, rt: Engine) exten
       val components = for (s <- state.bag()) yield Component(s.vertexID, s.component)
 
       // write result
-      write(outputUrl, new OutputFormat[Component])(components)
+      write(outputUrl, new CSVOutputFormat[Component])(components)
 
       println(components.fetch())
     }

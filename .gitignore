@@ -9,3 +9,4 @@ target
 *.swp
 *.class
 *.iml
+dependency-reduced-pom.xml

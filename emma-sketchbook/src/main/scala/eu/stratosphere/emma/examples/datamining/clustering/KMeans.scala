@@ -91,7 +91,7 @@ class KMeans(k: Int, epsilon: Double, inputUrl: String, outputUrl: String, rt: E
 
     val algorithm = /*emma.parallelize*/ {
       // read input
-      val points = read(inputUrl, new InputFormat[Point])
+      val points = read(inputUrl, new CSVInputFormat[Point])
 
       // initialize random cluster means
       val random = new Random(KMeans.SEED)
@@ -129,7 +129,7 @@ class KMeans(k: Int, epsilon: Double, inputUrl: String, outputUrl: String, rt: E
       } while (change < epsilon)
 
       // write result
-      write(outputUrl, new OutputFormat[(PID, PID)])(for (s <- solution) yield (s.point.id, s.clusterID))
+      write(outputUrl, new CSVOutputFormat[(PID, PID)])(for (s <- solution) yield (s.point.id, s.clusterID))
     }
 
     //algorithm.run(rt)

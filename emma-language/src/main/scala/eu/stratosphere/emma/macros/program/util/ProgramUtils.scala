@@ -98,6 +98,17 @@ private[emma] trait ProgramUtils[C <: blackbox.Context] extends ContextHolder[C]
     new TermSubstituter(map).transform(t)
   }
 
+  /**
+   * Inlines the right-hand side of the given `valdef` into the given context tree `t` and removes it from `t`.
+   *
+   * @param t The context tree to be rewritten.
+   * @param valdef The value definition to be inlined
+   * @return A version of the context tree with the value definition inlined
+   */
+  def inline(t: Tree, valdef: ValDef) = {
+    new ValDefInliner(valdef).transform(t)
+  }
+
   // ---------------------------------------------------
   // Code traversers.
   // ---------------------------------------------------
@@ -108,6 +119,15 @@ private[emma] trait ProgramUtils[C <: blackbox.Context] extends ContextHolder[C]
 
     override def transform(tree: Tree): Tree = tree match {
       case Ident(TermName(x)) => if (map.contains(x)) map(x) else tree
+      case _ => super.transform(tree)
+    }
+  }
+
+  private class ValDefInliner(val valdef: ValDef) extends Transformer {
+
+    override def transform(tree: Tree): Tree = tree match {
+      case t@ValDef(_, _, _, _) if t.symbol == valdef.symbol => EmptyTree
+      case t@Ident(TermName(x)) if t.symbol == valdef.symbol => valdef.rhs
       case _ => super.transform(tree)
     }
   }

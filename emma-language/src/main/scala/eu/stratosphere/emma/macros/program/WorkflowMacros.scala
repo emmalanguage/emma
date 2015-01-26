@@ -47,18 +47,19 @@ class WorkflowMacros(val c: blackbox.Context) {
       // ----------------------------------------------------------------------
 
       // 1. Create control flow graph
-      val cfGraph = createControlFlowGraph(normalizedTree)
+      implicit var cfGraph = createControlFlowGraph(normalizedTree)
 
       // 2. Identify and isolate maximal comprehensions
-      val comprehensionStore = createComprehensionStore(cfGraph)
-
-      // 3. Analyze variable usage
+      implicit var comprehensionView = createComprehensionView(cfGraph)
 
       // ----------------------------------------------------------------------
       // Code optimizations
       // ----------------------------------------------------------------------
 
-      // 1. Comprehension rewrite (TODO)
+      // 1. Inline comprehensions
+      val optimizedTree = inlineComprehensions(normalizedTree)
+      cfGraph = createControlFlowGraph(optimizedTree)
+      comprehensionView = createComprehensionView(cfGraph)
 
       // Sufficient conditions to rewrite folds using banana-split + fusion
       // 0) Let `f` be a fold expression
@@ -87,7 +88,7 @@ class WorkflowMacros(val c: blackbox.Context) {
            }
 
            private def runParallel(engine: eu.stratosphere.emma.runtime.Engine): ${c.weakTypeOf[T]} = {
-             ${compile(normalizedTree, cfGraph, comprehensionStore)}
+             ${compile(optimizedTree, cfGraph, comprehensionView)}
            }
         }
         """
@@ -110,10 +111,19 @@ class WorkflowMacros(val c: blackbox.Context) {
       // ----------------------------------------------------------------------
 
       // 1. Create control flow graph
-      val cfGraph = createControlFlowGraph(normalizedTree)
+      implicit var cfGraph = createControlFlowGraph(normalizedTree)
 
       // 2. Identify and isolate maximal comprehensions
-      val comprehensionStore = createComprehensionStore(cfGraph)
+      implicit var comprehensionView = createComprehensionView(cfGraph)
+
+      // ----------------------------------------------------------------------
+      // Code optimizations
+      // ----------------------------------------------------------------------
+
+      // 1. Inline comprehensions
+      val optimizedTree = inlineComprehensions(normalizedTree)
+      cfGraph = createControlFlowGraph(optimizedTree)
+      comprehensionView = createComprehensionView(cfGraph)
 
       // ----------------------------------------------------------------------
       // Final result assembly
@@ -122,7 +132,7 @@ class WorkflowMacros(val c: blackbox.Context) {
       val code =
         q"""
         { ..${
-          for (t <- comprehensionStore.terms) yield
+          for (t <- comprehensionView.terms) yield
             q"""
             println("~" * 80)
             println("~ Comprehension `" + ${t.id.toString} + "` (original):")
@@ -140,35 +150,6 @@ class WorkflowMacros(val c: blackbox.Context) {
 
       c.Expr[Unit](c.typecheck(code))
     }
-
-    /**
-     * Compiles a generic driver for a data-parallel runtime.
-     *
-     * @param tree The original program tree.
-     * @param cfGraph The control flow graph representation of the tree.
-     * @param comprehensionStore A store containing the comprehended terms in the tree.
-     * @return A tree representing the compiled triver.
-     */
-    def compile(tree: Tree, cfGraph: CFGraph, comprehensionStore: ComprehensionStore): Tree = {
-
-      object expandComprehendedTerms extends Transformer with (Tree => Tree) {
-        override def transform(tree: Tree): Tree = comprehensionStore.getByTerm(tree) match {
-          case Some(t) =>
-            expandComprehensionTerm(tree, cfGraph, comprehensionStore)(t)
-          case _ => tree match {
-            case Apply(fn, List(values)) if api.apply.alternatives.contains(fn.symbol) =>
-              expandScatterTerm(values)
-            case _ =>
-              super.transform(tree)
-          }
-        }
-
-        override def apply(tree: Tree): Tree = transform(tree)
-      }
-
-      c.untypecheck(expandComprehendedTerms(tree))
-    }
-
   }
 
 }

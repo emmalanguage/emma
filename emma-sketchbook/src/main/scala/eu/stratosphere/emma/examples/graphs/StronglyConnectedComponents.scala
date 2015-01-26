@@ -98,7 +98,7 @@ class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: Engin
       //    Vertex('h', DataBag(Seq('d', 'g')))))
 
       // read input
-      val vertices = read(inputUrl, new InputFormat[Vertex])
+      val vertices = read(inputUrl, new CSVInputFormat[Vertex])
 
       // initialize state
       val transposeNeighbors = (for (x <- vertices; y <- x.neighborIDs) yield (y, x.id)).groupBy(_._1)
@@ -188,7 +188,7 @@ class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: Engin
       val components = for (s <- state.bag()) yield Component(s.vertexID, s.component)
 
       // write result
-      write(outputUrl, new OutputFormat[Component])(components)
+      write(outputUrl, new CSVOutputFormat[Component])(components)
 
       //println(components.fetch())
     }

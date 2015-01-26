@@ -17,6 +17,7 @@
 
         <!-- Maven Plugins -->
         <maven-eclipse-plugin.version>2.9</maven-eclipse-plugin.version>
+        <maven-surefire-plugin.version>2.18.1</maven-surefire-plugin.version>
         <scala-maven-plugin.version>3.1.6</scala-maven-plugin.version>
         <build-helper-maven-plugin.version>1.7</build-helper-maven-plugin.version>
 
@@ -26,9 +27,12 @@
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
         <!-- Scala -->
-        <scala.version>2.11.0</scala.version>
+        <scala.version>2.11.5</scala.version>
         <scala.tools.version>2.11</scala.tools.version>
         <scala.graph-core.version>1.9.0</scala.graph-core.version>
+
+        <!-- Hadoop -->
+        <hadoop.version>2.2.0</hadoop.version>
 
         <!-- Logging -->
         <log4j.version>1.2.17</log4j.version>
@@ -44,12 +48,18 @@
         <reflections.version>0.9.9</reflections.version>
     </properties>
 
-
+    <!-- Enable Apache Development Snapshot Repository -->
     <repositories>
         <repository>
-            <id>oss.sonatype.org</id>
-            <name>sonatype sapshots</name>
-            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+            <id>apache.snapshots</id>
+            <name>Apache Development Snapshot Repository</name>
+            <url>https://repository.apache.org/content/repositories/snapshots/</url>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
         </repository>
     </repositories>
 
@@ -80,7 +90,7 @@
             <!-- Emma -->
             <dependency>
                 <groupId>eu.stratosphere</groupId>
-                <artifactId>emma-codegen</artifactId>
+                <artifactId>emma-backend</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -90,18 +100,42 @@
             </dependency>
             <dependency>
                 <groupId>eu.stratosphere</groupId>
-                <artifactId>emma-language</artifactId>
+                <artifactId>emma-common-macros</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>eu.stratosphere</groupId>
-                <artifactId>emma-optimizer</artifactId>
+                <artifactId>emma-flink</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.stratosphere</groupId>
+                <artifactId>emma-language</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>eu.stratosphere</groupId>
                 <artifactId>emma-sketchbook</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+
+            <!-- Hadoop -->
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-common</artifactId>
+                <version>${hadoop.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-hdfs</artifactId>
+                <version>${hadoop.version}</version>
+            </dependency>
+
+            <!-- CSV -->
+            <dependency>
+                <groupId>net.sf.opencsv</groupId>
+                <artifactId>opencsv</artifactId>
+                <version>2.3</version>
             </dependency>
 
             <!-- Logging -->
@@ -156,7 +190,6 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
-
 
     <build>
         <plugins>
@@ -265,14 +298,57 @@
                 </executions>
             </plugin>
 
+            <!-- Adding code generation folder to JUnit tests -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <configuration>
+                    <additionalClasspathElements>
+                        <additionalClasspathElement>${java.io.tmpdir}/emma/codegen</additionalClasspathElement>
+                    </additionalClasspathElements>
+                </configuration>
+            </plugin>
         </plugins>
+
+        <pluginManagement>
+            <plugins>
+                <!-- Shade Package (Create package with dependencies) -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>2.3</version>
+                    <executions>
+                        <execution>
+                            <id>shade-package</id>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>shade</goal>
+                            </goals>
+                            <configuration>
+                                <minimizeJar>false</minimizeJar>
+                                <filters>
+                                    <filter>
+                                        <artifact>*:*</artifact>
+                                        <excludes>
+                                            <exclude>META-INF/**</exclude>
+                                        </excludes>
+                                    </filter>
+                                </filters>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
     </build>
 
     <modules>
-        <module>emma-codegen</module>
+        <module>emma-backend</module>
         <module>emma-common</module>
+        <module>emma-common-macros</module>
+        <module>emma-flink</module>
         <module>emma-language</module>
-        <module>emma-optimizer</module>
         <module>emma-sketchbook</module>
     </modules>
 

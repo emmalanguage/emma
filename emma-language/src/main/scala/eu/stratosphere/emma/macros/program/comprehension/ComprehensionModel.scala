@@ -165,7 +165,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
   // Comprehension Store
   // --------------------------------------------------------------------------
 
-  class ComprehensionStore(val terms: mutable.Seq[ComprehendedTerm]) {
+  class ComprehensionView(var terms: mutable.Seq[ComprehendedTerm]) {
 
     private val defIndex = mutable.Map((for (t <- terms; d <- t.definition) yield d -> t): _*)
 
@@ -235,21 +235,21 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       case Filter(expr) => traverse(expr)
       case Generator(_, rhs) => traverse(rhs)
       // Environment & Host Language Connectors
-      case ScalaExpr(_, _) => Unit
+      case ScalaExpr(_, _) =>
       // Combinators
-      case combinator.Read(_, _) => Unit
+      case combinator.Read(_, _) =>
       case combinator.Write(_, _, xs) => traverse(xs)
-      case combinator.TempSource(id) => Unit
-      case combinator.TempSink(id, xs) => traverse(xs)
-      case combinator.FoldSink(id, xs) => traverse(xs)
-      case combinator.Map(f, xs) => traverse(xs)
-      case combinator.FlatMap(f, xs) => traverse(xs)
-      case combinator.Filter(p, xs) => traverse(xs)
-      case combinator.EquiJoin(keyx, keyy, xs, ys) => traverse(xs); traverse(ys)
+      case combinator.TempSource(_) =>
+      case combinator.TempSink(_, xs) => traverse(xs)
+      case combinator.FoldSink(_, xs) => traverse(xs)
+      case combinator.Map(_, xs) => traverse(xs)
+      case combinator.FlatMap(_, xs) => traverse(xs)
+      case combinator.Filter(_, xs) => traverse(xs)
+      case combinator.EquiJoin(_, _, xs, ys) => traverse(xs); traverse(ys)
       case combinator.Cross(xs, ys) => traverse(xs); traverse(ys)
       case combinator.Group(_, xs) => traverse(xs)
       case combinator.Fold(_, _, _, xs) => traverse(xs)
-      case combinator.FoldGroup(key, empty, sng, union, xs) => traverse(xs)
+      case combinator.FoldGroup(_, _, _, _, xs) => traverse(xs)
       case combinator.Distinct(xs) => traverse(xs)
       case combinator.Union(xs, ys) => traverse(xs); traverse(ys)
       case combinator.Diff(xs, ys) => traverse(xs); traverse(ys)

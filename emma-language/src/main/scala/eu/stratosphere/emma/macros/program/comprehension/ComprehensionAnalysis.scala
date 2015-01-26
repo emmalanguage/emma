@@ -56,7 +56,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       groupBy,
       minus, plus, distinct,
       minBy, maxBy, min, max, sum, product, count, exists, forall, empty
-    )
+    ) ++ apply.alternatives
 
     val monadic = Set(map, flatMap, withFilter)
   }
@@ -70,12 +70,12 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
    *
    * @param cfGraph The control flow graph for the comprehended algorithm.
    */
-  def createComprehensionStore(cfGraph: CFGraph) = {
+  def createComprehensionView(cfGraph: CFGraph) = {
 
     // step #1: compute the set of maximal terms that can be translated to comprehension syntax
     val root = cfGraph.nodes.find(_.inDegree == 0).get
     // implicit helpers
-    implicit def cfBlockTraverser = root.outerNodeTraverser()
+    implicit def cfBlockTraverser: CFGraph#OuterNodeTraverser = root.outerNodeTraverser()
 
     // step #1: compute the set of maximal terms that can be translated to comprehension syntax
     val terms = (for (block <- cfBlockTraverser; stmt <- block.stats) yield {
@@ -106,7 +106,6 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
     val comprehendedTerms = mutable.Seq((for (t <- terms) yield {
       val id = TermName(c.freshName("comprehension"))
       val definition = comprehendedTermDefinition(t)
-      val z = prettyprint(comprehend(Nil)(t))
       val comprehension = normalize(ExpressionRoot(comprehend(Nil)(t) match {
         case root@combinator.Write(_, _, _) => root
         case root@combinator.Fold(_, _, _, _) => combinator.FoldSink(comprehendedTermName(definition, id), root)
@@ -117,7 +116,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
     }).toSeq: _*)
 
     // step #3: build the comprehension store
-    new ComprehensionStore(comprehendedTerms)
+    new ComprehensionView(comprehendedTerms)
   }
 
   /**
@@ -128,6 +127,9 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
    * @return An option holding the comprehended parent term (if such exists).
    */
   private def comprehendedSelectParent(t: Tree)(implicit comprehendedTerms: mutable.Set[Tree]) = t match {
+    // FIXME: make this consistent with the comprehend() method patterns
+    case Apply(Apply(TypeApply(Select(_, _), _), _), List(parent)) if comprehendedTerms.contains(parent) =>
+      Some(parent)
     case Apply(TypeApply(Select(parent, _), _), _) if comprehendedTerms.contains(parent) =>
       Some(parent)
     case Apply(Select(parent, _), _) if comprehendedTerms.contains(parent) =>
@@ -161,10 +163,10 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
   private def comprehendedTermDefinition(t: Tree)(implicit cfBlockTraverser: TraversableOnce[CFBlock]) = {
     var optTree = Option.empty[Tree]
     for (block <- cfBlockTraverser; s <- block.stats) s.foreach({
-      case ValDef(_, name: TermName, _, rhs) if t == rhs =>
-        optTree = Some(s)
-      case Assign(Ident(name: TermName), rhs) if t == rhs =>
-        optTree = Some(s)
+      case vd@ValDef(_, name: TermName, _, rhs) if t == rhs =>
+        optTree = Some(vd)
+      case vd@Assign(Ident(name: TermName), rhs) if t == rhs =>
+        optTree = Some(vd)
       case _ =>
     })
     optTree
@@ -352,4 +354,47 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
     }
   }
 
+  // --------------------------------------------------------------------------
+  // Logical Optimizations
+  // --------------------------------------------------------------------------
+
+  /**
+   * Inlines comprehended ValDefs occurring only once with their parents.
+   *
+   * @param tree The original program tree.
+   * @param cfGraph The control flow graph for the comprehended algorithm.
+   * @param comprehensionView A view over the comprehended terms in the tree.
+   * @return An inlined inlined tree.
+   */
+  def inlineComprehensions(tree: Tree)(implicit cfGraph: CFGraph, comprehensionView: ComprehensionView) = {
+
+    var inlinedTree = tree
+
+    // find all valdefs that can be inlined
+    var valdefs = (for (cv <- comprehensionView.terms; d <- cv.definition) yield cv.definition.collect({
+      // make sure that the associated definition is a non-mutable ValDef
+      case valdef@ValDef(mods, name: TermName, _, rhs) if (mods.flags | Flag.MUTABLE) != mods.flags =>
+        // get the ValDef symbol
+        val symbol = d.symbol
+
+        // get the identifiers referencing this ValDef symbol
+        val idents = tree.collect({
+          case x@Ident(_) if x.symbol == symbol => x
+        })
+
+        // if the symbol is referenced only once, inline the ValDef rhs in place of the ident
+        if (idents.size == 1) Some(valdef) else Option.empty[ValDef]
+    })).flatten.flatten
+
+    while (valdefs.nonEmpty) {
+      // get a ValDef to inline
+      val valdef = valdefs.head
+      // inline current ValDef in the tree
+      inlinedTree = inline(inlinedTree, valdef)
+      // inline in all other ValDefs and continue with those
+      valdefs = for (other <- valdefs.filter(_.symbol != valdef.symbol)) yield inline(other, valdef).asInstanceOf[ValDef]
+    }
+
+    c.typecheck(inlinedTree)
+  }
 }

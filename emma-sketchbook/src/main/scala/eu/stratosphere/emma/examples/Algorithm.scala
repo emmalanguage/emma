@@ -12,7 +12,7 @@ object Algorithm {
     val KEY_RT_HOST = "rt-host"
     val KEY_RT_PORT = "rt-port"
     // default values
-    val KEY_RT_TYPE_DEFAULT = "flink"
+    val KEY_RT_TYPE_DEFAULT = "flink-remote"
     val KEY_RT_HOST_DEFAULT = "localhost"
     val KEY_RT_PORT_DEFAULT = 6123
   }
@@ -38,7 +38,7 @@ object Algorithm {
       // runtime type
       parser.addArgument(s"--${Command.KEY_RT_TYPE}")
         .`type`[String](classOf[String])
-        .choices("local", "flink", "spark")
+        .choices("local", "flink-local", "flink-remote", "spark")
         .dest(Command.KEY_RT_TYPE)
         .metavar("RT")
         .help(s"runtime type (default ${Command.KEY_RT_TYPE_DEFAULT}})")

@@ -1,6 +1,7 @@
 package eu.stratosphere.emma.macros.program.controlflow
 
-import eu.stratosphere.emma.macros.program.util.Counter
+
+import eu.stratosphere.emma.util.Counter
 
 import scala.reflect.macros._
 import scalax.collection.GraphPredef._

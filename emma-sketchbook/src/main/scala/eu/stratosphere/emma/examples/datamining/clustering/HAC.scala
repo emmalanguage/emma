@@ -57,25 +57,25 @@
 //  import eu.stratosphere.emma._
 //
 //  def run() {
-////    val algorithm = desugar /* workflow */ {
-////      val points = read("file:///tmp/points.txt", new InputFormat[Point])
-////
-////      var clusters = points.groupBy(x => x.pid)
-////      var minDistance, theta = 0.5
-////
-////      do {
-////        val distances = for (c1 <- clusters; c2 <- clusters) yield {
-////          (c1, c2, (for (p1 <- c1; p2 <- c2) yield cosineDistance(p1, p2)).min())
-////        }
-////
-////        val (c1, c2, d) = distances.minBy(_._3) // result is not unique!!!
-////
-////        clusters = clusters minus (DataSet(c1) union DataSet(c2)) union DataSet(c1 union c2)
-////        minDistance = d
-////      } while (Math.abs(minDistance) < theta)
-////
-////      write("file:///tmp/clusters.txt", new OutputFormat[DataBag[Point]])(clusters)
-////    }
+//    val algorithm = desugar /* workflow */ {
+//      val points = read("file:///tmp/points.txt", new CSVInputFormat[Point])
+//
+//      var clusters = points.groupBy(x => x.pid)
+//      var minDistance, theta = 0.5
+//
+//      do {
+//        val distances = for (c1 <- clusters; c2 <- clusters) yield {
+//          (c1, c2, (for (p1 <- c1; p2 <- c2) yield cosineDistance(p1, p2)).min())
+//        }
+//
+//        val (c1, c2, d) = distances.minBy(_._3) // result is not unique!!!
+//
+//        clusters = clusters minus (DataSet(c1) union DataSet(c2)) union 1 DataSet(cunion c2)
+//        minDistance = d
+//      } while (Math.abs(minDistance) < theta)
+//
+//      write("file:///tmp/clusters.txt", new OutputFormat[DataBag[Point]])(clusters)
+//    }
 //
 //    // runtime.factory(address).execute(algorithm)
 //  }
