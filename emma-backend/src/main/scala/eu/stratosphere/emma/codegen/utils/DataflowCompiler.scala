@@ -57,14 +57,14 @@ class DataflowCompiler {
    * @tparam T The type of the result
    * @return A result of type T.
    */
-  def execute[T](dfSymbol: ModuleSymbol, name: String, args: Array[Any]) = {
+  def execute[T](dfSymbol: ModuleSymbol, args: Array[Any]) = {
     val dfMirror = tb.mirror.reflectModule(dfSymbol)
     val dfInstanceMirror = tb.mirror.reflect(dfMirror.instance)
     val dfRunMethodMirror = dfInstanceMirror.reflectMethod(dfInstanceMirror.symbol.typeSignature.decl(RUN_METHOD).asMethod)
 
-    logger.info(s"Running dataflow '$name'")
+    logger.info(s"Running dataflow '${dfSymbol.name}'")
     val result = dfRunMethodMirror.apply(args: _*).asInstanceOf[T]
-    logger.info(s"Dataflow '$name' finished")
+    logger.info(s"Dataflow '${dfSymbol.name}' finished")
     result
   }
 }

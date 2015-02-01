@@ -19,112 +19,148 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
   val tb = dataflowCompiler.tb
 
+  // memoization table
+  val memo = mutable.Map[String, ModuleSymbol]()
+
   // --------------------------------------------------------------------------
   // Scatter & Gather Dataflows (hardcoded)
   // --------------------------------------------------------------------------
 
-  def generateScatterDef[A: TypeTag](dataflowName: String) = {
-    logger.info(s"Generating scatter code for '$dataflowName'")
+  def generateScatterDef[A: TypeTag](id: String) = {
+    val dataflowName = s"scatter$$$id"
 
-    val tc = createTypeConvertor(typeOf[A].dealias)
+    memo.getOrElse(dataflowName, {
+      logger.info(s"Generating scatter code for '$dataflowName'")
 
-    // assemble dataflow
-    q"""
-    object ${TermName(s"scatter$$$dataflowName")} {
+      val tc = createTypeConvertor(typeOf[A].dealias)
 
-      import org.apache.flink.api.java.ExecutionEnvironment
+      // assemble dataflow tree
+      val tree = q"""
+      object ${TermName(dataflowName)} {
 
-      def run(env: ExecutionEnvironment, values: Seq[${tc.srcTpe}]) = {
-        val __input = env.fromCollection(scala.collection.JavaConversions.asJavaCollection(for (v <- values) yield ${tc.srcToTgt(TermName("v"))}))
+        import org.apache.flink.api.java.ExecutionEnvironment
 
-        // create type information
-        val typeInformation = ${tc.tgtTypeInfo}
+        def run(env: ExecutionEnvironment, values: Seq[${tc.srcTpe}]) = {
+          val __input = env.fromCollection(scala.collection.JavaConversions.asJavaCollection(for (v <- values) yield ${tc.srcToTgt(TermName("v"))}))
 
-        // create output format
-        val outFormat = new org.apache.flink.api.java.io.TypeSerializerOutputFormat[${tc.tgtType}]
-        outFormat.setInputType(typeInformation)
-        outFormat.setSerializer(typeInformation.createSerializer())
+          // create type information
+          val typeInformation = ${tc.tgtTypeInfo}
 
-        // write output
-        __input.write(outFormat, ${s"$tempResultsPrefix/$dataflowName"}, org.apache.flink.core.fs.FileSystem.WriteMode.OVERWRITE)
+          // create output format
+          val outFormat = new org.apache.flink.api.java.io.TypeSerializerOutputFormat[${tc.tgtType}]
+          outFormat.setInputType(typeInformation)
+          outFormat.setSerializer(typeInformation.createSerializer())
 
-        env.execute(${s"Emma[scatter$$$dataflowName]"})
+          // write output
+          __input.write(outFormat, ${s"$tempResultsPrefix/$id"}, org.apache.flink.core.fs.FileSystem.WriteMode.OVERWRITE)
+
+          env.execute(${s"Emma[$dataflowName]"})
+        }
       }
-    }
-    """.asInstanceOf[ImplDef]
+      """.asInstanceOf[ImplDef]
+
+      // compile the dataflow tree
+      val symbol = dataflowCompiler.compile(tree)
+      // update the memo table
+      memo.put(dataflowName, symbol)
+      // return the compiled dataflow symbol
+      symbol
+    })
   }
 
-  def generateGatherDef[A: TypeTag](dataflowName: String) = {
-    logger.info(s"Generating gather code for '$dataflowName'")
+  def generateGatherDef[A: TypeTag](id: String) = {
+    val dataflowName = s"gather$$$id"
 
-    val tc = createTypeConvertor(typeOf[A].dealias)
+    memo.getOrElse(dataflowName, {
+      logger.info(s"Generating gather code for '$dataflowName'")
 
-    // assemble dataflow
-    q"""
-    object ${TermName(s"gather$$$dataflowName")} {
+      val tc = createTypeConvertor(typeOf[A].dealias)
 
-      import org.apache.flink.api.java.ExecutionEnvironment
-      import scala.collection.JavaConverters._
+      // assemble dataflow
+      val tree = q"""
+      object ${TermName(s"gather$$$dataflowName")} {
 
-      def run(env: ExecutionEnvironment) = {
-        // create type information
-        val typeInformation = ${tc.tgtTypeInfo}
+        import org.apache.flink.api.java.ExecutionEnvironment
+        import scala.collection.JavaConverters._
 
-        // create input format
-        val inFormat = new org.apache.flink.api.java.io.TypeSerializerInputFormat[${tc.tgtType}](typeInformation.createSerializer())
-        inFormat.setFilePath(${s"$tempResultsPrefix/$dataflowName"})
+        def run(env: ExecutionEnvironment) = {
+          // create type information
+          val typeInformation = ${tc.tgtTypeInfo}
 
-        // create input
-        val in = env.createInput(inFormat, typeInformation)
+          // create input format
+          val inFormat = new org.apache.flink.api.java.io.TypeSerializerInputFormat[${tc.tgtType}](typeInformation.createSerializer())
+          inFormat.setFilePath(${s"$tempResultsPrefix/$id"})
 
-        // local collection to store results in
-        val collection = java.util.Collections.synchronizedCollection(new java.util.ArrayList[${tc.tgtType}]())
+          // create input
+          val in = env.createInput(inFormat, typeInformation)
 
-        // collect results from remote in local collection
-        org.apache.flink.api.java.io.RemoteCollectorImpl.collectLocal(in, collection)
+          // local collection to store results in
+          val collection = java.util.Collections.synchronizedCollection(new java.util.ArrayList[${tc.tgtType}]())
 
-        // execute gather dataflow
-        env.execute(${s"Emma[gather$$$dataflowName]"})
+          // collect results from remote in local collection
+          org.apache.flink.api.java.io.RemoteCollectorImpl.collectLocal(in, collection)
 
-        // construct result DataBag
-        for (v <- scala.collection.JavaConversions.collectionAsScalaIterable(collection)) yield ${tc.tgtToSrc(TermName("v"))}
+          // execute gather dataflow
+          env.execute(${s"Emma[$dataflowName]"})
+
+          // construct result DataBag
+          for (v <- scala.collection.JavaConversions.collectionAsScalaIterable(collection)) yield ${tc.tgtToSrc(TermName("v"))}
+        }
       }
-    }
-    """.asInstanceOf[ImplDef]
+      """.asInstanceOf[ImplDef]
+
+      // compile the dataflow tree
+      val symbol = dataflowCompiler.compile(tree)
+      // update the memo table
+      memo.put(dataflowName, symbol)
+      // return the compiled dataflow symbol
+      symbol
+    })
   }
 
   // --------------------------------------------------------------------------
   // Combinator Dataflows (traversal based)
   // --------------------------------------------------------------------------
 
-  def generateDataflowDef(root: ir.Combinator[_], dataflowName: String) = {
-    logger.info(s"Generating dataflow code for '$dataflowName'")
+  def generateDataflowDef(root: ir.Combinator[_], id: String) = {
+    val dataflowName = id
 
-    // initialize UDF store to be passed around implicitly during dataflow opCode assembly
-    implicit val closure = new DataflowClosure()
-    // generate dataflow operator assembly code
-    val opCode = generateOpCode(root)
-    // create a sorted list of closure parameters (convention used by client in the generated macro)
-    val params = for (p <- closure.closureParams.toSeq.sortBy(_._1.toString)) yield ValDef(Modifiers(Flag.PARAM), p._1, p._2, EmptyTree)
-    // create a sorted list of closure local inputs (convention used by the Engine client)
-    val localInputs = for (p <- closure.localInputParams.toSeq.sortBy(_._1.toString)) yield ValDef(Modifiers(Flag.PARAM), p._1, p._2, EmptyTree)
+    memo.getOrElse(dataflowName, {
+      logger.info(s"Generating dataflow code for '$dataflowName'")
 
-    // assemble dataflow
-    q"""
-    object ${TermName(dataflowName)} {
+      // initialize UDF store to be passed around implicitly during dataflow opCode assembly
+      implicit val closure = new DataflowClosure()
+      // generate dataflow operator assembly code
+      val opCode = generateOpCode(root)
+      // create a sorted list of closure parameters (convention used by client in the generated macro)
+      val params = for (p <- closure.closureParams.toSeq.sortBy(_._1.toString)) yield ValDef(Modifiers(Flag.PARAM), p._1, p._2, EmptyTree)
+      // create a sorted list of closure local inputs (convention used by the Engine client)
+      val localInputs = for (p <- closure.localInputParams.toSeq.sortBy(_._1.toString)) yield ValDef(Modifiers(Flag.PARAM), p._1, p._2, EmptyTree)
 
-      import org.apache.flink.api.java.ExecutionEnvironment
-      import org.apache.flink.api.java.typeutils.ResultTypeQueryable
+      // assemble dataflow
+      val tree = q"""
+      object ${TermName(dataflowName)} {
 
-      ..${closure.udfs.result().toSeq}
+        import org.apache.flink.api.java.ExecutionEnvironment
+        import org.apache.flink.api.java.typeutils.ResultTypeQueryable
 
-      def run(env: ExecutionEnvironment, ..$params, ..$localInputs) = {
-        $opCode
+        ..${closure.udfs.result().toSeq}
 
-        env.execute("Emma[" + $dataflowName + "]")
+        def run(env: ExecutionEnvironment, ..$params, ..$localInputs) = {
+          $opCode
+
+          env.execute("Emma[" + $dataflowName + "]")
+        }
       }
-    }
-    """.asInstanceOf[ImplDef]
+      """.asInstanceOf[ImplDef]
+
+      // compile the dataflow tree
+      val symbol = dataflowCompiler.compile(tree)
+      // update the memo table
+      memo.put(dataflowName, symbol)
+      // return the compiled dataflow symbol
+      symbol
+    })
   }
 
   private def generateOpCode(cur: ir.Combinator[_])(implicit closure: DataflowClosure): Tree = cur match {

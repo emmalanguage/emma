@@ -40,43 +40,38 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
   }
 
   override def execute[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]] = {
-    val dataflowTree = dataflowGenerator.generateDataflowDef(root, name)
-    val dataflowSymbol = dataflowCompiler.compile(dataflowTree)
-    dataflowCompiler.execute[JobExecutionResult](dataflowSymbol, name, Array[Any](env) ++ closure ++ localInputs(root))
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    dataflowCompiler.execute[JobExecutionResult](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
     DataBagRef[A](root.name, this)
   }
 
   override def execute[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
-    val dataflowTree = dataflowGenerator.generateDataflowDef(root, name)
-    val dataflowSymbol = dataflowCompiler.compile(dataflowTree)
-    dataflowCompiler.execute[JobExecutionResult](dataflowSymbol, name, Array[Any](env) ++ closure ++ localInputs(root))
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    dataflowCompiler.execute[JobExecutionResult](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
 
   override def scatter[A: TypeTag](values: Seq[A]): ValueRef[DataBag[A]] = {
     // create fresh value reference
     val ref = DataBagRef(nextTmpName, this, Some(DataBag(values)))
     // generate and execute a 'scatter' dataflow
-    val dataflowTree = dataflowGenerator.generateScatterDef(ref.name)
-    val dataflowSymbol = dataflowCompiler.compile(dataflowTree)
-    dataflowCompiler.execute[JobExecutionResult](dataflowSymbol, ref.name, Array[Any](env, values))
+    val dataflowSymbol = dataflowGenerator.generateScatterDef(ref.name)
+    dataflowCompiler.execute[JobExecutionResult](dataflowSymbol, Array[Any](env, values))
     // return the value reference
     ref
   }
 
   override def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A] = {
     // generate and execute a 'scatter' dataflow
-    val dataflowTree = dataflowGenerator.generateGatherDef(ref.name)
-    val dataflowSymbol = dataflowCompiler.compile(dataflowTree)
-    DataBag[A](dataflowCompiler.execute[Seq[A]](dataflowSymbol, ref.name, Array[Any](env)))
+    val dataflowSymbol = dataflowGenerator.generateGatherDef(ref.name)
+    DataBag[A](dataflowCompiler.execute[Seq[A]](dataflowSymbol, Array[Any](env)))
   }
 
   override def put[A: TypeTag](value: A): ValueRef[A] = {
     // create fresh value reference
     val ref = ScalarRef(nextTmpName, this, Some(value))
     // generate and execute a 'scatter' dataflow
-    val dataflowTree = dataflowGenerator.generateScatterDef(ref.name)
-    val dataflowSymbol = dataflowCompiler.compile(dataflowTree)
-    dataflowCompiler.execute[String](dataflowSymbol, ref.name, Array[Any](env, Seq(value).asJava))
+    val dataflowSymbol = dataflowGenerator.generateScatterDef(ref.name)
+    dataflowCompiler.execute[String](dataflowSymbol, Array[Any](env, Seq(value).asJava))
     // return the value reference
     ref
   }
