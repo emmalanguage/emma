@@ -87,7 +87,7 @@ object CodegenProofOfConcept {
 
     val separator = "'"
 
-    dfCompiler.execute[Unit](dfSymbol, "foobar", Array[Any](env, separator))
+    dfCompiler.execute[Unit](dfSymbol, Array[Any](env, separator))
   }
 
   def testCollect(env: ExecutionEnvironment) = {
