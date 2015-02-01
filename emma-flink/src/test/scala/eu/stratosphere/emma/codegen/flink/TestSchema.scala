@@ -6,6 +6,8 @@ object TestSchema {
   // Graphs
   // --------------------------------------------------------------------------
 
+  case class Label(x: Double, y: String, z: Boolean) {}
+
   case class Edge[VT](src: VT, dst: VT) {}
 
   case class EdgeWithLabel[VT, LT](src: VT, dst: VT, label: LT) {}

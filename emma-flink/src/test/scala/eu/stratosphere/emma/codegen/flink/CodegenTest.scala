@@ -1,11 +1,14 @@
 package eu.stratosphere.emma.codegen.flink
 
 import eu.stratosphere.emma.api._
-import eu.stratosphere.emma.codegen.flink.TestSchema.{Edge, FilmFestivalWinner}
+import eu.stratosphere.emma.codegen.flink.TestSchema._
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.runtime.Engine
 import eu.stratosphere.emma.testutil._
 import org.junit.{After, Before, Test}
+
+import java.io.File
+import scala.reflect.runtime.universe._
 
 object CodegenTest {
 
@@ -16,7 +19,7 @@ object CodegenTest {
   def main(args: Array[String]): Unit = {
     val test = new CodegenTest()
     test.setup()
-    test.testScatterMapGatherSimpleType()
+    test.testCSVReadWriteComplexType()
     test.teardown()
   }
 }
@@ -25,53 +28,143 @@ class CodegenTest {
 
   var rt: Engine = _
 
+  var inBase = tempOutputPath("test/input")
+  var outBase = tempOutputPath("test/output")
+
   @Before def setup() {
+    // create a new runtime session
     rt = runtime.factory("flink-local", "localhost", 6123)
+    // make sure that the base paths exist
+    new File(inBase).mkdirs()
+    new File(outBase).mkdirs()
   }
 
   @After def teardown(): Unit = {
+    // close the runtime session
     rt.closeSession()
   }
 
-  @Test def testScatterMapGatherSimpleType(): Unit = {
+  // --------------------------------------------------------------------------
+  // Scatter / Gather
+  // --------------------------------------------------------------------------
+
+  @Test def testScatterGatherSimpleType(): Unit = {
+    testScatterGather(Seq(2, 4, 6, 8, 10))
+  }
+
+  @Test def testScatterGatherComplexType(): Unit = {
+    testScatterGather(Seq(
+      EdgeWithLabel(1L, 4L, Label(0.5, "A", z = false)),
+      EdgeWithLabel(2L, 5L, Label(0.8, "B", z = true)),
+      EdgeWithLabel(3L, 6L, Label(0.2, "C", z = false))))
+  }
+
+  private def testScatterGather[A: TypeTag](inp: Seq[A]): Unit = {
+    // scatter the input bag
+    val sct = rt.scatter(inp)
+
+    // assert that the scattered bag contains the input values
+    compareBags(inp, sct.fetch())
+
+    // repeat three times to test the memo underlying implementation
+    for (i <- 0 until 3) {
+      // gather back the scattered values
+      val res = rt.gather(sct)
+      // assert that the result contains the input values
+      compareBags(inp, res.fetch())
+    }
+  }
+
+  // --------------------------------------------------------------------------
+  // CSV I/O
+  // --------------------------------------------------------------------------
+
+  @Test def testCSVReadWriteComplexType(): Unit = {
+    testCSVReadWrite[EdgeWithLabel[Long, String]](Seq(
+      EdgeWithLabel(1L, 4L, "A"),
+      EdgeWithLabel(2L, 5L, "B"),
+      EdgeWithLabel(3L, 6L, "C")))
+  }
+
+  private def testCSVReadWrite[A: TypeTag : CSVConvertors](inp: Seq[A]): Unit = {
+    // construct a parameterized algorithm family
+    val alg = (suffix: String) => emma.parallelize {
+      val outputPath = s"$outBase/csv.$suffix"
+      // write out the original input
+      write(outputPath, new CSVOutputFormat[A])(DataBag(inp))
+      // return the output path
+      outputPath
+    }
+
+    // write the input to a file using the original code and the runtime under test
+    val actPath = alg("native").run(runtime.Native)
+    val resPath = alg("flink").run(rt)
+
+    val exp = scala.io.Source.fromFile(resPath).getLines().toStream
+    val res = scala.io.Source.fromFile(actPath).getLines().toStream
+
+    // assert that the result contains the expected values
+    compareBags(exp, res)
+  }
+
+  // --------------------------------------------------------------------------
+  // Map
+  // --------------------------------------------------------------------------
+
+  @Test def testMapSimpleType(): Unit = {
     val inp = Seq(2, 4, 6, 8, 10)
 
-    val algorithm = emma.parallelize {
-      val I = DataBag(inp)
-      for (x <- I) yield 2 * x
+    // define some closure parameters
+    val denominator = 4.0
+    val offset = 15.0
+
+    val alg = emma.parallelize {
+      for (x <- DataBag(inp)) yield offset + x / denominator
     }
 
-    val exp = for (x <- inp) yield 2 * x
-    val res = algorithm.run(rt).fetch()
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
 
-    assert((exp diff res) == Seq.empty[Int], s"Unexpected elements in result: $exp")
-    assert((res diff exp) == Seq.empty[Int], s"Unseen elements in result: $res")
+    // assert that the result contains the expected values
+    compareBags(act, exp)
   }
 
-  @Test def testScatterMapGatherComplexType(): Unit = {
-    val inp = Seq(Edge(1, 2))
+  @Test def testMapComplexType(): Unit = {
+    val inp = Seq(
+      EdgeWithLabel(1L, 4L, Label(0.5, "A", z = false)),
+      EdgeWithLabel(2L, 5L, Label(0.8, "B", z = true)),
+      EdgeWithLabel(3L, 6L, Label(0.2, "A", z = false)))
 
-    val algorithm = emma.parallelize {
-      for (x <- DataBag(inp)) yield Edge(2 * x.src, 5 * x.dst)
+    val y = "A"
+
+    val alg = emma.parallelize {
+      for (e <- DataBag(inp)) yield EdgeWithLabel(e.dst, e.src, e.label.y == y)
     }
 
-    val exp = for (x <- inp) yield Edge(2 * x.src, 5 * x.dst)
-    val res = algorithm.run(rt).fetch()
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
 
-    assert((exp diff res) == Seq.empty[Edge[Int]], s"Unexpected elements in result: $exp")
-    assert((res diff exp) == Seq.empty[Edge[Int]], s"Unseen elements in result: $res")
+    // assert that the result contains the expected values
+    compareBags(act, exp)
   }
 
-  @Test def testReadCSVMapGather(): Unit = {
-    val algorithm = emma.parallelize {
-      val winners = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
-      for (f <- winners) yield f.country
-    }
-
-    val res = algorithm.run(rt).fetch()
-    val exp = algorithm.run(runtime.Native).fetch()
-
-    assert((exp diff res) == Seq.empty[String], s"Unexpected elements in result: $exp")
-    assert((res diff exp) == Seq.empty[String], s"Unseen elements in result: $res")
-  }
+  //
+  //  // --------------------------------------------------------------------------
+  //  // FlatMap
+  //  // --------------------------------------------------------------------------
+  //
+  //  @Test def testReadCSVFlatMapGather(): Unit = {
+  //    val algorithm = emma.parallelize {
+  //      val winners = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
+  //      for (f <- winners) yield f.country
+  //    }
+  //
+  //    val res = algorithm.run(rt).fetch()
+  //    val exp = algorithm.run(runtime.Native).fetch()
+  //
+  //    assert((exp diff res) == Seq.empty[String], s"Unexpected elements in result: $exp")
+  //    assert((res diff exp) == Seq.empty[String], s"Unseen elements in result: $res")
+  //  }
 }
