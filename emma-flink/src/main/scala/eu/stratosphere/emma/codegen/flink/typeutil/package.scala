@@ -21,6 +21,10 @@ package object typeutil {
       val params = tpe.decl(termNames.CONSTRUCTOR).alternatives.head.asMethod.typeSignatureIn(tpe).paramLists.head.map(_.toString)
       val getters = for (p <- params; m <- tpe.members if m.isMethod && m.asMethod.isGetter && m.toString == p.toString) yield m
       new ProductTypeConvertor(tpe, getters)
+    } else if (tpe =:= weakTypeOf[Unit] || tpe =:= weakTypeOf[java.lang.Void]) {
+      SimpleTypeConvertor.Unit
+    } else if (tpe =:= weakTypeOf[Boolean] || tpe =:= weakTypeOf[java.lang.Boolean]) {
+      SimpleTypeConvertor.Boolean
     } else if (tpe =:= weakTypeOf[Byte] || tpe =:= weakTypeOf[java.lang.Byte]) {
       SimpleTypeConvertor.Byte
     } else if (tpe =:= weakTypeOf[Char] || tpe =:= weakTypeOf[java.lang.Character]) {
@@ -81,6 +85,8 @@ package object typeutil {
   }
 
   object SimpleTypeConvertor {
+    val Unit = SimpleTypeConvertor(typeOf[Unit], q"Unit.getClass")
+    val Boolean = SimpleTypeConvertor(typeOf[Boolean], q"Boolean.getClass")
     val Byte = SimpleTypeConvertor(typeOf[Byte], q"Byte.getClass")
     val Short = SimpleTypeConvertor(typeOf[Short], q"Short.getClass")
     val Char = SimpleTypeConvertor(typeOf[Char], q"Char.getClass")
