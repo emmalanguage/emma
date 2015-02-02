@@ -5,6 +5,12 @@ import java.nio.file.{Files, Paths, StandardCopyOption}
 
 package object testutil {
 
+  /**
+   * Copies the resource located at the given path to the emma temp folder.
+   *
+   * @param resourcePath The resource to be copied
+   * @return The path to the materialized version of the resource.
+   */
   def materializeResource(resourcePath: String) = {
     val is = Option[InputStream](getClass.getResourceAsStream(resourcePath))
 
@@ -16,6 +22,9 @@ package object testutil {
     outputPath.toString
   }
 
+  /**
+   * Creates a demp output path with the given `suffix`.
+   */
   def tempOutputPath(suffix: String) = Paths.get(s"${System.getProperty("java.io.tmpdir")}/emma/$suffix").toString
 
   /**

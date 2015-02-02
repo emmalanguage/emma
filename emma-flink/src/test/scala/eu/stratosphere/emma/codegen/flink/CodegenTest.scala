@@ -150,21 +150,24 @@ class CodegenTest {
     compareBags(act, exp)
   }
 
-  //
-  //  // --------------------------------------------------------------------------
-  //  // FlatMap
-  //  // --------------------------------------------------------------------------
-  //
-  //  @Test def testReadCSVFlatMapGather(): Unit = {
-  //    val algorithm = emma.parallelize {
-  //      val winners = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
-  //      for (f <- winners) yield f.country
-  //    }
-  //
-  //    val res = algorithm.run(rt).fetch()
-  //    val exp = algorithm.run(runtime.Native).fetch()
-  //
-  //    assert((exp diff res) == Seq.empty[String], s"Unexpected elements in result: $exp")
-  //    assert((res diff exp) == Seq.empty[String], s"Unseen elements in result: $res")
-  //  }
+  // --------------------------------------------------------------------------
+  // FlatMap
+  // --------------------------------------------------------------------------
+
+  @Test def testFlatMapSimpleType(): Unit = {
+    val inp = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines().toStream
+
+    val len = 3
+
+    val alg = emma.parallelize {
+      DataBag(inp).flatMap(x => DataBag(x.split("\\W+").filter(_.length > len)))
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
 }
