@@ -63,31 +63,8 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
       // apply combinators to get a purely-functional, logical plan
       val root = combine(t.comprehension).expr
 
-      // extract the comprehension closure, i.e. all term symbols that are defined outside of the comprehended tree
-      val closure = {
-        // find all term symbols referenced within the comprehended term
-        val referenced = t.term.collect({
-          case i@Ident(TermName(_)) if i.symbol.asTerm.isVal || i.symbol.asTerm.isVar => i.symbol.asTerm
-        })
-
-        // find all term symbols defined within the term
-        val defined = t.term.collect({
-          case vd@ValDef(_, _, _, _) => vd.symbol.asTerm
-        }).toSet
-
-        // find all symbols referenced in temp sources
-        val tempsources = t.comprehension.expr.collect({
-          case combinator.TempSource(i@Ident(TermName(_))) if i.symbol.asTerm.isVal || i.symbol.asTerm.isVar => i.symbol.asTerm
-        })
-
-        // final closure is "diff = referenced \ tempsources" (multiset difference), fo
-        // followed by "diff \ defined" (set difference)
-        // this protects against removal of tempsources which are also referenced from the UDF code
-        val closure = (referenced diff tempsources).toSet diff defined
-
-        // return as a list ordered lexicographically by the symbol's term names (via closure passing convention)
-        closure.toList.sortBy(_.name.toString)
-      }
+      // extract the comprehension closure
+      val c = closure(t.comprehension)
 
       // get the TermName associated with this comprehended term
       val name = t.definition.collect({
@@ -103,7 +80,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         val __root = ${serialize(root)}
 
         // execute the plan and return a reference to the result
-        engine.execute(__root, ${Literal(Constant(name.toString))}, ..${closure.map(_.name)})
+        engine.execute(__root, ${Literal(Constant(name.toString))}, ..${c.map(_.name)})
       }
       """
     }
@@ -170,6 +147,47 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
      * @return The `A` type.
      */
     private def elementType(t: Type): Type = t.typeArgs.head
+
+
+    /**
+     * Extract the `comprehension` closure, i.e. all term symbols that are defined outside of the comprehended tree.
+     *
+     * As per passing convention adhered by the environment implementations, the computed closure is returned
+     * as a list lexicographically ordered by the symbol's term names.
+     *
+     * @param comprehension The comprehension to be inspected.
+     * @return The closure as a list lexicographically ordered by the symbol's term names.
+     */
+    private def closure(comprehension: ExpressionRoot): List[TermSymbol] = comprehension.expr.collect({
+      // Combinators
+      case combinator.Map(f, _) => closure(f)
+      case combinator.FlatMap(f, _) => closure(f)
+      case combinator.Filter(p, _) => closure(p)
+      case combinator.EquiJoin(keyx, keyy, _, _) => closure(keyx) ++ closure(keyy)
+      case combinator.Group(key, _) => closure(key)
+      case combinator.Fold(empty, sng, union, _) => closure(empty) ++ closure(sng) ++ closure(union)
+      case combinator.FoldGroup(key, empty, sng, union, _) => closure(key) ++ closure(empty) ++ closure(sng) ++ closure(union)
+    }).flatten.toList.sortBy(_.name.toString)
+
+    /**
+     * Find all symbols which are not defined in the given tree `t`.
+     *
+     * @param t The tree to inspect.
+     */
+    private def closure(t: Tree): Set[TermSymbol] = {
+      // find all term symbols referenced within the comprehended term
+      val referenced = t.collect({
+        case i@Ident(TermName(_)) if i.symbol != NoSymbol && (i.symbol.asTerm.isVal || i.symbol.asTerm.isVar) => i.symbol.asTerm
+      }).toSet
+
+      // find all term symbols defined within the term
+      val defined = t.collect({
+        case vd@ValDef(_, _, _, _) => vd.symbol.asTerm
+      }).toSet
+
+      // the closure is the difference between the referenced and the defined symbols
+      referenced diff defined
+    }
   }
 
 }
