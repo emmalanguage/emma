@@ -154,7 +154,7 @@ class CodegenTest {
   // FlatMap
   // --------------------------------------------------------------------------
 
-  @Test def testFlatMapSimpleType(): Unit = {
+  @Test def testFlatMap(): Unit = {
     val inp = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines().toStream
 
     val len = 3
@@ -175,7 +175,7 @@ class CodegenTest {
   // Filter
   // --------------------------------------------------------------------------
 
-  @Test def testFilterSimpleType(): Unit = {
+  @Test def testFilter(): Unit = {
     val inp = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines().toStream
 
     val len = 10
@@ -191,4 +191,63 @@ class CodegenTest {
     // assert that the result contains the expected values
     compareBags(act, exp)
   }
+
+  // --------------------------------------------------------------------------
+  // Distinct and Union
+  // --------------------------------------------------------------------------
+
+  @Test def testDistinctSimpleType(): Unit = {
+    val inp = {
+      val lines = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines()
+      lines.flatMap(_.split("\\W+")).toStream
+    }
+
+    val alg = emma.parallelize {
+      DataBag(inp).distinct()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  @Test def testDistinctComplexType(): Unit = {
+    val inp = {
+      val lines = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines()
+      lines.flatMap(_.split("\\W+")).zipWithIndex.toStream
+    }
+
+    val alg = emma.parallelize {
+      DataBag(inp).distinct()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  // FIXME: macros don't seem comprehend PLUS expressions
+  //  @Test def testUnion(): Unit = {
+  //    val inp = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines().flatMap(_.split("\\W+")).toStream
+  //
+  //    val lft = inp.filter(_.length % 2 == 0) // even-length words
+  //    val rgt = inp.filter(_.length % 2 == 1) // odd-length words
+  //
+  //    val alg = emma.parallelize {
+  //      DataBag(lft) plus DataBag(rgt)
+  //    }
+  //
+  //    // compute the algorithm using the original code and the runtime under test
+  //    val act = alg.run(runtime.Native).fetch()
+  //    val exp = alg.run(rt).fetch()
+  //
+  //    // assert that the result contains the expected values
+  //    compareBags(act, exp)
+  //  }
 }

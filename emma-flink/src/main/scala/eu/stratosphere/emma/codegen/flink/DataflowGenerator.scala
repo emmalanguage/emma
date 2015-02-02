@@ -173,6 +173,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     case op: ir.Map[_, _] => opCode(op)
     case op: ir.FlatMap[_, _] => opCode(op)
     case op: ir.Filter[_] => opCode(op)
+    case op: ir.Distinct[_] => opCode(op)
+    case op: ir.Union[_, _, _] => opCode(op)
     case _ => throw new RuntimeException(s"Unsupported ir node of type '${cur.getClass}'")
   }
 
@@ -356,6 +358,26 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     ${generateOpCode(op.xs)}.filter(new $fnName(..${fnUDF.closure.map(_.name)}))
     """
   }
+
+  private def opCode[T](op: ir.Distinct[T])(implicit closure: DataflowClosure): Tree = {
+    createTypeConvertor(typeOf(op.tag)) match {
+      case tc: ProductTypeConvertor =>
+        q"${generateOpCode(op.xs)}.distinct()"
+      case tc: SimpleTypeConvertor =>
+        // generate fn UDF
+        val fnName = closure.nextUDFName("KeySelector")
+        closure.udfs +=
+          q"""
+          class $fnName extends org.apache.flink.api.java.functions.KeySelector[${tc.tgtType}, ${tc.tgtType}] {
+            override def getKey(v: ${tc.tgtType}): ${tc.tgtType} = v
+          }
+          """
+        // assemble dataflow fragment
+        q"${generateOpCode(op.xs)}.distinct(new $fnName)"
+    }
+  }
+
+  private def opCode[T, U, V](op: ir.Union[T, U, V])(implicit closure: DataflowClosure): Tree = q"${generateOpCode(op.xs)}.union()"
 
   // --------------------------------------------------------------------------
   // Auxiliary structures
