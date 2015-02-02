@@ -57,7 +57,7 @@ package object typeutil {
 
     def tgtTypeInfo: Tree
 
-    def convertResultType(expr: Tree): Tree
+    def convertResultType(expr: Tree, expandSymbols: Set[Symbol] = Set.empty[Symbol]): Tree
 
     def convertTermType(termName: TermName, expr: Tree): Tree
 
@@ -75,7 +75,7 @@ package object typeutil {
 
     lazy val tgtTypeInfo: Tree = q"org.apache.flink.api.common.typeinfo.BasicTypeInfo.getInfoFor(classOf[$tgtType])"
 
-    def convertResultType(expr: Tree) = expr
+    def convertResultType(expr: Tree, expandSymbols: Set[Symbol] = Set.empty[Symbol]) = expr
 
     def convertTermType(termName: TermName, expr: Tree) = expr
 
@@ -110,7 +110,20 @@ package object typeutil {
         case 6 => tq"org.apache.flink.api.java.tuple.Tuple6[..${fields.map(_.tgtType)}]"
         case 7 => tq"org.apache.flink.api.java.tuple.Tuple7[..${fields.map(_.tgtType)}]"
         case 8 => tq"org.apache.flink.api.java.tuple.Tuple8[..${fields.map(_.tgtType)}]"
-        case _ => throw new RuntimeException(s"Too many fields in type $srcTpe. Up to 8 fields are currently supported.")
+        case 9 => tq"org.apache.flink.api.java.tuple.Tuple9[..${fields.map(_.tgtType)}]"
+        case 10 => tq"org.apache.flink.api.java.tuple.Tuple10[..${fields.map(_.tgtType)}]"
+        case 11 => tq"org.apache.flink.api.java.tuple.Tuple11[..${fields.map(_.tgtType)}]"
+        case 12 => tq"org.apache.flink.api.java.tuple.Tuple12[..${fields.map(_.tgtType)}]"
+        case 13 => tq"org.apache.flink.api.java.tuple.Tuple13[..${fields.map(_.tgtType)}]"
+        case 14 => tq"org.apache.flink.api.java.tuple.Tuple14[..${fields.map(_.tgtType)}]"
+        case 15 => tq"org.apache.flink.api.java.tuple.Tuple15[..${fields.map(_.tgtType)}]"
+        case 16 => tq"org.apache.flink.api.java.tuple.Tuple16[..${fields.map(_.tgtType)}]"
+        case 17 => tq"org.apache.flink.api.java.tuple.Tuple17[..${fields.map(_.tgtType)}]"
+        case 18 => tq"org.apache.flink.api.java.tuple.Tuple18[..${fields.map(_.tgtType)}]"
+        case 19 => tq"org.apache.flink.api.java.tuple.Tuple19[..${fields.map(_.tgtType)}]"
+        case 20 => tq"org.apache.flink.api.java.tuple.Tuple20[..${fields.map(_.tgtType)}]"
+        case 21 => tq"org.apache.flink.api.java.tuple.Tuple21[..${fields.map(_.tgtType)}]"
+        case _ => throw new RuntimeException(s"Too many fields in type $srcTpe. Up to 21 fields are currently supported.")
       }
     }
 
@@ -136,7 +149,7 @@ package object typeutil {
         z
     }).flatten
 
-    override def convertResultType(expr: Tree) = new TypeConstructorsSubstituter(srcTpe, tgtType).transform(expr)
+    override def convertResultType(expr: Tree, expandSymbols: Set[Symbol] = Set.empty[Symbol]) = new TypeConstructorsSubstituter(srcTpe, tgtType, expandSymbols).transform(expr)
 
     override def convertTermType(termName: TermName, expr: Tree) = new TypeProjectionsSubstituter(termName, this).transform(expr)
 
@@ -158,25 +171,11 @@ package object typeutil {
   // Type subsitutors
   // --------------------------------------------------------------------------
 
-  // FIXME: this is a quick and dirty solution that only works for selector chains with limited depth
   private class TypeProjectionsSubstituter(termName: TermName, typeConvertor: ProductTypeConvertor) extends Transformer {
-
     override def transform(tree: Tree): Tree = {
-      val path = tree match {
-        case p3@Select(p2@Select(p1@Select(Ident(x), _), _), _) if x == termName =>
-          typeConvertor.paths.collectFirst({
-            case p if p == List(p1.symbol, p2.symbol, p3.symbol) => p
-          })
-        case p2@Select(p1@Select(Ident(x), _), _) if x == termName =>
-          typeConvertor.paths.collectFirst({
-            case p if p == List(p1.symbol, p2.symbol) => p
-          })
-        case p1@Select(Ident(x), _) if x == termName =>
-          typeConvertor.paths.collectFirst({
-            case p if p == List(p1.symbol) => p
-          })
-        case _ => Option.empty[List[Symbol]]
-      }
+      val path = (for (sp <- getSelectorPath(tree); if sp.ident.name == termName) yield typeConvertor.paths.collectFirst({
+        case p if p == sp.path => p
+      })).flatten
 
       path match {
         case Some(p) =>
@@ -188,19 +187,78 @@ package object typeutil {
   }
 
   // FIXME: this is a quick and dirty solution that might break the UDF code
-  private class TypeConstructorsSubstituter(srcTpe: Type, tgtTpe: Tree) extends Transformer {
+  private class TypeConstructorsSubstituter(srcTpe: Type, tgtTpe: Tree, expandSymbols: Set[Symbol]) extends Transformer {
 
     val applies = srcTpe.companion.member(TermName("apply")).alternatives
     val ctors = srcTpe.decl(termNames.CONSTRUCTOR).alternatives
 
     override def transform(tree: Tree): Tree = tree match {
       case Apply(fn, args) if applies.contains(fn.symbol) =>
-        q"new $tgtTpe(..$args)"
+        q"new $tgtTpe(..${expandArgs(args)})"
       case Apply(fn, args) if ctors.contains(fn.symbol) =>
-        q"new $tgtTpe(..$args)"
+        q"new $tgtTpe(..${expandArgs(args)})"
       case _ =>
         super.transform(tree)
     }
+
+    /**
+     * Expands the fields of selected product type symbols. For example, if the original arguments are
+     *
+     * {{{
+     * (x, y._2, z)
+     * }}}
+     *
+     * and the symbol of `y` is in the given set of `expandSymbols`, this utility function will substitute `y._2` with
+     * its children. If `y._2` is of type `scala.Tuple3`, the resulting expanded list of arguments will look like:
+     *
+     * {{{
+     * (x, y._2._1, y._2._2, y._2._3, z)
+     * }}}
+     *
+     * where `y.fi` are the simple-typed fields of the tuple type that is used to encode the type of `y`.
+     */
+    def expandArgs(args: List[Tree]) = args.flatMap(a => {
+      // check whether the argument is a selector path on one of the expanded symbols
+      val p = getSelectorPath(a).filter(x => expandSymbols.contains(x.ident.symbol))
+
+      if (p.isDefined) {
+        // if this is the case, expand the subtree at this path
+        createTypeConvertor(a.tpe).srcToTgt(a) match {
+          case Apply(tgtFn, tgtArgs) =>
+            tgtArgs // ProductTypeConverter: expand children
+          case _ =>
+            List(a) // SimpleTypeConverter: merely forward
+        }
+      } else {
+        // Otherwise, merely forward
+        List(a)
+      }
+    })
   }
+
+  /**
+   * Recusively constructs the `SelectorPath` located ending at the given `tree`.
+   *
+   * @param tree The current head of the path.
+   * @param path The already visited ancestors
+   * @return Optionally a `SelectorPath`, if the originally passed tree represents a valid `SelectorPath`.
+   */
+  def getSelectorPath(tree: Tree, path: List[Symbol] = List.empty[Symbol]): Option[SelectorPath] = tree match {
+    case proj@Select(parent, _) => getSelectorPath(parent, List(proj.symbol) ++ path)
+    case ident@Ident(TermName(_)) => Some(SelectorPath(ident, path))
+    case _ => Option.empty[SelectorPath]
+  }
+
+  /**
+   * Represents a selector chain of the form
+   *
+   * {{{
+   * q"$ident.${path(0)}.${path(1)}...${path(n)}"
+   * }}}
+   *
+   * @param ident The identifier at the beginning of the path.
+   * @param path The symbols at the path select steps (in order).
+   */
+  case class SelectorPath(ident: Ident, path: List[Symbol])
 
 }

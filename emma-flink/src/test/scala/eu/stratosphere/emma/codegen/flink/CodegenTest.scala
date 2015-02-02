@@ -250,4 +250,87 @@ class CodegenTest {
   //    // assert that the result contains the expected values
   //    compareBags(act, exp)
   //  }
+
+  // --------------------------------------------------------------------------
+  // Join & Cross
+  // --------------------------------------------------------------------------
+
+  @Test def testTwoWayJoinSimpleType(): Unit = {
+    val N = 100
+
+    val a = 1
+    val b = 1
+    val c = 5
+
+    val alg = emma.parallelize {
+      for (x <- DataBag(1 to N); y <- DataBag(1 to Math.sqrt(N).toInt); if a * x * x == b * y) yield (x, y, c)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  @Test def testTwoWayJoinComplexType(): Unit = {
+    // Q: how many cannes winners are there in the IMDB top 100?
+    val alg = emma.parallelize {
+      val imdb = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+      val cannes = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner])
+      val berlin = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
+
+      val cwinners = for (x <- imdb; y <- cannes; if (x.title, x.year) ==(y.title, y.year)) yield ("Cannes", x.year, y.title)
+      val bwinners = for (x <- imdb; y <- berlin; if (x.title, x.year) ==(y.title, y.year)) yield ("Berlin", x.year, y.title)
+
+      (bwinners, cwinners)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native)
+    val exp = alg.run(rt)
+
+    // assert that the result contains the expected values
+    compareBags(act._1.fetch(), exp._1.fetch())
+    compareBags(act._2.fetch(), exp._2.fetch())
+  }
+
+  @Test def testMultiWayJoinSimpleType(): Unit = {
+    val N = 10000
+
+    val alg = emma.parallelize {
+      for (x <- DataBag(1 to Math.sqrt(N).toInt);
+           y <- DataBag(1 to Math.sqrt(N).toInt);
+           z <- DataBag(1 to N); if x * x + y * y == z * z) yield (x, y, z)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  @Test def testMultiWayJoinComplexType(): Unit = {
+    // Q: how many cannes winners are there in the IMDB top 100?
+    val alg = emma.parallelize {
+      val imdb = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+      val cannes = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner])
+      val berlin = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
+
+      for (c <- cannes;
+           b <- berlin; if c.year == b.year;
+           ic <- imdb; if ic.title == c.title;
+           ib <- imdb; if ib.title == b.title) yield (c, b)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
 }

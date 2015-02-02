@@ -86,10 +86,12 @@ package object ir {
 
   final case class EquiJoin[+A: TypeTag, +B: TypeTag, +C: TypeTag](keyx: Expr[Any], keyy: Expr[Any], xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
+    lazy val f: Expr[Any] = reify((x: B, y: C) => (x, y))
   }
 
   final case class Cross[+A: TypeTag, +B: TypeTag, +C: TypeTag](xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
+    lazy val f: Expr[Any] = reify((x: B, y: C) => (x, y))
   }
 
   final case class Group[+A: TypeTag, +B: TypeTag](key: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
