@@ -42,7 +42,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
         import org.apache.flink.api.java.ExecutionEnvironment
 
         def run(env: ExecutionEnvironment, values: Seq[${tc.srcTpe}]) = {
-          val __input = env.fromCollection(scala.collection.JavaConversions.asJavaCollection(for (v <- values) yield ${tc.srcToTgt(TermName("v"))}))
+          val __input = env.fromCollection(scala.collection.JavaConversions.asJavaCollection(for (v <- values) yield ${tc.srcToTgt(Ident(TermName("v")))}))
 
           // create type information
           val typeInformation = ${tc.tgtTypeInfo}
@@ -105,7 +105,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
           env.execute(${s"Emma[$dataflowName]"})
 
           // construct result DataBag
-          for (v <- scala.collection.JavaConversions.collectionAsScalaIterable(collection)) yield ${tc.tgtToSrc(TermName("v"))}
+          for (v <- scala.collection.JavaConversions.collectionAsScalaIterable(collection)) yield ${tc.tgtToSrc(Ident(TermName("v")))}
         }
       }
       """.asInstanceOf[ImplDef]
@@ -171,6 +171,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     case op: ir.TempSink[_] => opCode(op)
     case op: ir.Scatter[_] => opCode(op)
     case op: ir.Map[_, _] => opCode(op)
+    case op: ir.FlatMap[_, _] => opCode(op)
     case _ => throw new RuntimeException(s"Unsupported ir node of type '${cur.getClass}'")
   }
 
@@ -295,26 +296,45 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
     // assemble dataflow fragment
     q"""
-    env.fromCollection(scala.collection.JavaConversions.asJavaCollection(for (v <- $inputParam) yield ${tc.srcToTgt(TermName("v"))}))
+    env.fromCollection(scala.collection.JavaConversions.asJavaCollection(for (v <- $inputParam) yield ${tc.srcToTgt(Ident(TermName("v")))}))
     """
   }
 
   private def opCode[OT, IT](op: ir.Map[OT, IT])(implicit closure: DataflowClosure): Tree = {
-    // generate mapper UDF
-    val mapperUDF = TupleizedUDF(ir.UDF(op.f, tb))
-    val mapperName = closure.nextUDFName("Mapper")
-    closure.closureParams ++= (for (p <- mapperUDF.closure) yield p.name -> p.tpt)
+    // generate fn UDF
+    val fnUDF = new TupleizedUDF(ir.UDF(op.f, tb)) with ReturnedResult
+    val fnName = closure.nextUDFName("Mapper")
+    closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $mapperName(..${mapperUDF.closure}) extends org.apache.flink.api.common.functions.RichMapFunction[${mapperUDF.paramType(0)}, ${mapperUDF.resultType}] with ResultTypeQueryable[${mapperUDF.resultType}] {
-        override def map(..${mapperUDF.params}): ${mapperUDF.resultType} = ${mapperUDF.body}
-        override def getProducedType = ${mapperUDF.resultTypeInfo}
+      class $fnName(..${fnUDF.closure}) extends org.apache.flink.api.common.functions.RichMapFunction[${fnUDF.paramType(0)}, ${fnUDF.resultType}] with ResultTypeQueryable[${fnUDF.resultType}] {
+        override def map(..${fnUDF.params}): ${fnUDF.resultType} = ${fnUDF.body}
+        override def getProducedType = ${fnUDF.resultTypeInfo}
       }
       """
 
     // assemble dataflow fragment
     q"""
-    ${generateOpCode(op.xs)}.map(new $mapperName(..${mapperUDF.closure.map(_.name)}))
+    ${generateOpCode(op.xs)}.map(new $fnName(..${fnUDF.closure.map(_.name)}))
+    """
+  }
+
+  private def opCode[OT, IT](op: ir.FlatMap[OT, IT])(implicit closure: DataflowClosure): Tree = {
+    // generate fn UDF
+    val fnUDF = new TupleizedUDF(ir.UDF(op.f, tb)) with CollectedResult
+    val fnName = closure.nextUDFName("FlatMapper")
+    closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
+    closure.udfs +=
+      q"""
+      class $fnName(..${fnUDF.closure}) extends org.apache.flink.api.common.functions.RichFlatMapFunction[${fnUDF.paramType(0)}, ${fnUDF.resultType}] with ResultTypeQueryable[${fnUDF.resultType}] {
+        override def flatMap(..${fnUDF.params}, __c: org.apache.flink.util.Collector[${fnUDF.resultType}]): Unit = ${fnUDF.body}
+        override def getProducedType = ${fnUDF.resultTypeInfo}
+      }
+      """
+
+    // assemble dataflow fragment
+    q"""
+    ${generateOpCode(op.xs)}.flatMap(new $fnName(..${fnUDF.closure.map(_.name)}))
     """
   }
 
@@ -322,7 +342,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   // Auxiliary structures
   // --------------------------------------------------------------------------
 
-  final class DataflowClosure(udfCounter: Counter = new Counter(), scatterCounter: Counter = new Counter()) {
+  private final class DataflowClosure(udfCounter: Counter = new Counter(), scatterCounter: Counter = new Counter()) {
 
     val closureParams = mutable.Map.empty[TermName, Tree]
 
@@ -335,21 +355,29 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     def nextLocalInputName(prefix: String = "scatter") = TermName(f"scatter${scatterCounter.advance.get}%05d")
   }
 
-  final class TupleizedUDF(udf: ir.UDF) {
+  private sealed abstract class TupleizedUDF(val udf: ir.UDF) {
 
-    val paramsTypeConverters = (for (p <- udf.params) yield createTypeConvertor(p.tpt.tpe)).toArray
+    lazy val paramsTypeConverters = (for (p <- udf.params) yield createTypeConvertor(p.tpt.tpe)).toArray
 
-    val resultTypeConverter = createTypeConvertor(udf.body.tpe)
-
-    val resultType = resultTypeConverter.tgtType
-
-    val resultTypeInfo = resultTypeConverter.tgtTypeInfo
-
-    val params = for ((p, ptc) <- udf.params zip paramsTypeConverters) yield ValDef(p.mods, p.name, ptc.tgtType, p.rhs)
+    lazy val params = for ((p, ptc) <- udf.params zip paramsTypeConverters) yield ValDef(p.mods, p.name, ptc.tgtType, p.rhs)
 
     def paramType(i: Int) = paramsTypeConverters(i).tgtType
 
+    val resultTypeConverter: TypeConvertor
+
+    lazy val resultType = resultTypeConverter.tgtType
+
+    lazy val resultTypeInfo = resultTypeConverter.tgtTypeInfo
+
     def closure = udf.closure
+
+    val body: Tree
+  }
+
+  private trait ReturnedResult {
+    this: TupleizedUDF =>
+
+    val resultTypeConverter = createTypeConvertor(udf.body.tpe)
 
     val body = {
       var tmp = udf.body
@@ -358,9 +386,36 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     }
   }
 
-  object TupleizedUDF {
+  private trait CollectedResult {
+    this: TupleizedUDF =>
 
-    def apply(udf: ir.UDF) = new TupleizedUDF(udf)
+    val resultTypeConverter = udf.body.tpe match {
+      case TypeRef(prefix, sym, List(tpe)) if bagSymbol == sym =>
+        createTypeConvertor(tpe)
+      case _ =>
+        throw new RuntimeException(s"Unexpected result type ${udf.body.tpe} of UDF with collected result (should return a DataBag).")
+    }
+
+    val body = {
+      var tmp = udf.body
+      // convert the parameter types
+      for ((p, ptc) <- udf.params zip paramsTypeConverters) tmp = ptc.convertTermType(p.name, tmp)
+      // rewrite the return expression to use the collector instead
+      tmp match {
+        // complex body consisting of a block
+        case Block(stats, Apply(fn, List(seq))) if bagConstructors.contains(fn.symbol) =>
+          Block(stats, q"for (x <- $seq) __collect(x)")
+        // simple body consisting of a single expression
+        case Apply(fn, List(seq)) if bagConstructors.contains(fn.symbol) =>
+          q"for (v <- $seq) __c.collect(${resultTypeConverter.srcToTgt(Ident(TermName("v")))})"
+        // something unexpected...
+        case _ =>
+          throw new RuntimeException(s"Unexpected return statement of UDF with collected result (should be a DataBag constructor).")
+      }
+    }
   }
 
+  private val bagSymbol = rootMirror.staticClass("eu.stratosphere.emma.api.DataBag")
+
+  private val bagConstructors = bagSymbol.companion.info.decl(TermName("apply")).alternatives
 }

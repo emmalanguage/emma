@@ -42,7 +42,7 @@ package object typeutil {
     } else if (tpe =:= weakTypeOf[String] || tpe =:= weakTypeOf[java.lang.String]) {
       SimpleTypeConvertor.String
     } else {
-      throw new RuntimeException("Too many distinct fields in type. Up to 8 fields are currently supported.")
+      throw new RuntimeException(s"Unsupported field type $tpe.")
     }
   }
 
@@ -61,9 +61,9 @@ package object typeutil {
 
     def convertTermType(termName: TermName, expr: Tree): Tree
 
-    def srcToTgt(v: TermName): Tree
+    def srcToTgt(v: Tree): Tree
 
-    def tgtToSrc(v: TermName): Tree
+    def tgtToSrc(v: Tree): Tree
   }
 
   // ------------------------------------------------------------------------
@@ -79,9 +79,9 @@ package object typeutil {
 
     def convertTermType(termName: TermName, expr: Tree) = expr
 
-    def srcToTgt(v: TermName) = q"$v"
+    def srcToTgt(v: Tree) = v
 
-    def tgtToSrc(v: TermName) = q"$v"
+    def tgtToSrc(v: Tree) = v
   }
 
   object SimpleTypeConvertor {
@@ -140,13 +140,13 @@ package object typeutil {
 
     override def convertTermType(termName: TermName, expr: Tree) = new TypeProjectionsSubstituter(termName, this).transform(expr)
 
-    override def srcToTgt(v: TermName) = q"new $tgtType(..${
-      for (p <- paths) yield p.foldLeft[Tree](q"$v")((prefix, s) => q"$prefix.$s")
+    override def srcToTgt(v: Tree) = q"new $tgtType(..${
+      for (p <- paths) yield p.foldLeft[Tree](v)((prefix, s) => q"$prefix.$s")
     })"
 
-    override def tgtToSrc(v: TermName) = tgtToSrc(v, new Counter)
+    override def tgtToSrc(v: Tree) = tgtToSrc(v, new Counter)
 
-    private def tgtToSrc(v: TermName, idx: Counter): Tree = q"new $srcTpe(..${
+    private def tgtToSrc(v: Tree, idx: Counter): Tree = q"new $srcTpe(..${
       for (c <- children) yield c match {
         case x: ProductTypeConvertor => x.tgtToSrc(v, idx)
         case x: SimpleTypeConvertor => q"$v.${TermName(s"f${idx.advance.get - 1}")}"
