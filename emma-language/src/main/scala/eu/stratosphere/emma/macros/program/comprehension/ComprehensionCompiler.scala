@@ -106,7 +106,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         case combinator.Map(f, xs) =>
           q"ir.Map[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(f)}, ${serialize(xs)})"
         case combinator.FlatMap(f, xs) =>
-          q"ir.FlatMap[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(f)}, ${serialize(xs)})"
+          q"ir.FlatMap[${elementType(elementType(e.tpe))}, ${elementType(xs.tpe)}](${serialize(f)}, ${serialize(xs)})"
         case combinator.Filter(p, xs) =>
           q"ir.Filter[${elementType(e.tpe)}](${serialize(p)}, ${serialize(xs)})"
         case combinator.EquiJoin(keyx, keyy, xs, ys) =>
