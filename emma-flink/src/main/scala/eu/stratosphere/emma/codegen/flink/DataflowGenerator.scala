@@ -172,6 +172,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     case op: ir.Scatter[_] => opCode(op)
     case op: ir.Map[_, _] => opCode(op)
     case op: ir.FlatMap[_, _] => opCode(op)
+    case op: ir.Filter[_] => opCode(op)
     case _ => throw new RuntimeException(s"Unsupported ir node of type '${cur.getClass}'")
   }
 
@@ -335,6 +336,24 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     // assemble dataflow fragment
     q"""
     ${generateOpCode(op.xs)}.flatMap(new $fnName(..${fnUDF.closure.map(_.name)}))
+    """
+  }
+
+  private def opCode[T](op: ir.Filter[T])(implicit closure: DataflowClosure): Tree = {
+    // generate fn UDF
+    val fnUDF = new TupleizedUDF(ir.UDF(op.p, tb)) with ReturnedResult
+    val fnName = closure.nextUDFName("Filter")
+    closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
+    closure.udfs +=
+      q"""
+      class $fnName(..${fnUDF.closure}) extends org.apache.flink.api.common.functions.RichFilterFunction[${fnUDF.paramType(0)}] {
+        override def filter(..${fnUDF.params}): ${fnUDF.resultType} = ${fnUDF.body}
+      }
+      """
+
+    // assemble dataflow fragment
+    q"""
+    ${generateOpCode(op.xs)}.filter(new $fnName(..${fnUDF.closure.map(_.name)}))
     """
   }
 

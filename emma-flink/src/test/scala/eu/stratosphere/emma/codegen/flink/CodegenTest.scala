@@ -170,4 +170,25 @@ class CodegenTest {
     // assert that the result contains the expected values
     compareBags(act, exp)
   }
+
+  // --------------------------------------------------------------------------
+  // Filter
+  // --------------------------------------------------------------------------
+
+  @Test def testFilterSimpleType(): Unit = {
+    val inp = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines().toStream
+
+    val len = 10
+
+    val alg = emma.parallelize {
+      DataBag(inp).withFilter(_.length > len)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
 }
