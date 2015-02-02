@@ -58,8 +58,14 @@ class ConvertorsMacros(val c: blackbox.Context) {
       val params = tpe.decl(termNames.CONSTRUCTOR).alternatives.head.asMethod.typeSignatureIn(tpe).paramLists.head
       val args = params.map(arg => fromString(arg.info, value))
       q"new $tpe(..$args)"
+    } else if (tpe =:= weakTypeOf[Unit] || tpe =:= weakTypeOf[java.lang.Void]) {
+      q"Unit"
+    } else if (tpe =:= weakTypeOf[Boolean] || tpe =:= weakTypeOf[java.lang.Boolean]) {
+      q"$value(nextIndex).toBoolean"
     } else if (tpe =:= weakTypeOf[Byte]) {
       q"$value(nextIndex).toByte"
+    } else if (tpe =:= weakTypeOf[Short] || tpe =:= weakTypeOf[java.lang.Short]) {
+      q"$value(nextIndex).toShort"
     } else if (tpe =:= weakTypeOf[Short] || tpe =:= weakTypeOf[java.lang.Short]) {
       q"$value(nextIndex).toShort"
     } else if (tpe =:= weakTypeOf[Int] || tpe =:= weakTypeOf[java.lang.Integer]) {
@@ -73,7 +79,7 @@ class ConvertorsMacros(val c: blackbox.Context) {
     } else if (tpe =:= weakTypeOf[String] || tpe =:= weakTypeOf[java.lang.String]) {
       q"$value(nextIndex)"
     } else {
-      // c.error(c.enclosingPosition, s"Cannot synthesize 'fromString' method for type ${tpe.toString}") FIXME: re-enable
+      // c.warning(c.enclosingPosition, s"Cannot synthesize 'fromString' method for type ${tpe.toString}") // TODO: enable warning
       q"{ nextIndex; null.asInstanceOf[$tpe] }"
     }
   }
@@ -84,7 +90,11 @@ class ConvertorsMacros(val c: blackbox.Context) {
       val fields = for (p <- params; m <- tpe.members if m.isMethod && m.asMethod.isGetter && m.toString == p.toString) yield m
       val strngs = fields.map(arg => toString(arg.infoIn(tpe).resultType, q"$value.$arg"))
       q"..$strngs"
+    } else if (tpe =:= weakTypeOf[Boolean] || tpe =:= weakTypeOf[java.lang.Boolean]) {
+      q"builder += $value.toString"
     } else if (tpe =:= weakTypeOf[Byte]) {
+      q"builder += $value.toString"
+    } else if (tpe =:= weakTypeOf[Short] || tpe =:= weakTypeOf[java.lang.Short]) {
       q"builder += $value.toString"
     } else if (tpe =:= weakTypeOf[Short] || tpe =:= weakTypeOf[java.lang.Short]) {
       q"builder += $value.toString"
@@ -99,8 +109,8 @@ class ConvertorsMacros(val c: blackbox.Context) {
     } else if (tpe =:= weakTypeOf[String] || tpe =:= weakTypeOf[java.lang.String]) {
       q"builder += $value"
     } else {
-      // c.error(c.enclosingPosition, s"Cannot synthesize 'toString' method for type ${tpe.toString}") FIXME: re-enable
-      q"builder += null"
+      // c.warning(c.enclosingPosition, s"Cannot synthesize 'toString' method for type ${tpe.toString}") // TODO: enable warning
+      EmptyTree
     }
   }
 }

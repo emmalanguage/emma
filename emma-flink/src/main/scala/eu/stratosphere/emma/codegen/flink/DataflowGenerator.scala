@@ -2,7 +2,8 @@ package eu.stratosphere.emma.codegen.flink
 
 import java.net.URI
 
-import typeutil._
+import eu.stratosphere.emma.api.{CSVInputFormat, CSVOutputFormat}
+import eu.stratosphere.emma.codegen.flink.typeutil._
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir
 import eu.stratosphere.emma.util.Counter
@@ -174,12 +175,32 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT](op: ir.Read[OT])(implicit closure: DataflowClosure): Tree = {
-    val tc = createTypeConvertor(typeOf(op.tag)) match {
-      case tc: ProductTypeConvertor => tc
-      case _ => throw new RuntimeException(s"Cannot create Flink CsvInputFormat for non-product type ${typeOf(op.tag)}")
+    val tc = createTypeConvertor(typeOf(op.tag))
+
+    val inFormatTree = op.format match {
+      case ifmt: CSVInputFormat[_] =>
+        val ptc = createTypeConvertor(typeOf(op.tag)) match {
+          case x: ProductTypeConvertor => x
+          case _ => throw new RuntimeException(s"Cannot create Flink CsvInputFormat for non-product type ${typeOf(op.tag)}")
+        }
+
+        q"""
+        {
+          // create CsvInputFormat
+          val inFormat = new org.apache.flink.api.java.io.CsvInputFormat[${ptc.tgtType}](new org.apache.flink.core.fs.Path(${op.location}))
+          inFormat.setDelimiter("\n")
+          inFormat.setFieldDelimiter(${ifmt.separator})
+          inFormat.setFields(
+            Array(..${for (i <- Range(0, ptc.fields.size)) yield Literal(Constant(i))}),
+            Array[Class[_]](..${for (t <- ptc.fields) yield t.javaClass}))
+          // return to the enclosing code fragment
+          inFormat
+        }
+        """
+      case _ =>
+        throw new RuntimeException(s"Unsupported InputFormat of type '${op.format.getClass}'")
     }
 
-    // TODO: the input format assembly should be extensible
     // assemble dataflow fragment
     q"""
     {
@@ -187,12 +208,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       val typeInformation = ${tc.tgtTypeInfo}
 
       // create input format
-      val inFormat = new org.apache.flink.api.java.io.CsvInputFormat[${tc.tgtType}](new org.apache.flink.core.fs.Path(${op.location}))
-      inFormat.setDelimiter("\n")
-      inFormat.setFieldDelimiter('\t')
-      inFormat.setFields(
-        Array(..${for (i <- Range(0, tc.fields.size)) yield Literal(Constant(i))}),
-        Array[Class[_]](..${for (t <- tc.fields) yield t.javaClass}))
+      val inFormat = $inFormatTree
 
       // create input
       env.createInput(inFormat, typeInformation)
@@ -201,16 +217,27 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[IT](op: ir.Write[IT])(implicit closure: DataflowClosure): Tree = {
-    val tc = createTypeConvertor(typeOf(op.xs.tag))
+    val outFormatTree = op.format match {
+      case ofmt: CSVOutputFormat[_] =>
+        val tc = createTypeConvertor(typeOf(op.xs.tag)) match {
+          case x: ProductTypeConvertor => x
+          case _ => throw new RuntimeException(s"Cannot create Flink CsvOutputFormat for non-product type ${typeOf(op.xs.tag)}")
+        }
 
-    // TODO: the output format assembly should be extensible
+        q"""
+        new org.apache.flink.api.java.io.CsvOutputFormat[${tc.tgtType}](new org.apache.flink.core.fs.Path(${op.location}), ${ofmt.separator}.toString)
+        """
+      case _ =>
+        throw new RuntimeException(s"Unsupported InputFormat of type '${op.format.getClass}'")
+    }
+
     // assemble dataflow fragment
     q"""
     {
       val __input = ${generateOpCode(op.xs)}
 
       // create output format
-      val outFormat = new org.apache.flink.api.java.io.CsvOutputFormat[${tc.tgtType}](new org.apache.flink.core.fs.Path(${op.location}))
+      val outFormat = $outFormatTree
 
       // write output
       __input.write(outFormat, ${op.location}, org.apache.flink.core.fs.FileSystem.WriteMode.OVERWRITE)
