@@ -115,10 +115,10 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
           q"ir.Cross[${elementType(e.tpe)}, ${elementType(xs.tpe)}, ${elementType(ys.tpe)}](${serialize(xs)}, ${serialize(ys)})"
         case combinator.Group(key, xs) =>
           q"ir.Group[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(key)}, ${serialize(xs)})"
-        case combinator.Fold(empty, sng, union, xs) =>
-          q"ir.Fold(${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
+        case combinator.Fold(empty, sng, union, xs, _) =>
+          q"ir.Fold[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
         case combinator.FoldGroup(key, empty, sng, union, xs) =>
-          q"ir.FoldGroup(${serialize(key)}, ${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
+          q"ir.FoldGroup[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(key)}, ${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
         case combinator.Distinct(xs) =>
           q"ir.Distinct(${serialize(xs)})"
         case combinator.Union(xs, ys) =>
@@ -128,7 +128,8 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         case ScalaExpr(_, Apply(fn, List(values))) if api.apply.alternatives.contains(fn.symbol) =>
           q"ir.Scatter(${transform(values)})"
         case _ =>
-          throw new RuntimeException("Unsupported serialization of non-combinator expression:\n" + prettyprint(e) + "\n")
+          EmptyTree
+          //throw new RuntimeException("Unsupported serialization of non-combinator expression:\n" + prettyprint(e) + "\n")
       }
     }
 
@@ -165,7 +166,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
       case combinator.Filter(p, _) => closure(p)
       case combinator.EquiJoin(keyx, keyy, _, _) => closure(keyx) ++ closure(keyy)
       case combinator.Group(key, _) => closure(key)
-      case combinator.Fold(empty, sng, union, _) => closure(empty) ++ closure(sng) ++ closure(union)
+      case combinator.Fold(empty, sng, union, _, _) => closure(empty) ++ closure(sng) ++ closure(union)
       case combinator.FoldGroup(key, empty, sng, union, _) => closure(key) ++ closure(empty) ++ closure(sng) ++ closure(union)
     }).flatten.toList.sortBy(_.name.toString)
 

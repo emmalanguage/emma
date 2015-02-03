@@ -186,7 +186,7 @@ trait ComprehensionNormalization[C <: blackbox.Context]
     case class RuleMatch(fold: combinator.Fold, map: Comprehension, child: Generator)
 
     override protected def bind(r: Expression) = r match {
-      case fold@combinator.Fold(_, _, _, map@Comprehension(ScalaExpr(_, _), List(child@Generator(_, _)))) =>
+      case fold@combinator.Fold(_, _, _, map@Comprehension(ScalaExpr(_, _), List(child@Generator(_, _))), _) =>
         Some(RuleMatch(fold, map, child))
       case _ =>
         Option.empty[RuleMatch]

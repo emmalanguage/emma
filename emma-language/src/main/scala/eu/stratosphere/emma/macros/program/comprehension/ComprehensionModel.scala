@@ -69,7 +69,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     def tpe = c.typeOf[Boolean]
   }
 
-  case class Generator(var lhs: TermName, var rhs: Expression) extends Qualifier {
+  case class Generator(lhs: TermName, var rhs: Expression) extends Qualifier {
     def tpe = rhs.tpe.typeArgs.head
   }
 
@@ -136,15 +136,15 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     }
 
     case class Group(var key: Tree, var xs: Expression) extends Combinator {
-      def tpe = c.typecheck(tq"Group[${key.tpe.widen.typeArgs.tail.head}, DataBag[${xs.tpe.typeArgs.head}]]", c.TYPEmode).tpe
+      def tpe = c.typecheck(tq"DataBag[Group[${key.tpe.widen.typeArgs.tail.head}, DataBag[${xs.tpe.typeArgs.head}]]]", c.TYPEmode).tpe
     }
 
-    case class Fold(var empty: Tree, var sng: Tree, var union: Tree, var xs: Expression) extends Combinator {
+    case class Fold(var empty: Tree, var sng: Tree, var union: Tree, var xs: Expression, var origin: Tree) extends Combinator {
       def tpe = sng.tpe.widen.typeArgs.tail.head // Function[A, B]#B
     }
 
     case class FoldGroup(var key: Tree, var empty: Tree, var sng: Tree, var union: Tree, var xs: Expression) extends Combinator {
-      def tpe = sng.tpe.widen.typeArgs.tail.head // Function[A, B]#B
+      def tpe = c.typecheck(tq"DataBag[Group[${key.tpe.widen.typeArgs.tail.head}, ${sng.tpe.widen.typeArgs.tail.head}]]", c.TYPEmode).tpe
     }
 
     case class Distinct(var xs: Expression) extends Combinator {
@@ -165,15 +165,22 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
   // Comprehension Store
   // --------------------------------------------------------------------------
 
-  class ComprehensionView(var terms: mutable.Seq[ComprehendedTerm]) {
+  class ComprehensionView(ctx: mutable.Seq[ComprehendedTerm]) {
 
-    private val defIndex = mutable.Map((for (t <- terms; d <- t.definition) yield d -> t): _*)
+    private val defIndex = mutable.Map((for (t <- ctx; d <- t.definition) yield d -> t): _*)
 
-    private val termIndex = mutable.Map((for (t <- terms) yield t.term -> t): _*)
+    private val termIndex = mutable.Map((for (t <- ctx) yield t.term -> t): _*)
+
+    def terms = termIndex.values.toStream
 
     def comprehendedDef(defintion: Tree) = defIndex.get(defintion)
 
     def getByTerm(term: Tree) = termIndex.get(term)
+
+    def remove(t: ComprehendedTerm) = {
+      for (d <- t.definition) defIndex -= d // remove from defIndex
+      termIndex -= t.term // remove from termIndex
+    }
   }
 
   case class ComprehendedTerm(id: TermName, term: Tree, comprehension: ExpressionRoot, definition: Option[Tree])
@@ -206,7 +213,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       case combinator.EquiJoin(keyx, keyy, xs, ys) => combinator.EquiJoin(keyx, keyy, transform(xs), transform(ys))
       case combinator.Cross(xs, ys) => combinator.Cross(transform(xs), transform(ys))
       case combinator.Group(key, xs) => combinator.Group(key, transform(xs))
-      case combinator.Fold(empty, sng, union, xs) => combinator.Fold(empty, sng, union, transform(xs))
+      case combinator.Fold(empty, sng, union, xs, origin) => combinator.Fold(empty, sng, union, transform(xs), origin)
       case combinator.FoldGroup(key, empty, sng, union, xs) => combinator.FoldGroup(key, empty, sng, union, transform(xs))
       case combinator.Distinct(xs) => combinator.Distinct(transform(xs))
       case combinator.Union(xs, ys) => combinator.Union(transform(xs), transform(ys))
@@ -248,7 +255,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       case combinator.EquiJoin(_, _, xs, ys) => traverse(xs); traverse(ys)
       case combinator.Cross(xs, ys) => traverse(xs); traverse(ys)
       case combinator.Group(_, xs) => traverse(xs)
-      case combinator.Fold(_, _, _, xs) => traverse(xs)
+      case combinator.Fold(_, _, _, xs, _) => traverse(xs)
       case combinator.FoldGroup(_, _, _, _, xs) => traverse(xs)
       case combinator.Distinct(xs) => traverse(xs)
       case combinator.Union(xs, ys) => traverse(xs); traverse(ys)
@@ -289,108 +296,113 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       // Monads
       case e@MonadJoin(expr) =>
         s"""
-        |μ ( ${pp(expr, offset + " " * 4)} )
+           |μ ( ${pp(expr, offset + " " * 4)} )
         """.stripMargin.trim
       case e@MonadUnit(expr) =>
         s"""
-        |η ( ${pp(expr, offset + " " * 4)} )
+           |η ( ${pp(expr, offset + " " * 4)} )
         """.stripMargin.trim
       case e@Comprehension(h, qs) =>
         s"""
-        |[ ${pp(h, offset + " " * 2)} |
-        |  ${offset + pp(qs, offset + " " * 2)} ]
+           |[ ${pp(h, offset + " " * 2)}|
+                                        | ${offset + pp(qs, offset + " " * 2)} ]
         """.stripMargin.trim //^${e.tpe.toString}
       // Qualifiers
       case e@Filter(expr) =>
         s"""
-        |${pp(expr)}
+           |${pp(expr)}
         """.stripMargin.trim
       case e@Generator(lhs, rhs) =>
         s"""
-        |$lhs ← ${pp(rhs, offset + "   " + " " * lhs.encodedName.toString.length)}
+           |$lhs ← ${pp(rhs, offset + "   " + " " * lhs.encodedName.toString.length)}
         """.stripMargin.trim
       // Environment & Host Language Connectors
       case e@ScalaExpr(freeVars, expr) =>
         s"""
-        |${pp(expr)}
+           |${pp(expr)}
         """.stripMargin.trim // if (debug) _pprint(" <" + freeVars + "> ")
       // Combinators
       case e@combinator.Read(location, format) =>
         s"""
-        |read (${pp(location)})
+           |read (${pp(location)})
         """.stripMargin.trim
       case e@combinator.Write(location, format, in) =>
         s"""
-        |write (${pp(location)}) (
-        |        ${offset + pp(in, offset + " " * 8)} )
+           |write (${pp(location)}) (
+                                    |       ${offset + pp(in, offset + " " * 8)} )
         """.stripMargin.trim
       case e@combinator.TempSource(id) =>
         s"""
-        |tmpsrc (${pp(id)})
+           |tmpsrc (${pp(id)})
         """.stripMargin.trim
       case e@combinator.TempSink(id, xs) =>
         s"""
-        |tmpsnk ${pp(id)} (
-        |        ${offset + pp(xs, offset + " " * 8)} )
+           |tmpsnk ${pp(id)} (
+                              |       ${offset + pp(xs, offset + " " * 8)} )
         """.stripMargin.trim
       case e@combinator.FoldSink(id, xs) =>
         s"""
-        |foldsnk ${pp(id)} (
-        |        ${offset + pp(xs, offset + " " * 8)} )
+           |foldsnk ${pp(id)} (
+                               |       ${offset + pp(xs, offset + " " * 8)} )
         """.stripMargin.trim
       case e@combinator.Map(f, xs) =>
         s"""
-        |map ${pp(f)} (
-        |        ${offset + pp(xs, offset + " " * 8)} )
+           |map ${pp(f)} (
+                          |       ${offset + pp(xs, offset + " " * 8)} )
         """.stripMargin.trim
       case e@combinator.FlatMap(f, xs) =>
         s"""
-        |flatMap ${pp(f)} (
-        |        ${offset + pp(xs, offset + " " * 8)} )
+           |flatMap ${pp(f)} (
+                              |       ${offset + pp(xs, offset + " " * 8)} )
         """.stripMargin.trim
       case e@combinator.Filter(p, xs) =>
         s"""
-        |filter ${pp(p)} (
-        |        ${offset + pp(xs, offset + " " * 8)})
+           |filter ${pp(p)} (
+                             |       ${offset + pp(xs, offset + " " * 8)})
         """.stripMargin.trim
       case e@combinator.EquiJoin(keyx, keyy, xs, ys) =>
         s"""
-        |join ${pp(keyx)} ${pp(keyy)} (
-        |        ${offset + pp(xs, offset + " " * 8)} ,
-        |        ${offset + pp(ys, offset + " " * 8)} )
+           |join ${pp(keyx)} ${pp(keyy)} (
+                                          |       ${offset + pp(xs, offset + " " * 8)} ,
+                                                                                        |       ${offset + pp(ys, offset + " " * 8)} )
         """.stripMargin.trim
       case e@combinator.Cross(xs, ys) =>
         s"""
-        |cross (
-        |        ${offset + pp(xs, offset + " " * 8)} ,
-        |        ${offset + pp(ys, offset + " " * 8)} )
+           |cross (
+           |       ${offset + pp(xs, offset + " " * 8)} ,
+                                                         |       ${offset + pp(ys, offset + " " * 8)} )
         """.stripMargin.trim
       case e@combinator.Group(key, xs) =>
         s"""
-        |group ${pp(key)} (
-        |        ${offset + pp(xs, offset + " " * 8)} )
+           |group ${pp(key)} (
+                              |       ${offset + pp(xs, offset + " " * 8)} )
         """.stripMargin.trim
-      case e@combinator.Fold(empty, sng, union, xs) =>
+      case e@combinator.FoldGroup(key, empty, sng, union, xs) =>
         s"""
-        |fold〈${pp(empty)}, ${pp(sng)}, ${pp(union)}〉(
-        |        ${offset + pp(xs, offset + " " * 8)} )
+           |foldGroup〈${pp(empty)}, ${pp(sng)}, ${pp(union)}〉 ${pp(key)} (
+                                                                          |       ${offset + pp(xs, offset + " " * 8)} )
+        """.stripMargin.trim
+      case e@combinator.Fold(empty, sng, union, xs, _) =>
+        s"""
+           |fold〈${pp(empty)}, ${pp(sng)}, ${pp(union)}〉(
+                                                         |       ${offset + pp(xs, offset + " " * 8)} )
         """.stripMargin.trim
       case e@combinator.Distinct(xs) =>
         s"""
-        |distinct (${pp(xs)})
-        |        ${offset + pp(xs, offset)})
+           |distinct (${pp(xs)})
+                                 |       ${offset + pp(xs, offset)})
         """.stripMargin.trim
       case e@combinator.Union(xs, ys) =>
         s"""
-        |union (
-        |        ${offset + pp(xs, offset + " " * 8)} ,
-        |        ${offset + pp(ys, offset + " " * 8)} )
+           |union (
+           |       ${offset + pp(xs, offset + " " * 8)} ,
+                                                         |       ${offset + pp(ys, offset + " " * 8)} )
         """.stripMargin.trim
       case e@combinator.Diff(xs, ys) =>
         s"""
-        |diff (
-        |        ${offset + pp(xs, offset + " " * 8)} ,
-        |        ${offset + pp(ys, offset + " " * 8)} )
+           |diff (
+           |       ${offset + pp(xs, offset + " " * 8)} ,
+                                                         |       ${offset + pp(ys, offset + " " * 8)} )
         """.stripMargin.trim
       // Lists
       case qs: List[Any] =>

@@ -349,7 +349,7 @@ trait ComprehensionCombination[C <: blackbox.Context]
       case combinator.Filter(p, xs) => combinator.Filter(s(p), transform(xs))
       case combinator.EquiJoin(keyx, keyy, xs, ys) => val k = s(keyx, keyy); combinator.EquiJoin(k._1, k._2, transform(xs), transform(ys))
       case combinator.Group(key, xs) => combinator.Group(s(key), transform(xs))
-      case combinator.Fold(empty, sng, union, xs) => combinator.Fold(empty, s(sng), s(union), transform(xs))
+      case combinator.Fold(empty, sng, union, xs, origin) => combinator.Fold(empty, s(sng), s(union), transform(xs), origin)
       case combinator.FoldGroup(key, empty, sng, union, xs) => combinator.FoldGroup(s(key), empty, s(sng), s(union), transform(xs))
       // Other: bypass
       case _ => super.transform(e)

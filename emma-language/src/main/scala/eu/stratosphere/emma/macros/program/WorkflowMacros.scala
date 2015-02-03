@@ -61,13 +61,8 @@ class WorkflowMacros(val c: blackbox.Context) {
       cfGraph = createControlFlowGraph(optimizedTree)
       comprehensionView = createComprehensionView(cfGraph)
 
-      // Sufficient conditions to rewrite folds using banana-split + fusion
-      // 0) Let `f` be a fold expression
-      // 1) Fold input should be a shared comprehended identifier (say `A`, or `A.values` where `A` is a group)
-      // 2) Reaching defititions of A should be a singleton set at all folds (say, with definition `d`)
-      // 3) There should be no terms that reference `A` which contain `d` in its reaching definitions
-
-      // 2. Derive logical plans (TODO)
+      // 2. Apply Fold-Group-Fusion where possible
+      foldGroupFusion(optimizedTree)
 
       // ----------------------------------------------------------------------
       // Final object assembly
@@ -124,6 +119,9 @@ class WorkflowMacros(val c: blackbox.Context) {
       val optimizedTree = inlineComprehensions(normalizedTree)
       cfGraph = createControlFlowGraph(optimizedTree)
       comprehensionView = createComprehensionView(cfGraph)
+
+      // 2. Apply Fold-Group-Fusion where possible
+      foldGroupFusion(optimizedTree)
 
       // ----------------------------------------------------------------------
       // Final result assembly
