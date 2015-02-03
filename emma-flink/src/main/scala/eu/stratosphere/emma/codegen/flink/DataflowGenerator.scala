@@ -79,7 +79,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
       // assemble dataflow
       val tree = q"""
-      object ${TermName(s"gather$$$dataflowName")} {
+      object ${TermName(dataflowName)} {
 
         import org.apache.flink.api.java.ExecutionEnvironment
         import scala.collection.JavaConverters._
@@ -184,7 +184,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     case op: ir.EquiJoin[_, _, _] => opCode(op)
     case op: ir.Cross[_, _, _] => opCode(op)
     case op: ir.Distinct[_] => opCode(op)
-    case op: ir.Union[_, _, _] => opCode(op)
+    case op: ir.Union[_] => opCode(op)
     case _ => throw new RuntimeException(s"Unsupported ir node of type '${cur.getClass}'")
   }
 
@@ -483,7 +483,9 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     }
   }
 
-  private def opCode[T, U, V](op: ir.Union[T, U, V])(implicit closure: DataflowClosure): Tree = q"${generateOpCode(op.xs)}.union()"
+  private def opCode[T](op: ir.Union[T])(implicit closure: DataflowClosure): Tree = {
+    q"${generateOpCode(op.xs)}.union(${generateOpCode(op.ys)})"
+  }
 
   // --------------------------------------------------------------------------
   // Auxiliary structures

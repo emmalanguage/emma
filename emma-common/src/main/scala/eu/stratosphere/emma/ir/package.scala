@@ -110,11 +110,11 @@ package object ir {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Union[+A: TypeTag, +B: TypeTag, +C: TypeTag](xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
+  final case class Union[+A: TypeTag](xs: Combinator[_ <: A], ys: Combinator[_ <: A]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Diff[+A: TypeTag, +B: TypeTag, +C: TypeTag](xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
+  final case class Diff[+A: TypeTag](xs: Combinator[_ <: A], ys: Combinator[_ <: A]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 

@@ -85,6 +85,12 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
         case _ => false
       }): _*)
 
+      // FIXME: the naming of the whole reduction procedure is misleading, rethink and reconsolidate
+      // what happens here is that effectively we are looking for "inverse" links as compared to the traversal
+      // order in the "comprehend" method; so effecively we are looking for "comprehended children", not "parents"
+      // the two "do-while" loops can be probably merged into one routine "comprehendedChild" which reflects the
+      // matching patterns leading to recursive calls in the "comprehend" method in a reversed way
+
       // reduce by removing obsolete terms
       var obsolete = mutable.Set.empty[Tree]
       // a) remove applies that will be comprehended with their parent selector
@@ -129,6 +135,8 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
   private def comprehendedSelectParent(t: Tree)(implicit comprehendedTerms: mutable.Set[Tree]) = t match {
     // FIXME: make this consistent with the comprehend() method patterns
     case Apply(Apply(TypeApply(Select(_, _), _), _), List(parent)) if comprehendedTerms.contains(parent) =>
+      Some(parent)
+    case Apply(TypeApply(Select(_, _), _), List(parent)) if comprehendedTerms.contains(parent) =>
       Some(parent)
     case Apply(TypeApply(Select(parent, _), _), _) if comprehendedTerms.contains(parent) =>
       Some(parent)
@@ -251,7 +259,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
         combinator.Diff(comprehend(Nil)(in), comprehend(Nil)(subtrahend))
 
       // in.plus(addend)
-      case Apply(TypeApply(select@Select(in, _), List(tpt)), List(addend)) if select.symbol == api.minus =>
+      case Apply(TypeApply(select@Select(in, _), List(_)), List(addend)) if select.symbol == api.plus =>
         combinator.Union(comprehend(Nil)(in), comprehend(Nil)(addend))
 
       // in.distinct()

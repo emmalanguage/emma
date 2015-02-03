@@ -232,24 +232,26 @@ class CodegenTest {
     compareBags(act, exp)
   }
 
-  // FIXME: macros don't seem comprehend PLUS expressions
-  //  @Test def testUnion(): Unit = {
-  //    val inp = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines().flatMap(_.split("\\W+")).toStream
-  //
-  //    val lft = inp.filter(_.length % 2 == 0) // even-length words
-  //    val rgt = inp.filter(_.length % 2 == 1) // odd-length words
-  //
-  //    val alg = emma.parallelize {
-  //      DataBag(lft) plus DataBag(rgt)
-  //    }
-  //
-  //    // compute the algorithm using the original code and the runtime under test
-  //    val act = alg.run(runtime.Native).fetch()
-  //    val exp = alg.run(rt).fetch()
-  //
-  //    // assert that the result contains the expected values
-  //    compareBags(act, exp)
-  //  }
+  @Test def testUnion(): Unit = {
+    val inp = {
+      val lines = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines()
+      lines.flatMap(_.split("\\W+")).toStream
+    }
+
+    val lft = inp.filter(_.length % 2 == 0) // even-length words
+    val rgt = inp.filter(_.length % 2 == 1) // odd-length words
+
+    val alg = emma.parallelize {
+      DataBag(lft) plus DataBag(rgt)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
 
   // --------------------------------------------------------------------------
   // Join & Cross
@@ -314,16 +316,16 @@ class CodegenTest {
   }
 
   @Test def testMultiWayJoinComplexType(): Unit = {
-    // Q: how many cannes winners are there in the IMDB top 100?
+    // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
     val alg = emma.parallelize {
-      val imdb = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-      val cannes = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner])
-      val berlin = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
+      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+      val cannesWinners = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner])
+      val berlinWinners = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
 
-      for (c <- cannes;
-           b <- berlin; if c.year == b.year;
-           ic <- imdb; if ic.title == c.title;
-           ib <- imdb; if ib.title == b.title) yield (c, b)
+      val cannesTop100 = for (w <- cannesWinners; m <- imdbTop100; if (w.title, w.year) ==(m.title, m.year)) yield ("Berlin", m.year, w.title)
+      val berlinTop100 = for (w <- berlinWinners; m <- imdbTop100; if (w.title, w.year) ==(m.title, m.year)) yield ("Cannes", m.year, w.title)
+
+      cannesTop100 plus berlinTop100
     }
 
     // compute the algorithm using the original code and the runtime under test
