@@ -21,7 +21,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
   }
 
   case class Variable(name: TermName, tpt: Tree) {
-    def tpe = c.typecheck(tpt, c.TYPEmode).tpe
+    def tpe = c.typecheck(tpt, c.TYPEmode).tpe.widen
   }
 
   sealed trait Expression {
@@ -76,7 +76,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
   // Environment & Host Language Connectors
 
   case class ScalaExpr(var vars: List[Variable], var tree: Tree) extends Expression {
-    def tpe = tree.tpe
+    def tpe = tree.tpe.widen
 
     /** Restrict the `vars` to the ones referenced in the expression `tree`. */
     def usedVars = {
@@ -96,7 +96,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     }
 
     case class Read(location: Tree, format: Tree) extends Combinator {
-      def tpe = c.typecheck(tq"DataBag[(${format.tpe.typeArgs.head})]", c.TYPEmode).tpe
+      def tpe = c.typecheck(tq"DataBag[(${format.tpe.widen.typeArgs.head})]", c.TYPEmode).tpe
     }
 
     case class Write(location: Tree, format: Tree, in: Expression) extends Combinator {
@@ -116,11 +116,11 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     }
 
     case class Map(f: Tree, xs: Expression) extends Combinator {
-      def tpe = c.typecheck(tq"DataBag[(${f.tpe.typeArgs.reverse.head})]", c.TYPEmode).tpe
+      def tpe = c.typecheck(tq"DataBag[(${f.tpe.widen.typeArgs.reverse.head})]", c.TYPEmode).tpe
     }
 
     case class FlatMap(f: Tree, xs: Expression) extends Combinator {
-      def tpe = c.typecheck(tq"DataBag[(${f.tpe.typeArgs.reverse.head})]", c.TYPEmode).tpe
+      def tpe = c.typecheck(tq"DataBag[(${f.tpe.widen.typeArgs.reverse.head})]", c.TYPEmode).tpe
     }
 
     case class Filter(var p: Tree, var xs: Expression) extends Combinator {
@@ -136,15 +136,15 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     }
 
     case class Group(var key: Tree, var xs: Expression) extends Combinator {
-      def tpe = c.typecheck(tq"Group[${key.tpe.typeArgs.tail.head}, DataBag[${xs.tpe.typeArgs.head}]]", c.TYPEmode).tpe
+      def tpe = c.typecheck(tq"Group[${key.tpe.widen.typeArgs.tail.head}, DataBag[${xs.tpe.typeArgs.head}]]", c.TYPEmode).tpe
     }
 
     case class Fold(var empty: Tree, var sng: Tree, var union: Tree, var xs: Expression) extends Combinator {
-      def tpe = sng.tpe.typeArgs.tail.head // Function[A, B]#B
+      def tpe = sng.tpe.widen.typeArgs.tail.head // Function[A, B]#B
     }
 
     case class FoldGroup(var key: Tree, var empty: Tree, var sng: Tree, var union: Tree, var xs: Expression) extends Combinator {
-      def tpe = sng.tpe.typeArgs.tail.head // Function[A, B]#B
+      def tpe = sng.tpe.widen.typeArgs.tail.head // Function[A, B]#B
     }
 
     case class Distinct(var xs: Expression) extends Combinator {
