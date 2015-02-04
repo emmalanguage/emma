@@ -335,4 +335,57 @@ class CodegenTest {
     // assert that the result contains the expected values
     compareBags(act, exp)
   }
+
+  // --------------------------------------------------------------------------
+  // FoldGroup (Aggregations)
+  // --------------------------------------------------------------------------
+
+  @Test def testBasicGroup() = {
+    val alg = emma.parallelize {
+      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+      for (g <- imdbTop100.groupBy(_.year)) yield g.values.count()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  @Test def testSimpleGroup() = {
+    val alg = emma.parallelize {
+      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+      for (g <- imdbTop100.groupBy(_.year / 10)) yield (s"${g.key * 10} - ${g.key * 10 + 9}", g.values.count())
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch().sortBy(_._1)
+    val exp = alg.run(rt).fetch().sortBy(_._1)
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  @Test def testComplexGroup() = {
+    val alg = emma.parallelize {
+      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+      for (g <- imdbTop100.groupBy(_.year / 10)) yield {
+        val total = g.values.count()
+        val avgRating = g.values.map(_.rating.toInt * 10).sum() / (total * 10.0)
+        val minRating = g.values.map(_.rating).min()
+        val maxRating = g.values.map(_.rating).max()
+
+        (s"${g.key * 10} - ${g.key * 10 + 9}", total, avgRating, minRating, maxRating)
+      }
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch().sortBy(_._1)
+    val exp = alg.run(rt).fetch().sortBy(_._1)
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
 }

@@ -167,15 +167,12 @@ package object ir {
     case Scatter(xs) => xs
   })
 
-  final class UDF(expr: Expr[Any], tb: ToolBox[ru.type]) {
+  final class UDF(fn: Function, tpe: Type, tb: ToolBox[ru.type]) {
 
     import UDF.fnSymbols
 
-    val staticType = expr.staticType
-
-    val tree = staticType match {
+    val tree = tpe match {
       case TypeRef(prefix, sym, targs) if fnSymbols.contains(sym) =>
-        val fn = expr.tree.asInstanceOf[Function]
         // find all "free" symbols in the UDF body
         val freeSymbols = fn.body.collect({
           case i@Ident(TermName(_)) if i.symbol.toString.startsWith("free term") => i.symbol.asTerm
@@ -187,7 +184,7 @@ package object ir {
         // create a typed curried form of the UDF (closure) => (params) => body
         tb.typecheck(q"(..$closure) => (..$params) => ${fn.body}").asInstanceOf[Function]
       case _ =>
-        throw new RuntimeException(s"Unsupported UDF type '$staticType'. Only (params) => (body) with up to 10 params are supported at the moment.")
+        throw new RuntimeException(s"Unsupported UDF type '$tpe'. Only (params) => (body) with up to 10 params are supported at the moment.")
     }
 
     def closure = tree.vparams
@@ -212,7 +209,9 @@ package object ir {
       rootMirror.staticClass("scala.Function9"),
       rootMirror.staticClass("scala.Function10"))
 
-    def apply(expr: Expr[Any], tb: ToolBox[ru.type]) = new UDF(expr, tb)
+    def apply(fn: Function, tpe: Type, tb: ToolBox[ru.type]) = new UDF(tb.untypecheck(fn).asInstanceOf[Function], tpe, tb)
+
+    def apply(expr: Expr[Any], tb: ToolBox[ru.type]) = new UDF(tb.untypecheck(expr.tree).asInstanceOf[Function], expr.staticType, tb)
   }
 
 }

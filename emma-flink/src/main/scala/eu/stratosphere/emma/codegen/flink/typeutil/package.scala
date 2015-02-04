@@ -17,32 +17,33 @@ package object typeutil {
    * @return A type convertor for the given source type.
    */
   def createTypeConvertor(tpe: Type): TypeConvertor = {
-    if (tpe <:< weakTypeOf[Product]) {
-      val params = tpe.decl(termNames.CONSTRUCTOR).alternatives.head.asMethod.typeSignatureIn(tpe).paramLists.head.map(_.toString)
-      val getters = for (p <- params; m <- tpe.members if m.isMethod && m.asMethod.isGetter && m.toString == p.toString) yield m
-      new ProductTypeConvertor(tpe, getters)
-    } else if (tpe =:= weakTypeOf[Unit] || tpe =:= weakTypeOf[java.lang.Void]) {
+    val widenedTpe = tpe.widen
+    if (widenedTpe <:< weakTypeOf[Product]) {
+      val params = widenedTpe.decl(termNames.CONSTRUCTOR).alternatives.head.asMethod.typeSignatureIn(widenedTpe).paramLists.head.map(_.toString)
+      val getters = for (p <- params; m <- widenedTpe.members if m.isMethod && m.asMethod.isGetter && m.toString == p.toString) yield m
+      new ProductTypeConvertor(widenedTpe, getters)
+    } else if (widenedTpe =:= weakTypeOf[Unit] || widenedTpe =:= weakTypeOf[java.lang.Void]) {
       SimpleTypeConvertor.Unit
-    } else if (tpe =:= weakTypeOf[Boolean] || tpe =:= weakTypeOf[java.lang.Boolean]) {
+    } else if (widenedTpe =:= weakTypeOf[Boolean] || widenedTpe =:= weakTypeOf[java.lang.Boolean]) {
       SimpleTypeConvertor.Boolean
-    } else if (tpe =:= weakTypeOf[Byte] || tpe =:= weakTypeOf[java.lang.Byte]) {
+    } else if (widenedTpe =:= weakTypeOf[Byte] || widenedTpe =:= weakTypeOf[java.lang.Byte]) {
       SimpleTypeConvertor.Byte
-    } else if (tpe =:= weakTypeOf[Char] || tpe =:= weakTypeOf[java.lang.Character]) {
+    } else if (widenedTpe =:= weakTypeOf[Char] || widenedTpe =:= weakTypeOf[java.lang.Character]) {
       SimpleTypeConvertor.Char
-    } else if (tpe =:= weakTypeOf[Short] || tpe =:= weakTypeOf[java.lang.Short]) {
+    } else if (widenedTpe =:= weakTypeOf[Short] || widenedTpe =:= weakTypeOf[java.lang.Short]) {
       SimpleTypeConvertor.Short
-    } else if (tpe =:= weakTypeOf[Int] || tpe =:= weakTypeOf[java.lang.Integer]) {
+    } else if (widenedTpe =:= weakTypeOf[Int] || widenedTpe =:= weakTypeOf[java.lang.Integer]) {
       SimpleTypeConvertor.Int
-    } else if (tpe =:= weakTypeOf[Long] || tpe =:= weakTypeOf[java.lang.Long]) {
+    } else if (widenedTpe =:= weakTypeOf[Long] || widenedTpe =:= weakTypeOf[java.lang.Long]) {
       SimpleTypeConvertor.Long
-    } else if (tpe =:= weakTypeOf[Float] || tpe =:= weakTypeOf[java.lang.Float]) {
+    } else if (widenedTpe =:= weakTypeOf[Float] || widenedTpe =:= weakTypeOf[java.lang.Float]) {
       SimpleTypeConvertor.Float
-    } else if (tpe =:= weakTypeOf[Double] || tpe =:= weakTypeOf[java.lang.Double]) {
+    } else if (widenedTpe =:= weakTypeOf[Double] || widenedTpe =:= weakTypeOf[java.lang.Double]) {
       SimpleTypeConvertor.Double
-    } else if (tpe =:= weakTypeOf[String] || tpe =:= weakTypeOf[java.lang.String]) {
+    } else if (widenedTpe =:= weakTypeOf[String] || widenedTpe =:= weakTypeOf[java.lang.String]) {
       SimpleTypeConvertor.String
     } else {
-      throw new RuntimeException(s"Unsupported field type $tpe.")
+      throw new RuntimeException(s"Unsupported field type $widenedTpe.")
     }
   }
 
@@ -193,13 +194,40 @@ package object typeutil {
     val ctors = srcTpe.decl(termNames.CONSTRUCTOR).alternatives
 
     override def transform(tree: Tree): Tree = tree match {
-      case Apply(fn, args) if applies.contains(fn.symbol) =>
-        q"new $tgtTpe(..${expandArgs(args)})"
-      case Apply(fn, args) if ctors.contains(fn.symbol) =>
-        q"new $tgtTpe(..${expandArgs(args)})"
+      case Apply(fn, args) if applies.contains(fn.symbol) || ctors.contains(fn.symbol) =>
+        q"new $tgtTpe(..${expandArgs(unboxArgs(args))})"
       case _ =>
         super.transform(tree)
     }
+
+    /**
+     * Unboxes arguments which are constructed on the fly. Arguments that represent constructor applications of the form
+     *
+     * {{{
+     * T(inner1, ..., innerN)
+     * }}}
+     *
+     * are replaced with the inner arguments `inner1`, ..., `innerN`. The procedure works recursively.
+     *
+     * @param args The list of arguments to unbox.
+     * @return The list of unboxed arguments.
+     */
+    def unboxArgs(args: List[Tree]): List[Tree] = args.flatMap(arg => {
+      createTypeConvertor(arg.tpe) match {
+        case tc: ProductTypeConvertor =>
+          val argApplies = tc.srcTpe.companion.member(TermName("apply")).alternatives
+          val argCtors = tc.srcTpe.decl(termNames.CONSTRUCTOR).alternatives
+
+          arg match {
+            case Apply(fn, childArgs) if argApplies.contains(fn.symbol) || argCtors.contains(fn.symbol) =>
+              unboxArgs(childArgs)
+            case _ =>
+              List(arg)
+          }
+        case tc: SimpleTypeConvertor =>
+          List(arg)
+      }
+    })
 
     /**
      * Expands the fields of selected product type symbols. For example, if the original arguments are

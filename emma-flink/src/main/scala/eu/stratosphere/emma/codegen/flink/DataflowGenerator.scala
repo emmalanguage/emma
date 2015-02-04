@@ -183,6 +183,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     case op: ir.Filter[_] => opCode(op)
     case op: ir.EquiJoin[_, _, _] => opCode(op)
     case op: ir.Cross[_, _, _] => opCode(op)
+    case op: ir.FoldGroup[_, _] => opCode(op)
     case op: ir.Distinct[_] => opCode(op)
     case op: ir.Union[_] => opCode(op)
     case _ => throw new RuntimeException(s"Unsupported ir node of type '${cur.getClass}'")
@@ -369,7 +370,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     """
   }
 
-  private def opCode[IT1, IT2, OT](op: ir.EquiJoin[IT1, IT2, OT])(implicit closure: DataflowClosure): Tree = {
+  private def opCode[OT, IT1, IT2](op: ir.EquiJoin[OT, IT1, IT2])(implicit closure: DataflowClosure): Tree = {
     // generate keyx UDF
     val keyxUDF = new TupleizedUDF(ir.UDF(op.keyx, tb)) with ReturnedResult
     val keyxName = closure.nextUDFName("KeyX")
@@ -434,7 +435,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     """
   }
 
-  private def opCode[IT1, IT2, OT](op: ir.Cross[IT1, IT2, OT])(implicit closure: DataflowClosure): Tree = {
+  private def opCode[OT, IT1, IT2](op: ir.Cross[OT, IT1, IT2])(implicit closure: DataflowClosure): Tree = {
     // generate cross UDF
     val fUDF = new TupleizedUDF(ir.UDF(op.f, tb)) with ReturnedResult
     val fName = closure.nextUDFName("Cross")
@@ -461,6 +462,87 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       ${fUDF.resultTypeInfo},
       "unknown"
     )
+    """
+  }
+
+  private def opCode[OT, IT](op: ir.FoldGroup[OT, IT])(implicit closure: DataflowClosure): Tree = {
+    val itc = createTypeConvertor(typeOf(op.xs.tag))
+    val otc = createTypeConvertor(typeOf(op.tag))
+
+    // get fold components
+    val key = ir.UDF(op.key, tb)
+    val sng = ir.UDF(op.sng, tb)
+    val union = ir.UDF(op.union, tb)
+
+    val mapName = closure.nextUDFName("Mapper")
+    val mapUDF = {
+      // FIXME: this is not sanitized, input parameters might diverge
+      // assemble UDF code
+      val udf = tb.typecheck(tb.untypecheck(
+        q"""
+        (x: ${itc.srcTpe}) => new ${otc.srcTpe}(
+          ${substitute(key.params(0).symbol -> q"x")(key.body)},
+          ${substitute(sng.params(0).symbol -> q"x")(sng.body)})
+        """))
+      // construct tuplelized UDF
+      new TupleizedUDF(ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)) with ReturnedResult
+    }
+    closure.closureParams ++= (for (p <- mapUDF.closure) yield p.name -> p.tpt)
+    closure.udfs +=
+      q"""
+      class $mapName(..${mapUDF.closure}) extends org.apache.flink.api.common.functions.RichMapFunction[${mapUDF.paramType(0)}, ${mapUDF.resultType}] with ResultTypeQueryable[${mapUDF.resultType}] {
+        override def map(..${mapUDF.params}): ${mapUDF.resultType} = ${mapUDF.body}
+        override def getProducedType = ${mapUDF.resultTypeInfo}
+      }
+      """
+
+    val keyName = closure.nextUDFName("KeySelector")
+    val keyUDF = {
+      // assemble UDF code
+      val udf = tb.typecheck(tb.untypecheck(q"(x: ${otc.srcTpe}) => x.key"))
+      // construct tuplelized UDF
+      new TupleizedUDF(ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)) with ReturnedResult
+    }
+    closure.closureParams ++= (for (p <- keyUDF.closure) yield p.name -> p.tpt)
+    closure.udfs +=
+      q"""
+      class $keyName(..${keyUDF.closure}) extends org.apache.flink.api.java.functions.KeySelector[${keyUDF.paramType(0)}, ${keyUDF.resultType}] with ResultTypeQueryable[${keyUDF.resultType}] {
+        override def getKey(..${keyUDF.params}): ${keyUDF.resultType} = ${keyUDF.body}
+        override def getProducedType = ${keyUDF.resultTypeInfo}
+      }
+      """
+
+    val reduceName = closure.nextUDFName("Reducer")
+    val reduceUDF = {
+      // FIXME: this is not sanitized, input parameters might diverge
+      // assemble UDF code
+      val udf = tb.typecheck(tb.untypecheck(
+        q"""
+        (x: ${otc.srcTpe}, y: ${otc.srcTpe}) => new ${otc.srcTpe}(
+          x.key, ${
+          substitute(
+            union.params(0).symbol -> q"x.values",
+            union.params(1).symbol -> q"y.values")(union.body)
+        })
+        """))
+      // construct tuplelized UDF
+      new TupleizedUDF(ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)) with ReturnedResult
+    }
+    closure.closureParams ++= (for (p <- reduceUDF.closure) yield p.name -> p.tpt)
+    closure.udfs +=
+      q"""
+      class $reduceName(..${reduceUDF.closure}) extends org.apache.flink.api.common.functions.RichReduceFunction[${reduceUDF.resultType}] with ResultTypeQueryable[${reduceUDF.resultType}] {
+        override def reduce(..${reduceUDF.params}): ${reduceUDF.resultType} = ${reduceUDF.body}
+        override def getProducedType = ${reduceUDF.resultTypeInfo}
+      }
+      """
+
+    // assemble dataflow fragment
+    q"""
+    ${generateOpCode(op.xs)}
+      .map(new $mapName(..${mapUDF.closure.map(_.name)}))
+      .groupBy(new $keyName(..${keyUDF.closure.map(_.name)}))
+      .reduce(new $reduceName(..${reduceUDF.closure.map(_.name)}))
     """
   }
 
@@ -534,7 +616,6 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       // 2) then convert the parameter projections
       for ((p, ptc) <- udf.params zip paramsTypeConverters) {
         tmp = ptc.convertTermType(p.name, tmp)
-        val x = tmp
       }
       // 3) return
       tmp
@@ -573,4 +654,16 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   private val bagSymbol = rootMirror.staticClass("eu.stratosphere.emma.api.DataBag")
 
   private val bagConstructors = bagSymbol.companion.info.decl(TermName("apply")).alternatives
+
+  def substitute(map: (Symbol, Tree)*) = new SymbolSubstituter(Map(map: _*))
+
+  class SymbolSubstituter(map: Map[Symbol, Tree]) extends Transformer with (Tree => Tree) {
+    override def apply(tree: Tree): Tree = transform(tree)
+
+    override def transform(tree: Tree) = tree match {
+      case ident@Ident(TermName(_)) if map.contains(ident.symbol) => map(ident.symbol)
+      case _ => super.transform(tree)
+    }
+  }
+
 }
