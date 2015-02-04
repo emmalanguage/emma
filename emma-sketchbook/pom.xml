@@ -36,6 +36,12 @@
             <groupId>eu.stratosphere</groupId>
             <artifactId>emma-flink</artifactId>
         </dependency>
+        <dependency>
+            <groupId>eu.stratosphere</groupId>
+            <artifactId>emma-common</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Logging -->
         <dependency>

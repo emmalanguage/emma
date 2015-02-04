@@ -2,7 +2,7 @@ package eu.stratosphere.emma.examples.tpch
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
-import eu.stratosphere.emma.runtime
+import eu.stratosphere.emma.examples.tpch.Query03.Schema._
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
@@ -19,9 +19,9 @@ object Query03 {
   class Command extends Algorithm.Command[Query03] {
 
     // algorithm names
-    override def name = "cc"
+    override def name = "tpch-q3"
 
-    override def description = "TPCH Query-3"
+    override def description = "TPC-H Query-3"
 
     override def setup(parser: Subparser) = {
       // basic setup
@@ -51,15 +51,13 @@ object Query03 {
     }
   }
 
-  // --------------------------------------------------------------------------------------------
-  // ----------------------------------- Schema -------------------------------------------------
-  // --------------------------------------------------------------------------------------------
+  // --------------------------------------------------------------------------
+  // Schema
+  // --------------------------------------------------------------------------
 
   object Schema {
 
-    import eu.stratosphere.emma.examples.tpch.Schema._
-
-    case class Join(l: Lineitem, o: Order) {}
+    case class Join(orderKey: Int, extendedPrice: Double, discount: Double, orderDate: String, shipPriority: Int) {}
 
     case class GrpKey(orderKey: Int, orderDate: String, shipPriority: Int) {}
 
@@ -113,37 +111,36 @@ class Query03(inPath: String, outPath: String, segment: String, date: String, rt
 
   def run() = {
 
-    import eu.stratosphere.emma.examples.tpch.Schema._
-    import eu.stratosphere.emma.examples.tpch.Query03.Schema._
-
-    val algorithm = /*emma.parallelize*/ {
+    val alg = emma.parallelize {
 
       // compute join part of the query
       val join = for (
-        c <- read(s"$inPath/customer.tbl", new CSVInputFormat[Customer]());
-        o <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]());
-        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]());
-        if c.mktSegment == segment    &&
-           c.custKey    == o.custKey  &&
-           l.orderKey   == o.orderKey &&
-           o.orderDate  <  date       &&
-           l.shipDate   >   date)
-        yield
-          Join(l, o)
+        c <- read(s"$inPath/customer.tbl", new CSVInputFormat[Customer]('|'));
+        o <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]('|'));
+        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'));
+        if c.mktSegment == segment &&
+          c.custKey == o.custKey &&
+          l.orderKey == o.orderKey &&
+          o.orderDate < date &&
+          l.shipDate > date)
+      yield
+        Join(l.orderKey, l.extendedPrice, l.discount, o.orderDate, o.shipPriority)
+
       // aggregate and compute the final result
       val rslt = for (
-        g <- join.groupBy(x => GrpKey(x.l.orderKey, x.o.orderDate, x.o.shipPriority)))
-        yield
-         Result(
+        g <- join.groupBy(x => GrpKey(x.orderKey, x.orderDate, x.shipPriority)))
+      yield
+        Result(
           g.key.orderKey,
-          g.values.map(x => x.l.extendedPrice * (1 - x.l.discount)).sum(),
+          g.values.map(x => x.extendedPrice * (1 - x.discount)).sum(),
           g.key.orderDate,
           g.key.shipPriority)
 
-      rslt
+      // write out the result
+      write(outPath, new CSVOutputFormat[Result]('|'))(rslt)
     }
 
-    //algorithm.run(rt)
+    alg.run(rt)
   }
 }
 

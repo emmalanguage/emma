@@ -61,6 +61,12 @@
             <artifactId>emma-language</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>eu.stratosphere</groupId>
+            <artifactId>emma-common</artifactId>
+            <type>test-jar</type>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Flink -->
         <dependency>

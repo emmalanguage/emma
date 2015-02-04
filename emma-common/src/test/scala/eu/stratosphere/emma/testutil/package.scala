@@ -25,7 +25,7 @@ package object testutil {
   /**
    * Creates a demp output path with the given `suffix`.
    */
-  def tempOutputPath(suffix: String) = Paths.get(s"${System.getProperty("java.io.tmpdir")}/emma/$suffix").toString
+  def tempPath(suffix: String) = Paths.get(s"${System.getProperty("java.io.tmpdir")}/emma/$suffix").toString
 
   /**
    * Compares the contents of two bags.

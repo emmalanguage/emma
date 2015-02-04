@@ -17,6 +17,7 @@
 
         <!-- Maven Plugins -->
         <maven-eclipse-plugin.version>2.9</maven-eclipse-plugin.version>
+        <maven-jar-plugin.version>2.5</maven-jar-plugin.version>
         <maven-surefire-plugin.version>2.18.1</maven-surefire-plugin.version>
         <scala-maven-plugin.version>3.1.6</scala-maven-plugin.version>
         <build-helper-maven-plugin.version>1.7</build-helper-maven-plugin.version>
@@ -97,6 +98,12 @@
                 <groupId>eu.stratosphere</groupId>
                 <artifactId>emma-common</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.stratosphere</groupId>
+                <artifactId>emma-common</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
             </dependency>
             <dependency>
                 <groupId>eu.stratosphere</groupId>

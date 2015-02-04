@@ -1,5 +1,7 @@
 package eu.stratosphere.emma.codegen.flink
 
+import java.io.File
+
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.codegen.flink.TestSchema._
 import eu.stratosphere.emma.runtime
@@ -7,29 +9,14 @@ import eu.stratosphere.emma.runtime.Engine
 import eu.stratosphere.emma.testutil._
 import org.junit.{After, Before, Test}
 
-import java.io.File
 import scala.reflect.runtime.universe._
-
-object CodegenTest {
-
-  /**
-   * Temporary, only for debugging.
-   *
-   */
-  def main(args: Array[String]): Unit = {
-    val test = new CodegenTest()
-    test.setup()
-    test.testCSVReadWriteComplexType()
-    test.teardown()
-  }
-}
 
 class CodegenTest {
 
   var rt: Engine = _
 
-  var inBase = tempOutputPath("test/input")
-  var outBase = tempOutputPath("test/output")
+  var inBase = tempPath("test/input")
+  var outBase = tempPath("test/output")
 
   @Before def setup() {
     // create a new runtime session
@@ -325,7 +312,8 @@ class CodegenTest {
       val cannesTop100 = for (w <- cannesWinners; m <- imdbTop100; if (w.title, w.year) ==(m.title, m.year)) yield ("Berlin", m.year, w.title)
       val berlinTop100 = for (w <- berlinWinners; m <- imdbTop100; if (w.title, w.year) ==(m.title, m.year)) yield ("Cannes", m.year, w.title)
 
-      cannesTop100 plus berlinTop100
+      val result = cannesTop100 plus berlinTop100
+      result
     }
 
     // compute the algorithm using the original code and the runtime under test
