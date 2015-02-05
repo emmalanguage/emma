@@ -38,18 +38,32 @@ class TPCHTest {
     rt.closeSession()
   }
 
-  @Test def testQuery3(): Unit = {
+  @Test def testQuery01(): Unit = {
+
+    // execute with native and with tested environment
+    new Query01(inBase, outputPath("q1.tbl.native"), 30, runtime.Native).run()
+    new Query01(inBase, outputPath("q1.tbl.flink"), 30, rt).run()
+
+    // compare the results
+    val exp = scala.io.Source.fromFile(outputPath("q1.tbl.flink")).getLines().toStream
+    val res = scala.io.Source.fromFile(outputPath("q1.tbl.flink")).getLines().toStream
+
+    // assert that the result contains the expected values
+    compareBags(exp, res)
+  }
+
+  @Test def testQuery03(): Unit = {
 
     // execute with native and with tested environment
     // new Query03(inBase, outputPath("q3.tbl.native"), "", "", runtime.Native).run()
     new Query03(inBase, outputPath("q3.tbl.flink"), "", "", rt).run()
 
     // compare the results
-//    val exp = scala.io.Source.fromFile(outputPath("q3.tbl.native")).getLines().toStream
-//    val res = scala.io.Source.fromFile(outputPath("q3.tbl.flink")).getLines().toStream
+    //    val exp = scala.io.Source.fromFile(outputPath("q3.tbl.native")).getLines().toStream
+    //    val res = scala.io.Source.fromFile(outputPath("q3.tbl.flink")).getLines().toStream
 
     // assert that the result contains the expected values
-//    compareBags(exp, res)
+    //    compareBags(exp, res)
   }
 
   def outputPath(suffix: String) = s"$outBase/$suffix"
