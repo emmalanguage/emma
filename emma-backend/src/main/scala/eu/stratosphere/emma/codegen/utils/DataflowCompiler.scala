@@ -31,7 +31,7 @@ class DataflowCompiler {
    */
   def compile(tree: ImplDef, withSource: Boolean = true) = {
     val untypechecked = tb.untypecheck(tree)
-    val symbol = tb.define(replaceIdents(untypechecked).asInstanceOf[ImplDef]).asModule
+    val symbol = tb.define(replaceIdents(untypechecked).asInstanceOf[ImplDef])
     if (withSource) writeSource(symbol, tree)
     logger.info(s"Compiling '${symbol.name}' at '${symbol.fullName}'")
     symbol

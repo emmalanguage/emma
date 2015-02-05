@@ -20,6 +20,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
   val tb = dataflowCompiler.tb
 
+  val typeInfoFactory = new TypeInformationFactory(dataflowCompiler)
+
   // memoization table
   val memo = mutable.Map[String, ModuleSymbol]()
 
@@ -33,7 +35,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     memo.getOrElse(dataflowName, {
       logger.info(s"Generating scatter code for '$dataflowName'")
 
-      val tc = createTypeConvertor(typeOf[A].dealias)
+      val tpe = typeOf[A]
+      val tpeInfo = typeInfoFactory(tpe)
 
       // assemble dataflow tree
       val tree = q"""
@@ -41,14 +44,15 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
         import org.apache.flink.api.java.ExecutionEnvironment
 
-        def run(env: ExecutionEnvironment, values: Seq[${tc.srcTpe}]) = {
-          val __input = env.fromCollection(scala.collection.JavaConversions.asJavaCollection(for (v <- values) yield ${tc.srcToTgt(Ident(TermName("v")))}))
-
+        def run(env: ExecutionEnvironment, values: Seq[$tpe]) = {
           // create type information
-          val typeInformation = ${tc.tgtTypeInfo}
+          val typeInformation = $tpeInfo
+
+          // read the input
+          val __input = env.fromCollection(scala.collection.JavaConversions.asJavaCollection(values), typeInformation)
 
           // create output format
-          val outFormat = new org.apache.flink.api.java.io.TypeSerializerOutputFormat[${tc.tgtType}]
+          val outFormat = new org.apache.flink.api.java.io.TypeSerializerOutputFormat[$tpe]
           outFormat.setInputType(typeInformation)
           outFormat.setSerializer(typeInformation.createSerializer())
 
@@ -61,7 +65,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       """.asInstanceOf[ImplDef]
 
       // compile the dataflow tree
-      val symbol = dataflowCompiler.compile(tree)
+      val symbol = dataflowCompiler.compile(tree).asModule
       // update the memo table
       memo.put(dataflowName, symbol)
       // return the compiled dataflow symbol
@@ -75,7 +79,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     memo.getOrElse(dataflowName, {
       logger.info(s"Generating gather code for '$dataflowName'")
 
-      val tc = createTypeConvertor(typeOf[A].dealias)
+      val tpe = typeOf[A]
+      val tpeInfo = typeInfoFactory(tpe)
 
       // assemble dataflow
       val tree = q"""
@@ -86,17 +91,17 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
         def run(env: ExecutionEnvironment) = {
           // create type information
-          val typeInformation = ${tc.tgtTypeInfo}
+          val typeInformation = $tpeInfo
 
           // create input format
-          val inFormat = new org.apache.flink.api.java.io.TypeSerializerInputFormat[${tc.tgtType}](typeInformation.createSerializer())
+          val inFormat = new org.apache.flink.api.java.io.TypeSerializerInputFormat[$tpe](typeInformation.createSerializer())
           inFormat.setFilePath(${s"$tempResultsPrefix/$id"})
 
           // create input
           val in = env.createInput(inFormat, typeInformation)
 
           // local collection to store results in
-          val collection = java.util.Collections.synchronizedCollection(new java.util.ArrayList[${tc.tgtType}]())
+          val collection = java.util.Collections.synchronizedCollection(new java.util.ArrayList[$tpe]())
 
           // collect results from remote in local collection
           org.apache.flink.api.java.io.RemoteCollectorImpl.collectLocal(in, collection)
@@ -104,14 +109,14 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
           // execute gather dataflow
           env.execute(${s"Emma[$dataflowName]"})
 
-          // construct result DataBag
-          for (v <- scala.collection.JavaConversions.collectionAsScalaIterable(collection)) yield ${tc.tgtToSrc(Ident(TermName("v")))}
+          // construct result Seq
+          scala.collection.JavaConversions.collectionAsScalaIterable(collection).toStream
         }
       }
       """.asInstanceOf[ImplDef]
 
       // compile the dataflow tree
-      val symbol = dataflowCompiler.compile(tree)
+      val symbol = dataflowCompiler.compile(tree).asModule
       // update the memo table
       memo.put(dataflowName, symbol)
       // return the compiled dataflow symbol
@@ -144,6 +149,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
         import org.apache.flink.api.java.ExecutionEnvironment
         import org.apache.flink.api.java.typeutils.ResultTypeQueryable
+        import eu.stratosphere.emma.api.DataBag
 
         ..${closure.udfs.result().toSeq}
 
@@ -164,7 +170,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       """.asInstanceOf[ImplDef]
 
       // compile the dataflow tree
-      val symbol = dataflowCompiler.compile(tree)
+      val symbol = dataflowCompiler.compile(tree).asModule
       // update the memo table
       memo.put(dataflowName, symbol)
       // return the compiled dataflow symbol
@@ -190,24 +196,20 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT](op: ir.Read[OT])(implicit closure: DataflowClosure): Tree = {
-    val tc = createTypeConvertor(typeOf(op.tag))
+    val tpe = typeOf(op.tag).dealias
+    val tpeInfo = typeInfoFactory(tpe)
 
     val inFormatTree = op.format match {
       case ifmt: CSVInputFormat[_] =>
-        val ptc = createTypeConvertor(typeOf(op.tag)) match {
-          case x: ProductTypeConvertor => x
-          case _ => throw new RuntimeException(s"Cannot create Flink CsvInputFormat for non-product type ${typeOf(op.tag)}")
+        if (!(tpe <:< weakTypeOf[Product])) {
+          throw new RuntimeException(s"Cannot create Flink CsvInputFormat for non-product type ${typeOf(op.tag)}")
         }
 
         q"""
         {
-          // create CsvInputFormat
-          val inFormat = new org.apache.flink.api.java.io.CsvInputFormat[${ptc.tgtType}](new org.apache.flink.core.fs.Path(${op.location}))
-          inFormat.setDelimiter("\n")
+          val inFormat = new org.apache.flink.api.scala.operators.ScalaCsvInputFormat[$tpe](new org.apache.flink.core.fs.Path(${op.location}), typeInformation)
           inFormat.setFieldDelimiter(${ifmt.separator})
-          inFormat.setFields(
-            Array(..${for (i <- Range(0, ptc.fields.size)) yield Literal(Constant(i))}),
-            Array[Class[_]](..${for (t <- ptc.fields) yield t.javaClass}))
+
           // return to the enclosing code fragment
           inFormat
         }
@@ -220,7 +222,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     q"""
     {
       // create type information
-      val typeInformation = ${tc.tgtTypeInfo}
+      val typeInformation = $tpeInfo
 
       // create input format
       val inFormat = $inFormatTree
@@ -232,15 +234,16 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[IT](op: ir.Write[IT])(implicit closure: DataflowClosure): Tree = {
+    val tpe = typeOf(op.xs.tag).dealias
+
     val outFormatTree = op.format match {
       case ofmt: CSVOutputFormat[_] =>
-        val tc = createTypeConvertor(typeOf(op.xs.tag)) match {
-          case x: ProductTypeConvertor => x
-          case _ => throw new RuntimeException(s"Cannot create Flink CsvOutputFormat for non-product type ${typeOf(op.xs.tag)}")
+        if (!(tpe <:< weakTypeOf[Product])) {
+          throw new RuntimeException(s"Cannot create Flink CsvOutputFormat for non-product type ${typeOf(op.xs.tag)}")
         }
 
         q"""
-        new org.apache.flink.api.java.io.CsvOutputFormat[${tc.tgtType}](new org.apache.flink.core.fs.Path(${op.location}), ${ofmt.separator}.toString)
+        new org.apache.flink.api.scala.operators.ScalaCsvOutputFormat[$tpe](new org.apache.flink.core.fs.Path(${op.location}), ${ofmt.separator}.toString)
         """
       case _ =>
         throw new RuntimeException(s"Unsupported InputFormat of type '${op.format.getClass}'")
@@ -261,16 +264,17 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT](op: ir.TempSource[OT])(implicit closure: DataflowClosure): Tree = {
-    val tc = createTypeConvertor(typeOf(op.tag))
+    val tpe = typeOf(op.tag).dealias
+    val tpeInfo = typeInfoFactory(tpe)
 
     // assemble dataflow fragment
     q"""
     {
       // create type information
-      val typeInformation = ${tc.tgtTypeInfo}
+      val typeInformation = $tpeInfo
 
       // create input format
-      val inFormat = new org.apache.flink.api.java.io.TypeSerializerInputFormat[${tc.tgtType}](typeInformation.createSerializer())
+      val inFormat = new org.apache.flink.api.java.io.TypeSerializerInputFormat[$tpe](typeInformation.createSerializer())
       inFormat.setFilePath(${s"$tempResultsPrefix/${op.ref.name}"})
 
       // create input
@@ -280,7 +284,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[IT](op: ir.TempSink[IT])(implicit closure: DataflowClosure): Tree = {
-    val tc = createTypeConvertor(typeOf(op.tag))
+    val tpe = typeOf(op.tag).dealias
+    val tpeInfo = typeInfoFactory(tpe)
 
     // assemble dataflow fragment
     q"""
@@ -288,10 +293,10 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       val __input = ${generateOpCode(op.xs)}
 
       // create type information
-      val typeInformation = ${tc.tgtTypeInfo}
+      val typeInformation = $tpeInfo
 
       // create output format
-      val outFormat = new org.apache.flink.api.java.io.TypeSerializerOutputFormat[${tc.tgtType}]
+      val outFormat = new org.apache.flink.api.java.io.TypeSerializerOutputFormat[$tpe]
       outFormat.setInputType(typeInformation)
       outFormat.setSerializer(typeInformation.createSerializer())
 
@@ -302,28 +307,33 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT](op: ir.Scatter[OT])(implicit closure: DataflowClosure): Tree = {
-    val tc = createTypeConvertor(typeOf(op.tag))
+    val tpe = typeOf(op.tag).dealias
+    val tpeInfo = typeInfoFactory(tpe)
 
     // add a dedicated closure variable to pass the scattered term
     val inputParam = closure.nextLocalInputName()
-    closure.localInputParams += inputParam -> tq"Seq[${tc.srcTpe}]"
+    closure.localInputParams += inputParam -> tq"Seq[$tpe]"
 
     // assemble dataflow fragment
     q"""
-    env.fromCollection(scala.collection.JavaConversions.asJavaCollection(for (v <- $inputParam) yield ${tc.srcToTgt(Ident(TermName("v")))}))
+    env.fromCollection(scala.collection.JavaConversions.asJavaCollection($inputParam), $tpeInfo)
     """
   }
 
   private def opCode[OT, IT](op: ir.Map[OT, IT])(implicit closure: DataflowClosure): Tree = {
+    val srcTpe = typeOf(op.xs.tag).dealias
+    val tgtTpe = typeOf(op.tag).dealias
+    val tgtTpeInfo = typeInfoFactory(tgtTpe)
+
     // generate fn UDF
-    val fnUDF = new TupleizedUDF(ir.UDF(op.f, tb)) with ReturnedResult
+    val fnUDF = ir.UDF(op.f, tb)
     val fnName = closure.nextUDFName("Mapper")
     closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $fnName(..${fnUDF.closure}) extends org.apache.flink.api.common.functions.RichMapFunction[${fnUDF.paramType(0)}, ${fnUDF.resultType}] with ResultTypeQueryable[${fnUDF.resultType}] {
-        override def map(..${fnUDF.params}): ${fnUDF.resultType} = ${fnUDF.body}
-        override def getProducedType = ${fnUDF.resultTypeInfo}
+      class $fnName(..${fnUDF.closure}) extends org.apache.flink.api.common.functions.RichMapFunction[$srcTpe, $tgtTpe] with ResultTypeQueryable[$tgtTpe] {
+        override def map(..${fnUDF.params}): $tgtTpe = ${fnUDF.body}
+        override def getProducedType = $tgtTpeInfo
       }
       """
 
@@ -334,15 +344,22 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT, IT](op: ir.FlatMap[OT, IT])(implicit closure: DataflowClosure): Tree = {
+    val srcTpe = typeOf(op.xs.tag).dealias
+    val tgtTpe = typeOf(op.tag).dealias
+    val tgtTpeInfo = typeInfoFactory(tgtTpe)
+
     // generate fn UDF
-    val fnUDF = new TupleizedUDF(ir.UDF(op.f, tb)) with CollectedResult
+    val fnUDF = ir.UDF(op.f, tb)
     val fnName = closure.nextUDFName("FlatMapper")
+    val fnBody = fnUDF.body
     closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $fnName(..${fnUDF.closure}) extends org.apache.flink.api.common.functions.RichFlatMapFunction[${fnUDF.paramType(0)}, ${fnUDF.resultType}] with ResultTypeQueryable[${fnUDF.resultType}] {
-        override def flatMap(..${fnUDF.params}, __c: org.apache.flink.util.Collector[${fnUDF.resultType}]): Unit = ${fnUDF.body}
-        override def getProducedType = ${fnUDF.resultTypeInfo}
+      class $fnName(..${fnUDF.closure}) extends org.apache.flink.api.common.functions.RichFlatMapFunction[$srcTpe, $tgtTpe] with ResultTypeQueryable[$tgtTpe] {
+        override def flatMap(..${fnUDF.params}, __c: org.apache.flink.util.Collector[$tgtTpe]): Unit = {
+          for (x <- (${fnUDF.body}).fetch()) __c.collect(x)
+        }
+        override def getProducedType = $tgtTpeInfo
       }
       """
 
@@ -353,14 +370,16 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[T](op: ir.Filter[T])(implicit closure: DataflowClosure): Tree = {
+    val tpe = typeOf(op.tag)
+
     // generate fn UDF
-    val fnUDF = new TupleizedUDF(ir.UDF(op.p, tb)) with ReturnedResult
+    val fnUDF = ir.UDF(op.p, tb)
     val fnName = closure.nextUDFName("Filter")
     closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $fnName(..${fnUDF.closure}) extends org.apache.flink.api.common.functions.RichFilterFunction[${fnUDF.paramType(0)}] {
-        override def filter(..${fnUDF.params}): ${fnUDF.resultType} = ${fnUDF.body}
+      class $fnName(..${fnUDF.closure}) extends org.apache.flink.api.common.functions.RichFilterFunction[$tpe] {
+        override def filter(..${fnUDF.params}): Boolean = ${fnUDF.body}
       }
       """
 
@@ -371,38 +390,47 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT, IT1, IT2](op: ir.EquiJoin[OT, IT1, IT2])(implicit closure: DataflowClosure): Tree = {
+    val xsTpe = typeOf(op.xs.tag).dealias
+    val ysTpe = typeOf(op.ys.tag).dealias
+
     // generate keyx UDF
-    val keyxUDF = new TupleizedUDF(ir.UDF(op.keyx, tb)) with ReturnedResult
+    val keyxUDF = ir.UDF(op.keyx, tb)
     val keyxName = closure.nextUDFName("KeyX")
+    val keyxTpe = keyxUDF.body.tpe
+    val keyxTpeInfo = typeInfoFactory(keyxTpe)
     closure.closureParams ++= (for (p <- keyxUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $keyxName(..${keyxUDF.closure}) extends org.apache.flink.api.java.functions.KeySelector[${keyxUDF.paramType(0)}, ${keyxUDF.resultType}] with ResultTypeQueryable[${keyxUDF.resultType}] {
-        override def getKey(..${keyxUDF.params}): ${keyxUDF.resultType} = ${keyxUDF.body}
-        override def getProducedType = ${keyxUDF.resultTypeInfo}
+      class $keyxName(..${keyxUDF.closure}) extends org.apache.flink.api.java.functions.KeySelector[$xsTpe, $keyxTpe] with ResultTypeQueryable[$keyxTpe] {
+        override def getKey(..${keyxUDF.params}): $keyxTpe = ${keyxUDF.body}
+        override def getProducedType = $keyxTpeInfo
       }
       """
     // generate keyy UDF
-    val keyyUDF = new TupleizedUDF(ir.UDF(op.keyy, tb)) with ReturnedResult
+    val keyyUDF = ir.UDF(op.keyy, tb)
     val keyyName = closure.nextUDFName("KeyY")
+    val keyyTpe = keyxUDF.body.tpe
+    val keyyTpeInfo = typeInfoFactory(keyyTpe)
     closure.closureParams ++= (for (p <- keyyUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $keyyName(..${keyyUDF.closure}) extends org.apache.flink.api.java.functions.KeySelector[${keyyUDF.paramType(0)}, ${keyyUDF.resultType}] with ResultTypeQueryable[${keyyUDF.resultType}] {
-        override def getKey(..${keyyUDF.params}): ${keyyUDF.resultType} = ${keyyUDF.body}
-        override def getProducedType = ${keyyUDF.resultTypeInfo}
+      class $keyyName(..${keyyUDF.closure}) extends org.apache.flink.api.java.functions.KeySelector[$ysTpe, $keyyTpe] with ResultTypeQueryable[$keyyTpe] {
+        override def getKey(..${keyyUDF.params}): $keyyTpe = ${keyyUDF.body}
+        override def getProducedType = $keyyTpeInfo
       }
       """
 
     // generate join UDF
-    val fUDF = new TupleizedUDF(ir.UDF(op.f, tb)) with ReturnedResult
+    val fUDF = ir.UDF(op.f, tb)
     val fName = closure.nextUDFName("Join")
+    val fTpe = fUDF.body.tpe
+    val fTpeInfo = typeInfoFactory(fTpe)
     closure.closureParams ++= (for (p <- fUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $fName(..${fUDF.closure}) extends org.apache.flink.api.common.functions.RichJoinFunction[${fUDF.paramType(0)}, ${fUDF.paramType(1)}, ${fUDF.resultType}] with ResultTypeQueryable[${fUDF.resultType}] {
-        override def join(..${fUDF.params}): ${fUDF.resultType} = ${fUDF.body}
-        override def getProducedType = ${fUDF.resultTypeInfo}
+      class $fName(..${fUDF.closure}) extends org.apache.flink.api.common.functions.RichJoinFunction[$xsTpe, $ysTpe, $fTpe] with ResultTypeQueryable[$fTpe] {
+        override def join(..${fUDF.params}): $fTpe = ${fUDF.body}
+        override def getProducedType = $fTpeInfo
       }
       """
 
@@ -414,11 +442,11 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     // direct variant
     val keyxSelector = new $keyxName(..${keyxUDF.closure.map(_.name)})
     val keyxType = org.apache.flink.api.java.typeutils.TypeExtractor.getKeySelectorTypes(keyxSelector, __xs.getType)
-    val keyx = new org.apache.flink.api.java.operators.Keys.SelectorFunctionKeys[${keyxUDF.paramType(0)}, ${keyxUDF.resultType}](keyxSelector, __xs.getType, keyxType)
+    val keyx = new org.apache.flink.api.java.operators.Keys.SelectorFunctionKeys[$xsTpe, ${keyxUDF.body.tpe}](keyxSelector, __xs.getType, keyxType)
 
     val keyySelector = new $keyyName(..${keyyUDF.closure.map(_.name)})
     val keyyType = org.apache.flink.api.java.typeutils.TypeExtractor.getKeySelectorTypes(keyySelector, __ys.getType)
-    val keyy = new org.apache.flink.api.java.operators.Keys.SelectorFunctionKeys[${keyyUDF.paramType(0)}, ${keyyUDF.resultType}](keyySelector, __ys.getType, keyxType)
+    val keyy = new org.apache.flink.api.java.operators.Keys.SelectorFunctionKeys[$ysTpe, ${keyyUDF.body.tpe}](keyySelector, __ys.getType, keyxType)
 
     val generatedFunction = new org.apache.flink.api.java.operators.JoinOperator.DefaultJoin.WrappingFlatJoinFunction(clean(env, new $fName(..${fUDF.closure.map(_.name)})))
 
@@ -428,7 +456,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       keyx,
       keyy,
       generatedFunction,
-      ${fUDF.resultTypeInfo},
+      $fTpeInfo,
       org.apache.flink.api.common.operators.base.JoinOperatorBase.JoinHint.OPTIMIZER_CHOOSES,
       "unknown"
     )
@@ -436,15 +464,20 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT, IT1, IT2](op: ir.Cross[OT, IT1, IT2])(implicit closure: DataflowClosure): Tree = {
+    val xsTpe = typeOf(op.xs.tag).dealias
+    val ysTpe = typeOf(op.ys.tag).dealias
+
     // generate cross UDF
-    val fUDF = new TupleizedUDF(ir.UDF(op.f, tb)) with ReturnedResult
+    val fUDF = ir.UDF(op.f, tb)
     val fName = closure.nextUDFName("Cross")
+    val fTpe = fUDF.body.tpe
+    val fTpeInfo = typeInfoFactory(fTpe)
     closure.closureParams ++= (for (p <- fUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $fName(..${fUDF.closure}) extends org.apache.flink.api.common.functions.RichCrossFunction[${fUDF.paramType(0)}, ${fUDF.paramType(1)}, ${fUDF.resultType}] with ResultTypeQueryable[${fUDF.resultType}] {
-        override def cross(..${fUDF.params}): ${fUDF.resultType} = ${fUDF.body}
-        override def getProducedType = ${fUDF.resultTypeInfo}
+      class $fName(..${fUDF.closure}) extends org.apache.flink.api.common.functions.RichCrossFunction[$xsTpe, $ysTpe, $fTpe] with ResultTypeQueryable[$fTpe] {
+        override def cross(..${fUDF.params}): $fTpe = ${fUDF.body}
+        override def getProducedType = $fTpeInfo
       }
       """
 
@@ -459,7 +492,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       __xs,
       __ys,
       generatedFunction,
-      ${fUDF.resultTypeInfo},
+      $fTpeInfo,
       "unknown"
     )
     """
@@ -474,7 +507,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     val sng = ir.UDF(op.sng, tb)
     val union = ir.UDF(op.union, tb)
 
-    val mapName = closure.nextUDFName("Mapper")
+    val mapName = closure.nextUDFName("FGMapper")
     val mapUDF = {
       // FIXME: this is not sanitized, input parameters might diverge
       // assemble UDF code
@@ -496,7 +529,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       }
       """
 
-    val keyName = closure.nextUDFName("KeySelector")
+    val keyName = closure.nextUDFName("FGKeySelector")
     val keyUDF = {
       // assemble UDF code
       val udf = tb.typecheck(tb.untypecheck(q"(x: ${otc.srcTpe}) => x.key"))
@@ -512,7 +545,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       }
       """
 
-    val reduceName = closure.nextUDFName("Reducer")
+    val reduceName = closure.nextUDFName("FGReducer")
     val reduceUDF = {
       // FIXME: this is not sanitized, input parameters might diverge
       // assemble UDF code

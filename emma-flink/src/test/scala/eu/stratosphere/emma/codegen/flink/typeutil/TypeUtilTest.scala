@@ -50,11 +50,42 @@ class TypeUtilTest {
           }
           """)
 
-        val act = tb.typecheck(tb.untypecheck(tc.convertResultType(tc.convertTermType(TermName("x"), tree))))
+        val act = tc.convertTermType(TermName("x"), tc.convertResultType(tree))
 
-        assert(exp equalsStructure act, "Bad converted tree")
+        assert(exp equalsStructure typecheck(act), "Bad converted tree")
       case _ =>
         assert(assertion = false, "Unexpected type convertor type")
     }
   }
+
+  @Test def testProductFieldConversion2(): Unit = {
+    createTypeConvertor(typeOf[Edge[(Int, String)]]) match {
+      case tc: ProductTypeConvertor =>
+        val tree = tb.typecheck(
+          q"""
+          {
+            val x = eu.stratosphere.emma.codegen.flink.TestSchema.Edge[(Int, String)]((1, "foo"), (2, "bar"))
+            val y = x.src
+            val z = x.dst
+          }
+          """)
+
+        val exp = tb.typecheck(
+          q"""
+          {
+            val x  = new ${tc.tgtType}(1, "foo", 2, "bar")
+            val y = new (Int, String)(x.f0, x.f1)
+            val z = new (Int, String)(x.f2, x.f3)
+          }
+          """)
+
+        val act = tc.convertTermType(TermName("x"), tc.convertResultType(tree))
+
+        assert(exp equalsStructure typecheck(act), "Bad converted tree")
+      case _ =>
+        assert(assertion = false, "Unexpected type convertor type")
+    }
+  }
+
+  private def typecheck(tree: Tree) = tb.typecheck(tb.untypecheck(tree))
 }

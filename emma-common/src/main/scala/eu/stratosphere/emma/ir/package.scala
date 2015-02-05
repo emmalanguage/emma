@@ -176,15 +176,25 @@ package object ir {
         // find all "free" symbols in the UDF body
         val freeSymbols = fn.body.collect({
           case i@Ident(TermName(_)) if i.symbol.toString.startsWith("free term") => i.symbol.asTerm
-        })
+        }).groupBy(_.name).map(_._2.head).toList
+        val infos = freeSymbols.map(_.info)
         // compute a typed closure list
         val closure: List[ValDef] = for (s <- freeSymbols) yield ValDef(Modifiers(Flag.PARAM), s.name, tq"${s.info}", EmptyTree)
         // compute a typed params list
         val params: List[ValDef] = for ((param, paramTypes) <- fn.vparams zip targs) yield ValDef(param.mods, param.name, tq"$paramTypes", param.rhs)
         // create a typed curried form of the UDF (closure) => (params) => body
-        tb.typecheck(q"(..$closure) => (..$params) => ${fn.body}").asInstanceOf[Function]
+        tb.typecheck(q"(..$closure) => (..$params) => ${substituteFreeSymbols(fn.body)}").asInstanceOf[Function]
       case _ =>
         throw new RuntimeException(s"Unsupported UDF type '$tpe'. Only (params) => (body) with up to 10 params are supported at the moment.")
+    }
+
+    object substituteFreeSymbols extends Transformer with (Tree => Tree) {
+      override def apply(tree: Tree) = this.transform(tree)
+
+      override def transform(tree: Tree) = tree match {
+        case i@Ident(tn@TermName(_)) if i.symbol.toString.startsWith("free term") => Ident(tn)
+        case _ => super.transform(tree)
+      }
     }
 
     def closure = tree.vparams

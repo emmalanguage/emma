@@ -86,7 +86,7 @@ object CodegenProofOfConcept {
        }""".asInstanceOf[ImplDef]
 
     val dfCompiler = new DataflowCompiler()
-    val dfSymbol = dfCompiler.compile(dfTree)
+    val dfSymbol = dfCompiler.compile(dfTree).asModule
 
     val separator = "'"
 
