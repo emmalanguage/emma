@@ -162,6 +162,25 @@ class CodegenTest {
     compareBags(act, exp)
   }
 
+  @Test def testFlatMapWithFilter(): Unit = {
+    val inp = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines().toStream
+
+    val max = 3
+    val min = 9
+    val len = 10
+
+    val alg = emma.parallelize {
+      DataBag(inp).flatMap(x => DataBag(x.split("\\W+").filter(w => w.length > min && w.length < max))).withFilter(_.length > len)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
   // --------------------------------------------------------------------------
   // Filter
   // --------------------------------------------------------------------------
@@ -248,16 +267,15 @@ class CodegenTest {
   // Join & Cross
   // --------------------------------------------------------------------------
 
-  @Ignore
   @Test def testTwoWayCrossSimpleType(): Unit = {
     val N = 100
 
     val a = 1
-    val b = 1
-    val c = 1
+    val b = 2
 
     val alg = emma.parallelize {
-      for (x <- DataBag(1 to N); y <- DataBag(1 to Math.sqrt(N).toInt)) yield (x, y, c)
+      // FIXME: closure which does not interact with the input causes ToolBox failure, e.g. "(a * x, b * y, a * b)"
+      for (x <- DataBag(1 to N); y <- DataBag(1 to Math.sqrt(N).toInt)) yield (a * x, b * y)
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -268,16 +286,15 @@ class CodegenTest {
     compareBags(act, exp)
   }
 
-  @Ignore
   @Test def testTwoWayJoinSimpleType(): Unit = {
     val N = 100
 
     val a = 1
-    val b = 1
-    val c = 5
+    val b = 2
 
     val alg = emma.parallelize {
-      for (x <- DataBag(1 to N); y <- DataBag(1 to Math.sqrt(N).toInt); if a * x * x == b * y) yield (x, y, c)
+      // FIXME: closure which does not interact with the input causes ToolBox failure, e.g. "(a * x, b * y, a * b)"
+      for (x <- DataBag(1 to N); y <- DataBag(1 to Math.sqrt(N).toInt); if x * a == y * b) yield (a * x, b * y)
     }
 
     // compute the algorithm using the original code and the runtime under test
