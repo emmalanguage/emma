@@ -142,9 +142,14 @@ class WorkflowMacros(val c: blackbox.Context) {
             println(${combine(t.comprehension).toString})
             println("~" * 80)
             println("")
+            println("~ Comprehension `" + ${t.id.toString} + "` (IR):")
+            println("~" * 80)
+            println(${showCode(compile(optimizedTree, cfGraph, comprehensionView))})
+            println("~" * 80)
+            println("")
             """
-        }
-        }"""
+        }}"""
+
 
       c.Expr[Unit](c.typecheck(code))
     }
