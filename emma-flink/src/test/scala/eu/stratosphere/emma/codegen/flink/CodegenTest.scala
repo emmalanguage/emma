@@ -5,7 +5,7 @@ import java.io.File
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.codegen.flink.TestSchema._
 import eu.stratosphere.emma.runtime
-import eu.stratosphere.emma.runtime.Engine
+import eu.stratosphere.emma.runtime.{FlinkLocal, Flink}
 import eu.stratosphere.emma.testutil._
 import org.junit.{Ignore, After, Before, Test}
 
@@ -13,14 +13,14 @@ import scala.reflect.runtime.universe._
 
 class CodegenTest {
 
-  var rt: Engine = _
+  var rt: Flink = _
 
   var inBase = tempPath("test/input")
   var outBase = tempPath("test/output")
 
   @Before def setup() {
     // create a new runtime session
-    rt = runtime.factory("flink-local", "localhost", 6123)
+    rt = FlinkLocal("localhost", 6123)
     // make sure that the base paths exist
     new File(inBase).mkdirs()
     new File(outBase).mkdirs()
@@ -123,10 +123,13 @@ class CodegenTest {
       EdgeWithLabel(2L, 5L, "B"),
       EdgeWithLabel(3L, 6L, "C"))
 
+    // FIXME: this circumvents some strange issue with the compiler
+    rt.dataflowGenerator.typeInfoFactory(typeOf[EdgeWithLabel[Int, java.lang.String]])
+
     val y = "A"
 
     val alg = emma.parallelize {
-      for (e <- DataBag(inp)) yield if (e.dst < e.src) Edge(e.dst, e.src) else Edge(e.dst, e.src)
+      for (e <- DataBag(inp)) yield if (e.dst < e.src) EdgeWithLabel(e.dst, e.src, y) else EdgeWithLabel(e.dst, e.src, e.label)
     }
 
     // compute the algorithm using the original code and the runtime under test

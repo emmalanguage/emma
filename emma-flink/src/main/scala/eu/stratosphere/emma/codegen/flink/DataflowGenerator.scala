@@ -239,7 +239,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     val outFormatTree = op.format match {
       case ofmt: CSVOutputFormat[_] =>
         if (!(tpe <:< weakTypeOf[Product])) {
-          throw new RuntimeException(s"Cannot create Flink CsvOutputFormat for non-product type ${typeOf(op.xs.tag)}")
+          throw new RuntimeException(s"Cannot create Flink CsvOutputFormat for non-product type $tpe")
         }
 
         q"""
@@ -287,10 +287,13 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     val tpe = typeOf(op.tag).dealias
     val tpeInfo = typeInfoFactory(tpe)
 
+    // assemble input fragment
+    val input = generateOpCode(op.xs)
+
     // assemble dataflow fragment
     q"""
     {
-      val __input = ${generateOpCode(op.xs)}
+      val __input = $input
 
       // create type information
       val typeInformation = $tpeInfo
@@ -337,9 +340,12 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       }
       """
 
+    // assemble input fragment
+    val input = generateOpCode(op.xs)
+
     // assemble dataflow fragment
     q"""
-    ${generateOpCode(op.xs)}.map(new $fnName(..${fnUDF.closure.map(_.name)}))
+    $input.map(new $fnName(..${fnUDF.closure.map(_.name)}))
     """
   }
 
@@ -351,7 +357,6 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     // generate fn UDF
     val fnUDF = ir.UDF(op.f, tb)
     val fnName = closure.nextUDFName("FlatMapper")
-    val fnBody = fnUDF.body
     closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
