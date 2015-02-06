@@ -120,7 +120,7 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
     }
 
     case class FlatMap(f: Tree, xs: Expression) extends Combinator {
-      def tpe = c.typecheck(tq"DataBag[(${f.tpe.widen.typeArgs.reverse.head})]", c.TYPEmode).tpe
+      def tpe = f.tpe.widen.typeArgs.reverse.head // Since the return type of is DataBag[DataBag[T]], don't wrap!
     }
 
     case class Filter(var p: Tree, var xs: Expression) extends Combinator {
