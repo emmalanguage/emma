@@ -168,7 +168,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
       case combinator.Group(key, _) => closure(key)
       case combinator.Fold(empty, sng, union, _, _) => closure(empty) ++ closure(sng) ++ closure(union)
       case combinator.FoldGroup(key, empty, sng, union, _) => closure(key) ++ closure(empty) ++ closure(sng) ++ closure(union)
-    }).flatten.toList.sortBy(_.name.toString)
+    }).flatten.distinct.toList.sortBy(_.name.toString)
 
     /**
      * Find all symbols which are not defined in the given tree `t`.
