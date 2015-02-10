@@ -70,12 +70,12 @@
 
         <!-- Flink -->
         <dependency>
-            <groupId>org.apache.flink</groupId>
+            <groupId>eu.stratosphere</groupId>
             <artifactId>flink-java</artifactId>
             <version>${flink.version}</version>
         </dependency>
         <dependency>
-            <groupId>org.apache.flink</groupId>
+            <groupId>eu.stratosphere</groupId>
             <artifactId>flink-clients</artifactId>
             <version>${flink.version}</version>
         </dependency>
