@@ -29,7 +29,7 @@ import org.apache.flink.core.memory.{DataOutputView, DataInputView}
 abstract class CaseClassSerializer[T <: Product](
                                                   clazz: Class[T],
                                                   scalaFieldSerializers: Array[TypeSerializer[_]])
-  extends TupleSerializerBase[T](clazz, scalaFieldSerializers) {
+  extends TupleSerializerBase[T](clazz, scalaFieldSerializers) with Cloneable {
 
   @transient var fields: Array[AnyRef] = _
 
@@ -50,15 +50,21 @@ abstract class CaseClassSerializer[T <: Product](
         createInstance(fields)
       }
       catch {
-        case t: Throwable => {
+        case t: Throwable =>
           instanceCreationFailed = true
           null.asInstanceOf[T]
-        }
       }
     }
   }
 
-  override def isStateful() = true
+  override def duplicate = {
+    val result = this.clone().asInstanceOf[CaseClassSerializer[T]]
+    // set transient fields to null and make copy of serializers
+    result.fields = null
+    result.instanceCreationFailed = false
+    result.fieldSerializers = fieldSerializers.map(_.duplicate())
+    result
+  }
 
   def copy(from: T, reuse: T): T = {
     copy(from)
