@@ -4,6 +4,7 @@ import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.ir.{FoldSink, TempSink, ValueRef, Write}
 
 import org.slf4j.LoggerFactory;
+import com.typesafe.scalalogging.slf4j.Logger
 
 import scala.reflect.runtime.universe._
 import scala.reflect.runtime.{universe => ru}
@@ -21,7 +22,7 @@ package object runtime {
     org.apache.log4j.Logger.getRootLogger.addAppender(appender)
   }
 
-  private[emma] val logger = LoggerFactory.getLogger(classOf[Engine])
+  private[emma] val logger = Logger(LoggerFactory.getLogger(classOf[Engine]))
 
   // log program run header
   {
