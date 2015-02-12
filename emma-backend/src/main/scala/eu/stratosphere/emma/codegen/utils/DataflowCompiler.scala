@@ -52,7 +52,7 @@ class DataflowCompiler {
   /**
    * Instantiate and execute the run method of a compiled dataflow via reflection.
    *
-   * @param dfSymbol The symbol of the compiled dataflow class.
+   * @param dfSymbol The symbol of the compiled dataflow module.
    * @param args The arguments to be passed to the run method.
    * @tparam T The type of the result
    * @return A result of type T.

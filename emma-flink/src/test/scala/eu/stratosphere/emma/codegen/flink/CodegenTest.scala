@@ -66,7 +66,7 @@ class CodegenTest {
   // CSV I/O
   // --------------------------------------------------------------------------
 
-  @Test def testCSVReadWriteComplexType(): Unit = {
+  @Test def testCSVReadWriteCaseClassType(): Unit = {
     testCSVReadWrite[EdgeWithLabel[Long, String]](Seq(
       EdgeWithLabel(1L, 4L, "A"),
       EdgeWithLabel(2L, 5L, "B"),
@@ -95,6 +95,27 @@ class CodegenTest {
   }
 
   // --------------------------------------------------------------------------
+  // Filter
+  // --------------------------------------------------------------------------
+
+  @Test def testFilter(): Unit = {
+    val inp = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines().toStream
+
+    val len = 10
+
+    val alg = emma.parallelize {
+      DataBag(inp).withFilter(_.length > len)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  // --------------------------------------------------------------------------
   // Map
   // --------------------------------------------------------------------------
 
@@ -117,16 +138,34 @@ class CodegenTest {
     compareBags(act, exp)
   }
 
-  @Test def testMapComplexType(): Unit = {
+  @Test def testMapTupleType(): Unit = {
     val inp = Seq(
       EdgeWithLabel(1L, 4L, "A"),
       EdgeWithLabel(2L, 5L, "B"),
       EdgeWithLabel(3L, 6L, "C"))
 
-    // FIXME: this circumvents some strange issue with the compiler
-    rt.dataflowGenerator.typeInfoFactory(typeOf[EdgeWithLabel[Int, java.lang.String]])
+    val a = 1
+    val b = 10
 
-    val y = "A"
+    val alg = emma.parallelize {
+      for (e <- DataBag(inp)) yield if (e.dst < e.src) (e.dst, e.src, a * b) else (e.dst, e.src, a * b)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  @Test def testMapCaseClassType(): Unit = {
+    val inp = Seq(
+      EdgeWithLabel(1L, 4L, "A"),
+      EdgeWithLabel(2L, 5L, "B"),
+      EdgeWithLabel(3L, 6L, "C"))
+
+    val y = "Y"
 
     val alg = emma.parallelize {
       for (e <- DataBag(inp)) yield if (e.dst < e.src) EdgeWithLabel(e.dst, e.src, y) else EdgeWithLabel(e.dst, e.src, e.label)
@@ -182,27 +221,6 @@ class CodegenTest {
   }
 
   // --------------------------------------------------------------------------
-  // Filter
-  // --------------------------------------------------------------------------
-
-  @Test def testFilter(): Unit = {
-    val inp = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines().toStream
-
-    val len = 10
-
-    val alg = emma.parallelize {
-      DataBag(inp).withFilter(_.length > len)
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
-  }
-
-  // --------------------------------------------------------------------------
   // Distinct and Union
   // --------------------------------------------------------------------------
 
@@ -224,7 +242,7 @@ class CodegenTest {
     compareBags(act, exp)
   }
 
-  @Test def testDistinctComplexType(): Unit = {
+  @Test def testDistinctTupleType(): Unit = {
     val inp = {
       val lines = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines()
       lines.flatMap(_.split("\\W+")).zipWithIndex.toStream
@@ -242,7 +260,7 @@ class CodegenTest {
     compareBags(act, exp)
   }
 
-  @Test def testUnion(): Unit = {
+  @Test def testUnionSimpleType(): Unit = {
     val inp = {
       val lines = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines()
       lines.flatMap(_.split("\\W+")).toStream
