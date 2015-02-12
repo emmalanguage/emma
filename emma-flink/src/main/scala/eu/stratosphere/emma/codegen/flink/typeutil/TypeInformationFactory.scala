@@ -82,6 +82,7 @@ class TypeInformationFactory(val dataflowCompiler: DataflowCompiler) {
         """.asInstanceOf[ClassDef]
 
       val symbol = dataflowCompiler.compile(tree).asClass
+      logger.debug(s"Synthesized type information for '$tpe' in class '${symbol.fullName}'")
 
       memo.put(tpe, symbol)
       symbol

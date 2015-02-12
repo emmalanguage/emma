@@ -98,13 +98,48 @@ class CodegenTest {
   // Filter
   // --------------------------------------------------------------------------
 
-  @Test def testFilter(): Unit = {
+  @Test def testFilterSimpleType(): Unit = {
     val inp = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines().toStream
 
     val len = 10
 
     val alg = emma.parallelize {
       DataBag(inp).withFilter(_.length > len)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  @Test def testFilterTupleType(): Unit = {
+    val inp = scala.io.Source.fromFile(materializeResource("/lyrics/Jabberwocky.txt")).getLines().zipWithIndex.toStream
+
+    val len = 10
+
+    val alg = emma.parallelize {
+      DataBag(inp).withFilter(_._1.length > len)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(runtime.Native).fetch()
+    val exp = alg.run(rt).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  @Test def testFilterCaseClassType(): Unit = {
+    val inp = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner]).fetch()
+
+    val len = 10
+    val year = 1980
+
+    val alg = emma.parallelize {
+      DataBag(inp).withFilter(_.year > year).withFilter(_.title.length > len)
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -127,7 +162,7 @@ class CodegenTest {
     val offset = 15.0
 
     val alg = emma.parallelize {
-      for (x <- DataBag(inp)) yield offset + x / denominator
+      for (x <- DataBag(inp)) yield if (x < 5) offset else offset + x / denominator
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -140,15 +175,20 @@ class CodegenTest {
 
   @Test def testMapTupleType(): Unit = {
     val inp = Seq(
-      EdgeWithLabel(1L, 4L, "A"),
-      EdgeWithLabel(2L, 5L, "B"),
-      EdgeWithLabel(3L, 6L, "C"))
+      (1L, 4L, "A"),
+      (2L, 5L, "B"),
+      (3L, 6L, "C"))
+
+    // TODO: This test doesn't work without explicitly registering the types upfront. Investigate why.
+    rt.dataflowGenerator.typeInfoFactory(typeOf[(Long, Long, Int)])
+    rt.dataflowGenerator.typeInfoFactory(typeOf[(Long, Long, String)])
+    rt.dataflowGenerator.typeInfoFactory(typeOf[(Long, Long, java.lang.String)])
 
     val a = 1
     val b = 10
 
     val alg = emma.parallelize {
-      for (e <- DataBag(inp)) yield if (e.dst < e.src) (e.dst, e.src, a * b) else (e.dst, e.src, a * b)
+      for (e <- DataBag(inp)) yield if (e._1 < e._2) (e._1 * a, e._2 * b, a * b) else (e._2 * a, e._1 * b, a * b)
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -167,8 +207,10 @@ class CodegenTest {
 
     val y = "Y"
 
+    // rt.dataflowGenerator.typeInfoFactory(typeOf[EdgeWithLabel[Long, java.lang.String]])
+
     val alg = emma.parallelize {
-      for (e <- DataBag(inp)) yield if (e.dst < e.src) EdgeWithLabel(e.dst, e.src, y) else EdgeWithLabel(e.dst, e.src, e.label)
+      for (e <- DataBag(inp)) yield if (e.label == "B") EdgeWithLabel(e.src, e.dst, y) else e.copy(label = y)
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -311,8 +353,10 @@ class CodegenTest {
     val b = 2
 
     val alg = emma.parallelize {
-      // FIXME: closure which does not interact with the input causes ToolBox failure, e.g. "(a * x, b * y, a * b)"
-      for (x <- DataBag(1 to N); y <- DataBag(1 to Math.sqrt(N).toInt); if x * a == y * b) yield (a * x, b * y)
+      val A = DataBag(1 to N)
+      val B = DataBag(1 to N)
+
+      for (x <- A; y <- B; if x * a == y * b) yield (a * x, b * y, a * b)
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -323,13 +367,12 @@ class CodegenTest {
     compareBags(act, exp)
   }
 
-  @Test def testTwoWayJoinScatteredTupleType(): Unit = {
+  @Test def testTwoWayJoinTupleType(): Unit = {
     // Q: how many cannes winners are there in the IMDB top 100?
     val alg = emma.parallelize {
       val A = DataBag((1 to 100).zipWithIndex.toSeq)
       val B = DataBag((1 to 100).zipWithIndex.toSeq)
 
-      // (bwinners, cwinners)
       for (a <- A; b <- B; if a._1 == b._1) yield (a, b)
     }
 
@@ -341,35 +384,34 @@ class CodegenTest {
     compareBags(act.fetch(), exp.fetch())
   }
 
+  // FIXME: fails with an error: cannot determine unique overloaded method alternative from
+  //   final private val title: java.lang.String
+  //   def title(): java.lang.String
+  // that matches value title:=> String
   @Ignore
   @Test def testTwoWayJoinComplexType(): Unit = {
+
     // Q: how many cannes winners are there in the IMDB top 100?
     val alg = emma.parallelize {
-      //      val imdb = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-      //      val cannes = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner])
-      //val berlin = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
+      val imdb = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+      val cannes = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner])
+      val berlin = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
 
-      //      val cwinners = for (x <- imdb; y <- cannes; if (x.title, x.year) ==(y.title, y.year)) yield ("Cannes", x.year, y.title)
-      //val bwinners = for (x <- imdb; y <- berlin; if (x.title, x.year) ==(y.title, y.year)) yield ("Berlin", x.year, y.title)
+      val cwinners = for (x <- imdb; y <- cannes; if (x.title, x.year) ==(y.title, y.year)) yield ("Cannes", x.year, y.title)
+      val bwinners = for (x <- imdb; y <- berlin; if (x.title, x.year) ==(y.title, y.year)) yield ("Berlin", x.year, y.title)
 
-      val A = DataBag((1 to 100).zipWithIndex.toSeq)
-      val B = DataBag((1 to 100).zipWithIndex.toSeq)
-
-      // (bwinners, cwinners)
-      for (a <- A; b <- B; if a._1 == b._1) yield (a, b)
+      (bwinners, cwinners)
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native)
-    val exp = alg.run(rt)
+    val (cact, bact) = alg.run(runtime.Native)
+    val (cexp, bexp) = alg.run(rt)
 
     // assert that the result contains the expected values
-    // compareBags(act._1.fetch(), exp._1.fetch())
-    // compareBags(act._2.fetch(), exp._2.fetch())
-    compareBags(act.fetch(), exp.fetch())
+    compareBags(cact.fetch(), cexp.fetch())
+    compareBags(bact.fetch(), bexp.fetch())
   }
 
-  @Ignore
   @Test def testMultiWayJoinSimpleType(): Unit = {
     val N = 10000
 
