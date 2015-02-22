@@ -51,6 +51,39 @@ object Stateful {
     })
 
     /**
+     * Computes and flattens the `nestJoin(p, f)` which nests the current state elements `s` against their
+     * associated bag of update elements. The UDF `f` is allowed to modify the state element `s`, however with the
+     * restriction that the modification should not affect it's identity.
+     *
+     * == Nest Join
+     *
+     * A `nestJoin` is an algebraic operator which applies a function `f` to each pair `x`, `G p_x ys`.
+     *
+     * {{{
+     * nestJoin(p, f)(xs, ys) = for (x <- xs) f(x, (for (y <- ys; if p(x, y)) yield y))
+     * }}}
+     *
+     * The left argument `x` is taken from the left input `xs`.
+     * The right argument denotes the group formed by applying a 'per x' filter `p(x, y)` to each element `y` from the
+     * right input `ys`.
+     *
+     * One can think of a `nestJoin` as a half-`join`, half-`cogroup` operator.
+     *
+     * @param updates A collection of inputs to be matched per `x`.
+     * @param k A key extractor function for matching `k(u) == s.identity`.
+     * @param f A UDF to be applied per pair `f(x, G p_x ys)` as described above.
+     * @tparam B The type of the `ys` elements.
+     * @tparam C The type of the output elements.
+     * @return The flattened collection
+     */
+    def updateWith[B, C](updates: DataBag[B])(k: B => K, f: (A, DataBag[B]) => DataBag[C]): DataBag[C] = {
+      // compute the nestJoin
+      val nestJoin = for (s <- this.bag()) yield f(s, for (u <- updates; if k(u) == s.identity) yield u)
+      // flatten the nestJoin result
+      nestJoin.flatMap[C](x => x)
+    }
+
+    /**
      * Converts the stateful bag into an immutable Bag.
      *
      * @return A Databag containing the set of elements contained in this stateful Bag.
