@@ -236,6 +236,9 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   private def opCode[IT](op: ir.Write[IT])(implicit closure: DataflowClosure): Tree = {
     val tpe = typeOf(op.xs.tag).dealias
 
+    // assemble input fragment
+    val xs = generateOpCode(op.xs)
+
     val outFormatTree = op.format match {
       case ofmt: CSVOutputFormat[_] =>
         if (!(tpe <:< weakTypeOf[Product])) {
@@ -252,7 +255,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     // assemble dataflow fragment
     q"""
     {
-      val __input = ${generateOpCode(op.xs)}
+      val __input = $xs
 
       // create output format
       val outFormat = $outFormatTree
@@ -288,12 +291,12 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     val tpeInfo = typeInfoFactory(tpe)
 
     // assemble input fragment
-    val input = generateOpCode(op.xs)
+    val xs = generateOpCode(op.xs)
 
     // assemble dataflow fragment
     q"""
     {
-      val __input = $input
+      val __input = $xs
 
       // create type information
       val typeInformation = $tpeInfo
@@ -328,6 +331,9 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     val tgtTpe = typeOf(op.tag).dealias
     val tgtTpeInfo = typeInfoFactory(tgtTpe)
 
+    // assemble input fragment
+    val xs = generateOpCode(op.xs)
+
     // generate fn UDF
     val fnUDF = ir.UDF(op.f, tb)
     val fnName = closure.nextUDFName("Mapper")
@@ -340,12 +346,9 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       }
       """
 
-    // assemble input fragment
-    val input = generateOpCode(op.xs)
-
     // assemble dataflow fragment
     q"""
-    $input.map(new $fnName(..${fnUDF.closure.map(_.name)}))
+    $xs.map(new $fnName(..${fnUDF.closure.map(_.name)}))
     """
   }
 
@@ -353,6 +356,9 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     val srcTpe = typeOf(op.xs.tag).dealias
     val tgtTpe = typeOf(op.tag).dealias
     val tgtTpeInfo = typeInfoFactory(tgtTpe)
+
+    // assemble input fragment
+    val xs = generateOpCode(op.xs)
 
     // generate fn UDF
     val fnUDF = ir.UDF(op.f, tb)
@@ -370,12 +376,15 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
     // assemble dataflow fragment
     q"""
-    ${generateOpCode(op.xs)}.flatMap(new $fnName(..${fnUDF.closure.map(_.name)}))
+    $xs.flatMap(new $fnName(..${fnUDF.closure.map(_.name)}))
     """
   }
 
   private def opCode[T](op: ir.Filter[T])(implicit closure: DataflowClosure): Tree = {
     val tpe = typeOf(op.tag)
+
+    // assemble input fragment
+    val xs = generateOpCode(op.xs)
 
     // generate fn UDF
     val fnUDF = ir.UDF(op.p, tb)
@@ -390,13 +399,17 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
     // assemble dataflow fragment
     q"""
-    ${generateOpCode(op.xs)}.filter(new $fnName(..${fnUDF.closure.map(_.name)}))
+    $xs.filter(new $fnName(..${fnUDF.closure.map(_.name)}))
     """
   }
 
   private def opCode[OT, IT1, IT2](op: ir.EquiJoin[OT, IT1, IT2])(implicit closure: DataflowClosure): Tree = {
     val xsTpe = typeOf(op.xs.tag).dealias
     val ysTpe = typeOf(op.ys.tag).dealias
+
+    // assemble input fragments
+    val xs = generateOpCode(op.xs)
+    val ys = generateOpCode(op.ys)
 
     // generate keyx UDF
     val keyxUDF = ir.UDF(op.keyx, tb)
@@ -441,8 +454,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
     // assemble dataflow fragment
     q"""
-    val __xs = ${generateOpCode(op.xs)}
-    val __ys = ${generateOpCode(op.ys)}
+    val __xs = $xs
+    val __ys = $ys
 
     // direct variant
     val keyxSelector = new $keyxName(..${keyxUDF.closure.map(_.name)})
@@ -472,6 +485,10 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     val xsTpe = typeOf(op.xs.tag).dealias
     val ysTpe = typeOf(op.ys.tag).dealias
 
+    // assemble input fragments
+    val xs = generateOpCode(op.xs)
+    val ys = generateOpCode(op.ys)
+
     // generate cross UDF
     val fUDF = ir.UDF(op.f, tb)
     val fName = closure.nextUDFName("Cross")
@@ -488,8 +505,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
     // assemble dataflow fragment
     q"""
-    val __xs = ${generateOpCode(op.xs)}
-    val __ys = ${generateOpCode(op.ys)}
+    val __xs = $xs
+    val __ys = $ys
 
     val generatedFunction = clean(env, new $fName(..${fUDF.closure.map(_.name)}))
 
@@ -506,6 +523,9 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   private def opCode[OT, IT](op: ir.FoldGroup[OT, IT])(implicit closure: DataflowClosure): Tree = {
     val itc = createTypeConvertor(typeOf(op.xs.tag))
     val otc = createTypeConvertor(typeOf(op.tag))
+
+    // assemble input fragment
+    val xs = generateOpCode(op.xs)
 
     // get fold components
     val key = ir.UDF(op.key, tb)
@@ -577,7 +597,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
     // assemble dataflow fragment
     q"""
-    ${generateOpCode(op.xs)}
+    $xs
       .map(new $mapName(..${mapUDF.closure.map(_.name)}))
       .groupBy(new $keyName(..${keyUDF.closure.map(_.name)}))
       .reduce(new $reduceName(..${reduceUDF.closure.map(_.name)}))
@@ -585,9 +605,11 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[T](op: ir.Distinct[T])(implicit closure: DataflowClosure): Tree = {
+    // assemble input fragment
+    val xs = generateOpCode(op.xs)
     createTypeConvertor(typeOf(op.tag)) match {
       case tc: ProductTypeConvertor =>
-        q"${generateOpCode(op.xs)}.distinct()"
+        q"$xs.distinct()"
       case tc: SimpleTypeConvertor =>
         // generate fn UDF
         val fnName = closure.nextUDFName("KeySelector")
@@ -599,12 +621,16 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
           }
           """
         // assemble dataflow fragment
-        q"${generateOpCode(op.xs)}.distinct(new $fnName)"
+        q"$xs.distinct(new $fnName)"
     }
   }
 
   private def opCode[T](op: ir.Union[T])(implicit closure: DataflowClosure): Tree = {
-    q"${generateOpCode(op.xs)}.union(${generateOpCode(op.ys)})"
+    // assemble input fragments
+    val xs = generateOpCode(op.xs)
+    val ys = generateOpCode(op.ys)
+    // assemble dataflow fragment
+    q"$xs.union($ys)"
   }
 
   // --------------------------------------------------------------------------

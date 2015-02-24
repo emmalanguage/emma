@@ -179,11 +179,6 @@ class CodegenTest {
       (2L, 5L, "B"),
       (3L, 6L, "C"))
 
-    // TODO: This test doesn't work without explicitly registering the types upfront. Investigate why.
-    rt.dataflowGenerator.typeInfoFactory(typeOf[(Long, Long, Int)])
-    rt.dataflowGenerator.typeInfoFactory(typeOf[(Long, Long, String)])
-    rt.dataflowGenerator.typeInfoFactory(typeOf[(Long, Long, java.lang.String)])
-
     val a = 1
     val b = 10
 
@@ -206,8 +201,6 @@ class CodegenTest {
       EdgeWithLabel(3L, 6L, "C"))
 
     val y = "Y"
-
-    // rt.dataflowGenerator.typeInfoFactory(typeOf[EdgeWithLabel[Long, java.lang.String]])
 
     val alg = emma.parallelize {
       for (e <- DataBag(inp)) yield if (e.label == "B") EdgeWithLabel(e.src, e.dst, y) else e.copy(label = y)
