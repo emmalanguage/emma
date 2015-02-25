@@ -427,7 +427,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     // generate keyy UDF
     val keyyUDF = ir.UDF(op.keyy, tb)
     val keyyName = closure.nextUDFName("KeyY")
-    val keyyTpe = keyxUDF.body.tpe
+    val keyyTpe = keyyUDF.body.tpe
     val keyyTpeInfo = typeInfoFactory(keyyTpe)
     closure.closureParams ++= (for (p <- keyyUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
@@ -464,7 +464,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
     val keyySelector = new $keyyName(..${keyyUDF.closure.map(_.name)})
     val keyyType = org.apache.flink.api.java.typeutils.TypeExtractor.getKeySelectorTypes(keyySelector, __ys.getType)
-    val keyy = new org.apache.flink.api.java.operators.Keys.SelectorFunctionKeys[$ysTpe, ${keyyUDF.body.tpe}](keyySelector, __ys.getType, keyxType)
+    val keyy = new org.apache.flink.api.java.operators.Keys.SelectorFunctionKeys[$ysTpe, ${keyyUDF.body.tpe}](keyySelector, __ys.getType, keyyType)
 
     val generatedFunction = new org.apache.flink.api.java.operators.JoinOperator.DefaultJoin.WrappingFlatJoinFunction(clean(env, new $fName(..${fUDF.closure.map(_.name)})))
 
