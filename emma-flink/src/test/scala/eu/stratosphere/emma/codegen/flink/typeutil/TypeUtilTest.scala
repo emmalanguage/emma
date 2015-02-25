@@ -1,7 +1,7 @@
 package eu.stratosphere.emma.codegen.flink.typeutil
 
 import org.junit.{After, Before, Test}
-import eu.stratosphere.emma.codegen.flink.TestSchema._
+import eu.stratosphere.emma.codegen.flink.testschema._
 
 import scala.reflect.runtime.universe._
 import scala.tools.reflect.ToolBox
@@ -35,7 +35,7 @@ class TypeUtilTest {
         val tree = tb.typecheck(
           q"""
           {
-            val x = eu.stratosphere.emma.codegen.flink.TestSchema.Edge[Long](1L, 2L)
+            val x = eu.stratosphere.emma.codegen.flink.testschema.Edge[Long](1L, 2L)
             val y = x.src
             val z = x.dst
           }
@@ -64,7 +64,7 @@ class TypeUtilTest {
         val tree = tb.typecheck(
           q"""
           {
-            val x = eu.stratosphere.emma.codegen.flink.TestSchema.Edge[(Int, String)]((1, "foo"), (2, "bar"))
+            val x = eu.stratosphere.emma.codegen.flink.testschema.Edge[(Int, String)]((1, "foo"), (2, "bar"))
             val y = x.src
             val z = x.dst
           }

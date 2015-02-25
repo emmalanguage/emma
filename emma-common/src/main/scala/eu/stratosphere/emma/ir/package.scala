@@ -84,14 +84,12 @@ package object ir {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class EquiJoin[+A: TypeTag, +B: TypeTag, +C: TypeTag](keyx: Expr[Any], keyy: Expr[Any], xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
+  final case class EquiJoin[+A: TypeTag, +B: TypeTag, +C: TypeTag](keyx: Expr[Any], keyy: Expr[Any], f: Expr[Any], xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
-    lazy val f: Expr[Any] = reify((x: B, y: C) => (x, y))
   }
 
-  final case class Cross[+A: TypeTag, +B: TypeTag, +C: TypeTag](xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
+  final case class Cross[+A: TypeTag, +B: TypeTag, +C: TypeTag](f: Expr[Any], xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
-    lazy val f: Expr[Any] = reify((x: B, y: C) => (x, y))
   }
 
   final case class Group[+A: TypeTag, +B: TypeTag](key: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
@@ -138,8 +136,8 @@ package object ir {
       case Map(_, xs) => traverse(xs)
       case FlatMap(_, xs) => traverse(xs)
       case Filter(_, xs) => traverse(xs)
-      case EquiJoin(_, _, xs, ys) => traverse(xs); traverse(ys)
-      case Cross(xs, ys) => traverse(xs); traverse(ys)
+      case EquiJoin(_, _, _, xs, ys) => traverse(xs); traverse(ys)
+      case Cross(_, xs, ys) => traverse(xs); traverse(ys)
       case Group(_, xs) => traverse(xs)
       case Fold(_, _, _, xs) => traverse(xs)
       case FoldGroup(_, _, _, _, xs) => traverse(xs)
@@ -169,36 +167,26 @@ package object ir {
 
   final class UDF(fn: Function, tpe: Type, tb: ToolBox[ru.type]) {
 
-    import UDF.fnSymbols
+    val tree = fn
 
-    val tree = tpe match {
-      case TypeRef(prefix, sym, targs) if fnSymbols.contains(sym) =>
-        // find all "free" symbols in the UDF body
-        val freeSymbols = fn.body.collect({
-          case i@Ident(TermName(_)) if i.symbol.toString.startsWith("free term") => i.symbol.asTerm
-        }).groupBy(_.name).map(_._2.head).toList
-        // compute a typed closure list
-        val closure: List[ValDef] = for (s <- freeSymbols) yield ValDef(Modifiers(Flag.PARAM), s.name, tq"${s.info}", EmptyTree)
-        // compute a typed params list
-        val params: List[ValDef] = for ((param, paramTypes) <- fn.vparams zip targs) yield ValDef(param.mods, param.name, tq"$paramTypes", param.rhs)
-        // create a typed curried form of the UDF (closure) => (params) => body
-        tb.typecheck(q"(..$closure) => (..$params) => ${substituteFreeSymbols(fn.body)}").asInstanceOf[Function]
-      case _ =>
-        throw new RuntimeException(s"Unsupported UDF type '$tpe'. Only (params) => (body) with up to 10 params are supported at the moment.")
-    }
-
-    object substituteFreeSymbols extends Transformer with (Tree => Tree) {
-      override def apply(tree: Tree) = this.transform(tree)
-
-      override def transform(tree: Tree) = tree match {
-        case i@Ident(tn@TermName(_)) if i.symbol.toString.startsWith("free term") => Ident(tn)
-        case _ => super.transform(tree)
+    def closure = {
+      val vparamsTpes = tpe match {
+        case TypeRef(prefix1, sym1, targs1) if UDF.fnSymbols.contains(sym1) => targs1.slice(0, targs1.size-1)
+        case _ => List(tpe)
       }
+      for ((vp, tpe) <- tree.vparams zip vparamsTpes) yield ValDef(vp.mods, vp.name, tq"$tpe", vp.rhs)
     }
 
-    def closure = tree.vparams
-
-    def params = tree.body.asInstanceOf[Function].vparams
+    def params = {
+      val vparamsTpes = tpe match {
+        case TypeRef(prefix1, sym1, targs1) if UDF.fnSymbols.contains(sym1) => targs1.reverse.head match {
+          case TypeRef(prefix2, sym2, targs2) if UDF.fnSymbols.contains(sym2) => targs2.slice(0, targs2.size-1)
+          case TypeRef(prefix2, sym2, targs2) => targs2
+        }
+        case _ => List(tpe)
+      }
+      for ((vp, tpe) <- tree.body.asInstanceOf[Function].vparams zip vparamsTpes) yield ValDef(vp.mods, vp.name, tq"$tpe", vp.rhs)
+    }
 
     def body = tree.body.asInstanceOf[Function].body
   }
@@ -218,13 +206,13 @@ package object ir {
       rootMirror.staticClass("scala.Function9"),
       rootMirror.staticClass("scala.Function10"))
 
-    def apply(fn: Function, tpe: Type, tb: ToolBox[ru.type]) = new UDF(tb.untypecheck(fn).asInstanceOf[Function], tpe, tb)
+    def apply(fn: Function, tpe: Type, tb: ToolBox[ru.type]) = new UDF(fn.asInstanceOf[Function], tpe, tb)
 
-    def apply(expr: Expr[Any], tb: ToolBox[ru.type]) = new UDF(tb.untypecheck(expr.tree).asInstanceOf[Function], expr.staticType, tb)
+    def apply(expr: Expr[Any], tb: ToolBox[ru.type]) = new UDF(expr.tree.asInstanceOf[Function], expr.staticType, tb)
   }
 
-  def resultType(tpe: Type) = tpe match {
-    case TypeRef(prefix, sym, targs) if UDF.fnSymbols.contains(sym) => targs.reverse.head
+  def resultType(tpe: Type): Type = tpe match {
+    case TypeRef(prefix, sym, targs) if UDF.fnSymbols.contains(sym) => resultType(targs.reverse.head)
     case _ => tpe
   }
 }

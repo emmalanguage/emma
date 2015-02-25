@@ -110,9 +110,13 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         case combinator.Filter(p, xs) =>
           q"ir.Filter[${elementType(e.tpe)}](${serialize(p)}, ${serialize(xs)})"
         case combinator.EquiJoin(keyx, keyy, xs, ys) =>
-          q"ir.EquiJoin[${elementType(e.tpe)}, ${elementType(xs.tpe)}, ${elementType(ys.tpe)}](${serialize(keyx)}, ${serialize(keyy)}, ${serialize(xs)}, ${serialize(ys)})"
+          val xsTpe = elementType(xs.tpe)
+          val ysTpe = elementType(ys.tpe)
+          q"ir.EquiJoin[${elementType(e.tpe)}, $xsTpe, $ysTpe](${serialize(keyx)}, ${serialize(keyy)}, ${serialize(c.typecheck(q"(x: $xsTpe, y: $ysTpe) => (x, y)"))}, ${serialize(xs)}, ${serialize(ys)})"
         case combinator.Cross(xs, ys) =>
-          q"ir.Cross[${elementType(e.tpe)}, ${elementType(xs.tpe)}, ${elementType(ys.tpe)}](${serialize(xs)}, ${serialize(ys)})"
+          val xsTpe = elementType(xs.tpe)
+          val ysTpe = elementType(ys.tpe)
+          q"ir.Cross[${elementType(e.tpe)}, $xsTpe, $ysTpe](${serialize(c.typecheck(q"(x: $xsTpe, y: $ysTpe) => (x, y)"))}, ${serialize(xs)}, ${serialize(ys)})"
         case combinator.Group(key, xs) =>
           q"ir.Group[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(key)}, ${serialize(xs)})"
         case combinator.Fold(empty, sng, union, xs, _) =>
@@ -129,7 +133,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
           q"ir.Scatter(${transform(values)})"
         case _ =>
           EmptyTree
-          //throw new RuntimeException("Unsupported serialization of non-combinator expression:\n" + prettyprint(e) + "\n")
+        //throw new RuntimeException("Unsupported serialization of non-combinator expression:\n" + prettyprint(e) + "\n")
       }
     }
 
@@ -139,7 +143,11 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
      * @param e The tree to be serialized.
      * @return
      */
-    private def serialize(e: Tree): Tree = q"scala.reflect.runtime.universe.reify { $e }"
+    private def serialize(e: Tree): Tree = {
+      c.typecheck( q"""scala.reflect.runtime.universe.reify {
+        (..${for (s <- closure(e)) yield ValDef(Modifiers(Flag.PARAM), s.name, tq"${s.info}", EmptyTree)}) => ${c.untypecheck(e)}
+      }""")
+    }
 
     /**
      * Fetches the element type `A` of a `DataBag[A]` type.

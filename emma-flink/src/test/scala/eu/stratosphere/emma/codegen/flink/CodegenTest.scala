@@ -3,7 +3,7 @@ package eu.stratosphere.emma.codegen.flink
 import java.io.File
 
 import eu.stratosphere.emma.api._
-import eu.stratosphere.emma.codegen.flink.TestSchema._
+import eu.stratosphere.emma.codegen.flink.testschema._
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.runtime.{FlinkLocal, Flink}
 import eu.stratosphere.emma.testutil._
@@ -472,6 +472,7 @@ class CodegenTest {
   // FoldGroup (Aggregations)
   // --------------------------------------------------------------------------
 
+  @Ignore
   @Test def testBasicGroup() = {
     val alg = emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])

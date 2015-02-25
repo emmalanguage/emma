@@ -1,6 +1,6 @@
 package eu.stratosphere.emma.codegen.flink.typeutil
 
-import eu.stratosphere.emma.codegen.flink.TestSchema._
+import eu.stratosphere.emma.codegen.flink.testschema._
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import org.junit.{After, Before, Test}
 

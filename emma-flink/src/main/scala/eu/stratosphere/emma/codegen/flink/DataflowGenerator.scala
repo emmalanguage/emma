@@ -421,7 +421,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     val keyyTpeInfo = typeInfoFactory(keyyTpe)
 
     val fTpe = ir.resultType(op.f.staticType.dealias)
-    val fTpeInfo = typeInfoFactory(fTpe) // equals to typeInfoFactory(op.tag).dealias
+    val fTpeInfo = typeInfoFactory(typeOf(op.tag).dealias)
 
     // assemble input fragments
     val xs = generateOpCode(op.xs)
@@ -470,11 +470,11 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     // direct variant
     val keyxSelector = new $keyxName(..${keyxUDF.closure.map(_.name)})
     val keyxType = org.apache.flink.api.java.typeutils.TypeExtractor.getKeySelectorTypes(keyxSelector, __xs.getType)
-    val keyx = new org.apache.flink.api.java.operators.Keys.SelectorFunctionKeys[$xsTpe, ${keyxUDF.body.tpe}](keyxSelector, __xs.getType, keyxType)
+    val keyx = new org.apache.flink.api.java.operators.Keys.SelectorFunctionKeys[$xsTpe, $keyxTpe](keyxSelector, __xs.getType, keyxType)
 
     val keyySelector = new $keyyName(..${keyyUDF.closure.map(_.name)})
     val keyyType = org.apache.flink.api.java.typeutils.TypeExtractor.getKeySelectorTypes(keyySelector, __ys.getType)
-    val keyy = new org.apache.flink.api.java.operators.Keys.SelectorFunctionKeys[$ysTpe, ${keyyUDF.body.tpe}](keyySelector, __ys.getType, keyyType)
+    val keyy = new org.apache.flink.api.java.operators.Keys.SelectorFunctionKeys[$ysTpe, $keyyTpe](keyySelector, __ys.getType, keyyType)
 
     val generatedFunction = new org.apache.flink.api.java.operators.JoinOperator.DefaultJoin.WrappingFlatJoinFunction(clean(env, new $fName(..${fUDF.closure.map(_.name)})))
 
