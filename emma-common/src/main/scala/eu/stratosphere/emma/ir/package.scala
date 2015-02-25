@@ -177,7 +177,6 @@ package object ir {
         val freeSymbols = fn.body.collect({
           case i@Ident(TermName(_)) if i.symbol.toString.startsWith("free term") => i.symbol.asTerm
         }).groupBy(_.name).map(_._2.head).toList
-        val infos = freeSymbols.map(_.info)
         // compute a typed closure list
         val closure: List[ValDef] = for (s <- freeSymbols) yield ValDef(Modifiers(Flag.PARAM), s.name, tq"${s.info}", EmptyTree)
         // compute a typed params list
@@ -224,4 +223,8 @@ package object ir {
     def apply(expr: Expr[Any], tb: ToolBox[ru.type]) = new UDF(tb.untypecheck(expr.tree).asInstanceOf[Function], expr.staticType, tb)
   }
 
+  def resultType(tpe: Type) = tpe match {
+    case TypeRef(prefix, sym, targs) if UDF.fnSymbols.contains(sym) => targs.reverse.head
+    case _ => tpe
+  }
 }
