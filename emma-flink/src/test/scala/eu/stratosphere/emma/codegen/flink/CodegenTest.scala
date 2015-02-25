@@ -327,8 +327,7 @@ class CodegenTest {
     val b = 2
 
     val alg = emma.parallelize {
-      // FIXME: closure which does not interact with the input causes ToolBox failure, e.g. "(a * x, b * y, a * b)"
-      for (x <- DataBag(1 to N); y <- DataBag(1 to Math.sqrt(N).toInt)) yield (a * x, b * y)
+      for (x <- DataBag(1 to N); y <- DataBag(1 to Math.sqrt(N).toInt)) yield (a * x, b * y, a * b)
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -381,7 +380,6 @@ class CodegenTest {
   //   final private val title: java.lang.String
   //   def title(): java.lang.String
   // that matches value title:=> String
-  @Ignore
   @Test def testTwoWayJoinComplexType(): Unit = {
 
     // Q: how many cannes winners are there in the IMDB top 100?
@@ -422,7 +420,6 @@ class CodegenTest {
     compareBags(act, exp)
   }
 
-  @Ignore
   @Test def testMultiWayJoinComplexTypeLocalInput(): Unit = {
     val imdbTop100Local = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry]).fetch()
     val cannesWinnersLocal = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner]).fetch()
@@ -449,7 +446,6 @@ class CodegenTest {
     compareBags(act, exp)
   }
 
-  @Ignore
   @Test def testMultiWayJoinComplexType(): Unit = {
     // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
     val alg = emma.parallelize {
@@ -476,7 +472,6 @@ class CodegenTest {
   // FoldGroup (Aggregations)
   // --------------------------------------------------------------------------
 
-  @Ignore
   @Test def testBasicGroup() = {
     val alg = emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])

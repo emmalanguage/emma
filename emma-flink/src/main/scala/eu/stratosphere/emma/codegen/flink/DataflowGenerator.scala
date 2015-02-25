@@ -196,6 +196,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT](op: ir.Read[OT])(implicit closure: DataflowClosure): Tree = {
+    // infer types and generate type information
     val tpe = typeOf(op.tag).dealias
     val tpeInfo = typeInfoFactory(tpe)
 
@@ -267,6 +268,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT](op: ir.TempSource[OT])(implicit closure: DataflowClosure): Tree = {
+    // infer types and generate type information
     val tpe = typeOf(op.tag).dealias
     val tpeInfo = typeInfoFactory(tpe)
 
@@ -287,6 +289,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[IT](op: ir.TempSink[IT])(implicit closure: DataflowClosure): Tree = {
+    // infer types and generate type information
     val tpe = typeOf(op.tag).dealias
     val tpeInfo = typeInfoFactory(tpe)
 
@@ -313,6 +316,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT](op: ir.Scatter[OT])(implicit closure: DataflowClosure): Tree = {
+    // infer types and generate type information
     val tpe = typeOf(op.tag).dealias
     val tpeInfo = typeInfoFactory(tpe)
 
@@ -327,6 +331,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT, IT](op: ir.Map[OT, IT])(implicit closure: DataflowClosure): Tree = {
+    // infer types and generate type information
     val srcTpe = typeOf(op.xs.tag).dealias
     val tgtTpe = typeOf(op.tag).dealias
     val tgtTpeInfo = typeInfoFactory(tgtTpe)
@@ -353,6 +358,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT, IT](op: ir.FlatMap[OT, IT])(implicit closure: DataflowClosure): Tree = {
+    // infer types and generate type information
     val srcTpe = typeOf(op.xs.tag).dealias
     val tgtTpe = typeOf(op.tag).dealias
     val tgtTpeInfo = typeInfoFactory(tgtTpe)
@@ -404,8 +410,18 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT, IT1, IT2](op: ir.EquiJoin[OT, IT1, IT2])(implicit closure: DataflowClosure): Tree = {
+    // infer types and generate type information
     val xsTpe = typeOf(op.xs.tag).dealias
     val ysTpe = typeOf(op.ys.tag).dealias
+
+    val keyxTpe = ir.resultType(op.keyx.staticType.dealias)
+    val keyxTpeInfo = typeInfoFactory(keyxTpe)
+
+    val keyyTpe = ir.resultType(op.keyy.staticType.dealias)
+    val keyyTpeInfo = typeInfoFactory(keyyTpe)
+
+    val fTpe = ir.resultType(op.f.staticType.dealias)
+    val fTpeInfo = typeInfoFactory(fTpe) // equals to typeInfoFactory(op.tag).dealias
 
     // assemble input fragments
     val xs = generateOpCode(op.xs)
@@ -414,8 +430,6 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     // generate keyx UDF
     val keyxUDF = ir.UDF(op.keyx, tb)
     val keyxName = closure.nextUDFName("KeyX")
-    val keyxTpe = keyxUDF.body.tpe
-    val keyxTpeInfo = typeInfoFactory(keyxTpe)
     closure.closureParams ++= (for (p <- keyxUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
@@ -427,8 +441,6 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     // generate keyy UDF
     val keyyUDF = ir.UDF(op.keyy, tb)
     val keyyName = closure.nextUDFName("KeyY")
-    val keyyTpe = keyyUDF.body.tpe
-    val keyyTpeInfo = typeInfoFactory(keyyTpe)
     closure.closureParams ++= (for (p <- keyyUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
@@ -441,8 +453,6 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     // generate join UDF
     val fUDF = ir.UDF(op.f, tb)
     val fName = closure.nextUDFName("Join")
-    val fTpe = fUDF.body.tpe
-    val fTpeInfo = typeInfoFactory(fTpe)
     closure.closureParams ++= (for (p <- fUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
@@ -485,6 +495,9 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     val xsTpe = typeOf(op.xs.tag).dealias
     val ysTpe = typeOf(op.ys.tag).dealias
 
+    val fTpe = ir.resultType(op.f.staticType.dealias)
+    val fTpeInfo = typeInfoFactory(fTpe)
+
     // assemble input fragments
     val xs = generateOpCode(op.xs)
     val ys = generateOpCode(op.ys)
@@ -492,8 +505,6 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     // generate cross UDF
     val fUDF = ir.UDF(op.f, tb)
     val fName = closure.nextUDFName("Cross")
-    val fTpe = fUDF.body.tpe
-    val fTpeInfo = typeInfoFactory(fTpe)
     closure.closureParams ++= (for (p <- fUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
@@ -521,8 +532,12 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
   }
 
   private def opCode[OT, IT](op: ir.FoldGroup[OT, IT])(implicit closure: DataflowClosure): Tree = {
-    val itc = createTypeConvertor(typeOf(op.xs.tag))
-    val otc = createTypeConvertor(typeOf(op.tag))
+    val srcTpe = typeOf(op.xs.tag).dealias
+    val srcTpeInfo = typeInfoFactory(srcTpe)
+    val tgtTpe = typeOf(op.tag).dealias
+    val tgtTpeInfo = typeInfoFactory(tgtTpe)
+
+    // val keyTpe = typeInfoFactory(op.key)
 
     // assemble input fragment
     val xs = generateOpCode(op.xs)
@@ -538,35 +553,39 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       // assemble UDF code
       val udf = tb.typecheck(tb.untypecheck(
         q"""
-        (x: ${itc.srcTpe}) => new ${otc.srcTpe}(
+        (x: $srcTpe) => new $tgtTpe(
           ${substitute(key.params(0).symbol -> q"x")(key.body)},
           ${substitute(sng.params(0).symbol -> q"x")(sng.body)})
         """))
       // construct tuplelized UDF
-      new TupleizedUDF(ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)) with ReturnedResult
+      ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)
     }
+    val mapTpe = mapUDF.body.tpe
+    val mapTpeInfo = tgtTpeInfo // equals to typeInfoFactory(mapTpe)
     closure.closureParams ++= (for (p <- mapUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $mapName(..${mapUDF.closure}) extends org.apache.flink.api.common.functions.RichMapFunction[${mapUDF.paramType(0)}, ${mapUDF.resultType}] with ResultTypeQueryable[${mapUDF.resultType}] {
-        override def map(..${mapUDF.params}): ${mapUDF.resultType} = ${mapUDF.body}
-        override def getProducedType = ${mapUDF.resultTypeInfo}
+      class $mapName(..${mapUDF.closure}) extends org.apache.flink.api.common.functions.RichMapFunction[$srcTpe, $mapTpe] with ResultTypeQueryable[$mapTpe] {
+        override def map(..${mapUDF.params}): $mapTpe = ${mapUDF.body}
+        override def getProducedType = $mapTpeInfo
       }
       """
 
     val keyName = closure.nextUDFName("FGKeySelector")
     val keyUDF = {
       // assemble UDF code
-      val udf = tb.typecheck(tb.untypecheck(q"(x: ${otc.srcTpe}) => x.key"))
+      val udf = tb.typecheck(tb.untypecheck(q"(x: $tgtTpe) => x.key"))
       // construct tuplelized UDF
-      new TupleizedUDF(ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)) with ReturnedResult
+      ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)
     }
+    val keyTpe = keyUDF.body.tpe
+    val keyTpeInfo = typeInfoFactory(keyTpe)
     closure.closureParams ++= (for (p <- keyUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $keyName(..${keyUDF.closure}) extends org.apache.flink.api.java.functions.KeySelector[${keyUDF.paramType(0)}, ${keyUDF.resultType}] with ResultTypeQueryable[${keyUDF.resultType}] {
-        override def getKey(..${keyUDF.params}): ${keyUDF.resultType} = ${keyUDF.body}
-        override def getProducedType = ${keyUDF.resultTypeInfo}
+      class $keyName(..${keyUDF.closure}) extends org.apache.flink.api.java.functions.KeySelector[$tgtTpe, $keyTpe] with ResultTypeQueryable[$keyTpe] {
+        override def getKey(..${keyUDF.params}): $keyTpe = ${keyUDF.body}
+        override def getProducedType = $keyTpeInfo
       }
       """
 
@@ -576,7 +595,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       // assemble UDF code
       val udf = tb.typecheck(tb.untypecheck(
         q"""
-        (x: ${otc.srcTpe}, y: ${otc.srcTpe}) => new ${otc.srcTpe}(
+        (x: $tgtTpeInfo, y: $tgtTpeInfo) => new $tgtTpeInfo(
           x.key, ${
           substitute(
             union.params(0).symbol -> q"x.values",
@@ -584,14 +603,16 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
         })
         """))
       // construct tuplelized UDF
-      new TupleizedUDF(ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)) with ReturnedResult
+      ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)
     }
+    val reduceTpe = keyUDF.body.tpe
+    val reduceTpeInfo = tgtTpeInfo // equals to typeInfoFactory(reduceTpe)
     closure.closureParams ++= (for (p <- reduceUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $reduceName(..${reduceUDF.closure}) extends org.apache.flink.api.common.functions.RichReduceFunction[${reduceUDF.resultType}] with ResultTypeQueryable[${reduceUDF.resultType}] {
-        override def reduce(..${reduceUDF.params}): ${reduceUDF.resultType} = ${reduceUDF.body}
-        override def getProducedType = ${reduceUDF.resultTypeInfo}
+      class $reduceName(..${reduceUDF.closure}) extends org.apache.flink.api.common.functions.RichReduceFunction[$reduceTpe] with ResultTypeQueryable[$reduceTpe] {
+        override def reduce(..${reduceUDF.params}): $reduceTpe = ${reduceUDF.body}
+        override def getProducedType = $reduceTpeInfo
       }
       """
 
