@@ -553,14 +553,14 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       // assemble UDF code
       val udf = tb.typecheck(tb.untypecheck(
         q"""
-        (x: $srcTpe) => new $tgtTpe(
-          ${substitute(key.params(0).symbol -> q"x")(key.body)},
-          ${substitute(sng.params(0).symbol -> q"x")(sng.body)})
+        () => (x: $srcTpe) => new $tgtTpe(
+          ${substitute(key.params(0).name -> q"x")(key.body)},
+          ${substitute(sng.params(0).name -> q"x")(sng.body)})
         """))
       // construct tuplelized UDF
       ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)
     }
-    val mapTpe = mapUDF.body.tpe
+    val mapTpe = tgtTpe
     val mapTpeInfo = tgtTpeInfo // equals to typeInfoFactory(mapTpe)
     closure.closureParams ++= (for (p <- mapUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
@@ -574,7 +574,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
     val keyName = closure.nextUDFName("FGKeySelector")
     val keyUDF = {
       // assemble UDF code
-      val udf = tb.typecheck(tb.untypecheck(q"(x: $tgtTpe) => x.key"))
+      val udf = tb.typecheck(tb.untypecheck(q"() => (x: $tgtTpe) => x.key"))
       // construct tuplelized UDF
       ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)
     }
@@ -595,17 +595,17 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       // assemble UDF code
       val udf = tb.typecheck(tb.untypecheck(
         q"""
-        (x: $tgtTpeInfo, y: $tgtTpeInfo) => new $tgtTpeInfo(
+        () => (x: $tgtTpe, y: $tgtTpe) => new $tgtTpe(
           x.key, ${
           substitute(
-            union.params(0).symbol -> q"x.values",
-            union.params(1).symbol -> q"y.values")(union.body)
+            union.params(0).name -> q"x.values",
+            union.params(1).name -> q"y.values")(union.body)
         })
         """))
       // construct tuplelized UDF
       ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)
     }
-    val reduceTpe = keyUDF.body.tpe
+    val reduceTpe = tgtTpe
     val reduceTpeInfo = tgtTpeInfo // equals to typeInfoFactory(reduceTpe)
     closure.closureParams ++= (for (p <- reduceUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
@@ -740,13 +740,16 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
   private val bagConstructors = bagSymbol.companion.info.decl(TermName("apply")).alternatives
 
-  def substitute(map: (Symbol, Tree)*) = new SymbolSubstituter(Map(map: _*))
+  def substitute(map: (TermName, Tree)*) = {
+    val m = Map(map: _*)
+    new SymbolSubstituter(Map(map: _*))
+  }
 
-  class SymbolSubstituter(map: Map[Symbol, Tree]) extends Transformer with (Tree => Tree) {
+  class SymbolSubstituter(map: Map[TermName, Tree]) extends Transformer with (Tree => Tree) {
     override def apply(tree: Tree): Tree = transform(tree)
 
     override def transform(tree: Tree) = tree match {
-      case ident@Ident(TermName(_)) if map.contains(ident.symbol) => map(ident.symbol)
+      case Ident(name@TermName(_)) if map.contains(name) => map(name)
       case _ => super.transform(tree)
     }
   }

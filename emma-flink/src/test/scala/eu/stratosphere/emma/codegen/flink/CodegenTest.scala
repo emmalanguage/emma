@@ -5,9 +5,9 @@ import java.io.File
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.codegen.flink.testschema._
 import eu.stratosphere.emma.runtime
-import eu.stratosphere.emma.runtime.{FlinkLocal, Flink}
+import eu.stratosphere.emma.runtime.{Flink, FlinkLocal}
 import eu.stratosphere.emma.testutil._
-import org.junit.{Ignore, After, Before, Test}
+import org.junit.{After, Before, Test}
 
 import scala.reflect.runtime.universe._
 
@@ -108,8 +108,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -125,8 +125,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -143,8 +143,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -166,8 +166,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -187,8 +187,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -203,12 +203,13 @@ class CodegenTest {
     val y = "Y"
 
     val alg = emma.parallelize {
-      for (e <- DataBag(inp)) yield if (e.label == "B") EdgeWithLabel(e.src, e.dst, y) else e.copy(label = y)
+      // FIXME: for some reason, does not work on companion apply constructor 'EdgeWithLabel(e.src, e.dst, y)'
+      for (e <- DataBag(inp)) yield if (e.label == "B") new EdgeWithLabel(e.src, e.dst, y) else e.copy(label = y)
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -229,8 +230,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -248,8 +249,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -270,8 +271,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -288,8 +289,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -309,8 +310,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -331,8 +332,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -352,8 +353,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -369,8 +370,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native)
-    val exp = alg.run(rt)
+    val act = alg.run(rt)
+    val exp = alg.run(runtime.Native)
 
     // assert that the result contains the expected values
     compareBags(act.fetch(), exp.fetch())
@@ -413,8 +414,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -439,8 +440,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -461,8 +462,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -472,7 +473,21 @@ class CodegenTest {
   // FoldGroup (Aggregations)
   // --------------------------------------------------------------------------
 
-  @Ignore
+  @Test def testGroupSimpleType() = {
+    val N = 200
+
+    val alg = emma.parallelize {
+      for (x <- DataBag(1 to N map (x => (0, x))).groupBy(_._1)) yield x.values.map(_._2).sum()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
   @Test def testBasicGroup() = {
     val alg = emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
@@ -480,29 +495,13 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch()
-    val exp = alg.run(rt).fetch()
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(runtime.Native).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
   }
 
-  @Ignore
-  @Test def testSimpleGroup() = {
-    val alg = emma.parallelize {
-      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-      for (g <- imdbTop100.groupBy(_.year / 10)) yield (s"${g.key * 10} - ${g.key * 10 + 9}", g.values.count())
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch().sortBy(_._1)
-    val exp = alg.run(rt).fetch().sortBy(_._1)
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
-  }
-
-  @Ignore
   @Test def testComplexGroup() = {
     val alg = emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
@@ -517,14 +516,13 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch().sortBy(_._1)
-    val exp = alg.run(rt).fetch().sortBy(_._1)
+    val act = alg.run(rt).fetch().sortBy(_._1)
+    val exp = alg.run(runtime.Native).fetch().sortBy(_._1)
 
     // assert that the result contains the expected values
     compareBags(act, exp)
   }
 
-  @Ignore
   @Test def testGroupWithComplexKey() = {
     val alg = emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
@@ -532,8 +530,8 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(runtime.Native).fetch().sortBy(_._1)
-    val exp = alg.run(rt).fetch().sortBy(_._1)
+    val act = alg.run(rt).fetch().sortBy(_._1)
+    val exp = alg.run(runtime.Native).fetch().sortBy(_._1)
 
     // assert that the result contains the expected values
     compareBags(act, exp)
