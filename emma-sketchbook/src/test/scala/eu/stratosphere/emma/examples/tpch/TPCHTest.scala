@@ -3,6 +3,7 @@ package eu.stratosphere.emma.examples.tpch
 import java.io.File
 
 import eu.stratosphere.emma.examples.tpch.query01.Query01
+import eu.stratosphere.emma.examples.tpch.query03.Query03
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.runtime.Engine
 import eu.stratosphere.emma.testutil._
@@ -42,13 +43,12 @@ class TPCHTest {
 
     // compare the results
     val exp = scala.io.Source.fromFile(outputPath("q1.tbl.native")).getLines().toStream.toList.sorted
-    val res = (1 to rt.defaultDOP flatMap(i => scala.io.Source.fromFile(outputPath(s"q1.tbl.flink/$i")).getLines().toStream)).toList.sorted
+    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q1.tbl.flink/$i")).getLines().toStream)).toList.sorted
 
     // assert that the result contains the expected values
     compareBags(exp, res)
   }
 
-  @Ignore
   @Test def testQuery03(): Unit = {
 
     // execute with native and with tested environment
@@ -56,11 +56,11 @@ class TPCHTest {
     new Query03(inBase, outputPath("q3.tbl.flink"), "", "", rt).run()
 
     // compare the results
-    //    val exp = scala.io.Source.fromFile(outputPath("q3.tbl.native")).getLines().toStream
-    //    val res = scala.io.Source.fromFile(outputPath("q3.tbl.flink")).getLines().toStream
+    val exp = scala.io.Source.fromFile(outputPath("q1.tbl.native")).getLines().toStream.toList.sorted
+    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q1.tbl.flink/$i")).getLines().toStream)).toList.sorted
 
     // assert that the result contains the expected values
-    //    compareBags(exp, res)
+    compareBags(exp, res)
   }
 
   def outputPath(suffix: String) = s"$outBase/$suffix"

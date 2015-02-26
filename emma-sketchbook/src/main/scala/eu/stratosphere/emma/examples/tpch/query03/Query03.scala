@@ -1,8 +1,8 @@
-package eu.stratosphere.emma.examples.tpch
+package eu.stratosphere.emma.examples.tpch.query03
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
-import eu.stratosphere.emma.examples.tpch.Query03.Schema._
+import eu.stratosphere.emma.examples.tpch.{Customer, Lineitem, Order}
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
@@ -51,20 +51,6 @@ object Query03 {
     }
   }
 
-  // --------------------------------------------------------------------------
-  // Schema
-  // --------------------------------------------------------------------------
-
-  object Schema {
-
-    case class Join(orderKey: Int, extendedPrice: Double, discount: Double, orderDate: String, shipPriority: Int) {}
-
-    case class GrpKey(orderKey: Int, orderDate: String, shipPriority: Int) {}
-
-    case class Result(orderKey: Int, revenue: Double, orderDate: String, shipPriority: Int) {}
-
-  }
-
 }
 
 /**
@@ -100,7 +86,7 @@ object Query03 {
  * @param segment Query parameter `SEGMENT`
  * @param date Query parameter `DATE`
  */
-class Query03(inPath: String, outPath: String, segment: String, date: String, rt: Engine) extends Algorithm(rt) {
+class Query03(inPath: String, outPath: String, segment: String, date: String, rt: Engine, val truncate: Boolean = false) extends Algorithm(rt) {
 
   def this(ns: Namespace, rt: Engine) = this(
     ns.get[String](Query03.Command.KEY_INPUT),
@@ -113,28 +99,32 @@ class Query03(inPath: String, outPath: String, segment: String, date: String, rt
 
     val alg = emma.parallelize {
 
+      // cannot directly reference the parameter
+      val _truncate = truncate
+      val _date = ""
+      val _segment = "f"
+
       // compute join part of the query
       val join = for (
-        c <- read(s"$inPath/customer.tbl", new CSVInputFormat[Customer]('|'));
-        o <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]('|'));
-        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'));
-        if c.mktSegment == segment &&
-          c.custKey == o.custKey &&
-          l.orderKey == o.orderKey &&
-          o.orderDate < date &&
-          l.shipDate > date)
+        c <- read(s"$inPath/customer.tbl", new CSVInputFormat[Customer]('|')); if c.mktSegment == _segment;
+        o <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]('|')); if o.orderDate < _date; if c.custKey == o.custKey;
+        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|')); if l.shipDate > _date; if l.orderKey == o.orderKey)
       yield
-        Join(l.orderKey, l.extendedPrice, l.discount, o.orderDate, o.shipPriority)
+        new Join(l.orderKey, l.extendedPrice, l.discount, o.orderDate, o.shipPriority)
 
       // aggregate and compute the final result
       val rslt = for (
-        g <- join.groupBy(x => GrpKey(x.orderKey, x.orderDate, x.shipPriority)))
-      yield
-        Result(
+        g <- join.groupBy(x => new GrpKey(x.orderKey, x.orderDate, x.shipPriority)))
+      yield {
+
+        def tr(v: Double) = if (_truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
+
+        new Result(
           g.key.orderKey,
-          g.values.map(x => x.extendedPrice * (1 - x.discount)).sum(),
+          tr(g.values.map(x => x.extendedPrice * (1 - x.discount)).sum()),
           g.key.orderDate,
           g.key.shipPriority)
+      }
 
       // write out the result
       write(outPath, new CSVOutputFormat[Result]('|'))(rslt)
