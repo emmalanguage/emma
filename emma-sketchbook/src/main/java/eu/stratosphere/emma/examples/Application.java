@@ -54,7 +54,7 @@ public final class Application {
 
         // construct argument parser
         //@formatter:off
-        ArgumentParser parser = ArgumentParsers.newArgumentParser(String.format("emma-experiments-%s", cliName), false)
+        ArgumentParser parser = ArgumentParsers.newArgumentParser(cliName, false)
                 .defaultHelp(true)
                 .description(String.format("Run an algorithm on %s", systemName));
         parser.addSubparsers()
