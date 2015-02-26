@@ -1,5 +1,7 @@
 package eu.stratosphere.emma
 
+import java.util.UUID
+
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.ir.{FoldSink, TempSink, ValueRef, Write}
 
@@ -24,14 +26,19 @@ package object runtime {
 
   private[emma] val logger = Logger(LoggerFactory.getLogger(classOf[Engine]))
 
-  // log program run header
-  {
-    logger.info("############################################################")
-    logger.info("# EMMA PARALLEL DATAFLOW COMPILER ")
-    logger.info("############################################################")
-  }
-
   abstract class Engine {
+
+    val envSessionID = UUID.randomUUID()
+
+    // log program run header
+    {
+      logger.info("############################################################")
+      logger.info("# Emma: Parallel Dataflow Compiler")
+      logger.info("############################################################")
+      logger.info(s"Starting Emma session $envSessionID")
+    }
+
+    val defaultDOP: Int
 
     def execute[A: TypeTag](root: FoldSink[A], name: String, closure: Any*): ValueRef[A]
 
@@ -47,10 +54,14 @@ package object runtime {
 
     def get[A: TypeTag](ref: ValueRef[A]): A
 
-    def closeSession(): Unit
+    def closeSession() = {
+      logger.info(s"Closing Emma session $envSessionID")
+    }
   }
 
   case object Native extends Engine {
+
+    override lazy val defaultDOP = 0
 
     def execute[A: TypeTag](root: FoldSink[A], name: String, closure: Any*): ValueRef[A] = ???
 
@@ -65,8 +76,6 @@ package object runtime {
     def put[A: TypeTag](value: A): ValueRef[A] = ???
 
     def get[A: TypeTag](ref: ValueRef[A]): A = ???
-
-    def closeSession(): Unit = ???
   }
 
   def factory(name: String, host: String, port: Int) = {

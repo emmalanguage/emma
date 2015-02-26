@@ -1,7 +1,5 @@
 package eu.stratosphere.emma.runtime
 
-import java.util.UUID
-
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.codegen.flink.DataflowGenerator
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
@@ -12,8 +10,8 @@ import org.apache.flink.api.common.JobExecutionResult
 import org.apache.flink.api.java.ExecutionEnvironment
 import org.apache.flink.api.java.io.RemoteCollectorImpl
 
-import scala.reflect.runtime.universe._
 import scala.collection.JavaConverters._
+import scala.reflect.runtime.universe._
 
 abstract class Flink(val host: String, val port: Int) extends Engine {
 
@@ -21,13 +19,13 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
     closeSession()
   }
 
+  override lazy val defaultDOP = env.getDegreeOfParallelism
+
   val tmpCounter = new Counter()
 
   val plnCounter = new Counter()
 
   val env: ExecutionEnvironment
-
-  val envSessionID = UUID.randomUUID()
 
   val dataflowCompiler = new DataflowCompiler()
 
@@ -82,6 +80,7 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
   }
 
   override def closeSession() = {
+    super.closeSession()
     RemoteCollectorImpl.shutdownAll()
   }
 
