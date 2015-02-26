@@ -98,7 +98,15 @@ case class FlinkRemote(override val host: String, override val port: Int) extend
 
   logger.info(s"Initializing remote execution environment for Flink at $host:$port")
 
-  override val env = ExecutionEnvironment.createRemoteEnvironment(host, port)
+  override val env = {
+    val path = new java.io.File(this.getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
+    if (path.exists() && path.isFile) {
+      logger.info(s"Passing jar location '${path.toString}' to remote environment")
+      ExecutionEnvironment.createRemoteEnvironment(host, port, path.toString)
+    } else {
+      ExecutionEnvironment.createRemoteEnvironment(host, port)
+    }
+  }
 }
 
 object Flink {
