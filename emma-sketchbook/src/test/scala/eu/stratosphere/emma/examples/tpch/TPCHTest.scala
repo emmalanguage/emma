@@ -5,7 +5,7 @@ import java.io.File
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.runtime.Engine
 import eu.stratosphere.emma.testutil._
-import org.junit.{Test, After, Before}
+import org.junit.{Ignore, Test, After, Before}
 
 class TPCHTest {
 
@@ -38,6 +38,7 @@ class TPCHTest {
     rt.closeSession()
   }
 
+  @Ignore
   @Test def testQuery01(): Unit = {
 
     // execute with native and with tested environment
@@ -52,6 +53,7 @@ class TPCHTest {
     compareBags(exp, res)
   }
 
+  @Ignore
   @Test def testQuery03(): Unit = {
 
     // execute with native and with tested environment

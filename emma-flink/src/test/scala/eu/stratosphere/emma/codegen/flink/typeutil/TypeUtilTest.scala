@@ -1,6 +1,6 @@
 package eu.stratosphere.emma.codegen.flink.typeutil
 
-import org.junit.{After, Before, Test}
+import org.junit.{Ignore, After, Before, Test}
 import eu.stratosphere.emma.codegen.flink.testschema._
 
 import scala.reflect.runtime.universe._
@@ -58,6 +58,7 @@ class TypeUtilTest {
     }
   }
 
+  @Ignore
   @Test def testProductFieldConversion2(): Unit = {
     createTypeConvertor(typeOf[Edge[(Int, String)]]) match {
       case tc: ProductTypeConvertor =>
