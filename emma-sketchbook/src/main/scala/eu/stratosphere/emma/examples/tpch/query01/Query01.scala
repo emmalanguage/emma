@@ -1,8 +1,9 @@
-package eu.stratosphere.emma.examples.tpch
+package eu.stratosphere.emma.examples.tpch.query01
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
-import eu.stratosphere.emma.examples.tpch.Query01.Schema._
+import eu.stratosphere.emma.examples.tpch.Lineitem
+import eu.stratosphere.emma.examples.tpch.query03.Query03
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
@@ -45,30 +46,6 @@ object Query01 {
     }
   }
 
-  // --------------------------------------------------------------------------
-  // Schema
-  // --------------------------------------------------------------------------
-
-  object Schema {
-
-    case class GrpKey(
-                       returnFlag: String,
-                       lineStatus: String) {}
-
-    case class Result(
-                       returnFlag: String,
-                       lineStatus: String,
-                       sumQty: Int,
-                       sumBasePrice: Double,
-                       sumDiscPrice: Double,
-                       sumCharge: Double,
-                       avgQty: Double,
-                       avgPrice: Double,
-                       avgDisc: Double,
-                       countOrder: Long) {}
-
-  }
-
 }
 
 
@@ -103,7 +80,7 @@ object Query01 {
  * @param outPath Output path
  * @param delta Query parameter `DELTA`
  */
-class Query01(inPath: String, outPath: String, delta: Int, rt: Engine) extends Algorithm(rt) {
+class Query01(inPath: String, outPath: String, delta: Int, rt: Engine, truncate: Boolean = false) extends Algorithm(rt) {
 
   def this(ns: Namespace, rt: Engine) = this(
     ns.get[String](Query01.Command.KEY_INPUT),
@@ -115,6 +92,9 @@ class Query01(inPath: String, outPath: String, delta: Int, rt: Engine) extends A
 
     val alg = emma.parallelize {
 
+      // cannot directly reference the parameter
+      val _truncate = truncate
+
       // compute join part of the query
       val l = for (
         l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'));
@@ -123,8 +103,11 @@ class Query01(inPath: String, outPath: String, delta: Int, rt: Engine) extends A
 
       // aggregate and compute the final result
       val r = for (
-        g <- l.groupBy(l => GrpKey(l.returnFlag, l.lineStatus)))
+        g <- l.groupBy(l => new GrpKey(l.returnFlag, l.lineStatus)))
       yield {
+
+        def tr(v: Double) = if (_truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
+
         // compute base aggregates
         val sumQty = g.values.map(_.quantity).sum();
         val sumBasePrice = g.values.map(_.extendedPrice).sum()
@@ -132,16 +115,16 @@ class Query01(inPath: String, outPath: String, delta: Int, rt: Engine) extends A
         val sumCharge = g.values.map(l => l.extendedPrice * (1 - l.discount) * (1 + l.tax)).sum()
         val countOrder = g.values.count()
         // compute result
-        Result(
+        new Result(
           g.key.returnFlag,
           g.key.lineStatus,
           sumQty,
-          sumBasePrice,
-          sumDiscPrice,
-          sumCharge,
+          tr(sumBasePrice),
+          tr(sumDiscPrice),
+          tr(sumCharge),
           avgQty = sumQty / countOrder,
-          avgPrice = sumBasePrice / countOrder,
-          avgDisc = sumDiscPrice / countOrder,
+          avgPrice = tr(sumBasePrice / countOrder),
+          avgDisc = tr(sumDiscPrice / countOrder),
           countOrder)
       }
 
