@@ -53,8 +53,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
           // create output format
           val outFormat = new org.apache.flink.api.java.io.TypeSerializerOutputFormat[$tpe]
-          outFormat.setInputType(typeInformation)
-          outFormat.setSerializer(typeInformation.createSerializer())
+          outFormat.setInputType(typeInformation, env.getConfig)
+          outFormat.setSerializer(typeInformation.createSerializer(env.getConfig))
 
           // write output
           __input.write(outFormat, ${s"$tempResultsPrefix/$id"}, org.apache.flink.core.fs.FileSystem.WriteMode.OVERWRITE)
@@ -94,7 +94,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
           val typeInformation = $tpeInfo
 
           // create input format
-          val inFormat = new org.apache.flink.api.java.io.TypeSerializerInputFormat[$tpe](typeInformation.createSerializer())
+          val inFormat = new org.apache.flink.api.java.io.TypeSerializerInputFormat[$tpe](typeInformation)
           inFormat.setFilePath(${s"$tempResultsPrefix/$id"})
 
           // create input
@@ -279,7 +279,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       val typeInformation = $tpeInfo
 
       // create input format
-      val inFormat = new org.apache.flink.api.java.io.TypeSerializerInputFormat[$tpe](typeInformation.createSerializer())
+      val inFormat = new org.apache.flink.api.java.io.TypeSerializerInputFormat[$tpe](typeInformation)
       inFormat.setFilePath(${s"$tempResultsPrefix/${op.ref.name}"})
 
       // create input
@@ -306,8 +306,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
       // create output format
       val outFormat = new org.apache.flink.api.java.io.TypeSerializerOutputFormat[$tpe]
-      outFormat.setInputType(typeInformation)
-      outFormat.setSerializer(typeInformation.createSerializer())
+      outFormat.setInputType(typeInformation, env.getConfig)
+      outFormat.setSerializer(typeInformation.createSerializer(env.getConfig))
 
       // write output
       __input.write(outFormat, ${s"$tempResultsPrefix/${op.name}"}, org.apache.flink.core.fs.FileSystem.WriteMode.OVERWRITE)
@@ -526,7 +526,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
       __ys,
       generatedFunction,
       $fTpeInfo,
-      "unknown"
+      org.apache.flink.api.common.operators.base.CrossOperatorBase.CrossHint.OPTIMIZER_CHOOSES,
+      "cross"
     )
     """
   }

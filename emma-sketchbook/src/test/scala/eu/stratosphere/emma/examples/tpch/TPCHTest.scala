@@ -7,7 +7,7 @@ import eu.stratosphere.emma.examples.tpch.query03.Query03
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.runtime.Engine
 import eu.stratosphere.emma.testutil._
-import org.junit.{Ignore, Test, After, Before}
+import org.junit.{Before, Test}
 
 class TPCHTest {
 
@@ -38,7 +38,7 @@ class TPCHTest {
   @Test def testQuery01(): Unit = {
 
     // execute with native and with tested environment
-    new Query01(inBase, outputPath("q1.tbl.native"), 30, runtime.Native, true).run()
+    new Query01(inBase, outputPath("q1.tbl.native"), 30, runtime.Native(), true).run()
     new Query01(inBase, outputPath("q1.tbl.flink"), 30, rt, true).run()
 
     // compare the results
@@ -52,8 +52,8 @@ class TPCHTest {
   @Test def testQuery03(): Unit = {
 
     // execute with native and with tested environment
-    // new Query03(inBase, outputPath("q3.tbl.native"), "", "", runtime.Native).run()
-    new Query03(inBase, outputPath("q3.tbl.flink"), "", "", rt).run()
+    new Query03(inBase, outputPath("q3.tbl.native"), "", "", runtime.Native(), true).run()
+    new Query03(inBase, outputPath("q3.tbl.flink"), "", "", rt, true).run()
 
     // compare the results
     val exp = scala.io.Source.fromFile(outputPath("q1.tbl.native")).getLines().toStream.toList.sorted

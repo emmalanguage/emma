@@ -2,11 +2,10 @@ package eu.stratosphere.emma
 
 import java.util.UUID
 
+import com.typesafe.scalalogging.slf4j.Logger
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.ir.{FoldSink, TempSink, ValueRef, Write}
-
-import org.slf4j.LoggerFactory;
-import com.typesafe.scalalogging.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 import scala.reflect.runtime.universe._
 import scala.reflect.runtime.{universe => ru}

@@ -2,6 +2,8 @@ package eu.stratosphere.emma.codegen.flink.typeutil
 
 import eu.stratosphere.emma.codegen.flink.testschema._
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
+import org.apache.flink.api.common.ExecutionConfig
+import org.apache.flink.api.scala.typeutils.{CaseClassSerializer, CaseClassTypeInfo}
 import org.junit.{After, Before, Test}
 
 import scala.reflect.runtime.universe._
@@ -31,8 +33,8 @@ class TypeInformationFactoryTest {
     val typeClass1 = typeInfo1.getTypeClass
     val typeClass2 = typeInfo2.getTypeClass
 
-    val act1 = typeInfo1.createSerializer().asInstanceOf[CaseClassSerializer[T1]].createInstance(Array[AnyRef](Int.box(2), Int.box(7), "9"))
-    val act2 = typeInfo2.createSerializer().asInstanceOf[CaseClassSerializer[T2]].createInstance(Array[AnyRef]("2", "7", Int.box(9)))
+    val act1 = typeInfo1.createSerializer(new ExecutionConfig).asInstanceOf[CaseClassSerializer[T1]].createInstance(Array[AnyRef](Int.box(2), Int.box(7), "9"))
+    val act2 = typeInfo2.createSerializer(new ExecutionConfig).asInstanceOf[CaseClassSerializer[T2]].createInstance(Array[AnyRef]("2", "7", Int.box(9)))
 
     val exp1 = new T1(2, 7, "9")
     val exp2 = new T2("2", "7", 9)
@@ -64,8 +66,8 @@ class TypeInformationFactoryTest {
     val typeClass1 = typeInfo1.getTypeClass
     val typeClass2 = typeInfo2.getTypeClass
 
-    val act1 = typeInfo1.createSerializer().asInstanceOf[CaseClassSerializer[T1]].createInstance(Array[AnyRef](Int.box(2), Int.box(7)))
-    val act2 = typeInfo2.createSerializer().asInstanceOf[CaseClassSerializer[T2]].createInstance(Array[AnyRef](Int.box(2), Int.box(7), Int.box(9)))
+    val act1 = typeInfo1.createSerializer(new ExecutionConfig).asInstanceOf[CaseClassSerializer[T1]].createInstance(Array[AnyRef](Int.box(2), Int.box(7)))
+    val act2 = typeInfo2.createSerializer(new ExecutionConfig).asInstanceOf[CaseClassSerializer[T2]].createInstance(Array[AnyRef](Int.box(2), Int.box(7), Int.box(9)))
 
     val exp1 = new T1(2, 7)
     val exp2 = new T2(2, 7, 9)

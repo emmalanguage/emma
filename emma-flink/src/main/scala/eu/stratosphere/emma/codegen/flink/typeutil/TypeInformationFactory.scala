@@ -55,21 +55,28 @@ class TypeInformationFactory(val dataflowCompiler: DataflowCompiler) {
       val fieldNames = for (field <- fields) yield field.name.toString
       val fieldTypes = for (field <- fields) yield field.infoIn(tpe).resultType
       val fieldTypeInfos = for (fieldType <- fieldTypes) yield apply(fieldType)
+      val genericTypeInfos = tpe match {
+        case TypeRef(_, _, typeParams) =>
+          typeParams map { genericTpe => apply(genericTpe) }
+        case _ =>
+          List.empty[Tree]
+      }
 
       val name = f"SynthesizedTypeInformation${counter.advance.get}%03d"
       logger.info(s"Synthesizing type information for '$tpe' in class '$name'")
 
       val tree =
         q"""
-        class ${TypeName(name)} extends eu.stratosphere.emma.codegen.flink.typeutil.CaseClassTypeInfo[$tpe](classOf[$tpe], Seq(..$fieldTypeInfos), Seq(..$fieldNames)) {
+        class ${TypeName(name)} extends org.apache.flink.api.scala.typeutils.CaseClassTypeInfo[$tpe](classOf[$tpe], Array[org.apache.flink.api.common.typeinfo.TypeInformation[_]](..$genericTypeInfos), Seq(..$fieldTypeInfos), Seq(..$fieldNames)) {
 
           import org.apache.flink.api.common.typeutils.TypeSerializer
-          import eu.stratosphere.emma.codegen.flink.typeutil.CaseClassSerializer
+          import org.apache.flink.api.scala.typeutils.CaseClassSerializer
+          import org.apache.flink.api.common.ExecutionConfig
 
-          override def createSerializer: TypeSerializer[$tpe] = {
+          override def createSerializer(executionConfig: ExecutionConfig): TypeSerializer[$tpe] = {
             val fieldSerializers: Array[TypeSerializer[_]] = new Array[TypeSerializer[_]](getArity)
             for (i <- 0 until getArity) {
-              fieldSerializers(i) = types(i).createSerializer
+              fieldSerializers(i) = types(i).createSerializer(executionConfig)
             }
 
             new CaseClassSerializer[$tpe](tupleType, fieldSerializers) {

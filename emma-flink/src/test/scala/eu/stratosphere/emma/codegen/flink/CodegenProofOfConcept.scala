@@ -208,8 +208,8 @@ object CodegenProofOfConcept {
         val typeInformation = new TupleTypeInfo[tuple.Tuple2[Int, Int]](BasicTypeInfo.getInfoFor(classOf[Int]), BasicTypeInfo.getInfoFor(classOf[Int]));
         val outFormat = new org.apache.flink.api.java.io.TypeSerializerOutputFormat[tuple.Tuple2[Int, Int]]();
 
-        outFormat.setInputType(typeInformation);
-        outFormat.setSerializer(typeInformation.createSerializer());
+        outFormat.setInputType(typeInformation, env.getConfig);
+        outFormat.setSerializer(typeInformation.createSerializer(env.getConfig));
 
         __input.write(outFormat, "file:///tmp/emma/temp/comprehension$macro$20", org.apache.flink.core.fs.FileSystem.WriteMode.OVERWRITE)
       };

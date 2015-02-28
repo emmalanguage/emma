@@ -19,6 +19,7 @@
 
 package org.apache.flink.api.scala.operators;
 
+import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.InvalidProgramException;
 import org.apache.flink.api.common.io.FileOutputFormat;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -218,8 +219,8 @@ public class ScalaCsvOutputFormat<T extends Product> extends FileOutputFormat<T>
 	 * is in fact a tuple type.
 	 */
 	@Override
-	public void setInputType(TypeInformation<?> type) {
-		if (!type.isTupleType()) {
+    public void setInputType(TypeInformation<?> typeInformation, ExecutionConfig executionConfig) {
+		if (!typeInformation.isTupleType()) {
 			throw new InvalidProgramException("The " + ScalaCsvOutputFormat.class.getSimpleName() +
 				" can only be used to write tuple data sets.");
 		}
