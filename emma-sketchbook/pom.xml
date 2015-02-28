@@ -43,6 +43,20 @@
             <scope>test</scope>
         </dependency>
 
+        <!-- Flink -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-scala</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-java</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-clients</artifactId>
+        </dependency>
+
         <!-- Logging -->
         <dependency>
             <groupId>log4j</groupId>
@@ -103,6 +117,15 @@
                                     <mainClass>eu.stratosphere.emma.examples.Application</mainClass>
                                 </transformer>
                             </transformers>
+                            <artifactSet>
+                                <excludes>
+                                    <exclude>org.apache.hadoop:*</exclude>
+                                    <exclude>org.apache.flink:*</exclude>
+                                    <exclude>org.scala-lang:*</exclude>
+                                    <exclude>com.google.guava:*</exclude>
+                                    <exclude>org.slf4j:slf4j-log4j12</exclude>
+                                </excludes>
+                            </artifactSet>
                         </configuration>
                     </execution>
                 </executions>
