@@ -1,6 +1,7 @@
 package eu.stratosphere.emma.codegen.flink
 
 import java.net.URI
+import java.util.UUID
 
 import eu.stratosphere.emma.api.{CSVInputFormat, CSVOutputFormat}
 import eu.stratosphere.emma.codegen.flink.typeutil._
@@ -11,7 +12,7 @@ import eu.stratosphere.emma.util.Counter
 import scala.collection.mutable
 import scala.reflect.runtime.universe._
 
-class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
+class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: UUID = UUID.randomUUID()) {
 
   import eu.stratosphere.emma.runtime.logger
 
@@ -59,7 +60,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
           // write output
           __input.write(outFormat, ${s"$tempResultsPrefix/$id"}, org.apache.flink.core.fs.FileSystem.WriteMode.OVERWRITE)
 
-          env.execute(${s"Emma[$dataflowName]"})
+          env.execute(${s"Emma[$sessionID][$dataflowName]"})
         }
       }
       """.asInstanceOf[ImplDef]
@@ -107,7 +108,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
           org.apache.flink.api.java.io.RemoteCollectorImpl.collectLocal(in, collection)
 
           // execute gather dataflow
-          env.execute(${s"Emma[$dataflowName]"})
+          env.execute(${s"Emma[$sessionID][$dataflowName]"})
 
           // construct result Seq
           scala.collection.JavaConversions.collectionAsScalaIterable(collection).toStream
@@ -155,8 +156,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler) {
 
         def run(env: ExecutionEnvironment, ..$params, ..$localInputs) = {
           $opCode
-
-          env.execute("Emma[" + $dataflowName + "]")
+          env.execute(${s"Emma[$sessionID][$dataflowName]"})
         }
 
         def clean[F](env: ExecutionEnvironment, f: F): F = {

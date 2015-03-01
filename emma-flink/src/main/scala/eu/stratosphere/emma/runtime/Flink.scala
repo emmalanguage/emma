@@ -29,7 +29,7 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
 
   val dataflowCompiler = new DataflowCompiler()
 
-  val dataflowGenerator = new DataflowGenerator(dataflowCompiler)
+  val dataflowGenerator = new DataflowGenerator(dataflowCompiler, envSessionID)
 
   override def execute[A: TypeTag](root: FoldSink[A], name: String, closure: Any*): ValueRef[A] = {
     // client.submitTopology(flink.generate(root, nextDataflowName), null)
