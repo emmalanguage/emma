@@ -58,9 +58,9 @@ package object runtime {
     }
   }
 
-  case object Native extends Engine {
+  case class Native() extends Engine {
 
-    override lazy val defaultDOP = 0
+    override lazy val defaultDOP = 1
 
     def execute[A: TypeTag](root: FoldSink[A], name: String, closure: Any*): ValueRef[A] = ???
 

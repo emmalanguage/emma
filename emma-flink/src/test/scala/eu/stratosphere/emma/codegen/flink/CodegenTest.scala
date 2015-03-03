@@ -84,7 +84,7 @@ class CodegenTest {
     }
 
     // write the input to a file using the original code and the runtime under test
-    val actPath = alg("native").run(runtime.Native)
+    val actPath = alg("native").run(runtime.Native())
     val resPath = alg("flink").run(rt)
 
     val exp = scala.io.Source.fromFile(resPath).getLines().toStream
@@ -109,7 +109,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -126,7 +126,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -144,7 +144,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -167,7 +167,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -188,7 +188,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -209,7 +209,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -231,7 +231,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -250,7 +250,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -272,7 +272,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -290,7 +290,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -311,7 +311,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -333,7 +333,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -354,7 +354,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -371,7 +371,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt)
-    val exp = alg.run(runtime.Native)
+    val exp = alg.run(runtime.Native())
 
     // assert that the result contains the expected values
     compareBags(act.fetch(), exp.fetch())
@@ -396,7 +396,7 @@ class CodegenTest {
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val (cact, bact) = alg.run(runtime.Native)
+    val (cact, bact) = alg.run(runtime.Native())
     val (cexp, bexp) = alg.run(rt)
 
     // assert that the result contains the expected values
@@ -415,7 +415,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -441,7 +441,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -463,7 +463,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -482,7 +482,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -496,7 +496,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch()
-    val exp = alg.run(runtime.Native).fetch()
+    val exp = alg.run(runtime.Native()).fetch()
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -517,7 +517,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch().sortBy(_._1)
-    val exp = alg.run(runtime.Native).fetch().sortBy(_._1)
+    val exp = alg.run(runtime.Native()).fetch().sortBy(_._1)
 
     // assert that the result contains the expected values
     compareBags(act, exp)
@@ -531,7 +531,7 @@ class CodegenTest {
 
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt).fetch().sortBy(_._1)
-    val exp = alg.run(runtime.Native).fetch().sortBy(_._1)
+    val exp = alg.run(runtime.Native()).fetch().sortBy(_._1)
 
     // assert that the result contains the expected values
     compareBags(act, exp)

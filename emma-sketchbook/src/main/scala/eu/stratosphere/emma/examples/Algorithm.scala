@@ -38,7 +38,7 @@ object Algorithm {
       // runtime type
       parser.addArgument(s"--${Command.KEY_RT_TYPE}")
         .`type`[String](classOf[String])
-        .choices("local", "flink-local", "flink-remote", "spark")
+        .choices("native", "flink-local", "flink-remote", "spark")
         .dest(Command.KEY_RT_TYPE)
         .metavar("RT")
         .help(s"runtime type (default ${Command.KEY_RT_TYPE_DEFAULT}})")

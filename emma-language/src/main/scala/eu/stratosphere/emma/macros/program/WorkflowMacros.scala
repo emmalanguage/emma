@@ -74,7 +74,7 @@ class WorkflowMacros(val c: blackbox.Context) {
         new eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
 
            def run(engine: eu.stratosphere.emma.runtime.Engine): ${c.weakTypeOf[T]} = engine match {
-             case eu.stratosphere.emma.runtime.Native => runNative()
+             case _: eu.stratosphere.emma.runtime.Native => runNative()
              case _ => runParallel(engine)
            }
 
