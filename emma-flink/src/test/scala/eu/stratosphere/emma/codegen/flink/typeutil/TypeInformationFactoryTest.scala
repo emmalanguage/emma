@@ -10,11 +10,13 @@ import scala.reflect.runtime.universe._
 
 class TypeInformationFactoryTest {
 
+  val mirror = runtimeMirror(getClass.getClassLoader)
+
   var compiler: DataflowCompiler = _
   var factory: TypeInformationFactory = _
 
   @Before def setup() {
-    compiler = new DataflowCompiler()
+    compiler = new DataflowCompiler(mirror)
     factory = new TypeInformationFactory(compiler)
   }
 

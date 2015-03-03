@@ -27,7 +27,7 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
 
   val env: ExecutionEnvironment
 
-  val dataflowCompiler = new DataflowCompiler()
+  val dataflowCompiler = new DataflowCompiler(mirror)
 
   val dataflowGenerator = new DataflowGenerator(dataflowCompiler, envSessionID)
 
@@ -102,7 +102,7 @@ case class FlinkRemote(override val host: String, override val port: Int) extend
     val path = new java.io.File(this.getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
     if (path.exists() && path.isFile) {
       logger.info(s"Passing jar location '${path.toString}' to remote environment")
-      ExecutionEnvironment.getExecutionEnvironment // createRemoteEnvironment(host, port, path.toString)
+      ExecutionEnvironment.createRemoteEnvironment(host, port, path.toString)
     } else {
       ExecutionEnvironment.getExecutionEnvironment
     }

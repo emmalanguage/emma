@@ -11,10 +11,9 @@ import scala.collection.mutable
  */
 package object ir {
 
-  import scala.language.implicitConversions
-  import scala.language.existentials
-  import scala.reflect.runtime.{universe => ru}
+  import scala.language.{existentials, implicitConversions}
   import scala.reflect.runtime.universe._
+  import scala.reflect.runtime.{universe => ru}
   import scala.tools.reflect.ToolBox
 
   // ---------------------------------------------------
@@ -171,7 +170,7 @@ package object ir {
 
     def closure = {
       val vparamsTpes = tpe match {
-        case TypeRef(prefix1, sym1, targs1) if UDF.fnSymbols.contains(sym1) => targs1.slice(0, targs1.size-1)
+        case TypeRef(prefix1, sym1, targs1) if UDF.fnSymbols.contains(sym1) => targs1.slice(0, targs1.size - 1)
         case _ => List(tpe)
       }
       for ((vp, tpe) <- tree.vparams zip vparamsTpes) yield ValDef(vp.mods, vp.name, tq"$tpe", vp.rhs)
@@ -180,7 +179,7 @@ package object ir {
     def params = {
       val vparamsTpes = tpe match {
         case TypeRef(prefix1, sym1, targs1) if UDF.fnSymbols.contains(sym1) => targs1.reverse.head match {
-          case TypeRef(prefix2, sym2, targs2) if UDF.fnSymbols.contains(sym2) => targs2.slice(0, targs2.size-1)
+          case TypeRef(prefix2, sym2, targs2) if UDF.fnSymbols.contains(sym2) => targs2.slice(0, targs2.size - 1)
           case TypeRef(prefix2, sym2, targs2) => targs2
         }
         case _ => List(tpe)
@@ -194,17 +193,17 @@ package object ir {
   object UDF {
 
     val fnSymbols = Set[Symbol](
-      rootMirror.staticClass("scala.Function0"),
-      rootMirror.staticClass("scala.Function1"),
-      rootMirror.staticClass("scala.Function2"),
-      rootMirror.staticClass("scala.Function3"),
-      rootMirror.staticClass("scala.Function4"),
-      rootMirror.staticClass("scala.Function5"),
-      rootMirror.staticClass("scala.Function6"),
-      rootMirror.staticClass("scala.Function7"),
-      rootMirror.staticClass("scala.Function8"),
-      rootMirror.staticClass("scala.Function9"),
-      rootMirror.staticClass("scala.Function10"))
+      runtime.mirror.staticClass("scala.Function0"),
+      runtime.mirror.staticClass("scala.Function1"),
+      runtime.mirror.staticClass("scala.Function2"),
+      runtime.mirror.staticClass("scala.Function3"),
+      runtime.mirror.staticClass("scala.Function4"),
+      runtime.mirror.staticClass("scala.Function5"),
+      runtime.mirror.staticClass("scala.Function6"),
+      runtime.mirror.staticClass("scala.Function7"),
+      runtime.mirror.staticClass("scala.Function8"),
+      runtime.mirror.staticClass("scala.Function9"),
+      runtime.mirror.staticClass("scala.Function10"))
 
     def apply(fn: Function, tpe: Type, tb: ToolBox[ru.type]) = new UDF(fn.asInstanceOf[Function], tpe, tb)
 

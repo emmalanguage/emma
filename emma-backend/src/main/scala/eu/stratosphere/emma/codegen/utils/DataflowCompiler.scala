@@ -3,10 +3,9 @@ package eu.stratosphere.emma.codegen.utils
 import java.nio.file.{Files, Paths}
 
 import scala.reflect.runtime.universe._
-import scala.reflect.runtime.{currentMirror => cm, universe => ru}
 import scala.tools.reflect.ToolBox
 
-class DataflowCompiler {
+class DataflowCompiler(val mirror: Mirror) {
 
   import eu.stratosphere.emma.codegen.utils.DataflowCompiler._
   import eu.stratosphere.emma.runtime.logger
@@ -19,7 +18,7 @@ class DataflowCompiler {
     path.toAbsolutePath.toString
   }
 
-  val tb = cm.mkToolBox(options = s"-d $classGenDir")
+  val tb = mirror.mkToolBox(options = s"-d $classGenDir")
 
   logger.info(s"Dataflow compiler will use '$classGenDir' as a target directory")
 
@@ -71,8 +70,8 @@ class DataflowCompiler {
 
 object DataflowCompiler {
 
-  val CONSTRUCTOR = ru.termNames.CONSTRUCTOR
-  val RUN_METHOD = ru.TermName("run")
+  val CONSTRUCTOR = termNames.CONSTRUCTOR
+  val RUN_METHOD = TermName("run")
 
   object replaceIdents extends Transformer with (Tree => Tree) {
     override def transform(tree: Tree): Tree = tree match {

@@ -534,11 +534,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
 
   private def opCode[OT, IT](op: ir.FoldGroup[OT, IT])(implicit closure: DataflowClosure): Tree = {
     val srcTpe = typeOf(op.xs.tag).dealias
-    val srcTpeInfo = typeInfoFactory(srcTpe)
     val tgtTpe = typeOf(op.tag).dealias
     val tgtTpeInfo = typeInfoFactory(tgtTpe)
-
-    // val keyTpe = typeInfoFactory(op.key)
 
     // assemble input fragment
     val xs = generateOpCode(op.xs)
@@ -558,7 +555,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
           ${substitute(key.params(0).name -> q"x")(key.body)},
           ${substitute(sng.params(0).name -> q"x")(sng.body)})
         """))
-      // construct tuplelized UDF
+      // construct UDF
       ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)
     }
     val mapTpe = tgtTpe
@@ -576,7 +573,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     val keyUDF = {
       // assemble UDF code
       val udf = tb.typecheck(tb.untypecheck(q"() => (x: $tgtTpe) => x.key"))
-      // construct tuplelized UDF
+      // construct UDF
       ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)
     }
     val keyTpe = keyUDF.body.tpe
@@ -603,7 +600,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
             union.params(1).name -> q"y.values")(union.body)
         })
         """))
-      // construct tuplelized UDF
+      // construct UDF
       ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)
     }
     val reduceTpe = tgtTpe
@@ -737,14 +734,11 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     }
   }
 
-  private val bagSymbol = rootMirror.staticClass("eu.stratosphere.emma.api.DataBag")
+  private val bagSymbol = dataflowCompiler.mirror.staticClass("eu.stratosphere.emma.api.DataBag")
 
   private val bagConstructors = bagSymbol.companion.info.decl(TermName("apply")).alternatives
 
-  def substitute(map: (TermName, Tree)*) = {
-    val m = Map(map: _*)
-    new SymbolSubstituter(Map(map: _*))
-  }
+  def substitute(map: (TermName, Tree)*) = new SymbolSubstituter(Map(map: _*))
 
   class SymbolSubstituter(map: Map[TermName, Tree]) extends Transformer with (Tree => Tree) {
     override def apply(tree: Tree): Tree = transform(tree)

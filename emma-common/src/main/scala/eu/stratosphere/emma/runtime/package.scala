@@ -8,7 +8,6 @@ import eu.stratosphere.emma.ir.{FoldSink, TempSink, ValueRef, Write}
 import org.slf4j.LoggerFactory
 
 import scala.reflect.runtime.universe._
-import scala.reflect.runtime.{universe => ru}
 
 
 package object runtime {
@@ -24,6 +23,8 @@ package object runtime {
   }
 
   private[emma] val logger = Logger(LoggerFactory.getLogger(classOf[Engine]))
+
+  val mirror = runtimeMirror(getClass.getClassLoader)
 
   abstract class Engine {
 
@@ -82,20 +83,19 @@ package object runtime {
   }
 
   def factory(name: String, host: String, port: Int) = {
-    val mirror = ru.runtimeMirror(getClass.getClassLoader)
     // reflect engine
     val engineClazz = mirror.staticClass(s"${getClass.getPackage.getName}.${toCamelCase(name)}")
     val engineClazzMirror = mirror.reflectClass(engineClazz)
-    val engineClassType = ru.appliedType(engineClazz)
+    val engineClassType = appliedType(engineClazz)
 
-    if (!(engineClassType <:< ru.typeOf[Engine]))
+    if (!(engineClassType <:< typeOf[Engine]))
       throw new RuntimeException(s"Cannot instantiate engine '${getClass.getPackage.getName}.${toCamelCase(name)}' (should implement Engine)")
 
     if (engineClazz.isAbstract)
       throw new RuntimeException(s"Cannot instantiate engine '${getClass.getPackage.getName}.${toCamelCase(name)}' (cannot be abtract)")
 
     // reflect engine constructor
-    val constructorMirror = engineClazzMirror.reflectConstructor(engineClassType.decl(ru.termNames.CONSTRUCTOR).asMethod)
+    val constructorMirror = engineClazzMirror.reflectConstructor(engineClassType.decl(termNames.CONSTRUCTOR).asMethod)
     // instantiate engine
     constructorMirror(host, port).asInstanceOf[Engine]
   }

@@ -85,7 +85,8 @@ object CodegenProofOfConcept {
           def run(env: ExecutionEnvironment, separator: String) = { $quotedPlan }
        }""".asInstanceOf[ImplDef]
 
-    val dfCompiler = new DataflowCompiler()
+    val mirror = runtimeMirror(getClass.getClassLoader)
+    val dfCompiler = new DataflowCompiler(mirror)
     val dfSymbol = dfCompiler.compile(dfTree).asModule
 
     val separator = "'"
