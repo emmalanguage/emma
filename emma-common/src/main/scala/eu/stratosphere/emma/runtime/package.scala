@@ -60,6 +60,10 @@ package object runtime {
 
   case class Native() extends Engine {
 
+    sys addShutdownHook {
+      closeSession()
+    }
+
     override lazy val defaultDOP = 1
 
     def execute[A: TypeTag](root: FoldSink[A], name: String, closure: Any*): ValueRef[A] = ???
@@ -85,7 +89,7 @@ package object runtime {
     val engineClassType = ru.appliedType(engineClazz)
 
     if (!(engineClassType <:< ru.typeOf[Engine]))
-      throw new RuntimeException(s"Cannot instantiate engine '${getClass.getPackage.getName}.${toCamelCase(name)}' (shold implement Engine)")
+      throw new RuntimeException(s"Cannot instantiate engine '${getClass.getPackage.getName}.${toCamelCase(name)}' (should implement Engine)")
 
     if (engineClazz.isAbstract)
       throw new RuntimeException(s"Cannot instantiate engine '${getClass.getPackage.getName}.${toCamelCase(name)}' (cannot be abtract)")
