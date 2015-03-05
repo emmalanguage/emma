@@ -3,7 +3,6 @@ package eu.stratosphere.emma.examples.tpch.query01
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
 import eu.stratosphere.emma.examples.tpch.Lineitem
-import eu.stratosphere.emma.examples.tpch.query03.Query03
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
@@ -16,7 +15,7 @@ object Query01 {
     val KEY_DELTA = "delta"
   }
 
-  class Command extends Algorithm.Command[Query03] {
+  class Command extends Algorithm.Command[Query01] {
 
     // algorithm names
     override def name = "tpch-q1"
