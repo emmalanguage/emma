@@ -60,15 +60,15 @@
 
         <!-- Flink -->
         <dependency>
-            <groupId>org.apache.flink</groupId>
+            <groupId>eu.stratosphere</groupId>
             <artifactId>flink-scala</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.apache.flink</groupId>
+            <groupId>eu.stratosphere</groupId>
             <artifactId>flink-java</artifactId>
         </dependency>
         <dependency>
-            <groupId>org.apache.flink</groupId>
+            <groupId>eu.stratosphere</groupId>
             <artifactId>flink-clients</artifactId>
         </dependency>
 
