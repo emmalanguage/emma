@@ -101,8 +101,8 @@ class Query03(inPath: String, outPath: String, segment: String, date: String, rt
 
       // cannot directly reference the parameter
       val _truncate = truncate
-      val _date = ""
-      val _segment = "f"
+      val _date = date
+      val _segment = segment
 
       // compute join part of the query
       val join = for (

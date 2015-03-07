@@ -52,12 +52,12 @@ class TPCHTest {
   @Test def testQuery03(): Unit = {
 
     // execute with native and with tested environment
-    new Query03(inBase, outputPath("q3.tbl.native"), "", "", runtime.Native(), true).run()
-    new Query03(inBase, outputPath("q3.tbl.flink"), "", "", rt, true).run()
+    new Query03(inBase, outputPath("q3.tbl.native"), "AUTOMOBILE", "1996-06-30", runtime.Native(), true).run()
+    new Query03(inBase, outputPath("q3.tbl.flink"), "AUTOMOBILE", "1996-06-30", rt, true).run()
 
     // compare the results
-    val exp = scala.io.Source.fromFile(outputPath("q1.tbl.native")).getLines().toStream.toList.sorted
-    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q1.tbl.flink/$i")).getLines().toStream)).toList.sorted
+    val exp = scala.io.Source.fromFile(outputPath("q3.tbl.native")).getLines().toStream.toList.sorted
+    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q3.tbl.flink/$i")).getLines().toStream)).toList.sorted
 
     // assert that the result contains the expected values
     compareBags(exp, res)
