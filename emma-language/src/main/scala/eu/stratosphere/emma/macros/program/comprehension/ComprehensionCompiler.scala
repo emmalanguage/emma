@@ -71,6 +71,12 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         case ValDef(_, n, _, _) => n.encodedName
       }).getOrElse(t.id.encodedName)
 
+      val executeMethod = root match {
+        case combinator.Write(_, _, xs) => TermName("executeWrite")
+        case combinator.Fold(_, _, _, _, _) => TermName("executeFold")
+        case _ => TermName("executeTempSink")
+      }
+
       q"""
       {
         // required imports
@@ -80,7 +86,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         val __root = ${serialize(root)}
 
         // execute the plan and return a reference to the result
-        engine.execute(__root, ${Literal(Constant(name.toString))}, ..${c.map(_.name)})
+        engine.$executeMethod(__root, ${Literal(Constant(name.toString))}, ..${c.map(_.name)})
       }
       """
     }
@@ -101,8 +107,6 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
           q"ir.TempSource($ident)"
         case combinator.TempSink(name, xs) =>
           q"ir.TempSink(${name.toString}, ${serialize(xs)})"
-        case combinator.FoldSink(name, xs) =>
-          q"ir.FoldSink(${name.toString}, ${serialize(xs)})"
         case combinator.Map(f, xs) =>
           q"ir.Map[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(f)}, ${serialize(xs)})"
         case combinator.FlatMap(f, xs) =>
@@ -120,7 +124,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         case combinator.Group(key, xs) =>
           q"ir.Group[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(key)}, ${serialize(xs)})"
         case combinator.Fold(empty, sng, union, xs, _) =>
-          q"ir.Fold[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
+          q"ir.Fold[${e.tpe}, ${elementType(xs.tpe)}](${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
         case combinator.FoldGroup(key, empty, sng, union, xs) =>
           q"ir.FoldGroup[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(key)}, ${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
         case combinator.Distinct(xs) =>

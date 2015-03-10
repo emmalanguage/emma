@@ -144,6 +144,24 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
       // create a sorted list of closure local inputs (convention used by the Engine client)
       val localInputs = for (p <- closure.localInputParams.toSeq.sortBy(_._1.toString)) yield ValDef(Modifiers(Flag.PARAM), p._1, p._2, EmptyTree)
 
+      val runMethod = root match {
+        case op: ir.Fold[_, _] =>
+          q"""
+          def run(env: ExecutionEnvironment, ..$params, ..$localInputs) = {
+            val __foldCollection = $opCode
+            env.execute(${s"Emma[$sessionID][$dataflowName]"})
+            if (__foldCollection.isEmpty) ${op.empty.tree.asInstanceOf[Function].body} else __foldCollection.iterator().next()
+          }
+          """
+        case op: ir.Combinator[_] =>
+          q"""
+          def run(env: ExecutionEnvironment, ..$params, ..$localInputs) = {
+            $opCode
+            env.execute(${s"Emma[$sessionID][$dataflowName]"})
+          }
+          """
+      }
+
       // assemble dataflow
       val tree = q"""
       object ${TermName(dataflowName)} {
@@ -154,10 +172,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
 
         ..${closure.udfs.result().toSeq}
 
-        def run(env: ExecutionEnvironment, ..$params, ..$localInputs) = {
-          $opCode
-          env.execute(${s"Emma[$sessionID][$dataflowName]"})
-        }
+        $runMethod
 
         def clean[F](env: ExecutionEnvironment, f: F): F = {
           if (env.getConfig.isClosureCleanerEnabled) {
@@ -189,6 +204,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     case op: ir.Filter[_] => opCode(op)
     case op: ir.EquiJoin[_, _, _] => opCode(op)
     case op: ir.Cross[_, _, _] => opCode(op)
+    case op: ir.Fold[_, _] => opCode(op)
     case op: ir.FoldGroup[_, _] => opCode(op)
     case op: ir.Distinct[_] => opCode(op)
     case op: ir.Union[_] => opCode(op)
@@ -532,6 +548,60 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     """
   }
 
+  private def opCode[OT, IT](op: ir.Fold[OT, IT])(implicit closure: DataflowClosure): Tree = {
+    val srcTpe = typeOf(op.xs.tag).dealias
+    val tgtTpe = typeOf(op.tag).dealias
+    val tgtTpeInfo = typeInfoFactory(tgtTpe)
+
+    // assemble input fragment
+    val xs = generateOpCode(op.xs)
+
+    // get fold components
+    val sng = ir.UDF(op.sng, tb)
+    val union = ir.UDF(op.union, tb)
+
+    val mapName = closure.nextUDFName("FoldMapper")
+    val mapUDF = sng
+    val mapTpe = tgtTpe
+    val mapTpeInfo = tgtTpeInfo // equals to typeInfoFactory(mapTpe)
+    closure.closureParams ++= (for (p <- mapUDF.closure) yield p.name -> p.tpt)
+    closure.udfs +=
+      q"""
+      class $mapName(..${mapUDF.closure}) extends org.apache.flink.api.common.functions.RichMapFunction[$srcTpe, $mapTpe] with ResultTypeQueryable[$mapTpe] {
+        override def map(..${mapUDF.params}): $mapTpe = ${mapUDF.body}
+        override def getProducedType = $mapTpeInfo
+      }
+      """
+
+    val reduceName = closure.nextUDFName("FoldReducer")
+    val reduceUDF = union
+    val reduceTpe = tgtTpe
+    val reduceTpeInfo = tgtTpeInfo // equals to typeInfoFactory(reduceTpe)
+    closure.closureParams ++= (for (p <- reduceUDF.closure) yield p.name -> p.tpt)
+    closure.udfs +=
+      q"""
+      class $reduceName(..${reduceUDF.closure}) extends org.apache.flink.api.common.functions.RichReduceFunction[$reduceTpe] with ResultTypeQueryable[$reduceTpe] {
+        override def reduce(..${reduceUDF.params}): $reduceTpe = ${reduceUDF.body}
+        override def getProducedType = $reduceTpeInfo
+      }
+      """
+
+    // assemble dataflow fragment
+    q"""
+    val __fold = $xs
+      .map(new $mapName(..${mapUDF.closure.map(_.name)}))
+      .reduce(new $reduceName(..${reduceUDF.closure.map(_.name)}))
+
+    // local collection to store results in
+    val __foldCollection = java.util.Collections.synchronizedCollection(new java.util.ArrayList[$tgtTpe]())
+
+    // collect results from remote in local collection
+    org.apache.flink.api.java.io.RemoteCollectorImpl.collectLocal(__fold, __foldCollection)
+
+    __foldCollection
+    """
+  }
+
   private def opCode[OT, IT](op: ir.FoldGroup[OT, IT])(implicit closure: DataflowClosure): Tree = {
     val srcTpe = typeOf(op.xs.tag).dealias
     val tgtTpe = typeOf(op.tag).dealias
@@ -545,7 +615,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     val sng = ir.UDF(op.sng, tb)
     val union = ir.UDF(op.union, tb)
 
-    val mapName = closure.nextUDFName("FGMapper")
+    val mapName = closure.nextUDFName("FoldGroupMapper")
     val mapUDF = {
       // FIXME: this is not sanitized, input parameters might diverge
       // assemble UDF code
@@ -569,7 +639,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
       }
       """
 
-    val keyName = closure.nextUDFName("FGKeySelector")
+    val keyName = closure.nextUDFName("FoldGroupKeySelector")
     val keyUDF = {
       // assemble UDF code
       val udf = tb.typecheck(tb.untypecheck(q"() => (x: $tgtTpe) => x.key"))
@@ -587,7 +657,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
       }
       """
 
-    val reduceName = closure.nextUDFName("FGReducer")
+    val reduceName = closure.nextUDFName("FoldGroupReducer")
     val reduceUDF = {
       // FIXME: this is not sanitized, input parameters might diverge
       // assemble UDF code

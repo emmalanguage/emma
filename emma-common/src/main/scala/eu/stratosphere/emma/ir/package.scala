@@ -67,10 +67,6 @@ package object ir {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class FoldSink[+A: TypeTag](name: String, xs: Fold[_ <: A, Any]) extends Combinator[A] {
-    override val tag: TypeTag[_ <: A] = typeTag[A]
-  }
-
   final case class Map[+A: TypeTag, +B: TypeTag](f: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
@@ -131,7 +127,6 @@ package object ir {
       case Write(_, _, xs) => traverse(xs)
       case TempSource(id) =>
       case TempSink(_, xs) => traverse(xs)
-      case FoldSink(_, xs) => traverse(xs)
       case Map(_, xs) => traverse(xs)
       case FlatMap(_, xs) => traverse(xs)
       case Filter(_, xs) => traverse(xs)

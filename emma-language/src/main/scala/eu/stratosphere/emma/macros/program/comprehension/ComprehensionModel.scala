@@ -111,10 +111,6 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       val tpe = xs.tpe
     }
 
-    case class FoldSink(id: TermName, xs: Fold) extends Combinator {
-      val tpe = xs.tpe
-    }
-
     case class Map(f: Tree, xs: Expression) extends Combinator {
       def tpe = c.typecheck(tq"DataBag[(${f.tpe.widen.typeArgs.reverse.head})]", c.TYPEmode).tpe
     }
@@ -206,7 +202,6 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       case combinator.Write(location, format, in) => combinator.Write(location, format, transform(in))
       case combinator.TempSource(id) => combinator.TempSource(id)
       case combinator.TempSink(id, xs) => combinator.TempSink(id, transform(xs))
-      case combinator.FoldSink(id, xs) => combinator.FoldSink(id, transformFold(xs))
       case combinator.Map(f, xs) => combinator.Map(f, transform(xs))
       case combinator.FlatMap(f, xs) => combinator.FlatMap(f, transform(xs))
       case combinator.Filter(p, xs) => combinator.Filter(p, transform(xs))
@@ -248,7 +243,6 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
       case combinator.Write(_, _, xs) => traverse(xs)
       case combinator.TempSource(_) =>
       case combinator.TempSink(_, xs) => traverse(xs)
-      case combinator.FoldSink(_, xs) => traverse(xs)
       case combinator.Map(_, xs) => traverse(xs)
       case combinator.FlatMap(_, xs) => traverse(xs)
       case combinator.Filter(_, xs) => traverse(xs)
@@ -339,11 +333,6 @@ private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHol
         s"""
            |tmpsnk ${pp(id)} (
                               |       ${offset + pp(xs, offset + " " * 8)} )
-        """.stripMargin.trim
-      case e@combinator.FoldSink(id, xs) =>
-        s"""
-           |foldsnk ${pp(id)} (
-                               |       ${offset + pp(xs, offset + " " * 8)} )
         """.stripMargin.trim
       case e@combinator.Map(f, xs) =>
         s"""

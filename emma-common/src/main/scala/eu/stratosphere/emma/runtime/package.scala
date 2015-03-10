@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.typesafe.scalalogging.slf4j.Logger
 import eu.stratosphere.emma.api.DataBag
-import eu.stratosphere.emma.ir.{FoldSink, TempSink, ValueRef, Write}
+import eu.stratosphere.emma.ir.{Fold, TempSink, ValueRef, Write}
 import org.slf4j.LoggerFactory
 
 import scala.reflect.runtime.universe._
@@ -40,19 +40,15 @@ package object runtime {
 
     val defaultDOP: Int
 
-    def execute[A: TypeTag](root: FoldSink[A], name: String, closure: Any*): ValueRef[A]
+    def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A
 
-    def execute[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]]
+    def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]]
 
-    def execute[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit
+    def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit
 
     def scatter[A: TypeTag](values: Seq[A]): ValueRef[DataBag[A]]
 
     def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A]
-
-    def put[A: TypeTag](value: A): ValueRef[A]
-
-    def get[A: TypeTag](ref: ValueRef[A]): A
 
     def closeSession() = {
       logger.info(s"Closing Emma session $envSessionID")
@@ -67,19 +63,15 @@ package object runtime {
 
     override lazy val defaultDOP = 1
 
-    def execute[A: TypeTag](root: FoldSink[A], name: String, closure: Any*): ValueRef[A] = ???
+    override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = ???
 
-    def execute[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]] = ???
+    override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]] = ???
 
-    def execute[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = ???
+    override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = ???
 
-    def scatter[A: TypeTag](values: Seq[A]): ValueRef[DataBag[A]] = ???
+    override def scatter[A: TypeTag](values: Seq[A]): ValueRef[DataBag[A]] = ???
 
-    def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A] = ???
-
-    def put[A: TypeTag](value: A): ValueRef[A] = ???
-
-    def get[A: TypeTag](ref: ValueRef[A]): A = ???
+    override def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A] = ???
   }
 
   def factory(name: String, host: String, port: Int) = {

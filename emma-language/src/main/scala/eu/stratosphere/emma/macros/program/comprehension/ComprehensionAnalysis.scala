@@ -103,7 +103,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       val definition = comprehendedTermDefinition(t)
       val comprehension = normalize(ExpressionRoot(comprehend(Nil)(t) match {
         case root@combinator.Write(_, _, _) => root
-        case root@combinator.Fold(_, _, _, _, _) => combinator.FoldSink(comprehendedTermName(definition, id), root)
+        case root@combinator.Fold(_, _, _, _, _) => root
         case root: Expression => combinator.TempSink(comprehendedTermName(definition, id), root)
       }))
 
@@ -303,22 +303,22 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       // in.count()(n)
       case Apply(select@Select(in, _), Nil) if select.symbol == api.count =>
         val comprehendedIn = comprehend(Nil)(in)
-        combinator.Fold(c.typecheck(q"0L"), c.typecheck(q"(x: ${comprehendedIn.tpe}) => 1L"), c.typecheck(q"(x: Long, y: Long) => x + y"), comprehendedIn, t)
+        combinator.Fold(c.typecheck(q"0L"), c.typecheck(q"(x: ${comprehendedIn.tpe.typeArgs.head}) => 1L"), c.typecheck(q"(x: Long, y: Long) => x + y"), comprehendedIn, t)
 
       // in.exists()(n)
       case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.exists =>
         val comprehendedIn = comprehend(Nil)(in)
-        combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe}) => ${substitute(body, arg.name, q"x")}"), c.typecheck(q"(x: Boolean, y: Boolean) => x || y"), comprehendedIn, t)
+        combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe.typeArgs.head}) => ${substitute(body, arg.name, q"x")}"), c.typecheck(q"(x: Boolean, y: Boolean) => x || y"), comprehendedIn, t)
 
       // in.forall()(n)
       case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.forall =>
         val comprehendedIn = comprehend(Nil)(in)
-        combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe}) => ${substitute(body, arg.name, q"x")}"), c.typecheck(q"(x: Boolean, y: Boolean) => x && y"), comprehendedIn, t)
+        combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe.typeArgs.head}) => ${substitute(body, arg.name, q"x")}"), c.typecheck(q"(x: Boolean, y: Boolean) => x && y"), comprehendedIn, t)
 
       // in.empty()(n)
       case Apply(select@Select(in, _), Nil) if select.symbol == api.empty =>
         val comprehendedIn = comprehend(Nil)(in)
-        combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe}) => true"), c.typecheck(q"(x: Boolean, y: Boolean) => x || y"), comprehendedIn, t)
+        combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe.typeArgs.head}) => true"), c.typecheck(q"(x: Boolean, y: Boolean) => x || y"), comprehendedIn, t)
 
       // ----------------------------------------------------------------------
       // Environment & Host Language Connectors
@@ -401,7 +401,6 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
     })
 
     // compute a flattened list of all expressions in the comprehensionView
-    val seqs = comprehensionView.terms.map(_.comprehension.expr.sequence())
     val allExpressions = comprehensionView.terms.map(_.comprehension.expr.sequence()).flatten
 
     for (groupValDef <- groupValDefs; (generator, group) <- generatorFor(groupValDef.name, allExpressions)) {

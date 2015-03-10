@@ -536,4 +536,37 @@ class CodegenTest {
     // assert that the result contains the expected values
     compareBags(act, exp)
   }
+
+  // --------------------------------------------------------------------------
+  // Fold (Global Aggregations)
+  // --------------------------------------------------------------------------
+
+  @Test def testFoldSimpleType() = {
+    val N = 200
+
+    val alg = emma.parallelize {
+      DataBag(1 to N).sum()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(runtime.Native())
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testFoldComplexType() = {
+    val alg = emma.parallelize {
+      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+      imdbTop100.count()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(runtime.Native())
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
 }
