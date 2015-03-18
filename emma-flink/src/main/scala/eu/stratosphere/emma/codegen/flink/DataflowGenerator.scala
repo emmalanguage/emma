@@ -288,6 +288,10 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     val tpe = typeOf(op.tag).dealias
     val tpeInfo = typeInfoFactory(tpe)
 
+    // add a dedicated closure variable to pass the input param
+    val param = TermName(op.ref.name)
+    closure.closureParams += param -> tq"eu.stratosphere.emma.runtime.Flink.DataBagRef[$tpe]"
+
     // assemble dataflow fragment
     q"""
     {
