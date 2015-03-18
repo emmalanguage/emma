@@ -1,6 +1,6 @@
 package eu.stratosphere.emma.api
 
-private[emma] trait CSVConvertors[T] {
+trait CSVConvertors[T] {
 
   def fromCSV(value: Array[String]): T
 
