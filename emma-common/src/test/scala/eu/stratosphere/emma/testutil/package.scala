@@ -28,6 +28,26 @@ package object testutil {
   def tempPath(suffix: String) = Paths.get(s"${System.getProperty("java.io.tmpdir")}/emma/$suffix").toString
 
   /**
+   * Reads The contents from file (or folder containing a list of files) as a string.
+   * @param path The path of the file (or folder containing a list of files) to be read.
+   * @return A sorted list of the read contents.
+   */
+  def fromPath(path: String): List[String] = fromPath(new java.io.File(path))
+
+  /**
+   * Reads The contents from file (or folder containing a list of files) as a string.
+   * @param path The path of the file (or folder containing a list of files) to be read.
+   * @return A sorted list of the read contents.
+   */
+  def fromPath(path: java.io.File): List[String] = {
+    val entries = if (path.isDirectory)
+      path.listFiles.filter(x => !(x.getName.startsWith(".") || x.getName.startsWith("_")))
+    else
+      Array(path)
+    (entries flatMap (x => scala.io.Source.fromFile(x.getAbsolutePath).getLines().toStream.toList)).toList.sorted
+  }
+
+  /**
    * Compares the contents of two bags.
    *
    * @param exp The bag containing the expected contents.
