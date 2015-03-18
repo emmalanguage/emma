@@ -1,6 +1,6 @@
 package eu.stratosphere.emma.codegen.flink.typeutil
 
-import eu.stratosphere.emma.codegen.flink.testschema._
+import eu.stratosphere.emma.codegen.testschema._
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import org.apache.flink.api.common.ExecutionConfig
 import org.apache.flink.api.scala.typeutils.{CaseClassSerializer, CaseClassTypeInfo}

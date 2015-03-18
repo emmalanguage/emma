@@ -1,3 +1,3 @@
-package eu.stratosphere.emma.codegen.flink.testschema
+package eu.stratosphere.emma.codegen.testschema
 
 case class FilmFestivalWinner(year: Int, title: String, director: String, country: String) {}
