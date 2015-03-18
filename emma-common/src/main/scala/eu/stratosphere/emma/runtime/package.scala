@@ -30,12 +30,14 @@ package object runtime {
 
     val envSessionID = UUID.randomUUID()
 
+    private var closed = false
+
     // log program run header
     {
       logger.info("############################################################")
       logger.info("# Emma: Parallel Dataflow Compiler")
       logger.info("############################################################")
-      logger.info(s"Starting Emma session $envSessionID")
+      logger.info(s"Starting Emma session $envSessionID (${this.getClass.getSimpleName} runtime)")
     }
 
     val defaultDOP: Int
@@ -50,12 +52,17 @@ package object runtime {
 
     def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A]
 
-    def closeSession() = {
-      logger.info(s"Closing Emma session $envSessionID")
+    final def closeSession() = if (!closed) {
+      doCloseSession()
+      closed = true
     }
+
+    protected def doCloseSession() = logger.info(s"Closing Emma session $envSessionID (${this.getClass.getSimpleName} runtime)")
   }
 
   case class Native() extends Engine {
+
+    logger.info(s"Initializing native execution environment")
 
     sys addShutdownHook {
       closeSession()

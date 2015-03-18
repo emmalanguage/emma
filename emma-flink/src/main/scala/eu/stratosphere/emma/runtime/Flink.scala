@@ -32,7 +32,7 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
 
   override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    dataflowCompiler.execute[JobExecutionResult](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root)).asInstanceOf[A]
+    dataflowCompiler.execute[A](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
 
   override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]] = {
@@ -62,8 +62,8 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
     DataBag[A](dataflowCompiler.execute[Seq[A]](dataflowSymbol, Array[Any](env)))
   }
 
-  override def closeSession() = {
-    super.closeSession()
+  override protected def doCloseSession() = {
+    super.doCloseSession()
     RemoteCollectorImpl.shutdownAll()
   }
 
