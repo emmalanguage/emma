@@ -1,8 +1,7 @@
-package eu.stratosphere.emma.examples.tpch.query01
+package eu.stratosphere.emma.examples.tpch
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
-import eu.stratosphere.emma.examples.tpch.Lineitem
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
@@ -45,6 +44,26 @@ object Query01 {
     }
   }
 
+  object Schema {
+
+    case class GrpKey(
+                       returnFlag: String,
+                       lineStatus: String) {}
+
+    case class Result(
+                       returnFlag: String,
+                       lineStatus: String,
+                       sumQty: Int,
+                       sumBasePrice: Double,
+                       sumDiscPrice: Double,
+                       sumCharge: Double,
+                       avgQty: Double,
+                       avgPrice: Double,
+                       avgDisc: Double,
+                       countOrder: Long) {}
+
+  }
+
 }
 
 
@@ -81,6 +100,8 @@ object Query01 {
  */
 class Query01(inPath: String, outPath: String, delta: Int, rt: Engine, truncate: Boolean = false) extends Algorithm(rt) {
 
+  import eu.stratosphere.emma.examples.tpch.Query01.Schema._
+
   def this(ns: Namespace, rt: Engine) = this(
     ns.get[String](Query01.Command.KEY_INPUT),
     ns.get[String](Query01.Command.KEY_OUTPUT),
@@ -91,41 +112,41 @@ class Query01(inPath: String, outPath: String, delta: Int, rt: Engine, truncate:
 
     val alg = emma.parallelize {
 
-      // cannot directly reference the parameter
+      // FIXME: cannot directly reference enclosing class parameters
       val _truncate = truncate
 
       // compute join part of the query
       val l = for (
         l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'));
         if l.shipDate <= "1996-12-01")
-      yield l
+        yield l
 
       // aggregate and compute the final result
       val r = for (
         g <- l.groupBy(l => new GrpKey(l.returnFlag, l.lineStatus)))
-      yield {
+        yield {
 
-        def tr(v: Double) = if (_truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
+          def tr(v: Double) = if (_truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
 
-        // compute base aggregates
-        val sumQty = g.values.map(_.quantity).sum();
-        val sumBasePrice = g.values.map(_.extendedPrice).sum()
-        val sumDiscPrice = g.values.map(l => l.extendedPrice * (1 - l.discount)).sum()
-        val sumCharge = g.values.map(l => l.extendedPrice * (1 - l.discount) * (1 + l.tax)).sum()
-        val countOrder = g.values.count()
-        // compute result
-        new Result(
-          g.key.returnFlag,
-          g.key.lineStatus,
-          sumQty,
-          tr(sumBasePrice),
-          tr(sumDiscPrice),
-          tr(sumCharge),
-          avgQty = sumQty / countOrder,
-          avgPrice = tr(sumBasePrice / countOrder),
-          avgDisc = tr(sumDiscPrice / countOrder),
-          countOrder)
-      }
+          // compute base aggregates
+          val sumQty = g.values.map(_.quantity).sum();
+          val sumBasePrice = g.values.map(_.extendedPrice).sum()
+          val sumDiscPrice = g.values.map(l => l.extendedPrice * (1 - l.discount)).sum()
+          val sumCharge = g.values.map(l => l.extendedPrice * (1 - l.discount) * (1 + l.tax)).sum()
+          val countOrder = g.values.count()
+          // compute result
+          new Result(
+            g.key.returnFlag,
+            g.key.lineStatus,
+            sumQty,
+            tr(sumBasePrice),
+            tr(sumDiscPrice),
+            tr(sumCharge),
+            avgQty = sumQty / countOrder,
+            avgPrice = tr(sumBasePrice / countOrder),
+            avgDisc = tr(sumDiscPrice / countOrder),
+            countOrder)
+        }
 
       // write out the result
       write(outPath, new CSVOutputFormat[Result]('|'))(r)
