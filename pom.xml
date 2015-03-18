@@ -36,6 +36,8 @@
         <hadoop.version>2.2.0</hadoop.version>
         <!-- Flink -->
         <flink.version>0.9-SNAPSHOT</flink.version>
+        <!-- Spark -->
+        <spark.version>1.2.1</spark.version>
 
         <!-- Logging -->
         <log4j.version>1.2.17</log4j.version>
@@ -162,6 +164,14 @@
                 <groupId>eu.stratosphere</groupId>
                 <artifactId>flink-clients</artifactId>
                 <version>${flink.version}</version>
+                <scope>provided</scope>
+            </dependency>
+
+            <!-- Spark -->
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-core_2.11</artifactId>
+                <version>${spark.version}</version>
                 <scope>provided</scope>
             </dependency>
 
@@ -389,6 +399,7 @@
         <module>emma-flink</module>
         <module>emma-language</module>
         <module>emma-sketchbook</module>
+        <module>emma-spark</module>
     </modules>
 
 </project>
