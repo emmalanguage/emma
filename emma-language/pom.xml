@@ -40,6 +40,12 @@
             <groupId>eu.stratosphere</groupId>
             <artifactId>emma-common</artifactId>
         </dependency>
+        <!-- Emma (test jars) -->
+        <dependency>
+            <groupId>eu.stratosphere</groupId>
+            <artifactId>emma-common</artifactId>
+            <type>test-jar</type>
+        </dependency>
 
         <!-- HDFS -->
         <dependency>
@@ -65,4 +71,21 @@
             <artifactId>scalatest_${scala.tools.version}</artifactId>
         </dependency>
     </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${maven-jar-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
 </project>

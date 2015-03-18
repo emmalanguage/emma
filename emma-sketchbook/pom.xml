@@ -36,11 +36,16 @@
             <groupId>eu.stratosphere</groupId>
             <artifactId>emma-flink</artifactId>
         </dependency>
+        <!-- Emma (test jars) -->
         <dependency>
             <groupId>eu.stratosphere</groupId>
             <artifactId>emma-common</artifactId>
             <type>test-jar</type>
-            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>eu.stratosphere</groupId>
+            <artifactId>emma-language</artifactId>
+            <type>test-jar</type>
         </dependency>
 
         <!-- Flink -->
@@ -55,6 +60,12 @@
         <dependency>
             <groupId>eu.stratosphere</groupId>
             <artifactId>flink-clients</artifactId>
+        </dependency>
+
+        <!-- Spark -->
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-core_${scala.tools.version}</artifactId>
         </dependency>
 
         <!-- Logging -->
@@ -121,6 +132,7 @@
                             <artifactSet>
                                 <excludes>
                                     <exclude>org.apache.hadoop:*</exclude>
+                                    <exclude>org.apache.spark:*</exclude>
                                     <exclude>eu.stratosphere:flink-scala</exclude>
                                     <exclude>eu.stratosphere:flink-java</exclude>
                                     <exclude>eu.stratosphere:flink-clients</exclude>

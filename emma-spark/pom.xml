@@ -42,17 +42,22 @@
             <artifactId>emma-language</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Emma (test jars) -->
         <dependency>
             <groupId>eu.stratosphere</groupId>
             <artifactId>emma-common</artifactId>
             <type>test-jar</type>
-            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>eu.stratosphere</groupId>
+            <artifactId>emma-language</artifactId>
+            <type>test-jar</type>
         </dependency>
 
         <!-- Spark -->
         <dependency>
             <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_2.11</artifactId>
+            <artifactId>spark-core_${scala.tools.version}</artifactId>
         </dependency>
 
         <!-- Test -->
