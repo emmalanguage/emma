@@ -2,8 +2,6 @@ package eu.stratosphere.emma.examples.tpch
 
 import java.io.File
 
-import eu.stratosphere.emma.examples.tpch.query01.Query01
-import eu.stratosphere.emma.examples.tpch.query03.Query03
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.runtime.Engine
 import eu.stratosphere.emma.testutil._
@@ -39,11 +37,11 @@ class TPCHTest {
 
     // execute with native and with tested environment
     new Query01(inBase, outputPath("q1.tbl.native"), 30, runtime.Native(), true).run()
-    new Query01(inBase, outputPath("q1.tbl.flink"), 30, rt, true).run()
+    new Query01(inBase, outputPath("q1.tbl.rt"), 30, rt, true).run()
 
     // compare the results
-    val exp = scala.io.Source.fromFile(outputPath("q1.tbl.native")).getLines().toStream.toList.sorted
-    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q1.tbl.flink/$i")).getLines().toStream)).toList.sorted
+    val exp = fromPath(outputPath("q1.tbl.native"))
+    val res = fromPath(outputPath("q1.tbl.rt"))
 
     // assert that the result contains the expected values
     compareBags(exp, res)
@@ -53,11 +51,11 @@ class TPCHTest {
 
     // execute with native and with tested environment
     new Query03(inBase, outputPath("q3.tbl.native"), "AUTOMOBILE", "1996-06-30", runtime.Native(), true).run()
-    new Query03(inBase, outputPath("q3.tbl.flink"), "AUTOMOBILE", "1996-06-30", rt, true).run()
+    new Query03(inBase, outputPath("q3.tbl.rt"), "AUTOMOBILE", "1996-06-30", rt, true).run()
 
     // compare the results
-    val exp = scala.io.Source.fromFile(outputPath("q3.tbl.native")).getLines().toStream.toList.sorted
-    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q3.tbl.flink/$i")).getLines().toStream)).toList.sorted
+    val exp = fromPath(outputPath("q1.tbl.native"))
+    val res = fromPath(outputPath("q1.tbl.rt"))
 
     // assert that the result contains the expected values
     compareBags(exp, res)

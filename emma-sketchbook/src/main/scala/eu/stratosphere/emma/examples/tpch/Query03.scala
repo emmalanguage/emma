@@ -1,8 +1,7 @@
-package eu.stratosphere.emma.examples.tpch.query03
+package eu.stratosphere.emma.examples.tpch
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
-import eu.stratosphere.emma.examples.tpch.{Customer, Lineitem, Order}
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
@@ -51,6 +50,11 @@ object Query03 {
     }
   }
 
+  object Schema {
+    case class GrpKey(orderKey: Int, orderDate: String, shipPriority: Int) {}
+    case class Join(orderKey: Int, extendedPrice: Double, discount: Double, orderDate: String, shipPriority: Int) {}
+    case class Result(orderKey: Int, revenue: Double, orderDate: String, shipPriority: Int) {}
+  }
 }
 
 /**
@@ -88,6 +92,8 @@ object Query03 {
  */
 class Query03(inPath: String, outPath: String, segment: String, date: String, rt: Engine, val truncate: Boolean = false) extends Algorithm(rt) {
 
+  import eu.stratosphere.emma.examples.tpch.Query03.Schema._
+
   def this(ns: Namespace, rt: Engine) = this(
     ns.get[String](Query03.Command.KEY_INPUT),
     ns.get[String](Query03.Command.KEY_OUTPUT),
@@ -99,7 +105,7 @@ class Query03(inPath: String, outPath: String, segment: String, date: String, rt
 
     val alg = emma.parallelize {
 
-      // cannot directly reference the parameter
+      // FIXME: cannot directly reference enclosing class parameters
       val _truncate = truncate
       val _date = date
       val _segment = segment
