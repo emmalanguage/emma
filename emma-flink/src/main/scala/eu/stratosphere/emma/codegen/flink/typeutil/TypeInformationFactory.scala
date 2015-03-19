@@ -43,8 +43,44 @@ class TypeInformationFactory(val dataflowCompiler: DataflowCompiler) {
     } else if (widenedTpe =:= weakTypeOf[String] || widenedTpe =:= weakTypeOf[java.lang.String]) {
       q"org.apache.flink.api.common.typeinfo.BasicTypeInfo.getInfoFor(classOf[$widenedTpe])"
     } else {
-      throw new RuntimeException(s"Unsupported field type $widenedTpe.")
+      q"new org.apache.flink.api.java.typeutils.GenericTypeInfo[$widenedTpe](classOf[$widenedTpe])"
     }
+  }
+
+  private def dataBagTypeInformationFor(tpe: Type): Tree = {
+    val symbol = memo.getOrElse(tpe, {
+      val collectionClass = q"classOf[eu.stratosphere.emma.api.DataBag]"
+      val elementClazz = q""
+      val elementTypeInfo = apply(tq"".tpe)
+
+//      val cbf = q"implicitly[CanBuildFrom[${desc.tpe}, ${desc.elem.tpe}, ${desc.tpe}]]"
+
+      val tree = q"".asInstanceOf[ClassDef]
+//        q"""
+//        import scala.collection.generic.CanBuildFrom
+//        import org.apache.flink.api.scala.typeutils.TraversableTypeInfo
+//        import org.apache.flink.api.scala.typeutils.TraversableSerializer
+//        import org.apache.flink.api.common.ExecutionConfig
+//
+//        val elementTpe = $elementTypeInfo
+//        new TraversableTypeInfo($collectionClass, elementTpe) {
+//          def createSerializer(executionConfig: ExecutionConfig) = {
+//            new TraversableSerializer[${desc.tpe}, ${desc.elem.tpe}](
+//                elementTpe.createSerializer(executionConfig)) {
+//              def getCbf = implicitly[CanBuildFrom[${desc.tpe}, ${desc.elem.tpe}, ${desc.tpe}]]
+//            }
+//          }
+//        }
+//      """.asInstanceOf[ClassDef]
+
+      val symbol = dataflowCompiler.compile(tree).asClass
+      logger.debug(s"Synthesized type information for '$tpe' in class '${symbol.fullName}'")
+
+      memo.put(tpe, symbol)
+      symbol
+    })
+
+    q"new $symbol"
   }
 
   private def productTypeInformationFor(tpe: Type): Tree = {
