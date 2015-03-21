@@ -146,11 +146,12 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
 
       val runMethod = root match {
         case op: ir.Fold[_, _] =>
+          val empty = tb.typecheck(tb.parse(op.empty))
           q"""
           def run(env: ExecutionEnvironment, ..$params, ..$localInputs) = {
             val __foldCollection = $opCode
             env.execute(${s"Emma[$sessionID][$dataflowName]"})
-            if (__foldCollection.isEmpty) ${op.empty.tree.asInstanceOf[Function].body} else __foldCollection.iterator().next()
+            if (__foldCollection.isEmpty) $empty else __foldCollection.iterator().next()
           }
           """
         case op: ir.Combinator[_] =>
@@ -360,20 +361,21 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     val xs = generateOpCode(op.xs)
 
     // generate fn UDF
-    val fnUDF = ir.UDF(op.f, tb)
+    val f = tb.typecheck(tb.parse(op.f))
+    val fUDF = ir.UDF(f, f.tpe, tb)
     val fnName = closure.nextUDFName("Mapper")
-    closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
+    closure.closureParams ++= (for (p <- fUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $fnName(..${fnUDF.closure}) extends org.apache.flink.api.common.functions.RichMapFunction[$srcTpe, $tgtTpe] with ResultTypeQueryable[$tgtTpe] {
-        override def map(..${fnUDF.params}): $tgtTpe = ${fnUDF.body}
+      class $fnName(..${fUDF.closure}) extends org.apache.flink.api.common.functions.RichMapFunction[$srcTpe, $tgtTpe] with ResultTypeQueryable[$tgtTpe] {
+        override def map(..${fUDF.params}): $tgtTpe = ${fUDF.body}
         override def getProducedType = $tgtTpeInfo
       }
       """
 
     // assemble dataflow fragment
     q"""
-    $xs.map(new $fnName(..${fnUDF.closure.map(_.name)}))
+    $xs.map(new $fnName(..${fUDF.closure.map(_.name)}))
     """
   }
 
@@ -387,14 +389,15 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     val xs = generateOpCode(op.xs)
 
     // generate fn UDF
-    val fnUDF = ir.UDF(op.f, tb)
+    val f = tb.typecheck(tb.parse(op.f))
+    val fUDF = ir.UDF(f, f.tpe, tb)
     val fnName = closure.nextUDFName("FlatMapper")
-    closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
+    closure.closureParams ++= (for (p <- fUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $fnName(..${fnUDF.closure}) extends org.apache.flink.api.common.functions.RichFlatMapFunction[$srcTpe, $tgtTpe] with ResultTypeQueryable[$tgtTpe] {
-        override def flatMap(..${fnUDF.params}, __c: org.apache.flink.util.Collector[$tgtTpe]): Unit = {
-          for (x <- (${fnUDF.body}).fetch()) __c.collect(x)
+      class $fnName(..${fUDF.closure}) extends org.apache.flink.api.common.functions.RichFlatMapFunction[$srcTpe, $tgtTpe] with ResultTypeQueryable[$tgtTpe] {
+        override def flatMap(..${fUDF.params}, __c: org.apache.flink.util.Collector[$tgtTpe]): Unit = {
+          for (x <- (${fUDF.body}).fetch()) __c.collect(x)
         }
         override def getProducedType = $tgtTpeInfo
       }
@@ -402,7 +405,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
 
     // assemble dataflow fragment
     q"""
-    $xs.flatMap(new $fnName(..${fnUDF.closure.map(_.name)}))
+    $xs.flatMap(new $fnName(..${fUDF.closure.map(_.name)}))
     """
   }
 
@@ -413,19 +416,20 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     val xs = generateOpCode(op.xs)
 
     // generate fn UDF
-    val fnUDF = ir.UDF(op.p, tb)
-    val fnName = closure.nextUDFName("Filter")
-    closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
+    val p = tb.typecheck(tb.parse(op.p))
+    val pUDF = ir.UDF(p, p.tpe, tb)
+    val pName = closure.nextUDFName("Filter")
+    closure.closureParams ++= (for (p <- pUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
       q"""
-      class $fnName(..${fnUDF.closure}) extends org.apache.flink.api.common.functions.RichFilterFunction[$tpe] {
-        override def filter(..${fnUDF.params}): Boolean = ${fnUDF.body}
+      class $pName(..${pUDF.closure}) extends org.apache.flink.api.common.functions.RichFilterFunction[$tpe] {
+        override def filter(..${pUDF.params}): Boolean = ${pUDF.body}
       }
       """
 
     // assemble dataflow fragment
     q"""
-    $xs.filter(new $fnName(..${fnUDF.closure.map(_.name)}))
+    $xs.filter(new $pName(..${pUDF.closure.map(_.name)}))
     """
   }
 
@@ -434,13 +438,19 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     val xsTpe = typeOf(op.xs.tag).dealias
     val ysTpe = typeOf(op.ys.tag).dealias
 
-    val keyxTpe = ir.resultType(op.keyx.staticType.dealias)
+    val keyx = tb.typecheck(tb.parse(op.keyx))
+    val keyxUDF = ir.UDF(keyx, keyx.tpe.dealias, tb)
+    val keyxTpe = ir.resultType(keyx.tpe.dealias)
     val keyxTpeInfo = typeInfoFactory(keyxTpe)
 
-    val keyyTpe = ir.resultType(op.keyy.staticType.dealias)
+    val keyy = tb.typecheck(tb.parse(op.keyy))
+    val keyyUDF = ir.UDF(keyy, keyy.tpe.dealias, tb)
+    val keyyTpe = ir.resultType(keyy.tpe.dealias)
     val keyyTpeInfo = typeInfoFactory(keyyTpe)
 
-    val fTpe = ir.resultType(op.f.staticType.dealias)
+    val f = tb.typecheck(tb.parse(op.f))
+    val fUDF = ir.UDF(f, f.tpe.dealias, tb)
+    val fTpe = ir.resultType(f.tpe.dealias)
     val fTpeInfo = typeInfoFactory(typeOf(op.tag).dealias)
 
     // assemble input fragments
@@ -448,7 +458,6 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     val ys = generateOpCode(op.ys)
 
     // generate keyx UDF
-    val keyxUDF = ir.UDF(op.keyx, tb)
     val keyxName = closure.nextUDFName("KeyX")
     closure.closureParams ++= (for (p <- keyxUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
@@ -459,7 +468,6 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
       }
       """
     // generate keyy UDF
-    val keyyUDF = ir.UDF(op.keyy, tb)
     val keyyName = closure.nextUDFName("KeyY")
     closure.closureParams ++= (for (p <- keyyUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
@@ -471,7 +479,6 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
       """
 
     // generate join UDF
-    val fUDF = ir.UDF(op.f, tb)
     val fName = closure.nextUDFName("Join")
     closure.closureParams ++= (for (p <- fUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
@@ -515,15 +522,16 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     val xsTpe = typeOf(op.xs.tag).dealias
     val ysTpe = typeOf(op.ys.tag).dealias
 
-    val fTpe = ir.resultType(op.f.staticType.dealias)
-    val fTpeInfo = typeInfoFactory(fTpe)
+    val f = tb.typecheck(tb.parse(op.f))
+    val fUDF = ir.UDF(f, f.tpe.dealias, tb)
+    val fTpe = ir.resultType(f.tpe.dealias)
+    val fTpeInfo = typeInfoFactory(typeOf(op.tag).dealias)
 
     // assemble input fragments
     val xs = generateOpCode(op.xs)
     val ys = generateOpCode(op.ys)
 
     // generate cross UDF
-    val fUDF = ir.UDF(op.f, tb)
     val fName = closure.nextUDFName("Cross")
     closure.closureParams ++= (for (p <- fUDF.closure) yield p.name -> p.tpt)
     closure.udfs +=
@@ -561,11 +569,11 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     val xs = generateOpCode(op.xs)
 
     // get fold components
-    val sng = ir.UDF(op.sng, tb)
-    val union = ir.UDF(op.union, tb)
+    val sng = tb.typecheck(tb.parse(op.sng))
+    val union = tb.typecheck(tb.parse(op.union))
 
     val mapName = closure.nextUDFName("FoldMapper")
-    val mapUDF = sng
+    val mapUDF = ir.UDF(sng, sng.tpe.dealias, tb)
     val mapTpe = tgtTpe
     val mapTpeInfo = tgtTpeInfo // equals to typeInfoFactory(mapTpe)
     closure.closureParams ++= (for (p <- mapUDF.closure) yield p.name -> p.tpt)
@@ -578,7 +586,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
       """
 
     val reduceName = closure.nextUDFName("FoldReducer")
-    val reduceUDF = union
+    val reduceUDF = ir.UDF(union, union.tpe.dealias, tb)
     val reduceTpe = tgtTpe
     val reduceTpeInfo = tgtTpeInfo // equals to typeInfoFactory(reduceTpe)
     closure.closureParams ++= (for (p <- reduceUDF.closure) yield p.name -> p.tpt)
@@ -615,19 +623,22 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     val xs = generateOpCode(op.xs)
 
     // get fold components
-    val key = ir.UDF(op.key, tb)
-    val sng = ir.UDF(op.sng, tb)
-    val union = ir.UDF(op.union, tb)
+    val key = tb.typecheck(tb.parse(op.key))
+    val sng = tb.typecheck(tb.parse(op.sng))
+    val sngUDF = ir.UDF(sng, sng.tpe.dealias, tb)
+    val union = tb.typecheck(tb.parse(op.union))
+    val unionUDF = ir.UDF(union, union.tpe.dealias, tb)
 
     val mapName = closure.nextUDFName("FoldGroupMapper")
     val mapUDF = {
+      val keyUDF = ir.UDF(key, key.tpe.dealias, tb)
       // FIXME: this is not sanitized, input parameters might diverge
       // assemble UDF code
       val udf = tb.typecheck(tb.untypecheck(
         q"""
         () => (x: $srcTpe) => new $tgtTpe(
-          ${substitute(key.params(0).name -> q"x")(key.body)},
-          ${substitute(sng.params(0).name -> q"x")(sng.body)})
+          ${substitute(keyUDF.params(0).name -> q"x")(keyUDF.body)},
+          ${substitute(sngUDF.params(0).name -> q"x")(sngUDF.body)})
         """))
       // construct UDF
       ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)
@@ -670,8 +681,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
         () => (x: $tgtTpe, y: $tgtTpe) => new $tgtTpe(
           x.key, ${
           substitute(
-            union.params(0).name -> q"x.values",
-            union.params(1).name -> q"y.values")(union.body)
+            unionUDF.params(0).name -> q"x.values",
+            unionUDF.params(1).name -> q"y.values")(unionUDF.body)
         })
         """))
       // construct UDF
