@@ -86,7 +86,7 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         val __root = ${serialize(root)}
 
         // execute the plan and return a reference to the result
-        engine.$executeMethod(__root, ${Literal(Constant(name.toString))}, ..${c.map(_.name)})
+        engine.$executeMethod(__root, ${Literal(Constant(name.toString))}, ..${c.map(s => q"${s.name}")})
       }
       """
     }
@@ -147,10 +147,10 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
      * @param e The tree to be serialized.
      * @return
      */
-    private def serialize(e: Tree): Tree = {
-      c.typecheck( q"""scala.reflect.runtime.universe.reify {
+    private def serialize(e: Tree): String = {
+      showCode(c.typecheck( q"""
         (..${for (s <- closure(e)) yield ValDef(Modifiers(Flag.PARAM), s.name, tq"${s.info}", EmptyTree)}) => ${c.untypecheck(e)}
-      }""")
+      """))
     }
 
     /**
