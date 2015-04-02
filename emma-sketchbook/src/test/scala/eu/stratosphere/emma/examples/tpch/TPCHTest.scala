@@ -4,6 +4,7 @@ import java.io.File
 
 import eu.stratosphere.emma.examples.tpch.query01.Query01
 import eu.stratosphere.emma.examples.tpch.query03.Query03
+import eu.stratosphere.emma.examples.tpch.query05.Query05
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.runtime.Engine
 import eu.stratosphere.emma.testutil._
@@ -58,6 +59,21 @@ class TPCHTest {
     // compare the results
     val exp = scala.io.Source.fromFile(outputPath("q3.tbl.native")).getLines().toStream.toList.sorted
     val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q3.tbl.flink/$i")).getLines().toStream)).toList.sorted
+
+    // assert that the result contains the expected values
+    compareBags(exp, res)
+  }
+
+  @Test def testQuery05(): Unit = {
+
+    // execute with native and with tested environment
+    //TODO Region: "ASIA" for validation against the qualification database (not enough results in sample data set)
+    new Query05(inBase, outputPath("q5.tbl.native"), "AMERICA", "1994-01-01", runtime.Native(), true).run()
+    new Query05(inBase, outputPath("q5.tbl.flink"), "AMERICA", "1994-01-01", rt, true).run()
+
+    // compare the results
+    val exp = scala.io.Source.fromFile(outputPath("q5.tbl.native")).getLines().toStream.toList.sorted
+    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q5.tbl.flink/$i")).getLines().toStream)).toList.sorted
 
     // assert that the result contains the expected values
     compareBags(exp, res)
