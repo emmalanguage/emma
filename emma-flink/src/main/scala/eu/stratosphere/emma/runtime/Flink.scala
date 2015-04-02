@@ -6,19 +6,19 @@ import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir.{Fold, TempSink, ValueRef, Write, localInputs}
 import eu.stratosphere.emma.runtime.Flink.DataBagRef
 import eu.stratosphere.emma.util.Counter
-import org.apache.flink.api.common.JobExecutionResult
-import org.apache.flink.api.java.ExecutionEnvironment
-import org.apache.flink.api.java.io.RemoteCollectorImpl
+import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 
 import scala.reflect.runtime.universe._
 
 abstract class Flink(val host: String, val port: Int) extends Engine {
 
+  import org.apache.flink.api.scala._
+
   sys addShutdownHook {
     closeSession()
   }
 
-  override lazy val defaultDOP = env.getDegreeOfParallelism
+  override lazy val defaultDOP = env.getParallelism
 
   val tmpCounter = new Counter()
 
@@ -37,34 +37,29 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
 
   override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]] = {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    dataflowCompiler.execute[JobExecutionResult](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
-    DataBagRef[A](root.name, this)
+    val expr = dataflowCompiler.execute[DataSet[A]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+    DataBagRef[A](root.name, expr)
   }
 
   override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    dataflowCompiler.execute[JobExecutionResult](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+    dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
 
   override def scatter[A: TypeTag](values: Seq[A]): ValueRef[DataBag[A]] = {
     // create fresh value reference
-    val ref = DataBagRef(nextTmpName, this, Some(DataBag(values)))
+    val refName = nextTmpName
     // generate and execute a 'scatter' dataflow
-    val dataflowSymbol = dataflowGenerator.generateScatterDef(ref.name)
-    dataflowCompiler.execute[JobExecutionResult](dataflowSymbol, Array[Any](env, values))
+    val dataflowSymbol = dataflowGenerator.generateScatterDef(refName)
+    val expr = dataflowCompiler.execute[DataSet[A]](dataflowSymbol, Array[Any](env, values))
     // return the value reference
-    ref
+    DataBagRef(refName, expr, Some(DataBag(values)))
   }
 
   override def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A] = {
     // generate and execute a 'scatter' dataflow
     val dataflowSymbol = dataflowGenerator.generateGatherDef(ref.name)
-    DataBag[A](dataflowCompiler.execute[Seq[A]](dataflowSymbol, Array[Any](env)))
-  }
-
-  override protected def doCloseSession() = {
-    super.doCloseSession()
-    RemoteCollectorImpl.shutdownAll()
+    dataflowCompiler.execute[DataBag[A]](dataflowSymbol, Array[Any](env, ref.asInstanceOf[DataBagRef[A]].expr))
   }
 
   private def nextTmpName = f"emma$$temp${tmpCounter.advance.get}%05d"
@@ -94,9 +89,9 @@ case class FlinkRemote(override val host: String, override val port: Int) extend
 
 object Flink {
 
-  case class DataBagRef[A: TypeTag](name: String, rt: Flink, var v: Option[DataBag[A]] = Option.empty[DataBag[A]]) extends ValueRef[DataBag[A]] {
+  case class DataBagRef[A: TypeTag](name: String, expr: DataSet[A], var v: Option[DataBag[A]] = Option.empty[DataBag[A]]) extends ValueRef[DataBag[A]] {
     def value: DataBag[A] = v.getOrElse({
-      v = Some(rt.gather[A](this))
+      v = Some(DataBag[A](expr.collect))
       v.get
     })
   }
