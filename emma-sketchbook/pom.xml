@@ -61,6 +61,25 @@
             <groupId>eu.stratosphere</groupId>
             <artifactId>flink-clients</artifactId>
         </dependency>
+        <!-- FIXME: this is a hacky solution for a Flink issue with the Jackson deps-->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>2.2.1</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.2.1</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.2.1</version>
+            <scope>provided</scope>
+        </dependency>
 
         <!-- Spark -->
         <dependency>
