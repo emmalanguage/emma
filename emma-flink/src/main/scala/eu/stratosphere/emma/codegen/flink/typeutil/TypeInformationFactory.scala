@@ -6,6 +6,7 @@ import eu.stratosphere.emma.util.Counter
 import scala.collection.mutable
 import scala.reflect.runtime.universe._
 
+@deprecated(message = "Not needed after migrating the DataflowGenerator to the Scala API and macro-based TypeInformation synthesis.", since = "1.0")
 class TypeInformationFactory(val dataflowCompiler: DataflowCompiler) {
 
   import eu.stratosphere.emma.runtime.logger
@@ -53,25 +54,25 @@ class TypeInformationFactory(val dataflowCompiler: DataflowCompiler) {
       val elementClazz = q""
       val elementTypeInfo = apply(tq"".tpe)
 
-//      val cbf = q"implicitly[CanBuildFrom[${desc.tpe}, ${desc.elem.tpe}, ${desc.tpe}]]"
+      //      val cbf = q"implicitly[CanBuildFrom[${desc.tpe}, ${desc.elem.tpe}, ${desc.tpe}]]"
 
       val tree = q"".asInstanceOf[ClassDef]
-//        q"""
-//        import scala.collection.generic.CanBuildFrom
-//        import org.apache.flink.api.scala.typeutils.TraversableTypeInfo
-//        import org.apache.flink.api.scala.typeutils.TraversableSerializer
-//        import org.apache.flink.api.common.ExecutionConfig
-//
-//        val elementTpe = $elementTypeInfo
-//        new TraversableTypeInfo($collectionClass, elementTpe) {
-//          def createSerializer(executionConfig: ExecutionConfig) = {
-//            new TraversableSerializer[${desc.tpe}, ${desc.elem.tpe}](
-//                elementTpe.createSerializer(executionConfig)) {
-//              def getCbf = implicitly[CanBuildFrom[${desc.tpe}, ${desc.elem.tpe}, ${desc.tpe}]]
-//            }
-//          }
-//        }
-//      """.asInstanceOf[ClassDef]
+      //        q"""
+      //        import scala.collection.generic.CanBuildFrom
+      //        import org.apache.flink.api.scala.typeutils.TraversableTypeInfo
+      //        import org.apache.flink.api.scala.typeutils.TraversableSerializer
+      //        import org.apache.flink.api.common.ExecutionConfig
+      //
+      //        val elementTpe = $elementTypeInfo
+      //        new TraversableTypeInfo($collectionClass, elementTpe) {
+      //          def createSerializer(executionConfig: ExecutionConfig) = {
+      //            new TraversableSerializer[${desc.tpe}, ${desc.elem.tpe}](
+      //                elementTpe.createSerializer(executionConfig)) {
+      //              def getCbf = implicitly[CanBuildFrom[${desc.tpe}, ${desc.elem.tpe}, ${desc.tpe}]]
+      //            }
+      //          }
+      //        }
+      //      """.asInstanceOf[ClassDef]
 
       val symbol = dataflowCompiler.compile(tree).asClass
       logger.debug(s"Synthesized type information for '$tpe' in class '${symbol.fullName}'")
