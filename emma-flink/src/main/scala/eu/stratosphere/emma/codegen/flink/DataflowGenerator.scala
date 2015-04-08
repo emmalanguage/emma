@@ -19,7 +19,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
   import eu.stratosphere.emma.runtime.logger
 
   // get the path where the toolbox will place temp results
-  private val tempResultsPrefix = new URI(System.getProperty("emma.temp.dir", s"file:///${FilenameUtils.separatorsToUnix(Paths.get(System.getProperty("java.io.tmpdir")).toString)}/emma/temp")).toString
+  private val tempResultsPrefix = new URI(System.getProperty("emma.temp.dir", s"file:///${FilenameUtils.separatorsToUnix(System.getProperty("java.io.tmpdir"))}/emma/temp")).toString
 
   val tb = dataflowCompiler.tb
 
