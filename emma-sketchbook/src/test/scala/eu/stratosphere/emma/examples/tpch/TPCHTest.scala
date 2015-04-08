@@ -8,6 +8,7 @@ import eu.stratosphere.emma.examples.tpch.query05.Query05
 import eu.stratosphere.emma.examples.tpch.query06.Query06
 import eu.stratosphere.emma.examples.tpch.query07.Query07
 import eu.stratosphere.emma.examples.tpch.query08.Query08
+import eu.stratosphere.emma.examples.tpch.query09.Query09
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.runtime.Engine
 import eu.stratosphere.emma.testutil._
@@ -126,5 +127,18 @@ class TPCHTest {
     compareBags(exp, res)
   }
 
+  @Test def testQuery09(): Unit = {
+
+    // execute with native and with tested environment
+    new Query09(inBase, outputPath("q9.tbl.native"), "green", runtime.Native(), true).run()
+    new Query09(inBase, outputPath("q9.tbl.flink"), "green", rt, true).run()
+
+    // compare the results
+    val exp = scala.io.Source.fromFile(outputPath("q9.tbl.native")).getLines().toStream.toList.sorted
+    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q9.tbl.flink/$i")).getLines().toStream)).toList.sorted
+
+    // assert that the result contains the expected values
+    compareBags(exp, res)
+  }
   def outputPath(suffix: String) = s"$outBase/$suffix"
 }
