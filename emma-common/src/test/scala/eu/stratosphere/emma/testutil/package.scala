@@ -3,6 +3,8 @@ package eu.stratosphere.emma
 import java.io.InputStream
 import java.nio.file.{Files, Paths, StandardCopyOption}
 
+import org.apache.commons.io.FilenameUtils
+
 package object testutil {
 
   /**
@@ -25,7 +27,7 @@ package object testutil {
   /**
    * Creates a demp output path with the given `suffix`.
    */
-  def tempPath(suffix: String) = Paths.get(s"${System.getProperty("java.io.tmpdir")}/emma/$suffix").toString
+  def tempPath(suffix: String) = FilenameUtils.separatorsToUnix(Paths.get(s"${System.getProperty("java.io.tmpdir")}/emma/$suffix").toString)
 
   /**
    * Reads The contents from file (or folder containing a list of files) as a string.

@@ -1,6 +1,7 @@
 package eu.stratosphere.emma.codegen.flink
 
 import java.net.URI
+import java.nio.file.Paths
 import java.util.UUID
 
 import eu.stratosphere.emma.api.{CSVInputFormat, CSVOutputFormat}
@@ -8,6 +9,7 @@ import eu.stratosphere.emma.codegen.flink.typeutil._
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir
 import eu.stratosphere.emma.util.Counter
+import org.apache.commons.io.FilenameUtils
 
 import scala.collection.mutable
 import scala.reflect.runtime.universe._
@@ -17,7 +19,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
   import eu.stratosphere.emma.runtime.logger
 
   // get the path where the toolbox will place temp results
-  private val tempResultsPrefix = new URI(System.getProperty("emma.temp.dir", s"file://${System.getProperty("java.io.tmpdir")}/emma/temp")).toString
+  private val tempResultsPrefix = new URI(System.getProperty("emma.temp.dir", s"file:///${FilenameUtils.separatorsToUnix(Paths.get(System.getProperty("java.io.tmpdir")).toString)}/emma/temp")).toString
 
   val tb = dataflowCompiler.tb
 
