@@ -12,7 +12,7 @@ class DataflowCompiler(val mirror: Mirror) {
 
   // get the directory where the toolbox will generate the runtime-defined classes
   private val classGenDir = {
-    val path = Paths.get(s"/${System.getProperty("emma.codegen.dir", s"${System.getProperty("java.io.tmpdir")}/emma/codegen")}")
+    val path = Paths.get(s"${System.getProperty("emma.codegen.dir", s"${System.getProperty("java.io.tmpdir")}/emma/codegen")}")
     // make sure that generated class directory exists
     Files.createDirectories(path)
     path.toAbsolutePath.toString
