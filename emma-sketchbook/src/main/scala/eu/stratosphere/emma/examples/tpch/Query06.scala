@@ -1,10 +1,9 @@
-package eu.stratosphere.emma.examples.tpch.query06
+package eu.stratosphere.emma.examples.tpch
 
 import java.text.SimpleDateFormat
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
-import eu.stratosphere.emma.examples.tpch.{Customer, Lineitem, Nation, Order, Region, Supplier}
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 import org.apache.commons.lang3.time.DateUtils
@@ -60,6 +59,15 @@ object Query06 {
     }
   }
 
+  object Schema {
+
+    case class GrpKey(name: String) {}
+
+    case class Select(extendedPrice: Double, discount: Double) {}
+
+    case class Result(revenue: Double) {}
+  }
+
 }
 
 /**
@@ -84,6 +92,8 @@ object Query06 {
  * @param quantity Query parameter `QUANTITY`
  */
 class Query06(inPath: String, outPath: String, date: String, discount: Double, quantity: Integer, rt: Engine, val truncate: Boolean = false) extends Algorithm(rt) {
+
+  import eu.stratosphere.emma.examples.tpch.Query06.Schema._
 
   def this(ns: Namespace, rt: Engine) = this(
     ns.get[String](Query06.Command.KEY_INPUT),

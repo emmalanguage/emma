@@ -64,6 +64,7 @@ class TPCHTest {
   @Test def testQuery05(): Unit = {
 
     // execute with native and with tested environment
+    //TODO Region: "ASIA" for validation against the qualification database (not enough results in sample data set)
     new Query05(inBase, outputPath("q5.tbl.native"), "AMERICA", "1994-01-01", runtime.Native(), true).run()
     new Query05(inBase, outputPath("q5.tbl.rt"), "AMERICA", "1994-01-01", rt, true).run()
 
@@ -75,30 +76,15 @@ class TPCHTest {
     compareBags(exp, res)
   }
 
-  @Test def testQuery05(): Unit = {
-
-    // execute with native and with tested environment
-    //TODO Region: "ASIA" for validation against the qualification database (not enough results in sample data set)
-    new Query05(inBase, outputPath("q5.tbl.native"), "AMERICA", "1994-01-01", runtime.Native(), true).run()
-    new Query05(inBase, outputPath("q5.tbl.flink"), "AMERICA", "1994-01-01", rt, true).run()
-
-    // compare the results
-    val exp = scala.io.Source.fromFile(outputPath("q5.tbl.native")).getLines().toStream.toList.sorted
-    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q5.tbl.flink/$i")).getLines().toStream)).toList.sorted
-
-    // assert that the result contains the expected values
-    compareBags(exp, res)
-  }
-
   @Test def testQuery06(): Unit = {
 
     // execute with native and with tested environment
     new Query06(inBase, outputPath("q6.tbl.native"), "1994-01-01", 0.06, 24, runtime.Native(), true).run()
-    new Query06(inBase, outputPath("q6.tbl.flink"), "1994-01-01", 0.06, 24, rt, true).run()
+    new Query06(inBase, outputPath("q6.tbl.rt"), "1994-01-01", 0.06, 24, rt, true).run()
 
     // compare the results
-    val exp = scala.io.Source.fromFile(outputPath("q6.tbl.native")).getLines().toStream.toList.sorted
-    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q6.tbl.flink/$i")).getLines().toStream)).toList.sorted
+    val exp = fromPath(outputPath("q6.tbl.native"))
+    val res = fromPath(outputPath("q6.tbl.rt"))
 
     // assert that the result contains the expected values
     compareBags(exp, res)
@@ -109,11 +95,11 @@ class TPCHTest {
     // execute with native and with tested environment
     //TODO Nation1: "FRANCE" for validation against the qualification database (not enough results in sample data set)
     new Query07(inBase, outputPath("q7.tbl.native"), "ARGENTINA", "GERMANY", runtime.Native(), true).run()
-    new Query07(inBase, outputPath("q7.tbl.flink"), "ARGENTINA", "GERMANY", rt, true).run()
+    new Query07(inBase, outputPath("q7.tbl.rt"), "ARGENTINA", "GERMANY", rt, true).run()
 
     // compare the results
-    val exp = scala.io.Source.fromFile(outputPath("q7.tbl.native")).getLines().toStream.toList.sorted
-    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q7.tbl.flink/$i")).getLines().toStream)).toList.sorted
+    val exp = fromPath(outputPath("q7.tbl.native"))
+    val res = fromPath(outputPath("q7.tbl.rt"))
 
     // assert that the result contains the expected values
     compareBags(exp, res)
@@ -124,11 +110,11 @@ class TPCHTest {
     // execute with native and with tested environment
     //TODO Nation: "BRAZIL" for validation against the qualification database (not enough results in sample data set)
     new Query08(inBase, outputPath("q8.tbl.native"), "ETHIOPIA", "AMERICA", "ECONOMY ANODIZED STEEL", runtime.Native(), true).run()
-    new Query08(inBase, outputPath("q8.tbl.flink"), "ETHIOPIA", "AMERICA", "ECONOMY ANODIZED STEEL", rt, true).run()
+    new Query08(inBase, outputPath("q8.tbl.rt"), "ETHIOPIA", "AMERICA", "ECONOMY ANODIZED STEEL", rt, true).run()
 
     // compare the results
-    val exp = scala.io.Source.fromFile(outputPath("q8.tbl.native")).getLines().toStream.toList.sorted
-    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q8.tbl.flink/$i")).getLines().toStream)).toList.sorted
+    val exp = fromPath(outputPath("q8.tbl.native"))
+    val res = fromPath(outputPath("q8.tbl.rt"))
 
     // assert that the result contains the expected values
     compareBags(exp, res)
@@ -138,11 +124,11 @@ class TPCHTest {
 
     // execute with native and with tested environment
     new Query09(inBase, outputPath("q9.tbl.native"), "green", runtime.Native(), true).run()
-    new Query09(inBase, outputPath("q9.tbl.flink"), "green", rt, true).run()
+    new Query09(inBase, outputPath("q9.tbl.rt"), "green", rt, true).run()
 
     // compare the results
-    val exp = scala.io.Source.fromFile(outputPath("q9.tbl.native")).getLines().toStream.toList.sorted
-    val res = (1 to rt.defaultDOP flatMap (i => scala.io.Source.fromFile(outputPath(s"q9.tbl.flink/$i")).getLines().toStream)).toList.sorted
+    val exp = fromPath(outputPath("q9.tbl.native"))
+    val res = fromPath(outputPath("q9.tbl.rt"))
 
     // assert that the result contains the expected values
     compareBags(exp, res)

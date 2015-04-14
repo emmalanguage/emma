@@ -1,11 +1,10 @@
-package eu.stratosphere.emma.examples.tpch.query09
+package eu.stratosphere.emma.examples.tpch
 
 import java.text.SimpleDateFormat
 import java.util.Calendar
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
-import eu.stratosphere.emma.examples.tpch._
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
@@ -46,6 +45,16 @@ object Query09 {
         .metavar("COLOR")
         .help("color")
     }
+  }
+
+  object Schema {
+
+    case class Subquery(nation: String, year: Integer, amount: Double) {}
+
+    case class GrpKey(nation:String, year: Integer) {}
+
+    case class Result(nation: String, year: Integer, sumProfit: Double) {}
+
   }
 
 }
@@ -92,6 +101,8 @@ object Query09 {
  * @param color Query parameter `COLR`
  */
 class Query09(inPath: String, outPath: String, color: String, rt: Engine, val truncate: Boolean = false) extends Algorithm(rt) {
+
+  import eu.stratosphere.emma.examples.tpch.Query09.Schema._
 
   def this(ns: Namespace, rt: Engine) = this(
     ns.get[String](Query09.Command.KEY_INPUT),

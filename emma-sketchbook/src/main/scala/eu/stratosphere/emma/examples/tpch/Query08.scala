@@ -1,11 +1,10 @@
-package eu.stratosphere.emma.examples.tpch.query08
+package eu.stratosphere.emma.examples.tpch
 
 import java.text.SimpleDateFormat
 import java.util.Calendar
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
-import eu.stratosphere.emma.examples.tpch._
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
@@ -60,6 +59,14 @@ object Query08 {
     }
   }
 
+  object Schema {
+
+    case class GrpKey(year: Integer) {}
+
+    case class Subquery(year: Integer, volume: Double, nation: String, nationVariable: String) {}
+
+    case class Result(year: Integer, mkt_share: Double) {}
+  }
 }
 
 /**
@@ -112,6 +119,8 @@ object Query08 {
  * @param typeString Query parameter `TYPE`
  */
 class Query08(inPath: String, outPath: String, nation: String, region: String, typeString: String, rt: Engine, val truncate: Boolean = false) extends Algorithm(rt) {
+
+  import eu.stratosphere.emma.examples.tpch.Query08.Schema._
 
   def this(ns: Namespace, rt: Engine) = this(
     ns.get[String](Query08.Command.KEY_INPUT),

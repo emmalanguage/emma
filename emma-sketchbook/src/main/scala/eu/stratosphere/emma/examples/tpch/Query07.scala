@@ -1,14 +1,12 @@
-package eu.stratosphere.emma.examples.tpch.query07
+package eu.stratosphere.emma.examples.tpch
 
 import java.text.SimpleDateFormat
 import java.util.Calendar
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
-import eu.stratosphere.emma.examples.tpch._
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
-import org.apache.commons.lang3.time.DateUtils
 
 object Query07 {
 
@@ -55,6 +53,14 @@ object Query07 {
     }
   }
 
+  object Schema {
+
+    case class GrpKey(suppNation: String, custNation: String, year: Integer) {}
+
+    case class Subquery(suppNation: String, custNation: String, year: Integer, volume: Double) {}
+
+    case class Result(suppNation: String, custNation: String, year: Integer, revenue: Double) {}
+  }
 }
 
 /**
@@ -106,6 +112,8 @@ object Query07 {
  * @param nation2 Query parameter `NATION2`
  */
 class Query07(inPath: String, outPath: String, nation1: String, nation2: String, rt: Engine, val truncate: Boolean = false) extends Algorithm(rt) {
+
+  import eu.stratosphere.emma.examples.tpch.Query07.Schema._
 
   def this(ns: Namespace, rt: Engine) = this(
     ns.get[String](Query07.Command.KEY_INPUT),
