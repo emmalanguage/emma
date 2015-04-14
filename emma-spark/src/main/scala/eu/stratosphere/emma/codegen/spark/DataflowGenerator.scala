@@ -188,96 +188,71 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
   }
 
   private def opCode[OT, IT](op: ir.Map[OT, IT])(implicit closure: DataflowClosure): Tree = {
-    val tpe = typeOf(op.tag)
-
     // assemble input fragment
     val xs = generateOpCode(op.xs)
 
     // generate fn UDF
-    val fnUDF = ir.UDF(op.f, tb)
-    closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
+    val f = tb.typecheck(tb.parse(op.f))
+    val fUDF = ir.UDF(f, f.tpe, tb)
+    closure.closureParams ++= (for (p <- fUDF.closure) yield p.name -> p.tpt)
 
     // assemble dataflow fragment
     q"""
-    $xs.map(..${fnUDF.params} => ${fnUDF.body})
+    $xs.map(..${fUDF.params} => ${fUDF.body})
     """
   }
 
   private def opCode[OT, IT](op: ir.FlatMap[OT, IT])(implicit closure: DataflowClosure): Tree = {
-    // infer types and generate type information
-    val srcTpe = typeOf(op.xs.tag).dealias
-    val tgtTpe = typeOf(op.tag).dealias
-
     // assemble input fragment
     val xs = generateOpCode(op.xs)
 
     // generate fn UDF
-    val fnUDF = ir.UDF(op.f, tb)
-    closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
+    val f = tb.typecheck(tb.parse(op.f))
+    val fUDF = ir.UDF(f, f.tpe, tb)
+    closure.closureParams ++= (for (p <- fUDF.closure) yield p.name -> p.tpt)
 
     q"""
-    $xs.flatMap(..${fnUDF.params} => (${fnUDF.body}).fetch())
+    $xs.flatMap(..${fUDF.params} => (${fUDF.body}).fetch())
     """
   }
 
 
   private def opCode[IT](op: ir.Filter[IT])(implicit closure: DataflowClosure): Tree = {
-    val tpe = typeOf(op.tag)
-
     // assemble input fragment
     val xs = generateOpCode(op.xs)
 
     // generate fn UDF
-    val fnUDF = ir.UDF(op.p, tb)
-    closure.closureParams ++= (for (p <- fnUDF.closure) yield p.name -> p.tpt)
+    val p = tb.typecheck(tb.parse(op.p))
+    val pUDF = ir.UDF(p, p.tpe, tb)
+    closure.closureParams ++= (for (p <- pUDF.closure) yield p.name -> p.tpt)
 
     // assemble dataflow fragment
     q"""
-    $xs.filter(..${fnUDF.params} => ${fnUDF.body})
-    """
-  }
-
-  private def opCode[OT, IT1, IT2](op: ir.Cross[OT, IT1, IT2])(implicit closure: DataflowClosure): Tree = {
-    val xsTpe = typeOf(op.xs.tag).dealias
-    val ysTpe = typeOf(op.ys.tag).dealias
-
-    val fTpe = ir.resultType(op.f.staticType.dealias)
-
-    // assemble input fragments
-    val xs = generateOpCode(op.xs)
-    val ys = generateOpCode(op.ys)
-
-    // assemble dataflow fragment
-    q"""
-    $xs.cartesian($ys)
+    $xs.filter(..${pUDF.params} => ${pUDF.body})
     """
   }
 
   private def opCode[OT, IT1, IT2](op: ir.EquiJoin[OT, IT1, IT2])(implicit closure: DataflowClosure): Tree = {
-    // infer types and generate type information
-    val xsTpe = typeOf(op.xs.tag).dealias
-    val ysTpe = typeOf(op.ys.tag).dealias
+    val keyx = tb.typecheck(tb.parse(op.keyx))
+    val keyxUDF = ir.UDF(keyx, keyx.tpe.dealias, tb)
 
-    val keyxTpe = ir.resultType(op.keyx.staticType.dealias)
+    val keyy = tb.typecheck(tb.parse(op.keyy))
+    val keyyUDF = ir.UDF(keyy, keyy.tpe.dealias, tb)
 
-    val keyyTpe = ir.resultType(op.keyy.staticType.dealias)
-
-    val fTpe = ir.resultType(op.f.staticType.dealias)
+    val f = tb.typecheck(tb.parse(op.f))
+    val fUDF = ir.UDF(f, f.tpe.dealias, tb)
 
     // assemble input fragments
     val xs = generateOpCode(op.xs)
     val ys = generateOpCode(op.ys)
 
     // generate keyx UDF
-    val keyxUDF = ir.UDF(op.keyx, tb)
     closure.closureParams ++= (for (p <- keyxUDF.closure) yield p.name -> p.tpt)
 
     // generate keyy UDF
-    val keyyUDF = ir.UDF(op.keyy, tb)
     closure.closureParams ++= (for (p <- keyyUDF.closure) yield p.name -> p.tpt)
 
     // generate join UDF
-    val fUDF = ir.UDF(op.f, tb)
     closure.closureParams ++= (for (p <- fUDF.closure) yield p.name -> p.tpt)
 
     // assemble dataflow fragment
@@ -289,44 +264,54 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     """
   }
 
-  private def opCode[OT, IT](op: ir.Fold[OT, IT])(implicit closure: DataflowClosure): Tree = {
-    val srcTpe = typeOf(op.xs.tag).dealias
-    val tgtTpe = typeOf(op.tag).dealias
+  private def opCode[OT, IT1, IT2](op: ir.Cross[OT, IT1, IT2])(implicit closure: DataflowClosure): Tree = {
+    // assemble input fragments
+    val xs = generateOpCode(op.xs)
+    val ys = generateOpCode(op.ys)
 
+    // assemble dataflow fragment
+    q"""
+    $xs.cartesian($ys)
+    """
+  }
+
+  private def opCode[OT, IT](op: ir.Fold[OT, IT])(implicit closure: DataflowClosure): Tree = {
     // assemble input fragment
     val xs = generateOpCode(op.xs)
 
     // get fold components
-    val sng = ir.UDF(op.sng, tb)
-    val union = ir.UDF(op.union, tb)
+    val sng = tb.typecheck(tb.parse(op.sng))
+    val sngUDF = ir.UDF(sng, sng.tpe.dealias, tb)
+    val union = tb.typecheck(tb.parse(op.union))
+    val unionUDF = ir.UDF(union, union.tpe.dealias, tb)
 
     // assemble dataflow fragment
     q"""
-    $xs.map(..${sng.params} => ${sng.body})
-       .reduce(..${union.params} => ${union.body})
+    $xs.map(..${sngUDF.params} => ${sngUDF.body})
+       .reduce(..${unionUDF.params} => ${unionUDF.body})
     """
   }
 
   private def opCode[OT, IT](op: ir.FoldGroup[OT, IT])(implicit closure: DataflowClosure): Tree = {
-    val srcTpe = typeOf(op.xs.tag).dealias
-    val tgtTpe = typeOf(op.tag).dealias
-
     // assemble input fragment
     val xs = generateOpCode(op.xs)
 
     // get fold components
-    val key = ir.UDF(op.key, tb)
-    val sng = ir.UDF(op.sng, tb)
-    val union = ir.UDF(op.union, tb)
+    val key = tb.typecheck(tb.parse(op.key))
+    val keyUDF = ir.UDF(key, key.tpe.dealias, tb)
+    val sng = tb.typecheck(tb.parse(op.sng))
+    val sngUDF = ir.UDF(sng, sng.tpe.dealias, tb)
+    val union = tb.typecheck(tb.parse(op.union))
+    val unionUDF = ir.UDF(union, union.tpe.dealias, tb)
 
     // assemble dataflow fragment
-    closure.closureParams ++= (for (p <- key.closure) yield p.name -> p.tpt)
-    closure.closureParams ++= (for (p <- sng.closure) yield p.name -> p.tpt)
-    closure.closureParams ++= (for (p <- union.closure) yield p.name -> p.tpt)
+    closure.closureParams ++= (for (p <- keyUDF.closure) yield p.name -> p.tpt)
+    closure.closureParams ++= (for (p <- sngUDF.closure) yield p.name -> p.tpt)
+    closure.closureParams ++= (for (p <- unionUDF.closure) yield p.name -> p.tpt)
 
     q"""
-    $xs.map(..${key.params} => (${key.body}, ${sng.body}))
-       .reduceByKey(..${union.params} => ${union.body})
+    $xs.map(..${keyUDF.params} => (${keyUDF.body}, ${sngUDF.body}))
+       .reduceByKey(..${unionUDF.params} => ${unionUDF.body})
        .map(x => eu.stratosphere.emma.api.Group(x._1, x._2))
     """
   }

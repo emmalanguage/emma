@@ -67,35 +67,35 @@ package object ir {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Map[+A: TypeTag, +B: TypeTag](f: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
+  final case class Map[+A: TypeTag, +B: TypeTag](f: String, xs: Combinator[_ <: B]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class FlatMap[+A: TypeTag, +B: TypeTag](f: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
+  final case class FlatMap[+A: TypeTag, +B: TypeTag](f: String, xs: Combinator[_ <: B]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Filter[+A: TypeTag](p: Expr[Any], xs: Combinator[_ <: A]) extends Combinator[A] {
+  final case class Filter[+A: TypeTag](p: String, xs: Combinator[_ <: A]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class EquiJoin[+A: TypeTag, +B: TypeTag, +C: TypeTag](keyx: Expr[Any], keyy: Expr[Any], f: Expr[Any], xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
+  final case class EquiJoin[+A: TypeTag, +B: TypeTag, +C: TypeTag](keyx: String, keyy: String, f: String, xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Cross[+A: TypeTag, +B: TypeTag, +C: TypeTag](f: Expr[Any], xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
+  final case class Cross[+A: TypeTag, +B: TypeTag, +C: TypeTag](f: String, xs: Combinator[_ <: B], ys: Combinator[_ <: C]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Group[+A: TypeTag, +B: TypeTag](key: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
+  final case class Group[+A: TypeTag, +B: TypeTag](key: String, xs: Combinator[_ <: B]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class Fold[+A: TypeTag, +B: TypeTag](empty: Expr[Any], sng: Expr[Any], union: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
+  final case class Fold[+A: TypeTag, +B: TypeTag](empty: String, sng: String, union: String, xs: Combinator[_ <: B]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
-  final case class FoldGroup[+A: TypeTag, +B: TypeTag](key: Expr[Any], empty: Expr[Any], sng: Expr[Any], union: Expr[Any], xs: Combinator[_ <: B]) extends Combinator[A] {
+  final case class FoldGroup[+A: TypeTag, +B: TypeTag](key: String, empty: String, sng: String, union: String, xs: Combinator[_ <: B]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
@@ -200,7 +200,7 @@ package object ir {
       runtime.mirror.staticClass("scala.Function9"),
       runtime.mirror.staticClass("scala.Function10"))
 
-    def apply(fn: Function, tpe: Type, tb: ToolBox[ru.type]) = new UDF(fn.asInstanceOf[Function], tpe, tb)
+    def apply(fn: Tree, tpe: Type, tb: ToolBox[ru.type]) = new UDF(fn.asInstanceOf[Function], tpe, tb)
 
     def apply(expr: Expr[Any], tb: ToolBox[ru.type]) = new UDF(expr.tree.asInstanceOf[Function], expr.staticType, tb)
   }

@@ -12,7 +12,7 @@ class DataflowCompiler(val mirror: Mirror) {
 
   // get the directory where the toolbox will generate the runtime-defined classes
   private val classGenDir = {
-    val path = Paths.get(s"/${System.getProperty("emma.codegen.dir", s"${System.getProperty("java.io.tmpdir")}/emma/codegen")}")
+    val path = Paths.get(s"${System.getProperty("emma.codegen.dir", s"${System.getProperty("java.io.tmpdir")}/emma/codegen")}")
     // make sure that generated class directory exists
     Files.createDirectories(path)
     path.toAbsolutePath.toString
@@ -29,8 +29,7 @@ class DataflowCompiler(val mirror: Mirror) {
    * @return The ModuleSymbol of the defined object
    */
   def compile(tree: ImplDef, withSource: Boolean = true) = {
-    val untypechecked = tb.untypecheck(tree)
-    val symbol = tb.define(replaceIdents(untypechecked).asInstanceOf[ImplDef])
+    val symbol = tb.define(tb.parse(showCode(tree)).asInstanceOf[ImplDef])
     if (withSource) writeSource(symbol, tree)
     logger.info(s"Compiling '${symbol.name}' at '${symbol.fullName}'")
     symbol

@@ -4,7 +4,7 @@ import eu.stratosphere.emma.codegen.testschema._
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import org.apache.flink.api.common.ExecutionConfig
 import org.apache.flink.api.scala.typeutils.{CaseClassSerializer, CaseClassTypeInfo}
-import org.junit.{After, Before, Test}
+import org.junit.{Ignore, After, Before, Test}
 
 import scala.reflect.runtime.universe._
 
@@ -23,7 +23,7 @@ class TypeInformationFactoryTest {
   @After def teardown(): Unit = {
   }
 
-  @Test def integrationTest(): Unit = {
+  @Ignore @Test def integrationTest(): Unit = {
 
     type T1 = EdgeWithLabel[Int, String]
     type T2 = EdgeWithLabel[String, Int]
@@ -56,7 +56,7 @@ class TypeInformationFactoryTest {
     compiler.tb.eval(factory.apply(typeOf[T])).asInstanceOf[CaseClassTypeInfo[T]]
   }
 
-  @Test def tuplesTest(): Unit = {
+  @Ignore @Test def tuplesTest(): Unit = {
 
     type T1 = (Int, Int)
     type T2 = (Int, Int, Int)
