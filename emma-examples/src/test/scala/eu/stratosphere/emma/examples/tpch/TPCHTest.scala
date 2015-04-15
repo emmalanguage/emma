@@ -67,6 +67,7 @@ class TPCHTest extends FunSuite with Matchers with BeforeAndAfterAll {
   test("Query05") (withRuntime() { rt =>
 
     // execute with native and with tested environment
+    //TODO Region: "ASIA" for validation against the qualification database (not enough results in sample data set)
     new Query05(inBase, outputPath("q5.tbl.native"), "AMERICA", "1994-01-01", runtime.Native(), true).run()
     new Query05(inBase, outputPath("q5.tbl.rt"), "AMERICA", "1994-01-01", rt, true).run()
 
@@ -78,5 +79,62 @@ class TPCHTest extends FunSuite with Matchers with BeforeAndAfterAll {
     compareBags(exp, res)
   })
 
+  @Test def testQuery06(): Unit = {
+
+    // execute with native and with tested environment
+    new Query06(inBase, outputPath("q6.tbl.native"), "1994-01-01", 0.06, 24, runtime.Native(), true).run()
+    new Query06(inBase, outputPath("q6.tbl.rt"), "1994-01-01", 0.06, 24, rt, true).run()
+
+    // compare the results
+    val exp = fromPath(outputPath("q6.tbl.native"))
+    val res = fromPath(outputPath("q6.tbl.rt"))
+
+    // assert that the result contains the expected values
+    compareBags(exp, res)
+  }
+
+  @Test def testQuery07(): Unit = {
+
+    // execute with native and with tested environment
+    //TODO Nation1: "FRANCE" for validation against the qualification database (not enough results in sample data set)
+    new Query07(inBase, outputPath("q7.tbl.native"), "ARGENTINA", "GERMANY", runtime.Native(), true).run()
+    new Query07(inBase, outputPath("q7.tbl.rt"), "ARGENTINA", "GERMANY", rt, true).run()
+
+    // compare the results
+    val exp = fromPath(outputPath("q7.tbl.native"))
+    val res = fromPath(outputPath("q7.tbl.rt"))
+
+    // assert that the result contains the expected values
+    compareBags(exp, res)
+  }
+
+  @Test def testQuery08(): Unit = {
+
+    // execute with native and with tested environment
+    //TODO Nation: "BRAZIL" for validation against the qualification database (not enough results in sample data set)
+    new Query08(inBase, outputPath("q8.tbl.native"), "ETHIOPIA", "AMERICA", "ECONOMY ANODIZED STEEL", runtime.Native(), true).run()
+    new Query08(inBase, outputPath("q8.tbl.rt"), "ETHIOPIA", "AMERICA", "ECONOMY ANODIZED STEEL", rt, true).run()
+
+    // compare the results
+    val exp = fromPath(outputPath("q8.tbl.native"))
+    val res = fromPath(outputPath("q8.tbl.rt"))
+
+    // assert that the result contains the expected values
+    compareBags(exp, res)
+  }
+
+  @Test def testQuery09(): Unit = {
+
+    // execute with native and with tested environment
+    new Query09(inBase, outputPath("q9.tbl.native"), "green", runtime.Native(), true).run()
+    new Query09(inBase, outputPath("q9.tbl.rt"), "green", rt, true).run()
+
+    // compare the results
+    val exp = fromPath(outputPath("q9.tbl.native"))
+    val res = fromPath(outputPath("q9.tbl.rt"))
+
+    // assert that the result contains the expected values
+    compareBags(exp, res)
+  }
   def outputPath(suffix: String) = s"$outBase/$suffix"
 }
