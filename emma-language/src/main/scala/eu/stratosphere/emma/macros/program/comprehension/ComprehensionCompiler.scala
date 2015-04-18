@@ -195,8 +195,13 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         case vd@ValDef(_, _, _, _) => vd.symbol.asTerm
       }).toSet
 
+      // find all term symbols bound within the term
+      val bound = t.collect({
+        case bind@Bind(_, _) => bind.symbol.asTerm
+      }).toSet
+
       // the closure is the difference between the referenced and the defined symbols
-      referenced diff defined
+      referenced diff defined diff bound
     }
   }
 
