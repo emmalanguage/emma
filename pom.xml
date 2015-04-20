@@ -9,12 +9,15 @@
     <version>1.0-SNAPSHOT</version>
 
     <name>emma</name>
+    <packaging>pom</packaging>
+
     <properties>
         <!-- Common -->
         <encoding>UTF-8</encoding>
 
         <!-- Maven Plugins -->
         <build-helper-maven-plugin.version>1.7</build-helper-maven-plugin.version>
+        <maven-archetype-plugin.version>2.4</maven-archetype-plugin.version>
         <maven-eclipse-plugin.version>2.9</maven-eclipse-plugin.version>
         <maven-jar-plugin.version>2.5</maven-jar-plugin.version>
         <maven-shade-plugin.version>2.4.1</maven-shade-plugin.version>
@@ -53,8 +56,6 @@
         <scala.graph-core.version>1.9.0</scala.graph-core.version>
         <scala-arm.version>1.4</scala-arm.version>
     </properties>
-
-    <packaging>pom</packaging>
 
     <!-- Enable Apache Development Snapshot Repository -->
     <!--
@@ -121,6 +122,11 @@
             <dependency>
                 <groupId>eu.stratosphere</groupId>
                 <artifactId>emma-examples</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>eu.stratosphere</groupId>
+                <artifactId>emma-quickstart</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -427,18 +433,24 @@
                         </execution>
                     </executions>
                 </plugin>
+
+                <plugin>
+                    <artifactId>maven-archetype-plugin</artifactId>
+                    <version>${maven-archetype-plugin.version}</version><!--$NO-MVN-MAN-VER$-->
+                </plugin>
             </plugins>
         </pluginManagement>
     </build>
 
     <modules>
-        <module>emma-backend</module>
-        <module>emma-common</module>
         <module>emma-common-macros</module>
-        <module>emma-flink</module>
+        <module>emma-common</module>
         <module>emma-language</module>
+        <module>emma-backend</module>
+        <module>emma-flink</module>
         <module>emma-spark</module>
         <module>emma-examples</module>
+        <module>emma-quickstart</module>
     </modules>
 
 </project>
