@@ -1,7 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
     <groupId>eu.stratosphere</groupId>
@@ -22,6 +20,7 @@
         <maven-shade-plugin.version>2.3</maven-shade-plugin.version>
         <maven-surefire-plugin.version>2.18.1</maven-surefire-plugin.version>
         <scala-maven-plugin.version>3.2.0</scala-maven-plugin.version>
+        <maven-archetype-plugin.version>2.2</maven-archetype-plugin.version>
 
         <!-- Java -->
         <java.version>1.7</java.version>
@@ -422,6 +421,11 @@
                         </execution>
                     </executions>
                 </plugin>
+
+                <plugin>
+                    <artifactId>maven-archetype-plugin</artifactId>
+                    <version>${maven-archetype-plugin.version}</version><!--$NO-MVN-MAN-VER$-->
+                </plugin>
             </plugins>
         </pluginManagement>
     </build>
@@ -434,6 +438,6 @@
         <module>emma-language</module>
         <module>emma-sketchbook</module>
         <module>emma-spark</module>
-    </modules>
+  </modules>
 
 </project>
