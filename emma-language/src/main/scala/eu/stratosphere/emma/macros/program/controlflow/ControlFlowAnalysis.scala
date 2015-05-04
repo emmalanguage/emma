@@ -235,65 +235,67 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
             q"val $condVal = $cond; ${If(Ident(condVal), thenp, elsep)}"
         }
 
-      case cl @ Apply(Select(_, TermName("withFilter")), _) =>
-
+      case Apply(Select(lhs, TermName("withFilter")), _) => {
+        normalizePredicates(tree)
+      }
 
       case _ =>
         super.transform(tree)
     }
 
     def apply(tree: Tree): Tree = c.typecheck(transform(c.untypecheck(tree)))
-
-
-    /**
-     * //TODO
-     *
-     * nested predicates (x == 2 && (Y !=2 && z > %))
-     * conjunctive predicates together with seperate ones (if x < 3 && y == 2; if z > 5)
-     *
-     * @param qualifier
-     * @param args
-     * @return
-     */
-    def normalizeFilterPredicates(qualifier: Tree, args: List[Tree]): Tree = {
-      println(showRaw(qualifier))
-      args match {
-        // empty argument, return qualifier (anchor)
-        case Nil => qualifier
-
-        // single argument
-        case xs :: Nil => xs match {
-          // if it's a function (&&, ||) take the qualifier and construct a withfilter expression, match the remaining arguments for further functions
-          case Function(vd, Apply(Select(qf, name), fargs)) => name match {
-            case TermName("$amp$amp") => {
-              // && predicate conjunction
-              val newQF = q"$qualifier.withFilter(..${vd} => ${fargs.head})"
-              normalizeFilterPredicates(newQF, List(Function(vd, qf)))
-            }
-
-            case _ => fargs match {
-                // if the argument is not a function but a literal, we are done
-              case Literal(_) :: Nil => {
-                val newQF = q"$qualifier.withFilter($xs)"
-                normalizeFilterPredicates(newQF, Nil)
-              }
-                // else, I don't know what it is...
-              case _ => qualifier
-            }
-          }
-
-          // if not a function, then what...
-          case _ => {
-            qualifier
-          }
-        }
-
-        // list of arguments
-        case x :: xs => {
-          qualifier
-        }
-      }
-    }
   }
+
+  /**
+   * Traverse a tree that represents a conjunction of predicates and collect all of them to form disjunctions.
+   * This flattens an arbitrary combination of predicates in a comprehension to single .withFilter(...) expression
+   *
+   * @param tree
+   * @return
+   */
+  def normalizePredicates(tree: Tree): Tree = {
+    // TODO: make sure that predicates already in cnf are not messed up
+
+    var root = true
+    var databag = tree
+    var params = List(tree)
+
+    def predicateAcc(trees: List[Tree], predicates: List[Tree]): List[Tree] =  trees match {
+
+      case Nil => predicates
+
+      // leaf with predicate (.>, .<, .==, .!=)
+      case Apply(Select(Ident(_), name), args) :: xs =>
+        predicateAcc(xs, trees.head :: predicates)
+
+      //branch
+      case Function(vparams, Apply(Select(qualifier, name), args)) :: xs => {
+        params = vparams
+        predicateAcc(qualifier :: args ::: xs, predicates)
+      }
+
+      // branch
+      case Apply(Select(lhs, name), rhs) :: xs => {
+        if (root) {
+          databag = lhs
+          root = false
+        }
+        // go down left side first
+        predicateAcc(lhs :: rhs ::: xs, predicates)
+      }
+
+      // if we don't know what to do with the current tree, skip it
+      case x :: xs =>
+        predicateAcc(xs, predicates)
+    }
+
+    val predicates = predicateAcc(List(tree), Nil)
+
+    // combine predicates with original databag
+    val cnf = predicates.fold(databag)((preds, pred) => q"$preds.withFilter(..$params => $pred)")
+
+    cnf
+  }
+
 
 }

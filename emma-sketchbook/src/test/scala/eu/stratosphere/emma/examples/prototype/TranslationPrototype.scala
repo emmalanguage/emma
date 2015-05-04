@@ -26,7 +26,7 @@ class TranslationPrototype(rt: Engine) extends Algorithm(rt) {
         x <- DataBag(1 to 10);
         y <- DataBag(11 to 20);
         z <- DataBag(Seq(1, 2, 3));
-        if x < 5 && y > 15 && z == 2; if z > 2) yield (x, y, z)
+        if x < 5 && y > 15 && z == 2; if z > 2 && y == 20) yield (x, y, z)
 
       val b = for (
         x <- DataBag(1 to 10);
