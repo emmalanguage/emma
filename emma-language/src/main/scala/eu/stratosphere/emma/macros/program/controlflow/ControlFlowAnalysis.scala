@@ -235,11 +235,65 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
             q"val $condVal = $cond; ${If(Ident(condVal), thenp, elsep)}"
         }
 
+      case cl @ Apply(Select(_, TermName("withFilter")), _) =>
+
+
       case _ =>
         super.transform(tree)
     }
 
     def apply(tree: Tree): Tree = c.typecheck(transform(c.untypecheck(tree)))
+
+
+    /**
+     * //TODO
+     *
+     * nested predicates (x == 2 && (Y !=2 && z > %))
+     * conjunctive predicates together with seperate ones (if x < 3 && y == 2; if z > 5)
+     *
+     * @param qualifier
+     * @param args
+     * @return
+     */
+    def normalizeFilterPredicates(qualifier: Tree, args: List[Tree]): Tree = {
+      println(showRaw(qualifier))
+      args match {
+        // empty argument, return qualifier (anchor)
+        case Nil => qualifier
+
+        // single argument
+        case xs :: Nil => xs match {
+          // if it's a function (&&, ||) take the qualifier and construct a withfilter expression, match the remaining arguments for further functions
+          case Function(vd, Apply(Select(qf, name), fargs)) => name match {
+            case TermName("$amp$amp") => {
+              // && predicate conjunction
+              val newQF = q"$qualifier.withFilter(..${vd} => ${fargs.head})"
+              normalizeFilterPredicates(newQF, List(Function(vd, qf)))
+            }
+
+            case _ => fargs match {
+                // if the argument is not a function but a literal, we are done
+              case Literal(_) :: Nil => {
+                val newQF = q"$qualifier.withFilter($xs)"
+                normalizeFilterPredicates(newQF, Nil)
+              }
+                // else, I don't know what it is...
+              case _ => qualifier
+            }
+          }
+
+          // if not a function, then what...
+          case _ => {
+            qualifier
+          }
+        }
+
+        // list of arguments
+        case x :: xs => {
+          qualifier
+        }
+      }
+    }
   }
 
 }
