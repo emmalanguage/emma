@@ -254,47 +254,51 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
    * @return
    */
   def normalizePredicates(tree: Tree): Tree = {
-    // TODO: make sure that predicates already in cnf are not messed up
+    var params: List[Tree] = List()
 
-    var root = true
-    var databag = tree
-    var params = List(tree)
+    def predicateAcc(trees: List[Tree], predicates: List[Tree]): (Tree, List[Tree]) =  trees match {
 
-    def predicateAcc(trees: List[Tree], predicates: List[Tree]): List[Tree] =  trees match {
+      case Nil =>
+        throw new IllegalArgumentException("No tree was given as input!")
 
-      case Nil => predicates
+      case x :: xs => x match {
 
-      // leaf with predicate (.>, .<, .==, .!=)
-      case Apply(Select(Ident(_), name), args) :: xs =>
-        predicateAcc(xs, trees.head :: predicates)
+        // leaf with predicate (.>, .<, .==, .!=)
+        case Apply(Select(Ident(_), name), args) =>
+          predicateAcc(xs, x :: predicates)
 
-      //branch
-      case Function(vparams, Apply(Select(qualifier, name), args)) :: xs => {
-        params = vparams
-        predicateAcc(qualifier :: args ::: xs, predicates)
-      }
-
-      // branch
-      case Apply(Select(lhs, name), rhs) :: xs => {
-        if (root) {
-          databag = lhs
-          root = false
+        //branch
+        case Function(vparams, apply @ Apply(Select(qualifier, name), args))  => {
+          params = vparams
+          apply match {
+            case Apply(Select(Ident(_), _), _) =>
+              predicateAcc( args ::: apply :: xs, predicates)
+            case _ =>
+              predicateAcc( args ::: qualifier :: xs, predicates)
+          }
         }
-        // go down left side first
-        predicateAcc(lhs :: rhs ::: xs, predicates)
-      }
 
-      // if we don't know what to do with the current tree, skip it
-      case x :: xs =>
-        predicateAcc(xs, predicates)
+        // root, rhs: List[Tree], lhs: Tree
+        case Apply(Select(lhs, name), rhs)  => {
+          // go down right side first, append left side
+          predicateAcc(rhs ::: lhs :: xs, predicates)
+        }
+
+        // at this point, in x should be the databag that the predicates are applied to and all predicates should be extracted
+        case _ if xs == Nil =>
+          (x, predicates)
+
+        // if we don't know what to do with the current tree, skip it
+        case _ =>
+          predicateAcc(xs, predicates)
+      }
     }
 
-    val predicates = predicateAcc(List(tree), Nil)
+    val (trunk, predicates) = predicateAcc(List(tree), Nil)
 
-    // combine predicates with original databag
-    val cnf = predicates.fold(databag)((preds, pred) => q"$preds.withFilter(..$params => $pred)")
+    // do sth. with predicates and trunk
 
-    cnf
+    trunk
   }
 
 
