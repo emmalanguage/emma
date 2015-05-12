@@ -22,4 +22,6 @@ object emma {
   final def desugar(e: Any): String = macro UtilMacros.desugar
 
   final def desugarRaw(e: Any): String = macro UtilMacros.desugarRaw
+
+  final def analyze[T](e: T): T = macro UtilMacros.analyze[T]
 }
