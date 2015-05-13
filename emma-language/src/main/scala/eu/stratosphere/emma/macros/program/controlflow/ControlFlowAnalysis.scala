@@ -1,6 +1,7 @@
 package eu.stratosphere.emma.macros.program.controlflow
 
 
+import eu.stratosphere.emma.macros.program.util.ProgramUtils
 import eu.stratosphere.emma.util.Counter
 
 import scala.reflect.macros._
@@ -8,7 +9,7 @@ import scalax.collection.GraphPredef._
 import scalax.collection.edge.LkDiEdge
 import scalax.collection.mutable.Graph
 
-private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFlowModel[C] {
+private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFlowModel[C] with ProgramUtils[C] {
   this: ControlFlowModel[C] =>
 
   import c.universe._
@@ -239,7 +240,8 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
         super.transform(tree)
     }
 
-    def apply(tree: Tree): Tree = c.typecheck(transform(c.untypecheck(tree)))
+    def apply(tree: Tree): Tree =
+      c.typecheck(q"{ import scala.reflect._; ${transform(untypecheck(tree))} }")
   }
 
 }
