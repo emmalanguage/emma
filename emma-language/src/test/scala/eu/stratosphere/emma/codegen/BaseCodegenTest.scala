@@ -571,4 +571,66 @@ abstract class BaseCodegenTest(rtName: String) {
     // assert that the result contains the expected values
     assert(exp == act, s"Unexpected result: $act != $exp")
   }
+
+  @Test def testPatternMatching() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0.until(100).zipWithIndex)
+      val squares = for (xy <- range) yield xy match {
+        case (x, y) => x + y
+      }
+      squares.sum
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testPartialFunction() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0.until(100).zipWithIndex)
+      val squares = range map { case (x, y) => x + y }
+      squares.sum
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testDestructuring() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0.until(100).zipWithIndex)
+      val squares = for ((x, y) <- range) yield x + y
+      squares.sum
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testIntermediateValueDefinition() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0.until(100).zipWithIndex)
+      val squares = for (xy <- range; sqr = xy._1 * xy._2) yield sqr
+      squares.sum
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
 }

@@ -1,6 +1,7 @@
 package eu.stratosphere.emma.macros.program.controlflow
 
 
+import eu.stratosphere.emma.macros.program.util.ProgramUtils
 import eu.stratosphere.emma.util.Counter
 
 import scala.reflect.macros._
@@ -8,7 +9,7 @@ import scalax.collection.GraphPredef._
 import scalax.collection.edge.LkDiEdge
 import scalax.collection.mutable.Graph
 
-private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFlowModel[C] {
+private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFlowModel[C] with ProgramUtils[C] {
   this: ControlFlowModel[C] =>
 
   import c.universe._
@@ -172,10 +173,10 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
     _createCFG(tree, vCurr)
 
     // remove empty blocks from the end of the graph (might result from tailing if (c) e1 else e2 return statements)
-    var emptyBlocks = graph.nodes filter { x => x.diSuccessors.isEmpty && x.stats.isEmpty}
+    var emptyBlocks = graph.nodes filter { x => x.diSuccessors.isEmpty && x.stats.isEmpty }
     while (emptyBlocks.nonEmpty) {
       for (block <- emptyBlocks) graph -= block // remove empty block with no successors from the graph
-      emptyBlocks = graph.nodes filter { x => x.diSuccessors.isEmpty && x.stats.isEmpty}
+      emptyBlocks = graph.nodes filter { x => x.diSuccessors.isEmpty && x.stats.isEmpty }
     }
 
     // return the graph
@@ -239,7 +240,10 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
         super.transform(tree)
     }
 
-    def apply(tree: Tree): Tree = c.typecheck(transform(c.untypecheck(tree)))
+    def apply(tree: Tree): Tree = {
+      val block = c.typecheck(q"{ import scala.reflect._; ${transform(untypecheck(tree))} }").asInstanceOf[Block]
+      block.expr
+    }
   }
 
 }

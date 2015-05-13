@@ -72,6 +72,7 @@ class WorkflowMacros(val c: blackbox.Context) {
       val algorithmCode =
         q"""
         new eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
+           import scala.reflect._
 
            def run(engine: eu.stratosphere.emma.runtime.Engine): ${c.weakTypeOf[T]} = engine match {
              case _: eu.stratosphere.emma.runtime.Native => runNative()
@@ -79,7 +80,7 @@ class WorkflowMacros(val c: blackbox.Context) {
            }
 
            private def runNative(): ${c.weakTypeOf[T]} = {
-             ${c.untypecheck(root.tree)}
+             ${untypecheck(root.tree)}
            }
 
            private def runParallel(engine: eu.stratosphere.emma.runtime.Engine): ${c.weakTypeOf[T]} = {
@@ -131,7 +132,7 @@ class WorkflowMacros(val c: blackbox.Context) {
         q"""
         { ..${
           for (t <- comprehensionView.terms) yield
-            q"""
+          q"""
             println("~" * 80)
             println("~ Comprehension `" + ${t.id.toString} + "` (original):")
             println("~" * 80)
