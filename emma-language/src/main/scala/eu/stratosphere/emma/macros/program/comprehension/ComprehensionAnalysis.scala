@@ -254,7 +254,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(Function(List(x, y), body))) if select.symbol == api.minBy =>
         // replace the body of the fn to use 'u', 'v' parameters instead of the given arguments
         // FIXME: changes semantics if 'u' and 'v' are defined in the body
-        val bodyNew = substitute(body, Map(x.name.toString -> Ident(TermName("u")), y.name.toString -> Ident(TermName("v"))))
+        val bodyNew = substitute(body, Map(x.name -> Ident(TermName("u")), y.name -> Ident(TermName("v"))))
 
         // quasiquote fold operators using the minBy parameter function
         val empty = c.typecheck(q"Option.empty[$tpt]")
@@ -271,7 +271,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(Function(List(x, y), body))) if select.symbol == api.maxBy =>
         // replace the body of the fn to use 'u', 'v' parameters instead of the given arguments
         // FIXME: changes semantics if 'u' and 'v' are defined in the body
-        val bodyNew = substitute(body, Map(x.name.toString -> Ident(TermName("u")), y.name.toString -> Ident(TermName("v"))))
+        val bodyNew = substitute(body, Map(x.name -> Ident(TermName("u")), y.name -> Ident(TermName("v"))))
 
         // quasiquote fold operators using the minBy parameter function
         val empty = c.typecheck(q"Option.empty[$tpt]")
@@ -499,8 +499,8 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
         for ((fold, i) <- folds.zipWithIndex) yield {
           val union = fold.union.asInstanceOf[Function]
           substitute(union.body, Map(
-            union.vparams(0).name.toString -> q"x.${TermName(s"_${i + 1}")}",
-            union.vparams(1).name.toString -> q"y.${TermName(s"_${i + 1}")}"))
+            union.vparams(0).name -> q"x.${TermName(s"_${i + 1}")}",
+            union.vparams(1).name -> q"y.${TermName(s"_${i + 1}")}"))
         }
       })")
 

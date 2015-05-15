@@ -309,8 +309,11 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     closure.closureParams ++= (for (p <- sngUDF.closure) yield p.name -> p.tpt)
     closure.closureParams ++= (for (p <- unionUDF.closure) yield p.name -> p.tpt)
 
+    val aliases = (sngUDF.params map { _.name }) zip
+      (keyUDF.params map { vd => Ident(vd.name) })
+
     q"""
-    $xs.map(..${keyUDF.params} => (${keyUDF.body}, ${sngUDF.body}))
+    $xs.map(..${keyUDF.params} => (${keyUDF.body}, ${substitute(sngUDF.body, aliases: _*)}))
        .reduceByKey(..${unionUDF.params} => ${unionUDF.body})
        .map(x => eu.stratosphere.emma.api.Group(x._1, x._2))
     """
@@ -349,16 +352,15 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     def nextTermName(prefix: String = "scatter") = TermName(f"$prefix${scatterCounter.advance.get}%05d")
   }
 
-  def substitute(map: (TermName, Tree)*) = {
-    val m = Map(map: _*)
-    new SymbolSubstituter(Map(map: _*))
-  }
+  def substitute(tree: Tree, map: (TermName, Tree)*) =
+    new SymbolSubstituter(map.toMap).transform(tree)
 
   class SymbolSubstituter(map: Map[TermName, Tree]) extends Transformer with (Tree => Tree) {
     override def apply(tree: Tree): Tree = transform(tree)
 
     override def transform(tree: Tree) = tree match {
-      case Ident(name@TermName(_)) if map.contains(name) => map(name)
+      case Typed(Ident(tn: TermName), _) if map.contains(tn) => map(tn)
+      case       Ident(tn: TermName)     if map.contains(tn) => map(tn)
       case _ => super.transform(tree)
     }
   }

@@ -25,10 +25,8 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
    * @param comprehensionView A view over the comprehended terms in the tree.
    * @return A tree representing the compiled triver.
    */
-  def compile(tree: Tree, cfGraph: CFGraph, comprehensionView: ComprehensionView): Tree = {
-    val compiled = new Compiler(cfGraph, comprehensionView).transform(tree)
-    c.untypecheck(compiled)
-  }
+  def compile(tree: Tree, cfGraph: CFGraph, comprehensionView: ComprehensionView): Tree =
+    untypecheck(new Compiler(cfGraph, comprehensionView).transform(tree))
 
   private class Compiler(cfGraph: CFGraph, comprehensionView: ComprehensionView) extends Transformer {
 
@@ -147,11 +145,9 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
      * @param e The tree to be serialized.
      * @return
      */
-    private def serialize(e: Tree): String = {
-      showCode(c.typecheck( q"""
-        (..${for (s <- closure(e)) yield ValDef(Modifiers(Flag.PARAM), s.name, tq"${s.info}", EmptyTree)}) => ${c.untypecheck(e)}
-      """))
-    }
+    private def serialize(e: Tree): String = showCode(c.typecheck(q"""
+      (..${for (s <- closure(e)) yield ValDef(Modifiers(Flag.PARAM), s.name, tq"${s.info}", EmptyTree)}) =>
+        ${untypecheck(e)}"""))
 
     /**
      * Fetches the element type `A` of a `DataBag[A]` type.
@@ -199,8 +195,13 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
         case vd@ValDef(_, _, _, _) => vd.symbol.asTerm
       }).toSet
 
+      // find all term symbols bound within the term
+      val bound = t.collect({
+        case bind@Bind(_, _) => bind.symbol.asTerm
+      }).toSet
+
       // the closure is the difference between the referenced and the defined symbols
-      referenced diff defined
+      referenced diff defined diff bound
     }
   }
 
