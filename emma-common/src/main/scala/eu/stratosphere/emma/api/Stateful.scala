@@ -85,6 +85,35 @@ object Stateful {
       } yield d
 
     /**
+     * Computes and flattens a delta without additional inputs. The UDF `f` is allowed to modify the state element `s`,
+     * however with the restriction that the modification should not affect it's identity.
+     *
+     * @param f the update function to be applied for each point in the distributed state.
+     * @tparam B The type of the output elements.
+     * @return The flattened result of all update invocations.
+     */
+    def updateWith[B](f: A => DataBag[B]): DataBag[B] =
+      for (s <- bag(); d <- f(s)) yield d
+
+    /**
+     * Computes and flattens the `leftJoin` with `updates` which passes for each update element `u` it's
+     * corresponding state element `s` to the update function `f`. The UDF `f` is allowed to modify the current
+     * state element `s`, however with the restriction that the modification should not affect it's identity.
+     *
+     * @param updates A collection of inputs to be joined with.
+     * @param f A UDF to be applied per pair `f(s, u)` as described above.
+     * @tparam B The type of the `updates` elements.
+     * @tparam C The type of the output elements.
+     * @return The flattened result of all update invocations.
+     */
+    def updateWith[B <: Identity[K], C](updates: DataBag[B])(f: (A, B) => DataBag[C]): DataBag[C] =
+      for {
+        u <- updates
+        s <- DataBag(state.get(u.identity).toSeq)
+        d <- f(s, u)
+      } yield d
+
+    /**
      * Computes and flattens the `nestJoin(p, f)` which nests the current state elements `s` against their
      * associated bag of update elements. The UDF `f` is allowed to modify the state element `s`, however with the
      * restriction that the modification should not affect it's identity.
