@@ -114,6 +114,12 @@
             <groupId>org.scalatest</groupId>
             <artifactId>scalatest_${scala.tools.version}</artifactId>
         </dependency>
+        <dependency>
+            <groupId>org.scalacheck</groupId>
+            <artifactId>scalacheck_${scala.tools.version}</artifactId>
+            <version>1.12.2</version>
+            <scope>test</scope>
+        </dependency>
 
         <!-- Arguments parsing -->
         <dependency>
@@ -125,6 +131,18 @@
         <dependency>
             <groupId>org.reflections</groupId>
             <artifactId>reflections</artifactId>
+        </dependency>
+
+        <!-- Number crunching -->
+        <dependency>
+            <groupId>org.scalanlp</groupId>
+            <artifactId>breeze_${scala.tools.version}</artifactId>
+            <version>0.11.2</version>
+        </dependency>
+        <dependency>
+            <groupId>org.scalanlp</groupId>
+            <artifactId>breeze-natives_${scala.tools.version}</artifactId>
+            <version>0.11.2</version>
         </dependency>
     </dependencies>
 
