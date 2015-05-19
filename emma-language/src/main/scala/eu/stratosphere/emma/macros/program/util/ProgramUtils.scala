@@ -20,7 +20,7 @@ private[emma] trait ProgramUtils[C <: blackbox.Context] extends ContextHolder[C]
    * @return a non-typecked AST representing the code of `tree`
    */
   // FIXME: Replace with c.untypecheck once SI-5464 is resolved
-  def untypecheck(tree: Tree): Tree = c.parse(showCode(tree))
+  def untypecheck(tree: Tree): Tree = c.parse(showCode(tree, printRootPkg = true))
 
   /**
    * Create a function that replaces all occurences of the identifiers from the given environment with fresh
