@@ -240,10 +240,10 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
         super.transform(tree)
     }
 
-    def apply(tree: Tree): Tree = {
-      val block = c.typecheck(q"{ import scala.reflect._; ${transform(untypecheck(tree))} }").asInstanceOf[Block]
-      block.expr
-    }
+    def apply(tree: Tree): Tree = c.typecheck(q"""{
+      import _root_.scala.reflect._
+      ${transform(untypecheck(tree))}
+    }""").asInstanceOf[Block].expr
   }
 
 }
