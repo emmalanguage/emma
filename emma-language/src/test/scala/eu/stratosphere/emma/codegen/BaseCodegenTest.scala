@@ -9,6 +9,7 @@ import eu.stratosphere.emma.testutil._
 import org.junit.{Test, After, Before}
 
 import scala.reflect.runtime.universe._
+import scala.util.Random
 
 abstract class BaseCodegenTest(rtName: String) {
 
@@ -624,6 +625,41 @@ abstract class BaseCodegenTest(rtName: String) {
       val range = DataBag(0.until(100).zipWithIndex)
       val squares = for (xy <- range; sqr = xy._1 * xy._2) yield sqr
       squares.sum
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testGroupMaterialization() = {
+    val alg = emma.parallelize {
+      val bag = DataBag(new Random().shuffle(0.until(100).toList))
+      val top = for (g <- bag groupBy { _ % 8 })
+        yield g.values.fetch().sorted.take(4).sum
+
+      top.max
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testGroupMaterializationWithClosure() = {
+    val alg = emma.parallelize {
+      val semiFinal = 8
+      val bag = DataBag(new Random().shuffle(0.until(100).toList))
+      val top = for (g <- bag groupBy { _ % semiFinal })
+        yield g.values.fetch().sorted.take(semiFinal / 2).sum
+
+      top.max
     }
 
     // compute the algorithm using the original code and the runtime under test
