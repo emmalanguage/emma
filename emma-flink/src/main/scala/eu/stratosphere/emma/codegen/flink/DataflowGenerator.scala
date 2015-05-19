@@ -1,7 +1,6 @@
 package eu.stratosphere.emma.codegen.flink
 
 import java.net.URI
-import java.nio.file.Paths
 import java.util.UUID
 
 import eu.stratosphere.emma.api.{CSVInputFormat, CSVOutputFormat}
@@ -182,6 +181,7 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     case op: ir.FoldGroup[_, _] => opCode(op)
     case op: ir.Distinct[_] => opCode(op)
     case op: ir.Union[_] => opCode(op)
+    case op: ir.Group[_, _] => opCode(op)
     case _ => throw new RuntimeException(s"Unsupported ir node of type '${cur.getClass}'")
   }
 
@@ -562,7 +562,36 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
     q"$xs union $ys"
   }
 
+  private def opCode[OT, IT](op: ir.Group[OT, IT])(implicit closure: DataflowClosure): Tree = {
+    val srcTpe = typeOf(op.xs.tag).dealias
+
+    // assemble input fragment
+    val xs = generateOpCode(op.xs)
+
+    // generate key UDF
+    val keyFn  = typecheckUDF(op.key)
+    val keyUDF = ir.UDF(keyFn, keyFn.tpe, tb)
+    closure.closureParams ++=
+      (for (p <- keyUDF.closure) yield p.name -> p.tpt)
+
+    val iterator = freshIdent("iterator")
+    val stream   = freshIdent("stream")
+
+    // assemble dataflow fragment
+    q"""$xs groupBy { (..${keyUDF.params}) =>
+        ${keyUDF.body}
+      } reduceGroup { ($iterator: scala.Iterator[$srcTpe]) =>
+        val $stream = $iterator.toStream
+        eu.stratosphere.emma.api.Group(
+          ((..${keyUDF.params}) => ${keyUDF.body})($stream.head),
+          eu.stratosphere.emma.api.DataBag($stream))
+      }"""
+  }
+
   private def typecheckUDF(udf: String) = tb.typecheck(tb.parse(udf))
+
+  private def freshIdent(prefix: String) =
+    Ident(internal.reificationSupport.freshTermName(prefix))
 
   // --------------------------------------------------------------------------
   // Auxiliary structures
