@@ -67,9 +67,9 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
       val tree = q"""
       object ${TermName(dataflowName)} {
 
-        import org.apache.spark.SparkContext
-        import org.apache.spark.SparkContext._
-        import eu.stratosphere.emma.api.DataBag
+        import _root_.org.apache.spark.SparkContext
+        import _root_.org.apache.spark.SparkContext._
+        import _root_.eu.stratosphere.emma.api.DataBag
 
         ..${closure.udfs.result().toSeq}
 

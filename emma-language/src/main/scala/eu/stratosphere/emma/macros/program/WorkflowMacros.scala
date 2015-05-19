@@ -72,7 +72,7 @@ class WorkflowMacros(val c: blackbox.Context) {
       val algorithmCode =
         q"""
         new eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
-           import scala.reflect._
+           import _root_.scala.reflect._
 
            def run(engine: eu.stratosphere.emma.runtime.Engine): ${c.weakTypeOf[T]} = engine match {
              case _: eu.stratosphere.emma.runtime.Native => runNative()

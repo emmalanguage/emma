@@ -106,9 +106,9 @@ class TypeInformationFactory(val dataflowCompiler: DataflowCompiler) {
         q"""
         class ${TypeName(name)} extends org.apache.flink.api.scala.typeutils.CaseClassTypeInfo[$tpe](classOf[$tpe], Array[org.apache.flink.api.common.typeinfo.TypeInformation[_]](..$genericTypeInfos), Seq(..$fieldTypeInfos), Seq(..$fieldNames)) {
 
-          import org.apache.flink.api.common.typeutils.TypeSerializer
-          import org.apache.flink.api.scala.typeutils.CaseClassSerializer
-          import org.apache.flink.api.common.ExecutionConfig
+          import _root_.org.apache.flink.api.common.typeutils.TypeSerializer
+          import _root_.org.apache.flink.api.scala.typeutils.CaseClassSerializer
+          import _root_.org.apache.flink.api.common.ExecutionConfig
 
           override def createSerializer(executionConfig: ExecutionConfig): TypeSerializer[$tpe] = {
             val fieldSerializers: Array[TypeSerializer[_]] = new Array[TypeSerializer[_]](getArity)

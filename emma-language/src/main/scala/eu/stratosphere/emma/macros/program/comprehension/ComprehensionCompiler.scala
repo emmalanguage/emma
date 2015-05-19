@@ -78,8 +78,8 @@ private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
       q"""
       {
         // required imports
-        import scala.reflect.runtime.universe._
-        import eu.stratosphere.emma.ir
+        import _root_.scala.reflect.runtime.universe._
+        import _root_.eu.stratosphere.emma.ir
 
         val __root = ${serialize(root)}
 

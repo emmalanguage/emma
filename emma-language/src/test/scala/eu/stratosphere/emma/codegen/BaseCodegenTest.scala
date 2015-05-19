@@ -669,4 +669,23 @@ abstract class BaseCodegenTest(rtName: String) {
     // assert that the result contains the expected values
     assert(exp == act, s"Unexpected result: $act != $exp")
   }
+
+  @Test def testRootPackageCapture() = {
+    val alg = emma.parallelize {
+      val eu    = "eu"
+      val com   = "com"
+      val java  = "java"
+      val org   = "org"
+      val scala = "scala"
+      val range = DataBag(0 until 100)
+      range.sum
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
 }

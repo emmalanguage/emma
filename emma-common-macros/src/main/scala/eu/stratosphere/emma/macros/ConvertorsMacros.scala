@@ -40,7 +40,7 @@ class ConvertorsMacros(val c: blackbox.Context) {
       q"""
        new eu.stratosphere.emma.api.CSVConvertors[$tpe] {
 
-         import scala.collection.mutable.ArrayBuilder
+         import _root_.scala.collection.mutable.ArrayBuilder
 
          val builder = ArrayBuilder.make[String]()
 

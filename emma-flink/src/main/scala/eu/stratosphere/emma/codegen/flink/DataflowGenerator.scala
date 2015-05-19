@@ -40,8 +40,8 @@ class DataflowGenerator(val dataflowCompiler: DataflowCompiler, val sessionID: U
       val tree = q"""
       object ${TermName(dataflowName)} {
 
-        import org.apache.flink.api.scala.ExecutionEnvironment
-        import org.apache.flink.api.scala._
+        import _root_.org.apache.flink.api.scala.ExecutionEnvironment
+        import _root_.org.apache.flink.api.scala._
 
         def run(env: ExecutionEnvironment, values: Seq[$tpe]) = {
           // read the input
