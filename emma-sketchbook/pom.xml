@@ -34,6 +34,10 @@
         </dependency>
         <dependency>
             <groupId>eu.stratosphere</groupId>
+            <artifactId>emma-spark</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>eu.stratosphere</groupId>
             <artifactId>emma-flink</artifactId>
         </dependency>
         <!-- Emma (test jars) -->
@@ -46,6 +50,12 @@
             <groupId>eu.stratosphere</groupId>
             <artifactId>emma-language</artifactId>
             <type>test-jar</type>
+        </dependency>
+
+        <!-- Spark -->
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-core_${scala.tools.version}</artifactId>
         </dependency>
 
         <!-- Flink -->
@@ -79,12 +89,6 @@
             <artifactId>jackson-annotations</artifactId>
             <version>2.2.1</version>
             <scope>provided</scope>
-        </dependency>
-
-        <!-- Spark -->
-        <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.tools.version}</artifactId>
         </dependency>
 
         <!-- Logging -->
