@@ -250,6 +250,11 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       // Aggregates
       // -----------------------------------------------------
 
+      // in.fold(empty, sng, union)
+      case Apply(TypeApply(select@Select(in, _), _), List(empty, sng, union))
+          if select.symbol == api.fold =>
+        combinator.Fold(empty, sng, union, comprehend(Nil)(in), t)
+
       // in.minBy()(n)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(Function(List(x, y), body))) if select.symbol == api.minBy =>
         // replace the body of the fn to use 'u', 'v' parameters instead of the given arguments
