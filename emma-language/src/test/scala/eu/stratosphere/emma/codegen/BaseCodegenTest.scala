@@ -688,4 +688,18 @@ abstract class BaseCodegenTest(rtName: String) {
     // assert that the result contains the expected values
     assert(exp == act, s"Unexpected result: $act != $exp")
   }
+
+  @Test def testFold() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0 until 100)
+      range.fold[Int](0, identity, _ + _)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result:  $act != $exp")
+  }
 }
