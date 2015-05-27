@@ -3,7 +3,6 @@ package eu.stratosphere.emma.api
 import eu.stratosphere.emma.api.model.Identity
 import eu.stratosphere.emma.macros.utility.UtilMacros
 import eu.stratosphere.emma.macros.program.WorkflowMacros
-
 /**
  * This is e playground specification of e function-oriented algebra for the Emma language.
  */
@@ -24,4 +23,6 @@ object emma {
   final def desugarRaw(e: Any): String = macro UtilMacros.desugarRaw
 
   final def analyze[T](e: T): T = macro UtilMacros.analyze[T]
+
+  final def substituteClassNames[T](e: T): T = macro UtilMacros.substituteClassNames[T]
 }
