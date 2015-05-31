@@ -40,8 +40,8 @@ class GraphColoring(input: String, output: String, rt: Engine)
 
       // resolve conflicting colors until convergence
       while (!messages.empty()) {
-        messages = vertices.updateWith(messages)(_.dst,
-          (v, ms) => { // if the color is taken choose a new one
+        messages = vertices.updateWithMany(messages)(
+          _.dst, (v, ms) => { // if the color is taken choose a new one
             if (ms exists { _.col == v.col }) {
               val colors = for {
                 e <- directed
@@ -68,7 +68,7 @@ class GraphColoring(input: String, output: String, rt: Engine)
       write(output, new CSVOutputFormat[ColoredVertex]) { colored }
     }
 
-    //algorithm.run(rt)
+    //algorithm run rt
   }
 }
 
