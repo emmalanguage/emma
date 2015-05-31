@@ -105,7 +105,7 @@ class MinimumSpanningForest(inputUrl: String, outputUrl: String, rt: Engine) ext
         // create initial questions
         var questions = for (d <- supervertices.bag()) yield QuestionMsg(d.label.pointer, d.id)
         // initial answer phase: send messages to pointers
-        val answers = (supervertices updateWith questions)(q => q.receiver, (s, questions) => {
+        val answers = (supervertices updateWithMany questions)(q => q.receiver, (s, questions) => {
           if (questions.map(_.sender).exists(_ == s.label.pointer)) {
             // an incoming question message was sent by by the current supervertex pointer (conjoined-tree root case)
             s.label.pointer = s.id
@@ -117,7 +117,7 @@ class MinimumSpanningForest(inputUrl: String, outputUrl: String, rt: Engine) ext
 
         while (supervertices.bag().exists(_.label.tpe == Unknown)) {
           // question phase: merge answers and generate next questions
-          questions = (supervertices updateWith answers)(a => a.receiver, (s, answers) => {
+          questions = (supervertices updateWithMany answers)(a => a.receiver, (s, answers) => {
             val supervertex = answers.fetch().collectFirst({
               case x if x.pointerIsSupervertex => x
             })

@@ -90,18 +90,18 @@ class BeliefPropagation(
       while (iterations < _maxIterations && !converged) {
         iterations += 1
 
-        beliefs.updateWith(messages.bag())(
-          m       => (m.dst, m.state),
-          (b, ms) => {
+        beliefs.updateWithMany(messages.bag())(
+          m => (m.dst, m.state), (b, ms) => {
             b.previous = b.marginal
             b.marginal = ms.map(_.prob).product()
             DataBag()
           })
 
-        beliefs.updateWith(variables) { (b, v) =>
-          b.marginal *= v.prior
-          DataBag()
-        }
+        beliefs.updateWithOne(variables)(
+          _.identity, (b, v) => {
+            b.marginal *= v.prior
+            DataBag()
+          })
 
         val normBeliefs = for {
           gnb <- beliefs.bag() groupBy { _.variable }
@@ -113,10 +113,11 @@ class BeliefPropagation(
           if b.variable == n._1
         } yield b.copy(marginal = n._2)
 
-        beliefs.updateWith(updates) { (b, u) =>
-          b.marginal /= u.marginal
-          DataBag()
-        }
+        beliefs.updateWithOne(updates)(
+          _.identity, (b, u) => {
+            b.marginal /= u.marginal
+            DataBag()
+          })
 
         converged = beliefs.bag() forall { b =>
           (b.marginal - b.previous).abs < _epsilon
@@ -130,9 +131,8 @@ class BeliefPropagation(
           Belief(v, s, prob)
         }
 
-        messages.updateWith(edges)(
-          e       => (e.var1, e.var2, e.state2),
-          (m, es) => {
+        messages.updateWithMany(edges)(
+          e => (e.var1, e.var2, e.state2), (m, es) => {
             m.prob = (for {
               e <- es
               v <- variables
@@ -144,7 +144,6 @@ class BeliefPropagation(
             } yield {
               v.prior * e.prob * p.marginal / m.prob
             }).sum()
-
             DataBag()
           })
       }
@@ -155,7 +154,7 @@ class BeliefPropagation(
       write(output, new CSVOutputFormat[Variable]) { marginals }
     }
 
-//    algorithm.run(rt)
+    //algorithm run rt
   }
 }
 
