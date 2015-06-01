@@ -7,13 +7,6 @@ import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
 object Query01 {
 
-  object Command {
-    // argument names
-    val KEY_INPUT = "input"
-    val KEY_OUTPUT = "output"
-    val KEY_DELTA = "delta"
-  }
-
   class Command extends Algorithm.Command[Query01] {
 
     // algorithm names
@@ -42,6 +35,13 @@ object Query01 {
         .metavar("DELTA")
         .help("delta")
     }
+  }
+
+  object Command {
+    // argument names
+    val KEY_INPUT = "input"
+    val KEY_OUTPUT = "output"
+    val KEY_DELTA = "delta"
   }
 
   object Schema {
@@ -117,7 +117,7 @@ class Query01(inPath: String, outPath: String, delta: Int, rt: Engine, truncate:
 
       // compute join part of the query
       val l = for (
-        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'));
+        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'))
         if l.shipDate <= "1996-12-01")
         yield l
 
@@ -129,7 +129,7 @@ class Query01(inPath: String, outPath: String, delta: Int, rt: Engine, truncate:
           def tr(v: Double) = if (_truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
 
           // compute base aggregates
-          val sumQty = g.values.map(_.quantity).sum();
+          val sumQty = g.values.map(_.quantity).sum()
           val sumBasePrice = g.values.map(_.extendedPrice).sum()
           val sumDiscPrice = g.values.map(l => l.extendedPrice * (1 - l.discount)).sum()
           val sumCharge = g.values.map(l => l.extendedPrice * (1 - l.discount) * (1 + l.tax)).sum()
