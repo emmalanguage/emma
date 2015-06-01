@@ -1,7 +1,7 @@
-package eu.stratosphere.emma.macros.program
-
+package eu.stratosphere.emma.macros.program.comprehension
 
 import eu.stratosphere.emma.api.Algorithm
+import eu.stratosphere.emma.macros.program.ContextHolder
 import eu.stratosphere.emma.macros.program.comprehension.Comprehension
 import eu.stratosphere.emma.macros.program.controlflow.ControlFlow
 
@@ -9,7 +9,7 @@ import scala.language.existentials
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
-class WorkflowMacros(val c: blackbox.Context) {
+class TestMacros(val c: blackbox.Context) {
 
   /**
    * Entry macro for emma algorithms.
@@ -92,7 +92,8 @@ class WorkflowMacros(val c: blackbox.Context) {
         }
         """
 
-      c.Expr[Algorithm[T]](c.typecheck(algorithmCode))
+      val ac = c.Expr[Algorithm[T]](c.typecheck(algorithmCode))
+      ac
     }
 
     /**
@@ -126,7 +127,6 @@ class WorkflowMacros(val c: blackbox.Context) {
 
       // 2. Apply Fold-Group-Fusion where possible
       foldGroupFusion(optimizedTree)
-      normalizePredicates(optimizedTree)
 
       // ----------------------------------------------------------------------
       // Final result assembly
@@ -136,7 +136,7 @@ class WorkflowMacros(val c: blackbox.Context) {
         q"""
         { ..${
           for (t <- comprehensionView.terms) yield
-          q"""
+            q"""
             println("~" * 80)
             println("~ Comprehension `" + ${t.id.toString} + "` (original):")
             println("~" * 80)

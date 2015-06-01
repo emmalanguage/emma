@@ -4,6 +4,7 @@ import java.io.File
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.codegen.testschema._
+import eu.stratosphere.emma.codegen.predicates._
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
 import org.junit.{Ignore, Test, After, Before}
@@ -703,58 +704,56 @@ abstract class BaseCodegenTest(rtName: String) {
     assert(exp == act, s"Unexpected result:  $act != $exp")
   }
 
-  @Test def testEmpty() = {
-    val alg = emma.parallelize { DataBag(Seq.empty[Int]).isEmpty }
+  @Test def testFilterNormalizationWithSimplePredicates() = {
+
+    val alg = emma.parallelize {
+      val f = for (x <- DataBag(1 to 1000)
+                if !(x > 5 || (x < 2 && x == 0)) || (x > 5 || !(x < 2)))
+              yield x
+      f.fetch()
+    }
+
     // compute the algorithm using the original code and the runtime under test
     val act = alg.run(rt)
     val exp = alg.run(native)
+
     // assert that the result contains the expected values
-    assert(exp == act, s"Unexpected result:  $act != $exp")
+    compareBags(act, exp)
   }
 
-  @Ignore @Test def testClassNameNormalization() = {
-    // without emma.substituteClassNames ImdbYear can not be found
+  @Test def testFilterNormalizationWithSimplePredicatesMultipleInputs() = {
+
     val alg = emma.parallelize {
-      val entries = for (e <- read(materializeResource(s"/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])) yield e
+      val X = DataBag(1 to 1000)
+      val Y = DataBag(100 to 2000)
 
-      val group = for (g <- entries.groupBy(l => new ImdbYear(l.year))) yield g
-
-      group.flatMap(g => g.values).fetch()
+      val f = for (x <- X; y <- Y if x < y || x + y < 100 && x % 2 == 0 || y / 2 == 0) yield y + x
+      f.fetch()
     }
 
     // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).toSet
-    val exp = alg.run(native).toSet
+    val act = alg.run(rt)
+    val exp = alg.run(native)
 
     // assert that the result contains the expected values
-    assert(exp == act, s"Unexpected result: $act != $exp")
+    compareBags(act, exp)
   }
 
-  @Test def testEnclosingParametersNormalization() = {
-    // a class that wraps an Emma program and a parameter used within the 'parallelize' call
-    case class MoviesWithinPeriodQuery(minYear: Int, periodLenth: Int, rt: runtime.Engine) {
-      def run() = {
-        val alg = emma.parallelize {
-          (for {
-            e <- read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-            if e.year >= minYear && e.year < minYear + periodLenth
-          } yield e).fetch()
-        }
+  @Test def testFilterNormalizationWithUDFPredicates() = {
 
-        alg.run(rt)
-      }
+    val alg = emma.parallelize {
+      val f = for (x <- DataBag(1 to 1000)
+                   if !(A(x) || (B(x) && C(x))) || (A(x) || !B(x)))
+      yield x
+      f.fetch()
     }
 
-    // run the algorithm
-    try {
-      val exp = MoviesWithinPeriodQuery(1990, 10, runtime.Native()).run().toSet
-      val act = MoviesWithinPeriodQuery(1990, 10, rt).run().toSet
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
 
-      // assert that the result contains the expected values
-      assert(exp == act, s"Unexpected result: $act != $exp")
-    } catch {
-      case e: Throwable => assert(assertion = false, s"Unexpected exception while running MoviesAfterQuery: $e")
-    }
+    // assert that the result contains the expected values
+    compareBags(act, exp)
   }
 }
 
