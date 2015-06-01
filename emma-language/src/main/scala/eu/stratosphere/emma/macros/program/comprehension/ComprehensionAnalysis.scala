@@ -7,6 +7,7 @@ import scala.collection.mutable
 import eu.stratosphere.emma.macros.program.ContextHolder
 import eu.stratosphere.emma.macros.program.controlflow.ControlFlowModel
 
+import scala.collection.mutable.ListBuffer
 import scala.reflect.macros._
 
 private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
@@ -385,6 +386,246 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
           case _ =>
         }
       }
+    }
+  }
+
+  def normalizePredicates(tree: Tree)(implicit cfGraph: CFGraph, comprehensionView: ComprehensionView) = {
+
+    for (term <- comprehensionView.terms) yield {
+      val comprehensions = term.comprehension.expr.collect({ case c@Comprehension(h, q) => c})
+
+      for (comprehension <- comprehensions) yield {
+        val qualifiers = comprehension.qualifiers
+
+        val newQualifiers = {for (qualifier <- qualifiers) yield
+          qualifier match {
+            case Filter(ScalaExpr(v, t)) =>
+              // normalize the tree
+              val normalizedFilters = cleanConjuncts(distributeOrOverAnd(applyDeMorgan(t)))
+                                      .filter(x => x != None)
+                                      .map { case Some(nf) => Filter(ScalaExpr(v, nf))}
+              normalizedFilters
+
+            case _ => List(qualifier)
+          }}.flatten
+
+        comprehension.qualifiers = newQualifiers
+      }
+    }
+
+    tree
+  }
+
+  /**
+   * Apply deMorgan's Rules to predicates (move negations as far in as possible)
+   * @param expr
+   * @return
+   */
+  def applyDeMorgan(tree: Tree): Tree = {
+
+    object deMorganTransformer extends Transformer {
+      def moveNegationsInside(t: Tree): Tree = t match {
+
+        case op@Apply(Select(q, n), as) => n match {
+
+          // !(A || B) => !A && !B
+          case TermName("$bar$bar") =>
+            val arg = as.head
+            val moved = q"(!$q && !$arg)"
+            transform(moved)
+
+          // !(A && B) => !A || !B
+          case TermName("$amp$amp") =>
+            val arg = as.head
+            val moved = q"(!$q || !$arg)"
+            transform(moved)
+
+          /* !A => !A
+             this should cover the cases for atoms that we don't want to reduce further: */
+          case _ => q"!$t"
+
+        }
+        case _ =>
+          throw new RuntimeException("Unforseen Tree in DeMorgatransformer!")
+      }
+
+      override def transform(tree: Tree): Tree = tree match {
+        case Select(q, TermName("unary_$bang")) =>
+          moveNegationsInside(q)
+        case _ => super.transform(tree)
+      }
+    }
+
+    deMorganTransformer.transform(tree)
+  }
+
+  /**
+   * Distribute ∨ inwards over ∧
+   * Repeatedly replace B ∨ (A ∧ C) with (B ∨ A) ∧ (B ∨ C)
+   */
+  def distributeOrOverAnd(tree: Tree): Tree = {
+    object DistributeTransformer extends Transformer {
+      override def transform(tree: Tree): Tree = tree match {
+        case Apply(Select(lhs, TermName("$bar$bar")), rhs) =>
+          (lhs, rhs.head) match {
+            /* C || (A && B) => (A || C) && (C || B)
+
+            this also covers
+
+            (A && B) || (C && D)
+             => ((A && B) || C) && ((A && B) || D)
+             => (((A || C) && (B || C)) && ((A || D) && (B || D))
+             */
+            case (_, Apply(Select(lhs2, TermName("$amp$amp")), rhs2)) =>
+              val modlhs = transform(q"($lhs || $lhs2)")
+              val modrhs = transform(q"($lhs || ${rhs2.head})")
+              q"$modlhs && $modrhs"
+
+            // (A && B) || C => (A || C) && (C || B)
+            case (Apply(Select(lhs2, TermName("$amp$amp")), rhs2), _) =>
+              val modlhs = transform(q"($lhs2 || ${rhs.head})")
+              val modrhs = transform(q"(${rhs2.head} || ${rhs.head})")
+              q"$modlhs && $modrhs"
+
+            case _ => super.transform(tree)
+          }
+        case _ => super.transform(tree)
+      }
+    }
+
+    DistributeTransformer.transform(tree)
+  }
+
+  /** Checks the conjuncts for always true statements and duplicates and cleans them up.
+    *
+    * This object gets single disjuncts (A || B || C) and removes duplicates.
+    * If the disjunct is always true, e.g. (A || !A || B || C), it gets removed.
+    *
+    * (¬B ∨ B ∨ ¬A) ∧ (¬A ∨ ¬C ∨ B ∨ ¬A) => ¬A ∨ ¬C ∨ B
+    * @param tree The conjunct tree.
+    * @return  A list of Option[Tree] where each option stands for one disjunct (A || ... || Z).
+    *          If the disjunct is always true (e.g. (A || !A)) we can remove it and the Option will be None.
+    *          In case the disjunct is not always true, the list will contain Some(tree) with the tree of
+    *          the cleaned/reduced disjunct.
+    */
+  def cleanConjuncts(tree: Tree): ListBuffer[Option[Tree]] = {
+    val conjunct = ListBuffer[Disjunct]()
+
+    object DisjunctTraverser extends Traverser {
+      var disjunct = new Disjunct()
+
+      def newDisjunct() = {
+        disjunct = new Disjunct()
+      }
+
+      def getDisjunct = disjunct
+
+      override def traverse(tree: Tree) = tree match {
+        // (A || B || ... || Y || Z)
+        case Apply(Select(lhs, TermName("$bar$bar")), rhs) => {
+          traverse(lhs)
+          traverse(rhs.head)
+        }
+
+        // here we have a negated atom
+        case Select(a@Apply(Select(_,_),_), TermName("unary_$bang")) =>
+          val p = Predicate(a, negated=true)
+          disjunct.addPredicate(p)
+
+        // here we have an atom with a method select attached
+        case Select(lhs, _) =>
+          traverse(lhs)
+
+        // here we should have only atoms
+        case a: Apply =>
+          val p = Predicate(a, negated=false)
+          disjunct.addPredicate(p)
+
+        case _ =>
+          throw new RuntimeException("Discovered unforeseen structure in Predicate Disjunct!")
+      }
+    }
+
+    object ConjunctTraverser extends Traverser {
+      override def traverse(tree: Tree) = tree match {
+        // C1 && C2 && C3 && ... && C4
+        case Apply(Select(lhs, TermName("$amp$amp")), rhs) => {
+          traverse(lhs)
+          traverse(rhs.head)
+        }
+
+        // we found a disjunct
+        case a: Apply =>
+          DisjunctTraverser.traverse(a)
+          conjunct += DisjunctTraverser.getDisjunct
+          DisjunctTraverser.newDisjunct()
+
+        case _ =>
+          //super.traverse(tree)
+          //throw new RuntimeException("Discovered unforeseen structure in Predicate Conjunct!")
+      }
+    }
+
+    ConjunctTraverser.traverse(tree)
+    conjunct.map(x => x.getTree)
+  }
+
+  case class Predicate(tree: Apply, negated: Boolean) {
+
+    def negate() = Predicate(tree, negated = !this.negated)
+
+    def getTree: Tree = if (negated) Select(tree, TermName("unary_$bang")) else tree
+
+    override def equals(other: Any): Boolean = other match {
+      case Predicate(t, n) =>
+        tree.equalsStructure(t) && negated == n
+      case _ => false
+    }
+
+    // TODO implement hashcode
+  }
+
+  class Disjunct(val predicates: ListBuffer[Predicate] = ListBuffer.empty[Predicate]) {
+
+    // add predicate if it is not contained yet
+    def addPredicate(p: Predicate) = if (!containsPredicate(p)) predicates += p
+
+    def getPredicates = predicates
+
+    def getTree: Option[Tree] = {
+      // if this disjunct is always true, we omit it from the final tree
+      if (alwaysTrue) return None
+
+      predicates.toList.map(x => x.getTree) match {
+        case Nil =>
+          None
+        case x :: Nil =>
+          Some(x)
+        case x :: xs =>
+          val t: Tree = xs.fold(x)((p1, p2) => q"$p1 || $p2")
+          Some(t)
+      }
+    }
+
+    def containsPredicate(pred: Predicate): Boolean = {
+      for ( p <- predicates
+            if pred.tree.equalsStructure(p.tree)
+            if pred.negated == p.negated) {
+        return true
+      }
+
+      false
+    }
+
+    def alwaysTrue: Boolean = {
+      //TODO this should be improvable...
+      for (p1 <- predicates;
+           p2 <- predicates;
+           if p1.tree.equalsStructure(p2.tree);
+           if p1.negated != p2.negated) {
+        return true
+      }
+      false
     }
   }
 

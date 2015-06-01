@@ -400,6 +400,9 @@
                     <additionalClasspathElements>
                         <additionalClasspathElement>${java.io.tmpdir}/emma/codegen</additionalClasspathElement>
                     </additionalClasspathElements>
+                    <systemPropertyVariables>
+                        <emma.test.macro.toolboxcp>${project.basedir}/target/classes</emma.test.macro.toolboxcp>
+                    </systemPropertyVariables>
                 </configuration>
             </plugin>
         </plugins>
