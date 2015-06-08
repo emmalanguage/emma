@@ -146,7 +146,10 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
 
   def forall(f: A => Boolean): Boolean = fold[Boolean](true, x => f(x), (x, y) => x && y)
 
+  @deprecated("Use isEmpty instead", "08.06.2015")
   def empty(): Boolean = impl.isEmpty
+
+  def isEmpty: Boolean = impl.isEmpty
 
   // -----------------------------------------------------
   // Conversion Methods
