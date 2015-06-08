@@ -48,6 +48,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
     val exists = bagSymbol.info.decl(TermName("exists"))
     val forall = bagSymbol.info.decl(TermName("forall"))
     val empty = bagSymbol.info.decl(TermName("empty"))
+    val isEmpty = bagSymbol.info.decl(TermName("isEmpty"))
 
     val methods = Set(
       read, write,
@@ -56,7 +57,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       map, flatMap, withFilter,
       groupBy,
       minus, plus, distinct,
-      minBy, maxBy, min, max, sum, product, count, exists, forall, empty
+      minBy, maxBy, min, max, sum, product, count, exists, forall, empty, isEmpty
     ) ++ apply.alternatives
 
     val monadic = Set(map, flatMap, withFilter)
@@ -323,6 +324,11 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       case Apply(select@Select(in, _), Nil) if select.symbol == api.empty =>
         val comprehendedIn = comprehend(Nil)(in)
         combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe.typeArgs.head}) => true"), c.typecheck(q"(x: Boolean, y: Boolean) => x || y"), comprehendedIn, t)
+
+      // in.isEmpty
+      case Apply(select@Select(in, _), Nil) if select.symbol == api.isEmpty =>
+        val comprehendedIn = comprehend(Nil)(in)
+        combinator.Fold(c.typecheck(q"true"), c.typecheck(q"(x: ${comprehendedIn.tpe.typeArgs.head}) => false"), c.typecheck(q"(x: Boolean, y: Boolean) => x && y"), comprehendedIn, t)
 
       // ----------------------------------------------------------------------
       // Environment & Host Language Connectors

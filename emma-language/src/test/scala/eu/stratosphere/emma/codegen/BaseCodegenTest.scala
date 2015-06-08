@@ -703,6 +703,15 @@ abstract class BaseCodegenTest(rtName: String) {
     assert(exp == act, s"Unexpected result:  $act != $exp")
   }
 
+  @Test def testEmpty() = {
+    val alg = emma.parallelize { DataBag(Seq.empty[Int]).isEmpty }
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result:  $act != $exp")
+  }
+
   @Ignore @Test def testClassNameNormalization() = {
     // without emma.substituteClassNames ImdbYear can not be found
     val alg = emma.parallelize {
@@ -747,7 +756,6 @@ abstract class BaseCodegenTest(rtName: String) {
       case e: Throwable => assert(assertion = false, s"Unexpected exception while running MoviesAfterQuery: $e")
     }
   }
-
 }
 
 case class ImdbYear(year: Int) {}
