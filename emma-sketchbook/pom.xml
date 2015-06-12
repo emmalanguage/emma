@@ -90,6 +90,14 @@
             <version>2.2.1</version>
             <scope>provided</scope>
         </dependency>
+        <!-- another hacky solution for a Flink issue with codahale deps -->
+        <dependency>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>metrics-json</artifactId>
+            <version>3.0.2</version>
+            <scope>provided</scope>
+        </dependency>
+
 
         <!-- Logging -->
         <dependency>
