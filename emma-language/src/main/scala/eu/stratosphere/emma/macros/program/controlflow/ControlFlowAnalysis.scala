@@ -9,7 +9,7 @@ import scalax.collection.GraphPredef._
 import scalax.collection.edge.LkDiEdge
 import scalax.collection.mutable.Graph
 
-private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFlowModel[C] with ProgramUtils[C] {
+private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFlowModel[C] with ProgramUtils[C] with MacroHelper[C] {
   this: ControlFlowModel[C] =>
 
   import c.universe._
@@ -196,6 +196,16 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
 
     val testCounter = new Counter()
 
+    def apply(tree: Tree): Tree = {
+      val convertedTree = convertEnclosingParametersToLocal(tree)
+      val substitutedTree = substituteClassNames(convertedTree)
+
+      c.typecheck( q"""{
+      import _root_.scala.reflect._
+      ${transform(untypecheck(substitutedTree))}
+    }""").asInstanceOf[Block].expr
+    }
+
     override def transform(tree: Tree): Tree = tree match {
       // while (`cond`) { `body` }
       case LabelDef(_, _, If(cond, Block(body, _), _)) =>
@@ -239,11 +249,6 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
       case _ =>
         super.transform(tree)
     }
-
-    def apply(tree: Tree): Tree = c.typecheck(q"""{
-      import _root_.scala.reflect._
-      ${transform(untypecheck(tree))}
-    }""").asInstanceOf[Block].expr
   }
 
 }

@@ -688,4 +688,49 @@ abstract class BaseCodegenTest(rtName: String) {
     // assert that the result contains the expected values
     assert(exp == act, s"Unexpected result: $act != $exp")
   }
+
+  @Test def testSubstitution() = {
+    // without emma.substituteClassNames ImdbYear can not be found
+    val alg = emma.parallelize {
+      val entries = for (e <- read(materializeResource(s"/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])) yield e
+
+      val group = for (g <- entries.groupBy(l => new ImdbYear(l.year))) yield g
+
+      group.flatMap(g => g.values).fetch()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt).toSet
+    val exp = alg.run(native).toSet
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testEnclosingParameters() = {
+    // without emma.analyze the enclosingParameter / classParameter can not be found
+    val enclosingParameter = 1990
+    val clazz = new ParameterClass(enclosingParameter)
+    clazz.run()
+  }
+
+  class ParameterClass(classParameter: Int) {
+    def run() = {
+      val alg = emma.parallelize {
+        val entries = for (e <- read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])) yield {
+          if (e.year > classParameter)
+            e
+        }
+        entries.fetch()
+      }
+
+      val act = alg.run(rt)
+      val exp = alg.run(native)
+
+      // assert that the result contains the expected values
+      assert(exp == act, s"Unexpected result: $act != $exp")
+    }
+  }
 }
+
+case class ImdbYear(year: Int) {}
