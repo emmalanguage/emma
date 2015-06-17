@@ -420,7 +420,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       val foldExpressions = for (select <- groupValueSelects; expr <- allExpressions; fold <- foldOverSelect(select, expr)) yield fold
 
       // !!! all 'g.values' expressions are used directly in a comprehended 'fold' => apply Fold-Group-Fusion !!!
-      if (groupValueSelects.size == foldExpressions.size) {
+      if (foldExpressions.nonEmpty && groupValueSelects.size == foldExpressions.size) {
         // create an auxiliary map
         val foldToIndex = Map(foldExpressions.map(_.origin).zipWithIndex: _*)
 
