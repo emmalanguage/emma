@@ -259,10 +259,16 @@ class DataflowGenerator(
     // assemble input fragment
     val xs       = generateOpCode(op.xs)
     // get fold components
+    val empty    = parseCheck(op.empty)
+    val emptyUDF = ir.UDF(empty, empty.tpe.dealias, tb)
     val sng      = parseCheck(op.sng)
     val sngUDF   = ir.UDF(sng, sng.tpe.dealias, tb)
     val union    = parseCheck(op.union)
     val unionUDF = ir.UDF(union, union.tpe.dealias, tb)
+    // add closure parameters
+    closure.closureParams ++= emptyUDF.closure map { p => p.name -> p.tpt }
+    closure.closureParams ++=   sngUDF.closure map { p => p.name -> p.tpt }
+    closure.closureParams ++= unionUDF.closure map { p => p.name -> p.tpt }
     // assemble dataFlow fragment
     q"""$xs.map((..${sngUDF.params}) => ${sngUDF.body})
         .reduce((..${unionUDF.params}) => ${unionUDF.body})"""
@@ -275,15 +281,18 @@ class DataflowGenerator(
     // get fold components
     val key      = parseCheck(op.key)
     val keyUDF   = ir.UDF(key, key.tpe.dealias, tb)
+    val empty    = parseCheck(op.empty)
+    val emptyUDF = ir.UDF(empty, empty.tpe.dealias, tb)
     val sng      = parseCheck(op.sng)
     val sngUDF   = ir.UDF(sng, sng.tpe.dealias, tb)
     val union    = parseCheck(op.union)
     val unionUDF = ir.UDF(union, union.tpe.dealias, tb)
-    // assemble dataFlow fragment
+    // add closure parameters
     closure.closureParams ++=   keyUDF.closure map { p => p.name -> p.tpt }
+    closure.closureParams ++= emptyUDF.closure map { p => p.name -> p.tpt }
     closure.closureParams ++=   sngUDF.closure map { p => p.name -> p.tpt }
     closure.closureParams ++= unionUDF.closure map { p => p.name -> p.tpt }
-
+    // assemble dataFlow fragment
     val aliases = for {
       (alias, origin) <- sngUDF.params zip keyUDF.params
       (aName, oName )  = (alias.name, origin.name)

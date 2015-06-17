@@ -374,6 +374,9 @@ class DataflowGenerator(
     val sng    = parseCheck(op.sng)
     val union  = parseCheck(op.union)
 
+    val emptyUDF = ir.UDF(empty, empty.tpe.dealias, tb)
+    closure.closureParams ++= emptyUDF.closure map { p => p.name -> p.tpt }
+
     val mapName = closure nextUDFName "FoldMapper"
     val mapUDF  = ir.UDF(sng, sng.tpe.dealias, tb)
     closure.closureParams ++= mapUDF.closure map { p => p.name -> p.tpt }
@@ -418,6 +421,8 @@ class DataflowGenerator(
     // get fold components
     val key      = parseCheck(op.key)
     val keyUDF   = ir.UDF(key, key.tpe.dealias, tb)
+    val empty    = parseCheck(op.empty)
+    val emptyUDF = ir.UDF(empty, empty.tpe.dealias, tb)
     val sng      = parseCheck(op.sng)
     val sngUDF   = ir.UDF(sng, sng.tpe.dealias, tb)
     val union    = parseCheck(op.union)
@@ -449,8 +454,11 @@ class DataflowGenerator(
       // construct UDF
       ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)
     }
-
-    closure.closureParams ++= foldUDF.closure map { p => p.name -> p.tpt }
+    // add closure parameters
+    closure.closureParams ++=   keyUDF.closure map { p => p.name -> p.tpt }
+    closure.closureParams ++= emptyUDF.closure map { p => p.name -> p.tpt }
+    closure.closureParams ++=   sngUDF.closure map { p => p.name -> p.tpt }
+    closure.closureParams ++=  foldUDF.closure map { p => p.name -> p.tpt }
 
     closure.UDFs +=q"""class $foldName(..${foldUDF.closure})
         extends _root_.org.apache.flink.api.common.functions.RichReduceFunction[$dstTpe]
