@@ -21,7 +21,7 @@ class DataflowGenerator(
     extends RuntimeUtil {
 
   val tb   = compiler.tb
-  val sc   = freshName("sc$")
+  val sc   = freshName("sc$spark$")
   val memo = mutable.Map[String, ModuleSymbol]()
 
   private val SparkCtx = typeOf[SparkContext]
@@ -65,7 +65,7 @@ class DataflowGenerator(
           q"def run($sc: $SparkCtx, ..$params, ..$localInputs) = $opCode"
 
         case op: ir.Combinator[_] =>
-          val res = freshName("result$")
+          val res = freshName("result$spark$")
           q"""def run($sc: $SparkCtx, ..$params, ..$localInputs) = {
             val $res = $opCode.cache()
             $res.foreach(_ => ())
@@ -115,7 +115,7 @@ class DataflowGenerator(
           throw new RuntimeException(
             s"Cannot create Flink CsvInputFormat for non-product type ${typeOf(op.tag)}")
 
-        val line = freshName("line$")
+        val line = freshName("line$spark$")
         val name = closure nextTermName "converter"
         closure.UDFs += q"""val $name =
           _root_.eu.stratosphere.emma.api.`package`.materializeCSVConvertors[$tpe]"""
@@ -138,7 +138,7 @@ class DataflowGenerator(
     val outFormatTree = op.format match {
       case fmt: CSVOutputFormat[_] =>
         val sep = fmt.separator.toString
-        val e   = freshName("e$")
+        val e   = freshName("e$spark$")
         if (tpe <:< weakTypeOf[Product])
           q"""$xs.map({ case $e =>
             0.until($e.productArity).map($e.productElement(_)).mkString($sep)
@@ -225,8 +225,8 @@ class DataflowGenerator(
     // assemble input fragments
     val xs    = generateOpCode(op.xs)
     val ys    = generateOpCode(op.ys)
-    val left  = freshName("xs$")
-    val right = freshName("ys$")
+    val left  = freshName("xs$spark$")
+    val right = freshName("ys$spark$")
     // generate kx UDF
     closure.closureParams ++= kxUDF.closure map { p => p.name -> p.tpt }
     // generate ky UDF
@@ -299,8 +299,8 @@ class DataflowGenerator(
       if aName != oName
     } yield aName -> Ident(oName)
 
-    val x = freshName("x$")
-    val y = freshName("y$")
+    val x = freshName("x$spark$")
+    val y = freshName("y$spark$")
 
     q"""$xs.map({ (..${keyUDF.params}) =>
         (${keyUDF.body}, ${bind(sngUDF.body, aliases: _*)})
@@ -329,8 +329,8 @@ class DataflowGenerator(
 
   private def opCode[B, A](op: ir.Group[B, A])
       (implicit closure: DataFlowClosure): Tree = {
-    val key      = freshName("key$")
-    val iterator = freshName("iterator$")
+    val key      = freshName("key$spark$")
+    val iterator = freshName("iterator$spark$")
     // assemble input fragment
     val xs       = generateOpCode(op.xs)
     // generate key UDF
