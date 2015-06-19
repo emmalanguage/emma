@@ -22,7 +22,7 @@ class DataflowGenerator(
     extends RuntimeUtil {
 
   val tb   = compiler.tb
-  val env  = freshName("env$")
+  val env  = freshName("env$flink$")
   val memo = mutable.Map.empty[String, ModuleSymbol]
 
   private val tmpDir = "java.io.tmpdir" ->>
@@ -50,7 +50,7 @@ class DataflowGenerator(
     val dataFlowName = s"scatter$$$id"
     memo.getOrElseUpdate(dataFlowName, {
       logger info s"Generating scatter code for '$dataFlowName'"
-      val values = freshName("values$")
+      val values = freshName("values$flink$")
       // assemble dataFlow
       q"""object ${TermName(dataFlowName)} {
         import _root_.org.apache.flink.api.scala._
@@ -64,7 +64,7 @@ class DataflowGenerator(
     val dataFlowName = s"gather$$$id"
     memo.getOrElseUpdate(dataFlowName, {
       logger info s"Generating gather code for '$dataFlowName'"
-      val expr = freshName("expr")
+      val expr = freshName("expr$flink$")
       // assemble dataFlow
       q"""object ${TermName(dataFlowName)} {
         import org.apache.flink.api.scala._
@@ -87,8 +87,8 @@ class DataflowGenerator(
       implicit val closure = new DataFlowClosure()
       // generate dataFlow operator assembly code
       val opCode = generateOpCode(root)
-      val fn     = freshName("f$")
-      val fnTpe  = freshType("F$")
+      val fn     = freshName("f$flink$")
+      val fnTpe  = freshType("F$flink$")
 
       // create a sorted list of closure parameters
       // (convention used by client in the generated macro)
@@ -107,7 +107,7 @@ class DataflowGenerator(
           q"def run($env: $ExecEnv, ..$params, ..$localInputs) = $opCode"
 
         case op: ir.TempSink[_] =>
-          val res = freshName("result$")
+          val res = freshName("result$flink$")
           q"""def run($env: $ExecEnv, ..$params, ..$localInputs) = {
             val $res = $opCode
             $env.execute(${s"Emma[$sessionID][$dataFlowName]"})
@@ -173,7 +173,7 @@ class DataflowGenerator(
           throw new RuntimeException(
             s"Cannot create Flink CsvInputFormat for non-product type ${typeOf(op.tag)}")
 
-        val inf = freshName("inFormat$")
+        val inf = freshName("inFormat$flink$")
 
         q"""{
           val $inf =
@@ -224,7 +224,7 @@ class DataflowGenerator(
     val tpe   = typeOf(op.tag).dealias
     // add a dedicated closure variable to pass the input param
     val param = TermName(op.ref.name)
-    val inf   = freshName("inFormat$")
+    val inf   = freshName("inFormat$flink$")
     closure.closureParams +=
       param -> tq"_root_.eu.stratosphere.emma.runtime.Flink.DataBagRef[$tpe]"
     // assemble dataFlow fragment
@@ -239,14 +239,14 @@ class DataflowGenerator(
   }
 
   private def opCode[A](op: ir.TempSink[A])
-      (implicit closure: DataFlowClosure): Tree = {
+                       (implicit closure: DataFlowClosure): Tree = {
     // infer types and generate type information
     val tpe = typeOf(op.tag).dealias
     // assemble input fragment
     val xs  = generateOpCode(op.xs)
-    val in  = freshName("input$")
-    val ti  = freshName("typeInformation$")
-    val of  = freshName("outFormat$")
+    val in  = freshName("input$flink$")
+    val ti  = freshName("typeInformation$flink$")
+    val of  = freshName("outFormat$flink$")
     // assemble dataFlow fragment
     q"""{
       val $in = $xs
@@ -306,7 +306,7 @@ class DataflowGenerator(
     val fmFn   = parseCheck(op.f)
     val fmUDF  = ir.UDF(fmFn, fmFn.tpe, tb)
     val fmName = closure.nextUDFName("FlatMapper")
-    val coll   = freshName("collector$")
+    val coll   = freshName("collector$flink$")
     closure.closureParams ++= fmUDF.closure map { p => p.name -> p.tpt }
 
     closure.UDFs += q"""class $fmName(..${fmUDF.closure})
@@ -399,7 +399,7 @@ class DataflowGenerator(
       override def getProducedType = createTypeInformation[$dstTpe]
     }"""
 
-    val result = freshName("result$")
+    val result = freshName("result$flink$")
     // assemble dataFlow fragment
     q"""{
       val $result = $xs
@@ -428,11 +428,13 @@ class DataflowGenerator(
     val union    = parseCheck(op.union)
     val unionUDF = ir.UDF(union, union.tpe.dealias, tb)
     val mapName  = closure nextUDFName "FoldGroupMapper"
-    val extract  = freshName("extractKey$")
-    val mapAgg   = freshName("mapAggregates$")
-    val x        = freshName("x$")
+    val extract  = freshName("extractKey$flink$")
+    val mapAgg   = freshName("mapAggregates$flink$")
+    val x        = freshName("x$flink$")
 
-    closure.UDFs += q"""class $mapName
+    val mapClosure = keyUDF.closure ++ sngUDF.closure
+
+    closure.UDFs += q"""class $mapName(..$mapClosure)
         extends _root_.org.apache.flink.api.common.functions.RichMapFunction[$srcTpe, $dstTpe]
         with    _root_.org.apache.flink.api.java.typeutils.ResultTypeQueryable[$dstTpe] {
       def $extract(..${keyUDF.params}) = ${keyUDF.body}
@@ -443,8 +445,8 @@ class DataflowGenerator(
 
     val foldName = closure nextUDFName "FoldGroupReducer"
     val foldUDF  = {
-      val x   = freshName("x$")
-      val y   = freshName("y$")
+      val x   = freshName("x$flink$")
+      val y   = freshName("y$flink$")
       // assemble UDF code
       val udf = reTypeCheck(q"""() => ($x: $dstTpe, $y: $dstTpe) => {
           val ${unionUDF.params.head.name} = $x.values
@@ -455,9 +457,8 @@ class DataflowGenerator(
       ir.UDF(udf.asInstanceOf[Function], udf.tpe, tb)
     }
     // add closure parameters
-    closure.closureParams ++=   keyUDF.closure map { p => p.name -> p.tpt }
     closure.closureParams ++= emptyUDF.closure map { p => p.name -> p.tpt }
-    closure.closureParams ++=   sngUDF.closure map { p => p.name -> p.tpt }
+    closure.closureParams ++=       mapClosure map { p => p.name -> p.tpt }
     closure.closureParams ++=  foldUDF.closure map { p => p.name -> p.tpt }
 
     closure.UDFs +=q"""class $foldName(..${foldUDF.closure})
@@ -468,8 +469,8 @@ class DataflowGenerator(
     }"""
 
     // assemble dataFlow fragment
-    q"""$xs.map(new $mapName()).groupBy(_.key).reduce(
-        new $foldName(..${foldUDF.closure.map(_.name)}))"""
+    q"""$xs.map(new $mapName(..${mapClosure.map(_.name)})).groupBy(
+        _.key).reduce(new $foldName(..${foldUDF.closure.map(_.name)}))"""
   }
 
   private def opCode[A](op: ir.Distinct[A])
@@ -494,8 +495,8 @@ class DataflowGenerator(
     val srcTpe   = typeOf(op.xs.tag).dealias
     // assemble input fragment
     val xs       = generateOpCode(op.xs)
-    val iterator = freshName("iterator$")
-    val stream   = freshName("stream$")
+    val iterator = freshName("iterator$flink$")
+    val stream   = freshName("stream$flink$")
     // generate key UDF
     val keyFn    = parseCheck(op.key)
     val keyUDF   = ir.UDF(keyFn, keyFn.tpe, tb)
