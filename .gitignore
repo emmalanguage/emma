@@ -1,12 +1,2 @@
-.cache
-.classpath
-.idea
-.idea/*
-.metadata/*
-.project
-.settings
-target
-*.swp
-*.class
-*.iml
-dependency-reduced-pom.xml
+_site
+.sass-cache
