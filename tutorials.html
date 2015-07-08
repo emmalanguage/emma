@@ -1,0 +1,10 @@
+---
+layout: page
+title: Tutorials
+---
+{% assign tutorials = site.tutorials | sort: 'date' %}
+<ol>
+    {% for tutorial in tutorials %}
+    <li><a class="page-link" href="{{ tutorial.url | prepend: site.baseurl }}">{{ tutorial.title }}</a></li>
+    {% endfor %}
+</ol>

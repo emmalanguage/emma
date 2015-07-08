@@ -1,0 +1,10 @@
+---
+layout: page
+title: Documentation
+---
+{% assign docs = site.docs | sort: 'date' %}
+<ol>
+    {% for doc in docs %}
+    <li><a class="page-link" href="{{ doc.url | prepend: site.baseurl }}">{{ doc.title }}</a></li>
+    {% endfor %}
+</ol>

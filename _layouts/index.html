@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+
+  {% include head.html %}
+
+  <body>
+
+    {% include header.html %}
+
+    <div class="home-content">
+        <div class="pattern">
+            &nbsp;
+        </div>
+        <div class="wrapper" style="z-index: 10;">
+            {{ content }}
+        </div>
+    </div>
+
+    {% assign tuts = site.tutorials | sort: 'date' %}
+    <div class="page-content">
+        <div class="wrapper">
+            <div class="row">
+                <div class="small-12 columns">
+                    <h2 class="heading">{{ tuts.first.title }}</h2>
+                    {{ tuts.first.content }}
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="page-content grey-dark">
+        <div class="wrapper">
+            {% include features.html %}
+        </div>
+    </div>
+
+
+    {% include footer.html %}
+
+  </body>
+
+</html>

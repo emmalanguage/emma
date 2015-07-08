@@ -1,0 +1,32 @@
+# Site settings
+title: Emma
+email: your-email@domain.com
+description: Emma is a Scala API for scalable data analysis. The goal of Emma is to improve developer productivity by hiding parallelism aspects behind a high-level, declarative API.
+baseurl: "" # the subpath of your site, e.g. /blog/
+url: "http://emma.dev" # the base hostname & protocol for your site
+twitter_username: jekyllrb
+github_username:  stratosphere/emma
+
+# Build settings
+markdown: redcarpet
+sass:
+    style: :compressed
+collections:
+  tutorials:
+    output: true
+  docs:
+    output: true
+
+defaults:
+  - scope:
+      path: ""
+      type: tutorials
+    values:
+      layout: tutorials
+  - scope:
+      path: ""
+      type: docs
+    values:
+      layout: documentation
+
+highlighter: pygments

@@ -1,0 +1,37 @@
+<div class="row">
+    <div class="small-12 medium-8 columns">
+        <h2 class="heading">Performant</h2>
+        Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
+    </div>
+    <div class="medium-4 columns hide-for-small-only text-center"><i class="fi-graph-bar fi-icon"></i></div>
+</div>
+<br>
+<hr class="faded">
+<br>
+<div class="row">
+    <div class="medium-4 columns hide-for-small-only text-center"><i class="fi-arrows-out fi-icon"></i></div>
+    <div class="small-12 medium-8 columns">
+        <h2 class="heading">Scalable</h2>
+        Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
+    </div>
+</div>
+<br>
+<hr class="faded">
+<br>
+<div class="row">
+    <div class="small-12 medium-8 columns">
+        <h2 class="heading">Versatile</h2>
+        Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet. Lorem ipsum dolor sit amet, consetetur sadipscing elitr, sed diam nonumy eirmod tempor invidunt ut labore et dolore magna aliquyam erat, sed diam voluptua. At vero eos et accusam et justo duo dolores et ea rebum. Stet clita kasd gubergren, no sea takimata sanctus est Lorem ipsum dolor sit amet.
+    </div>
+    <div class="medium-4 columns hide-for-small-only text-center"><i class="fi-annotate fi-icon"></i></div>
+</div>
+
+<script>
+    $(function(){
+        $('.fi-icon').each(function(i,e){
+            var rowHeight = $(e).parents(".row").height();
+            var parentHeight = $(e).parent().height();
+            $(e).parent().css("top",((rowHeight-parentHeight)/2)+"px");
+        });
+    });
+</script>
