@@ -236,6 +236,10 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
             q"val $condVal = $cond; ${If(Ident(condVal), thenp, elsep)}"
         }
 
+      case Apply(Select(lhs, TermName("withFilter")), _) => {
+        normalizePredicates(tree)
+      }
+
       case _ =>
         super.transform(tree)
     }
@@ -245,5 +249,61 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
       ${transform(untypecheck(tree))}
     }""").asInstanceOf[Block].expr
   }
+
+  /**
+   * Traverse a tree that represents a conjunction of predicates and collect all of them to form disjunctions.
+   * This flattens an arbitrary combination of predicates in a comprehension to single .withFilter(...) expression
+   *
+   * @param tree
+   * @return
+   */
+  def normalizePredicates(tree: Tree): Tree = {
+    var params: List[Tree] = List()
+
+    def predicateAcc(trees: List[Tree], predicates: List[Tree]): (Tree, List[Tree]) =  trees match {
+
+      case Nil =>
+        throw new IllegalArgumentException("No tree was given as input!")
+
+      case x :: xs => x match {
+
+        // leaf with predicate (.>, .<, .==, .!=)
+        case Apply(Select(Ident(_), name), args) =>
+          predicateAcc(xs, x :: predicates)
+
+        //branch
+        case Function(vparams, apply @ Apply(Select(qualifier, name), args))  => {
+          params = vparams
+          apply match {
+            case Apply(Select(Ident(_), _), _) =>
+              predicateAcc( args ::: apply :: xs, predicates)
+            case _ =>
+              predicateAcc( args ::: qualifier :: xs, predicates)
+          }
+        }
+
+        // root, rhs: List[Tree], lhs: Tree
+        case Apply(Select(lhs, name), rhs)  => {
+          // go down right side first, append left side
+          predicateAcc(rhs ::: lhs :: xs, predicates)
+        }
+
+        // at this point, in x should be the databag that the predicates are applied to and all predicates should be extracted
+        case _ if xs == Nil =>
+          (x, predicates)
+
+        // if we don't know what to do with the current tree, skip it
+        case _ =>
+          predicateAcc(xs, predicates)
+      }
+    }
+
+    val (trunk, predicates) = predicateAcc(List(tree), Nil)
+
+    // do sth. with predicates and trunk
+
+    trunk
+  }
+
 
 }
