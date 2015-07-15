@@ -4,7 +4,7 @@ import java.io.File
 
 import breeze.linalg._
 import breeze.stats.distributions._
-import eu.stratosphere.emma.runtime._
+import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
 import org.junit.runner.RunWith
 import org.scalacheck.Gen._
@@ -26,7 +26,7 @@ class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matc
   val features   = 8
   val lambda     = 0.065
   val iterations = 25
-  val rt         = Native()
+  val rt         = runtime.default()
   val dataSets   = 1 to 5
 
   // initialize resources
@@ -70,7 +70,7 @@ class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matc
       features:   Int,
       lambda:     Double,
       iterations: Int,
-      rt:         Engine) =
+      rt:         runtime.Engine) =
     (for (i <- dataSets) yield {
       val base = s"$path/r$i.base"
       val test = s"$path/r$i.test"

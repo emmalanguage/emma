@@ -2,7 +2,7 @@ package eu.stratosphere.emma.examples.graphs
 
 import java.io.File
 
-import eu.stratosphere.emma.runtime.Native
+import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
 import org.junit.runner.RunWith
 import org.scalatest._
@@ -16,7 +16,7 @@ class GraphColoringTest extends FunSuite with PropertyChecks with Matchers {
   // default parameters
   val dir   = "/graphs/graph-col"
   val path  = tempPath(dir)
-  val rt    = Native()
+  val rt    = runtime.default()
   // initialize resources
   new File(path).mkdirs()
   materializeResource(s"$dir/edges.tsv")

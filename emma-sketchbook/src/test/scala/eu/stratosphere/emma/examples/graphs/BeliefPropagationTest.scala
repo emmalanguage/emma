@@ -1,6 +1,6 @@
 package eu.stratosphere.emma.examples.graphs
 
-import eu.stratosphere.emma.runtime.Native
+import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
 
 import java.io.File
@@ -19,7 +19,7 @@ class BeliefPropagationTest extends FunSuite with Matchers {
   val path       = tempPath(dir)
   val epsilon    = 1e-9
   val iterations = 100
-  val rt         = Native()
+  val rt         = runtime.default()
   // initialize resources
   new File(path).mkdirs()
   materializeResource(s"$dir/variables")
@@ -27,7 +27,7 @@ class BeliefPropagationTest extends FunSuite with Matchers {
 
   test("Belief Propagation calculates unknown marginal probabilities") {
     new BeliefPropagation(
-      path, s"$path/marginals", epsilon, iterations, Native()).run()
+      path, s"$path/marginals", epsilon, iterations, rt).run()
 
     val variables = (for {
       line <- Source.fromFile(s"$path/variables").getLines()

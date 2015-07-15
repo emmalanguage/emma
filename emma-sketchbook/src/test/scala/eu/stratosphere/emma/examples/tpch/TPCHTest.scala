@@ -16,7 +16,7 @@ class TPCHTest {
 
   @Before def setup() {
     // create a new runtime session
-    rt = runtime.factory("flink-local", "localhost", 6123)
+    rt = runtime.default()
 
     // materialize the TPCH schema
     materializeResource("/tpch/sf0.001/customer.tbl")
