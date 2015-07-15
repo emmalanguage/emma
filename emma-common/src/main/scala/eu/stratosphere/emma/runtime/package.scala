@@ -81,6 +81,26 @@ package object runtime {
     override def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A] = ???
   }
 
+  def default(): Engine = {
+    val backend = System.getProperty("emma.execution.backend", "")
+    val execmod = System.getProperty("emma.execution.mode", "")
+
+    require(backend.isEmpty || ("native" :: "flink" :: "spark" :: Nil contains backend), "Unsupported execution backend (flink|spark).")
+    require((!backend.isEmpty && execmod.isEmpty) || ("native" :: "local" :: "remote" :: Nil contains execmod), "Unsupported execution mode (local|remote).")
+
+    backend match {
+      case "flink" => execmod match {
+        case "local" /* */ => factory("flink-local", "localhost", 6123)
+        case "remote" /**/ => factory("flink-remote", "localhost", 6123)
+      }
+      case "spark" => execmod match {
+        case "local" /* */ => factory("spark-local", "localhost", 7077)
+        case "remote" /**/ => factory("spark-remote", "localhost", 7077)
+      }
+      case _ => Native() // run native version of the code
+    }
+  }
+
   def factory(name: String, host: String, port: Int) = {
     // reflect engine
     val engineClazz = mirror.staticClass(s"${getClass.getPackage.getName}.${toCamelCase(name)}")
