@@ -9,8 +9,10 @@ import scalax.collection.GraphPredef._
 import scalax.collection.edge.LkDiEdge
 import scalax.collection.mutable.Graph
 
-private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFlowModel[C] with ProgramUtils[C] {
-  this: ControlFlowModel[C] =>
+private[emma] trait ControlFlowAnalysis[C <: blackbox.Context]
+    extends ControlFlowModel[C]
+      with ProgramUtils[C]
+      with ControlFlowNormalization[C] { this: ControlFlowModel[C] =>
 
   import c.universe._
 
@@ -182,68 +184,4 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFl
     // return the graph
     graph
   }
-
-  /**
-   * Normalizes an expression tree.
-   *
-   * This process includes:
-   *
-   * - unnesting of compex trees ouside while loop tests.
-   * - unnesting of compex trees ouside do-while loop tests.
-   * - unnesting of compex trees ouside if-then-else conditions.
-   */
-  object normalize extends Transformer with (Tree => Tree) {
-
-    val testCounter = new Counter()
-
-    override def transform(tree: Tree): Tree = tree match {
-      // while (`cond`) { `body` }
-      case LabelDef(_, _, If(cond, Block(body, _), _)) =>
-        cond match {
-          case Ident(_: TermName) =>
-            // if condition is a simple identifier, no normalization needed
-            super.transform(tree)
-          case _ =>
-            // introduce condition variable
-            val condVar = TermName(f"testA${testCounter.advance.get}%03d")
-            // move the complex test outside the condition
-            q"{ var $condVar = $cond; while ($condVar) { $body; $condVar = $cond } }"
-        }
-
-      // do { `body` } while (`cond`)
-      case LabelDef(_, _, Block(body, If(cond, _, _))) =>
-        cond match {
-          case Ident(_: TermName) =>
-            // if condition is a simple identifier, no normalization needed
-            super.transform(tree)
-          case _ =>
-            // introduce condition variable
-            val condVar = TermName(f"testB${testCounter.advance.get}%03d")
-            // move the complex test outside the condition
-            q"{ var $condVar = null.asInstanceOf[Boolean]; do { $body; $condVar = $cond } while ($condVar) }"
-        }
-
-      // if (`cond`) `thenp` else `elsep`
-      case If(cond, thenp, elsep) =>
-        cond match {
-          case Ident(_: TermName) =>
-            // if condition is a simple identifier, no normalization needed
-            super.transform(tree)
-          case _ =>
-            // introduce condition value
-            val condVal = TermName(f"testC${testCounter.advance.get}%03d")
-            // move the complex test outside the condition
-            q"val $condVal = $cond; ${If(Ident(condVal), thenp, elsep)}"
-        }
-
-      case _ =>
-        super.transform(tree)
-    }
-
-    def apply(tree: Tree): Tree = c.typecheck(q"""{
-      import _root_.scala.reflect._
-      ${transform(untypecheck(tree))}
-    }""").asInstanceOf[Block].expr
-  }
-
 }

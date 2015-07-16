@@ -6,7 +6,7 @@ import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.codegen.testschema._
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
-import org.junit.{Test, After, Before}
+import org.junit.{Ignore, Test, After, Before}
 
 import scala.reflect.runtime.universe._
 import scala.util.Random
@@ -702,4 +702,52 @@ abstract class BaseCodegenTest(rtName: String) {
     // assert that the result contains the expected values
     assert(exp == act, s"Unexpected result:  $act != $exp")
   }
+
+  @Ignore @Test def testClassNameNormalization() = {
+    // without emma.substituteClassNames ImdbYear can not be found
+    val alg = emma.parallelize {
+      val entries = for (e <- read(materializeResource(s"/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])) yield e
+
+      val group = for (g <- entries.groupBy(l => new ImdbYear(l.year))) yield g
+
+      group.flatMap(g => g.values).fetch()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt).toSet
+    val exp = alg.run(native).toSet
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testEnclosingParametersNormalization() = {
+    // a class that wraps an Emma program and a parameter used within the 'parallelize' call
+    case class MoviesWithinPeriodQuery(minYear: Int, periodLenth: Int, rt: runtime.Engine) {
+      def run() = {
+        val alg = emma.parallelize {
+          (for {
+            e <- read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+            if e.year >= minYear && e.year < minYear + periodLenth
+          } yield e).fetch()
+        }
+
+        alg.run(rt)
+      }
+    }
+
+    // run the algorithm
+    try {
+      val exp = MoviesWithinPeriodQuery(1990, 10, runtime.Native()).run().toSet
+      val act = MoviesWithinPeriodQuery(1990, 10, rt).run().toSet
+
+      // assert that the result contains the expected values
+      assert(exp == act, s"Unexpected result: $act != $exp")
+    } catch {
+      case e: Throwable => assert(assertion = false, s"Unexpected exception while running MoviesAfterQuery: $e")
+    }
+  }
+
 }
+
+case class ImdbYear(year: Int) {}

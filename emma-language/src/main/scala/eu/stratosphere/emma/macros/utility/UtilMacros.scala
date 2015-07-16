@@ -20,4 +20,5 @@ class UtilMacros(val c: blackbox.Context) {
       Literal(Constant(s))
     )
   }
+
 }
