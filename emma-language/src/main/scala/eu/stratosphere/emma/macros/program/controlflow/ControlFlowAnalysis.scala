@@ -46,7 +46,7 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context]
           case Block(_, _) => true
           case If(_, _, _) => true
           case _ => false
-        }) c.error(c.enclosingPosition, "Emma does not support assignments with conditionals on the rhs at the moment!")
+        }) c.error(currTree.pos, "Emma does not support assignments with conditionals on the rhs at the moment!")
 
         // add assignment to the current block
         currBlock.stats += currTree
@@ -59,7 +59,7 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context]
           case Block(_, _) => true
           case If(_, _, _) => true
           case _ => false
-        }) c.error(c.enclosingPosition, "Emma does not support assignments with conditionals on the rhs at the moment!")
+        }) c.error(currTree.pos, "Emma does not support assignments with conditionals on the rhs at the moment!")
 
         // add assignment to the current block
         currBlock.stats += currTree
@@ -71,7 +71,7 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context]
         if (cond match {
           case Ident(_: TermName) => false
           case _ => true
-        }) c.error(c.enclosingPosition, "Invalid do-while test expression!") // should not happen after normalization
+        }) c.error(currTree.pos, "Invalid do-while test expression!") // should not happen after normalization
 
         // create body block
         val body = if (b.size > 1) Block(b.slice(0, b.size - 1).toList, b.last) else b.head
@@ -103,7 +103,7 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context]
         if (cond match {
           case Ident(_: TermName) => false
           case _ => true
-        }) c.error(c.enclosingPosition, "Invalid while test expression!") // should not happen after normalization
+        }) c.error(currTree.pos, "Invalid while test expression!") // should not happen after normalization
 
         // create condition block with the `cond` term
         val condBlock = new CFBlock()
@@ -137,7 +137,7 @@ private[emma] trait ControlFlowAnalysis[C <: blackbox.Context]
         if (cond match {
           case Ident(_: TermName) => true
           case _ => false
-        }) c.error(c.enclosingPosition, "Invalid if-then-else test expression!") // should not happen after normalization
+        }) c.error(currTree.pos, "Invalid if-then-else test expression!") // should not happen after normalization
 
         // create condition block with the `cond` term
         val condBlock = new CFBlock()
