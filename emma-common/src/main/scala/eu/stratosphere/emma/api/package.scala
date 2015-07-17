@@ -60,6 +60,15 @@ package object api {
       if (uri.getScheme == "hdfs") {
         hdfs.create(new Path(uri), true)
       } else {
+        def deleteRecursive(path: File): Boolean = {
+          val ret = if (path.isDirectory) {
+            path.listFiles().toSeq.foldLeft(true)((r, f) => deleteRecursive(f))
+          } else { /* regular file */
+            true
+          }
+          ret && path.delete()
+        }
+        deleteRecursive(new File(path)) // make sure that file does not exist FIXME: add flag
         new FileOutputStream(new File(path))
       }
     }
