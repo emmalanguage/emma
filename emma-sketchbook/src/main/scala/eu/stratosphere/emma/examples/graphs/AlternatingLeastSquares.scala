@@ -47,7 +47,7 @@ class AlternatingLeastSquares(
         val u   = g.key._1
         val i   = g.key._2
         val rs  = g.values
-        val avg = rs.map(_.value).sum / rs.count()
+        val avg = rs.map(_.value).sum() / rs.count()
         Rating(u, i, avg)
       } // read input and gather all ratings
 
@@ -62,7 +62,7 @@ class AlternatingLeastSquares(
         val Ri  = g.values
         val cnt = Ri.count()
         val rnd = new Random(i.hashCode)
-        val avg = Ri.map(_.value).sum / cnt
+        val avg = Ri.map(_.value).sum() / cnt
         val Fi  = Array.iterate(avg, features) { _ => rnd.nextDouble() }
         Vertex(i, cnt, DenseVector(Fi))
       } // initialize items partition

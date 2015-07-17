@@ -579,7 +579,7 @@ abstract class BaseCodegenTest(rtName: String) {
       val squares = for (xy <- range) yield xy match {
         case (x, y) => x + y
       }
-      squares.sum
+      squares.sum()
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -594,7 +594,7 @@ abstract class BaseCodegenTest(rtName: String) {
     val alg = emma.parallelize {
       val range = DataBag(0.until(100).zipWithIndex)
       val squares = range map { case (x, y) => x + y }
-      squares.sum
+      squares.sum()
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -609,7 +609,7 @@ abstract class BaseCodegenTest(rtName: String) {
     val alg = emma.parallelize {
       val range = DataBag(0.until(100).zipWithIndex)
       val squares = for ((x, y) <- range) yield x + y
-      squares.sum
+      squares.sum()
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -624,7 +624,7 @@ abstract class BaseCodegenTest(rtName: String) {
     val alg = emma.parallelize {
       val range = DataBag(0.until(100).zipWithIndex)
       val squares = for (xy <- range; sqr = xy._1 * xy._2) yield sqr
-      squares.sum
+      squares.sum()
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -641,7 +641,7 @@ abstract class BaseCodegenTest(rtName: String) {
       val top = for (g <- bag groupBy { _ % 8 })
         yield g.values.fetch().sorted.take(4).sum
 
-      top.max
+      top.max()
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -659,7 +659,7 @@ abstract class BaseCodegenTest(rtName: String) {
       val top = for (g <- bag groupBy { _ % semiFinal })
         yield g.values.fetch().sorted.take(semiFinal / 2).sum
 
-      top.max
+      top.max()
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -678,7 +678,7 @@ abstract class BaseCodegenTest(rtName: String) {
       val org   = "org"
       val scala = "scala"
       val range = DataBag(0 until 100)
-      range.sum
+      range.sum()
     }
 
     // compute the algorithm using the original code and the runtime under test
