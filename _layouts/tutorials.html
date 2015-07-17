@@ -45,7 +45,7 @@ layout: default
         <h5>Table of Contents</h5>
         <ul class="side-nav">
         {% for tutorial in tutorials %}
-            <li><a class="page-link{% if page.url == tutorial.url %} active{% endif %}" href="{{ tutorial.url | prepend: site.baseurl }}">{{ tutorial.title }}</a></li>
+            <li><a class="page-link{% if page.url == tutorial.url %} active{% endif %}" href="{{ tutorial.url | prepend: site.url }}">{{ tutorial.title }}</a></li>
         {% endfor %}
         </ul>
     </div>
