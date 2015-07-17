@@ -4,7 +4,7 @@ import java.io.{File, FileInputStream, FileOutputStream}
 import java.net.URI
 
 import eu.stratosphere.emma.api.model.Identity
-import eu.stratosphere.emma.macros.ConvertorsMacros
+import eu.stratosphere.emma.macros.{Folds, ConvertorsMacros}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
@@ -133,6 +133,17 @@ package object api {
   // -----------------------------------------------------
   // convertors
   // -----------------------------------------------------
+
+  /**
+   * Extend the [[DataBag]] type with methods from [[Folds]] via the "pimp my library" pattern.
+   * This is a value class, which means that in most cases, the allocation of an instance can be
+   * avoided when using the defined methods.
+   * @param self the actual [[DataBag]] instance
+   * @tparam E the type of elements to fold over
+   */
+  implicit class DataBagWithFolds[+E](val self: DataBag[E]) extends AnyVal with Folds[E] {
+    def fold[R](z: R, s: E => R, p: (R, R) => R) = self.fold[R](z, s, p)
+  }
 
   implicit def materializeCSVConvertors[T]: CSVConvertors[T] = macro ConvertorsMacros.materializeCSVConvertorsImpl[T]
 }

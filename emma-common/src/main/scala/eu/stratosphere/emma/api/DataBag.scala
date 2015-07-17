@@ -1,9 +1,11 @@
 package eu.stratosphere.emma.api
 
+import scala.language.experimental.macros
+
 /**
  * An abstraction for homogeneous collections.
  */
-sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collection[A] {
+sealed class DataBag[+A] private(private[api] val impl: Seq[A]) {
 
   // -----------------------------------------------------
   // Structural recursion
@@ -116,37 +118,7 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
    */
   def distinct(): DataBag[A] = DataBag(impl.distinct)
 
-  // -----------------------------------------------------
-  // Aggregates
-  // -----------------------------------------------------
-
-  def minBy[B >: A](p: (A, A) => Boolean): Option[A] = fold[Option[A]](Option.empty[A], x => Some[A](x), (x, y) => {
-    if (x.isEmpty && y.isDefined) y
-    else if (x.isDefined && y.isEmpty) x
-    else for (u <- x; v <- y) yield if (p(u, v)) u else v
-  })
-
-  def maxBy[B >: A](p: (A, A) => Boolean): Option[A] = fold[Option[A]](Option.empty[A], x => Some[A](x), (x, y) => {
-    if (x.isEmpty && y.isDefined) y
-    else if (x.isDefined && y.isEmpty) x
-    else for (u <- x; v <- y) yield if (p(u, v)) v else u
-  })
-
-  def min[B >: A]()(implicit n: Numeric[B], l: Limits[B]): B = fold[B](l.max, identity, n.min)
-
-  def max[B >: A]()(implicit n: Numeric[B], l: Limits[B]): B = fold[B](l.min, identity, n.max)
-
-  def sum[B >: A]()(implicit n: Numeric[B]): B = fold[B](n.zero, identity, n.plus)
-
-  def product[B >: A]()(implicit n: Numeric[B]): B = fold[B](n.one, identity, n.times)
-
-  def count(): Long = fold[Long](0, x => 1, (x, y) => x + y)
-
-  def exists(f: A => Boolean): Boolean = fold[Boolean](false, x => f(x), (x, y) => x || y)
-
-  def forall(f: A => Boolean): Boolean = fold[Boolean](true, x => f(x), (x, y) => x && y)
-
-  @deprecated("Use isEmpty instead", "08.06.2015")
+  @deprecated("use `isEmpty` and `nonEmpty` instead", "31.05.2015")
   def empty(): Boolean = impl.isEmpty
 
   def isEmpty: Boolean = impl.isEmpty

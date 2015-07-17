@@ -23,32 +23,22 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
    */
   protected object api {
     val moduleSymbol = rootMirror.staticModule("eu.stratosphere.emma.api.package")
-    val bagSymbol = rootMirror.staticClass("eu.stratosphere.emma.api.DataBag")
-    val groupSymbol = rootMirror.staticClass("eu.stratosphere.emma.api.Group")
+    val bagSymbol    = rootMirror.staticClass("eu.stratosphere.emma.api.DataBag")
+    val groupSymbol  = rootMirror.staticClass("eu.stratosphere.emma.api.Group")
 
-    val apply = bagSymbol.companion.info.decl(TermName("apply"))
-    val read = moduleSymbol.info.decl(TermName("read"))
-    val write = moduleSymbol.info.decl(TermName("write"))
-    val stateful = moduleSymbol.info.decl(TermName("stateful"))
-    val fold = bagSymbol.info.decl(TermName("fold"))
-    val map = bagSymbol.info.decl(TermName("map"))
-    val flatMap = bagSymbol.info.decl(TermName("flatMap"))
-    val withFilter = bagSymbol.info.decl(TermName("withFilter"))
-    val groupBy = bagSymbol.info.decl(TermName("groupBy"))
-    val minus = bagSymbol.info.decl(TermName("minus"))
-    val plus = bagSymbol.info.decl(TermName("plus"))
-    val distinct = bagSymbol.info.decl(TermName("distinct"))
-    val minBy = bagSymbol.info.decl(TermName("minBy"))
-    val maxBy = bagSymbol.info.decl(TermName("maxBy"))
-    val min = bagSymbol.info.decl(TermName("min"))
-    val max = bagSymbol.info.decl(TermName("max"))
-    val sum = bagSymbol.info.decl(TermName("sum"))
-    val product = bagSymbol.info.decl(TermName("product"))
-    val count = bagSymbol.info.decl(TermName("count"))
-    val exists = bagSymbol.info.decl(TermName("exists"))
-    val forall = bagSymbol.info.decl(TermName("forall"))
-    val empty = bagSymbol.info.decl(TermName("empty"))
-    val isEmpty = bagSymbol.info.decl(TermName("isEmpty"))
+    val apply        = bagSymbol.companion.info.decl(TermName("apply"))
+    val read         = moduleSymbol.info.decl(TermName("read"))
+    val write        = moduleSymbol.info.decl(TermName("write"))
+    val stateful     = moduleSymbol.info.decl(TermName("stateful"))
+    val fold         = bagSymbol.info.decl(TermName("fold"))
+    val map          = bagSymbol.info.decl(TermName("map"))
+    val flatMap      = bagSymbol.info.decl(TermName("flatMap"))
+    val withFilter   = bagSymbol.info.decl(TermName("withFilter"))
+    val groupBy      = bagSymbol.info.decl(TermName("groupBy"))
+    val minus        = bagSymbol.info.decl(TermName("minus"))
+    val plus         = bagSymbol.info.decl(TermName("plus"))
+    val distinct     = bagSymbol.info.decl(TermName("distinct"))
+    val empty        = bagSymbol.info.decl(TermName("empty"))
 
     val methods = Set(
       read, write,
@@ -57,7 +47,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       map, flatMap, withFilter,
       groupBy,
       minus, plus, distinct,
-      minBy, maxBy, min, max, sum, product, count, exists, forall, empty, isEmpty
+      empty
     ) ++ apply.alternatives
 
     val monadic = Set(map, flatMap, withFilter)
@@ -255,80 +245,10 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       case Apply(TypeApply(select@Select(in, _), _), List(empty, sng, union)) if select.symbol == api.fold =>
         combinator.Fold(empty, sng, union, comprehend(Nil)(in), t)
 
-      // in.minBy()(n)
-      case Apply(TypeApply(select@Select(in, _), List(tpt)), List(Function(List(x, y), body))) if select.symbol == api.minBy =>
-        // replace the body of the fn to use 'u', 'v' parameters instead of the given arguments
-        // FIXME: changes semantics if 'u' and 'v' are defined in the body
-        val bodyNew = substitute(body, Map(x.name -> Ident(TermName("u")), y.name -> Ident(TermName("v"))))
-
-        // quasiquote fold operators using the minBy parameter function
-        val empty = c.typecheck(q"Option.empty[$tpt]")
-        val sng = c.typecheck(q"(x: $tpt) => Some(x)")
-        val union = c.typecheck( q"""(x: Option[$tpt], y: Option[$tpt]) =>
-            if (x.isEmpty && y.isDefined) y
-            else if (x.isDefined && y.isEmpty) x
-            else for (u <- x; v <- y) yield if ($bodyNew) u else v
-        """)
-
-        combinator.Fold(empty, sng, union, comprehend(Nil)(in), t)
-
-      // in.maxBy()(n)
-      case Apply(TypeApply(select@Select(in, _), List(tpt)), List(Function(List(x, y), body))) if select.symbol == api.maxBy =>
-        // replace the body of the fn to use 'u', 'v' parameters instead of the given arguments
-        // FIXME: changes semantics if 'u' and 'v' are defined in the body
-        val bodyNew = substitute(body, Map(x.name -> Ident(TermName("u")), y.name -> Ident(TermName("v"))))
-
-        // quasiquote fold operators using the minBy parameter function
-        val empty = c.typecheck(q"Option.empty[$tpt]")
-        val sng = c.typecheck(q"(x: $tpt) => Some(x)")
-        val union = c.typecheck( q"""(x: Option[$tpt], y: Option[$tpt]) =>
-          if (x.isEmpty && y.isDefined) y
-          else if (x.isDefined && y.isEmpty) x
-          else for (u <- x; v <- y) yield if ($bodyNew) v else u
-        """)
-
-        combinator.Fold(empty, sng, union, comprehend(Nil)(in), t)
-
-      // in.min()(n)
-      case Apply(Apply(TypeApply(select@Select(in, _), List(tpt)), Nil), n :: l :: Nil) if select.symbol == api.min =>
-        combinator.Fold(c.typecheck(q"$l.max"), c.typecheck(q"(x: $tpt) => x"), c.typecheck(q"(x: $tpt, y: $tpt) => $n.min(x, y)"), comprehend(Nil)(in), t)
-
-      // in.max()(n)
-      case Apply(Apply(TypeApply(select@Select(in, _), List(tpt)), Nil), n :: l :: Nil) if select.symbol == api.max =>
-        combinator.Fold(c.typecheck(q"$l.min"), c.typecheck(q"(x: $tpt) => x"), c.typecheck(q"(x: $tpt, y: $tpt) => $n.max(x, y)"), comprehend(Nil)(in), t)
-
-      // in.sum()(n)
-      case Apply(Apply(TypeApply(select@Select(in, _), List(tpt)), Nil), n :: Nil) if select.symbol == api.sum =>
-        combinator.Fold(c.typecheck(q"$n.zero"), c.typecheck(q"(x: $tpt) => x"), c.typecheck(q"(x: $tpt, y: $tpt) => $n.plus(x, y)"), comprehend(Nil)(in), t)
-
-      // in.product()(n)
-      case Apply(Apply(TypeApply(select@Select(in, _), List(tpt)), Nil), n :: Nil) if select.symbol == api.product =>
-        combinator.Fold(c.typecheck(q"$n.one"), c.typecheck(q"(x: $tpt) => x"), c.typecheck(q"(x: $tpt, y: $tpt) => $n.times(x, y)"), comprehend(Nil)(in), t)
-
-      // in.count()(n)
-      case Apply(select@Select(in, _), Nil) if select.symbol == api.count =>
-        val comprehendedIn = comprehend(Nil)(in)
-        combinator.Fold(c.typecheck(q"0L"), c.typecheck(q"(x: ${comprehendedIn.tpe.typeArgs.head}) => 1L"), c.typecheck(q"(x: Long, y: Long) => x + y"), comprehendedIn, t)
-
-      // in.exists()(n)
-      case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.exists =>
-        val comprehendedIn = comprehend(Nil)(in)
-        combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe.typeArgs.head}) => ${substitute(body, arg.name, q"x")}"), c.typecheck(q"(x: Boolean, y: Boolean) => x || y"), comprehendedIn, t)
-
-      // in.forall()(n)
-      case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.forall =>
-        val comprehendedIn = comprehend(Nil)(in)
-        combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe.typeArgs.head}) => ${substitute(body, arg.name, q"x")}"), c.typecheck(q"(x: Boolean, y: Boolean) => x && y"), comprehendedIn, t)
-
       // in.empty()(n)
       case Apply(select@Select(in, _), Nil) if select.symbol == api.empty =>
         val comprehendedIn = comprehend(Nil)(in)
         combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe.typeArgs.head}) => true"), c.typecheck(q"(x: Boolean, y: Boolean) => x || y"), comprehendedIn, t)
-
-      // in.isEmpty
-      case Apply(select@Select(in, _), Nil) if select.symbol == api.isEmpty =>
-        val comprehendedIn = comprehend(Nil)(in)
-        combinator.Fold(c.typecheck(q"true"), c.typecheck(q"(x: ${comprehendedIn.tpe.typeArgs.head}) => false"), c.typecheck(q"(x: Boolean, y: Boolean) => x && y"), comprehendedIn, t)
 
       // ----------------------------------------------------------------------
       // Environment & Host Language Connectors
