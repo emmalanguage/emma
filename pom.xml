@@ -40,6 +40,9 @@
         <!-- Spark -->
         <spark.version>1.2.1</spark.version>
 
+        <!-- Jetty -->
+        <jetty.version>8.1.14.v20131031</jetty.version>
+
         <!-- Logging -->
         <log4j.version>1.2.17</log4j.version>
         <slf4j.version>1.7.9</slf4j.version>
@@ -188,6 +191,18 @@
                 <artifactId>spark-core_${scala.tools.version}</artifactId>
                 <version>${spark.version}</version>
                 <scope>provided</scope>
+            </dependency>
+
+            <!-- Jetty -->
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-util</artifactId>
+                <version>${jetty.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.eclipse.jetty</groupId>
+                <artifactId>jetty-servlet</artifactId>
+                <version>${jetty.version}</version>
             </dependency>
 
             <!-- CSV -->

@@ -5,18 +5,20 @@ import java.io.File
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.runtime.Engine
 import eu.stratosphere.emma.testutil._
-import org.junit.{Before, Test}
+import org.junit.{After, Before, Test}
 
-class TPCHTest {
+abstract class BaseTPCHTest(rtName: String) {
 
   var rt: Engine = _
 
   var inBase = tempPath("/tpch/sf0.001")
   var outBase = tempPath("/tpch/sf0.001/output")
 
+  protected def runtimeUnderTest: runtime.Engine
+
   @Before def setup() {
     // create a new runtime session
-    rt = runtime.factory("flink-local", "localhost", 6123)
+    rt = runtimeUnderTest
 
     // materialize the TPCH schema
     materializeResource("/tpch/sf0.001/customer.tbl")
@@ -31,6 +33,10 @@ class TPCHTest {
     // make sure that the base paths exist
     new File(outBase).mkdirs()
     new File(outBase).mkdirs()
+  }
+
+  @After def shutdown(): Unit = {
+    rt.closeSession()
   }
 
   @Test def testQuery01(): Unit = {

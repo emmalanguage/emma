@@ -34,6 +34,10 @@
         </dependency>
         <dependency>
             <groupId>eu.stratosphere</groupId>
+            <artifactId>emma-spark</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>eu.stratosphere</groupId>
             <artifactId>emma-flink</artifactId>
         </dependency>
         <!-- Emma (test jars) -->
@@ -46,6 +50,12 @@
             <groupId>eu.stratosphere</groupId>
             <artifactId>emma-language</artifactId>
             <type>test-jar</type>
+        </dependency>
+
+        <!-- Spark -->
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-core_${scala.tools.version}</artifactId>
         </dependency>
 
         <!-- Flink -->
@@ -80,12 +90,14 @@
             <version>2.2.1</version>
             <scope>provided</scope>
         </dependency>
-
-        <!-- Spark -->
+        <!-- another hacky solution for a Flink issue with codahale deps -->
         <dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-core_${scala.tools.version}</artifactId>
+            <groupId>com.codahale.metrics</groupId>
+            <artifactId>metrics-json</artifactId>
+            <version>3.0.2</version>
+            <scope>provided</scope>
         </dependency>
+
 
         <!-- Logging -->
         <dependency>
