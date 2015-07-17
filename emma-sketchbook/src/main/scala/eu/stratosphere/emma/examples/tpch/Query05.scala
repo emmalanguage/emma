@@ -1,12 +1,12 @@
 package eu.stratosphere.emma.examples.tpch
 
 import java.text.SimpleDateFormat
+import java.util.Calendar
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
-import org.apache.commons.lang3.time.DateUtils
 
 object Query05 {
 
@@ -120,8 +120,11 @@ class Query05(inPath: String, outPath: String, region: String, date: String, rt:
       val _date = date
       val _region = region
 
-      val df = new SimpleDateFormat("yyyy-MM-dd")
-      val nextYear = df.format(DateUtils.addYears(df.parse(_date), 1))
+      val dfm = new SimpleDateFormat("yyyy-MM-dd")
+      val cal = Calendar.getInstance();
+      cal.setTime(dfm.parse(_date));
+      cal.add(Calendar.YEAR, 1);
+      val nextYear = dfm.format(cal.getTime)
 
       // compute join part of the query
       val join = for (
