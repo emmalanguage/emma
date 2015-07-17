@@ -1,7 +1,6 @@
 <header class="site-header">
 
   <div class="wrapper">
-
     <a class="site-title" href="{{ site.baseurl }}/" style="font-family: 'Libre Baskerville', serif;">{{ site.title }}</a>
 
     <nav class="site-nav">
@@ -16,7 +15,7 @@
       <div class="trigger">
         {% for page in site.pages %}
           {% if page.title %}
-          <a class="page-link" href="{{ page.url | prepend: site.baseurl }}">{{ page.title }}</a>
+          <a class="page-link" href="{{ page.url | prepend: site.url }}">{{ page.title }}</a>
           {% endif %}
         {% endfor %}
         {% if site.github_username %}
