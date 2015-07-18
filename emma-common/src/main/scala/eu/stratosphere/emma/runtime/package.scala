@@ -85,8 +85,10 @@ package object runtime {
     val backend = System.getProperty("emma.execution.backend", "")
     val execmod = System.getProperty("emma.execution.mode", "")
 
-    require(backend.isEmpty || ("native" :: "flink" :: "spark" :: Nil contains backend), "Unsupported execution backend (flink|spark).")
-    require((!backend.isEmpty && execmod.isEmpty) || ("native" :: "local" :: "remote" :: Nil contains execmod), "Unsupported execution mode (local|remote).")
+    require(backend.isEmpty || ("native" :: "flink" :: "spark" :: Nil contains backend),
+      "Unsupported execution backend (native|flink|spark).")
+    require((backend.isEmpty || backend == "native") || ("local" :: "remote" :: Nil contains execmod),
+      "Unsupported execution mode (local|remote).")
 
     backend match {
       case "flink" => execmod match {
