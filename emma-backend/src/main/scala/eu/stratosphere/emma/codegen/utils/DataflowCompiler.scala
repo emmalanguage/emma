@@ -10,17 +10,18 @@ class DataflowCompiler(val mirror: Mirror) {
   import eu.stratosphere.emma.codegen.utils.DataflowCompiler._
   import eu.stratosphere.emma.runtime.logger
 
-  // get the directory where the toolbox will generate the runtime-defined classes
-  private val classGenDir = {
-    val path = Paths.get(s"${System.getProperty("emma.codegen.dir", s"${System.getProperty("java.io.tmpdir")}/emma/codegen")}")
+  /** The directory where the toolbox will store runtime-generated code */
+  val codeGenDir = {
+    val path = Paths.get(System.getProperty("emma.codegen.dir", CODEGEN_DIR_DEFAULT))
     // make sure that generated class directory exists
     Files.createDirectories(path)
     path.toAbsolutePath.toString
   }
 
-  val tb = mirror.mkToolBox(options = s"-d $classGenDir")
+  /** The generating Scala toolbox */
+  val tb = mirror.mkToolBox(options = s"-d $codeGenDir")
 
-  logger.info(s"Dataflow compiler will use '$classGenDir' as a target directory")
+  logger.info(s"Dataflow compiler will use '$codeGenDir' as a target directory")
 
   /**
    * Compile an object using the compiler toolbox.
@@ -42,7 +43,7 @@ class DataflowCompiler(val mirror: Mirror) {
    * @param tree The AST to be written.
    */
   def writeSource(symbol: Symbol, tree: ImplDef) = {
-    val writer = new java.io.PrintWriter(s"$classGenDir/${symbol.fullName.replace('.', '/')}.scala")
+    val writer = new java.io.PrintWriter(s"$codeGenDir/${symbol.fullName.replace('.', '/')}.scala")
     try writer.write(showCode(tree))
     finally writer.close()
   }
@@ -69,6 +70,7 @@ class DataflowCompiler(val mirror: Mirror) {
 
 object DataflowCompiler {
 
+  val CODEGEN_DIR_DEFAULT = Paths.get(System.getProperty("java.io.tmpdir"), "emma", "codegen").toAbsolutePath.toString
   val CONSTRUCTOR = termNames.CONSTRUCTOR
   val RUN_METHOD = TermName("run")
 

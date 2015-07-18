@@ -1,5 +1,8 @@
 package eu.stratosphere.emma.runtime
 
+import java.io.File
+import java.net.URL
+
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.codegen.flink.DataflowGenerator
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
@@ -77,13 +80,20 @@ case class FlinkRemote(override val host: String, override val port: Int) extend
   logger.info(s"Initializing remote execution environment for Flink at $host:$port")
 
   override val env = {
-    val path = new java.io.File(this.getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
-    if (path.exists() && path.isFile) {
-      logger.info(s"Passing jar location '${path.toString}' to remote environment")
-      ExecutionEnvironment.createRemoteEnvironment(host, port, path.toString)
-    } else {
-      ExecutionEnvironment.getExecutionEnvironment
+    val jars = {
+      val jar = new java.io.File(this.getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
+      if (jar.exists() && jar.isFile) {
+        Array[String](jar.toString)
+      } else {
+        Array.empty[String]
+      }
     }
+    val path = Array[URL](new File(dataflowCompiler.codeGenDir).toURI.toURL)
+
+    logger.info(s" - jars: [ ${jars.mkString(", ")} ]")
+    logger.info(s" - path: [ ${path.mkString(", ")} ]")
+
+    ExecutionEnvironment.createRemoteEnvironment(host, port, jars, path)
   }
 }
 
@@ -91,7 +101,7 @@ object Flink {
 
   case class DataBagRef[A: TypeTag](name: String, expr: DataSet[A], var v: Option[DataBag[A]] = Option.empty[DataBag[A]]) extends ValueRef[DataBag[A]] {
     def value: DataBag[A] = v.getOrElse({
-      v = Some(DataBag[A](expr.collect))
+      v = Some(DataBag[A](expr.collect()))
       v.get
     })
   }
