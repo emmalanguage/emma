@@ -109,6 +109,12 @@
             <artifactId>reflections</artifactId>
         </dependency>
 
+        <!-- Auto-Resource Management -->
+        <dependency>
+            <groupId>com.jsuereth</groupId>
+            <artifactId>scala-arm_${scala.tools.version}</artifactId>
+        </dependency>
+
         <!-- Number crunching -->
         <dependency>
             <groupId>org.scalanlp</groupId>
@@ -123,6 +129,7 @@
     </dependencies>
 
     <profiles>
+        <!-- profile that activates Flink-related dependencies -->
         <profile>
             <id>flink</id>
             <activation>
@@ -130,7 +137,6 @@
                     <name>execution.backend</name>
                     <value>flink</value>
                 </property>
-                <activeByDefault>false</activeByDefault>
             </activation>
             <properties>
                 <execution.backend>flink</execution.backend>
@@ -151,6 +157,8 @@
                 </dependency>
             </dependencies>
         </profile>
+
+        <!-- profile that activates Spark-related dependencies -->
         <profile>
             <id>spark</id>
             <activation>
@@ -158,7 +166,6 @@
                     <name>execution.backend</name>
                     <value>spark</value>
                 </property>
-                <activeByDefault>false</activeByDefault>
             </activation>
             <properties>
                 <execution.backend>spark</execution.backend>
