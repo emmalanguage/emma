@@ -37,10 +37,6 @@
             <groupId>eu.stratosphere</groupId>
             <artifactId>emma-language</artifactId>
         </dependency>
-        <dependency>
-            <groupId>eu.stratosphere</groupId>
-            <artifactId>emma-flink</artifactId>
-        </dependency>
         <!-- Emma (test jars) -->
         <dependency>
             <groupId>eu.stratosphere</groupId>
@@ -142,6 +138,11 @@
                 <execution.backend>flink</execution.backend>
             </properties>
             <dependencies>
+                <!-- Emma -->
+                <dependency>
+                    <groupId>eu.stratosphere</groupId>
+                    <artifactId>emma-flink</artifactId>
+                </dependency>
                 <!-- Flink -->
                 <dependency>
                     <groupId>eu.stratosphere</groupId>
@@ -171,6 +172,11 @@
                 <execution.backend>spark</execution.backend>
             </properties>
             <dependencies>
+                <!-- Emma -->
+                <dependency>
+                    <groupId>eu.stratosphere</groupId>
+                    <artifactId>emma-spark</artifactId>
+                </dependency>
                 <!-- Spark -->
                 <dependency>
                     <groupId>org.apache.spark</groupId>
