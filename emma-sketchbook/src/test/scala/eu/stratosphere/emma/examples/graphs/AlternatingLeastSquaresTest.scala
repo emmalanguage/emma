@@ -6,6 +6,7 @@ import breeze.linalg._
 import breeze.stats.distributions._
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
+import org.apache.commons.io.FileUtils
 import org.junit.runner.RunWith
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary => Arb}
@@ -25,16 +26,13 @@ class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matc
   val path       = tempPath("/graphs/als")
   val features   = 8
   val lambda     = 0.065
-  val iterations = 25
+  val iterations = 10
   val rt         = runtime.default()
-  val dataSets   = 1 to 5
 
   // initialize resources
   new File(path).mkdirs()
-  for (i <- dataSets) {
-    materializeResource(s"/graphs/als/r$i.base")
-    materializeResource(s"/graphs/als/r$i.test")
-  }
+  materializeResource(s"/graphs/als/r.base")
+  materializeResource(s"/graphs/als/r.test")
 
   test("M[i][j] * (M^t)[j][i] = sum[j](M[i][*] * M[i][*]^t)") {
     forAll { M: DenseMatrix[Int] =>
@@ -45,8 +43,8 @@ class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matc
   }
 
   test("ALS with increasing number of features") {
-    val errors = for (features <- 5 to 25 by 5) yield {
-      val err  = crossValidate(path, features, lambda, iterations, rt)
+    val errors = for (features <- 5 to 15 by 5) yield {
+      val err  = validate(path, features, lambda, iterations)
       println(f"$features%2d features: $err")
       err
     }
@@ -55,8 +53,8 @@ class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matc
   }
 
   test("ALS with increasing number of iterations") {
-    val errors = for (iterations <- 10 to 50 by 10) yield {
-      val err  = crossValidate(path, features, lambda, iterations, rt)
+    val errors = for (iterations <- 5 to 15 by 5) yield {
+      val err  = validate(path, features, lambda, iterations)
       println(f"$iterations%2d iterations: $err")
       err
     }
@@ -65,22 +63,22 @@ class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matc
   }
 
   /** Test the Alternating Least Squares algorithm with given parameters. */
-  def crossValidate(
+  def validate(
       path:       String,
       features:   Int,
       lambda:     Double,
-      iterations: Int,
-      rt:         runtime.Engine) =
-    (for (i <- dataSets) yield {
-      val base = s"$path/r$i.base"
-      val test = s"$path/r$i.test"
-      val out  = s"$path/output"
-      new AlternatingLeastSquares(
-        base, out, features, lambda, iterations, rt).run()
-      val expected = readRatings(test)
-      val result   = readRatings(out)
-      rmse(expected, result)
-    }).sum / dataSets.size
+      iterations: Int) = {
+    val base = s"$path/r.base"
+    val test = s"$path/r.test"
+    val out  = s"$path/output"
+    val alg  = new AlternatingLeastSquares(
+      base, out, features, lambda, iterations, rt).algorithm
+
+    val result   = alg.run(rt).fetch().iterator
+    val expected = readRatings(test)
+    FileUtils.deleteQuietly(new File(s"$path/output"))
+    rmse(expected, result)
+  }
 
   /** Read a sequence of Ratings. */
   def readRatings(path: String) = for {
