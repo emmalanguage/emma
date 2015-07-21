@@ -15,6 +15,10 @@
     <properties>
         <!-- Default execution backend -->
         <execution.backend>native</execution.backend>
+        <!-- Breeze -->
+        <breeze.version>0.11.2</breeze.version>
+        <!-- Testing -->
+        <scalacheck.version>1.12.2</scalacheck.version>
     </properties>
 
     <dependencies>
@@ -89,7 +93,7 @@
         <dependency>
             <groupId>org.scalacheck</groupId>
             <artifactId>scalacheck_${scala.tools.version}</artifactId>
-            <version>1.12.2</version>
+            <version>${scalacheck.version}</version>
             <scope>test</scope>
         </dependency>
 
@@ -111,16 +115,11 @@
             <artifactId>scala-arm_${scala.tools.version}</artifactId>
         </dependency>
 
-        <!-- Number crunching -->
+        <!-- Breeze -->
         <dependency>
             <groupId>org.scalanlp</groupId>
             <artifactId>breeze_${scala.tools.version}</artifactId>
-            <version>0.11.2</version>
-        </dependency>
-        <dependency>
-            <groupId>org.scalanlp</groupId>
-            <artifactId>breeze-natives_${scala.tools.version}</artifactId>
-            <version>0.11.2</version>
+            <version>${breeze.version}</version>
         </dependency>
     </dependencies>
 
@@ -170,6 +169,8 @@
             </activation>
             <properties>
                 <execution.backend>spark</execution.backend>
+                <!-- Guava -->
+                <guava.version>18.0</guava.version>
             </properties>
             <dependencies>
                 <!-- Emma -->
@@ -181,6 +182,12 @@
                 <dependency>
                     <groupId>org.apache.spark</groupId>
                     <artifactId>spark-core_${scala.tools.version}</artifactId>
+                </dependency>
+                <!-- Guava -->
+                <dependency>
+                    <groupId>com.google.guava</groupId>
+                    <artifactId>guava</artifactId>
+                    <version>${guava.version}</version>
                 </dependency>
             </dependencies>
         </profile>

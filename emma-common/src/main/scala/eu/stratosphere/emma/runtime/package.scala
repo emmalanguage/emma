@@ -96,7 +96,7 @@ package object runtime {
         case "remote" /**/ => factory("flink-remote", "localhost", 6123)
       }
       case "spark" => execmod match {
-        case "local" /* */ => factory("spark-local", "localhost", 7077)
+        case "local" /* */ => factory("spark-local", "local[2]", 7077)
         case "remote" /**/ => factory("spark-remote", "localhost", 7077)
       }
       case _ => Native() // run native version of the code
