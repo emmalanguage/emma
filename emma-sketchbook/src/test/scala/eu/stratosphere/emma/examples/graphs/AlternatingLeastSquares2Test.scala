@@ -17,10 +17,10 @@ import org.scalatest.prop.PropertyChecks
 import scala.io.Source
 
 @RunWith(classOf[JUnitRunner])
-class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matchers {
+class AlternatingLeastSquares2Test extends FunSuite with PropertyChecks with Matchers {
 
-  import AlternatingLeastSquares.Schema._
-  import AlternatingLeastSquaresTest._
+  import AlternatingLeastSquares2.Schema._
+  import AlternatingLeastSquares2Test._
 
   // default parameters
   val path       = tempPath("/graphs/als")
@@ -71,7 +71,7 @@ class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matc
     val base = s"$path/r.base"
     val test = s"$path/r.test"
     val out  = s"$path/output"
-    val alg  = new AlternatingLeastSquares(
+    val alg  = new AlternatingLeastSquares2(
       base, out, features, lambda, iterations, rt).algorithm
 
     val result   = alg.run(rt).fetch().iterator
@@ -103,7 +103,7 @@ class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matc
   }
 }
 
-object AlternatingLeastSquaresTest {
+object AlternatingLeastSquares2Test {
   def arb[A: Arb] = implicitly[Arb[A]].arbitrary
 
   implicit val uniformIntMatrix:    Arb[DenseMatrix[Int]] =

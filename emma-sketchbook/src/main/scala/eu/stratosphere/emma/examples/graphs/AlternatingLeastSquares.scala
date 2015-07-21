@@ -28,86 +28,85 @@ class AlternatingLeastSquares(
     ns get AlternatingLeastSquares.Command.keyIterations,
     rt)
 
-  def run() = {
-    val algorithm = emma.parallelize {
-      // reusable variables and functions
-      val eye = DenseMatrix.eye  [Double](features)
-      val V0  = DenseVector.zeros[Double](features)
-      val M0  = DenseMatrix.zeros[Double](features, features)
-      val Vr  = { (V: DenseVector[Double], r: Double) => V * r   }.tupled
-      val VVt = { (V: DenseVector[Double], _: Double) => V * V.t }.tupled
+  val algorithm = emma.parallelize {
+    // reusable variables and functions
+    val eye = DenseMatrix.eye  [Double](features)
+    val V0  = DenseVector.zeros[Double](features)
+    val M0  = DenseMatrix.zeros[Double](features, features)
+    val Vr  = { (V: DenseVector[Double], r: Double) => V * r   }.tupled
+    val VVt = { (V: DenseVector[Double], _: Double) => V * V.t }.tupled
 
-      // IO formats
-      val inputFormat  = new CSVInputFormat [Rating]
-      val outputFormat = new CSVOutputFormat[Rating]
+    // IO formats
+    val inputFormat  = new CSVInputFormat [Rating]
+    val outputFormat = new CSVOutputFormat[Rating]
 
-      val ratings = for {
-        g <- read(input, inputFormat).groupBy(_.identity)
-      } yield {
-        val u   = g.key._1
-        val i   = g.key._2
-        val rs  = g.values
-        val avg = rs.map(_.value).sum() / rs.count()
-        Rating(u, i, avg)
-      } // read input and gather all ratings
+    val ratings = for {
+      g <- read(input, inputFormat).groupBy(_.identity)
+    } yield {
+      val u   = g.key._1
+      val i   = g.key._2
+      val rs  = g.values
+      val avg = rs.map(_.value).sum() / rs.count()
+      Rating(u, i, avg)
+    } // read input and gather all ratings
 
-      var users = for (g <- ratings.groupBy(_.user)) yield {
-        val u  = g.key
-        val Ru = g.values
-        Vertex(u, Ru.count(), V0)
-      } // initialize users partition
-      
-      var items = for (g <- ratings.groupBy(_.item)) yield {
-        val i   = g.key
-        val Ri  = g.values
-        val cnt = Ri.count()
-        val rnd = new Random(i.hashCode)
-        val avg = Ri.map(_.value).sum() / cnt
-        val Fi  = Array.iterate(avg, features) { _ => rnd.nextDouble() }
-        Vertex(i, cnt, DenseVector(Fi))
-      } // initialize items partition
+    var users = for (g <- ratings.groupBy(_.user)) yield {
+      val u  = g.key
+      val Ru = g.values
+      Vertex(u, Ru.count(), V0)
+    } // initialize users partition
 
-      // iterations alternate between the users/items partitions
-      // all feature vectors are updated per iteration
-      for (_ <- 1 to iterations) {
-        users = for (user <- users) yield {
-          val prefs = for { // derive preferences
-            rating <- ratings
-            if rating.user == user.id
-            item   <- items
-            if rating.item == item.id
-          } yield item.features -> rating.value
-          // calculate new feature vector
-          val Vu = prefs.fold[DenseVector[Double]](V0, Vr,  _ + _)
-          val Au = prefs.fold[DenseMatrix[Double]](M0, VVt, _ + _)
-          val Eu = eye * (lambda * user.degree)
-          user.copy(features = inv(Au + Eu) * Vu)
-        } // update state of users
+    var items = for (g <- ratings.groupBy(_.item)) yield {
+      val i   = g.key
+      val Ri  = g.values
+      val cnt = Ri.count()
+      val rnd = new Random(i.hashCode)
+      val avg = Ri.map(_.value).sum() / cnt
+      val Fi  = Array.iterate(avg, features) { _ => rnd.nextDouble() }
+      Vertex(i, cnt, DenseVector(Fi))
+    } // initialize items partition
 
-        items = for (item <- items) yield {
-          val prefs = for { // derive preferences
-            rating <- ratings
-            if rating.item == item.id
-            user   <- users
-            if rating.user == user.id
-          } yield user.features -> rating.value
-          // calculate new feature vector
-          val Vi = prefs.fold[DenseVector[Double]](V0, Vr,  _ + _)
-          val Ai = prefs.fold[DenseMatrix[Double]](M0, VVt, _ + _)
-          val Ei = eye * (lambda * item.degree)
-          item.copy(features = inv(Ai + Ei) * Vi)
-        } // update state of items
-      }
+    // iterations alternate between the users/items partitions
+    // all feature vectors are updated per iteration
+    for (_ <- 1 to iterations) {
+      users = for (user <- users) yield {
+        val prefs = for { // derive preferences
+          rating <- ratings
+          if rating.user == user.id
+          item   <- items
+          if rating.item == item.id
+        } yield item.features -> rating.value
+        // calculate new feature vector
+        val Vu = prefs.fold[DenseVector[Double]](V0, Vr,  _ + _)
+        val Au = prefs.fold[DenseMatrix[Double]](M0, VVt, _ + _)
+        val Eu = eye * (lambda * user.degree)
+        user.copy(features = inv(Au + Eu) * Vu)
+      } // update state of users
 
-      // calculate missing ratings
-      val recommendations = for (user <- users; item <- items) yield
-        Rating(user.id, item.id, user.features dot item.features)
-      // write results to output
-      write(output, outputFormat) { recommendations }
+      items = for (item <- items) yield {
+        val prefs = for { // derive preferences
+          rating <- ratings
+          if rating.item == item.id
+          user   <- users
+          if rating.user == user.id
+        } yield user.features -> rating.value
+        // calculate new feature vector
+        val Vi = prefs.fold[DenseVector[Double]](V0, Vr,  _ + _)
+        val Ai = prefs.fold[DenseMatrix[Double]](M0, VVt, _ + _)
+        val Ei = eye * (lambda * item.degree)
+        item.copy(features = inv(Ai + Ei) * Vi)
+      } // update state of items
     }
 
-    algorithm.run(rt)
+    // calculate missing ratings
+    val recommendations = for (user <- users; item <- items) yield
+      Rating(user.id, item.id, user.features dot item.features)
+    // write results to output
+    write(output, outputFormat) { recommendations }
+    recommendations
   }
+
+  def run() = algorithm run rt
 }
 
 object AlternatingLeastSquares {
