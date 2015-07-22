@@ -60,4 +60,13 @@ package object testutil {
     assert((exp diff act) == Seq.empty[String], s"Unexpected elements in result: $exp")
     assert((act diff exp) == Seq.empty[String], s"Unseen elements in result: $act")
   }
+
+  def deleteRecursive(path: java.io.File): Boolean = {
+    val ret = if (path.isDirectory) {
+      path.listFiles().toSeq.foldLeft(true)((r, f) => deleteRecursive(f))
+    } else { /* regular file */
+      true
+    }
+    ret && path.delete()
+  }
 }

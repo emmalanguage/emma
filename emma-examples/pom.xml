@@ -178,7 +178,6 @@
                     <groupId>eu.stratosphere</groupId>
                     <artifactId>emma-spark</artifactId>
                 </dependency>
-                <!-- Spark -->
                 <dependency>
                     <groupId>org.apache.spark</groupId>
                     <artifactId>spark-core_${scala.tools.version}</artifactId>
