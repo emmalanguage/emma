@@ -3,7 +3,7 @@ package eu.stratosphere.emma.codegen.flink
 import java.net.URI
 import java.util.UUID
 
-import eu.stratosphere.emma.api.{CSVInputFormat, CSVOutputFormat}
+import eu.stratosphere.emma.api.{TextInputFormat, CSVInputFormat, CSVOutputFormat}
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir
 import eu.stratosphere.emma.macros.ReflectUtil._
@@ -168,6 +168,19 @@ class DataflowGenerator(
     val tpe = typeOf(op.tag).dealias
 
     val inFormatTree = op.format match {
+      case fmt: TextInputFormat[_] =>
+
+        val inf = freshName("inFormat$flink$")
+
+        q"""{
+          val $inf =
+            new _root_.org.apache.flink.api.java.io.TextInputFormat(
+              new _root_.org.apache.flink.core.fs.Path(${op.location}))
+
+          $inf.setDelimiter(${fmt.separator})
+          $inf
+        }"""
+
       case fmt: CSVInputFormat[_] =>
         if (!(tpe <:< weakTypeOf[Product]))
           throw new RuntimeException(
