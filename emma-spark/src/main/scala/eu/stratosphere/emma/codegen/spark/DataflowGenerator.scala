@@ -2,7 +2,7 @@ package eu.stratosphere.emma.codegen.spark
 
 import java.util.UUID
 
-import eu.stratosphere.emma.api.{CSVOutputFormat, CSVInputFormat}
+import eu.stratosphere.emma.api.{CSVOutputFormat, CSVInputFormat, TextInputFormat}
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir
 import eu.stratosphere.emma.macros.ReflectUtil._
@@ -113,7 +113,7 @@ class DataflowGenerator(
       case fmt: CSVInputFormat[tp] =>
         if (!(tpe <:< weakTypeOf[Product]))
           throw new RuntimeException(
-            s"Cannot create Flink CsvInputFormat for non-product type ${typeOf(op.tag)}")
+            s"Cannot create Spark CsvInputFormat for non-product type ${typeOf(op.tag)}")
 
         val line = freshName("line$spark$")
         val name = closure nextTermName "converter"
@@ -123,6 +123,9 @@ class DataflowGenerator(
         q"""$sc.textFile($path).map({ ($line: ${typeOf[String]}) =>
           $name.fromCSV($line.split(${fmt.separator}))
         })"""
+
+      case fmt: TextInputFormat[tp] =>
+        q"""$sc.textFile($path)"""
 
       case _ => throw new RuntimeException(
         s"Unsupported InputFormat of type '${op.format.getClass}'")
