@@ -1,10 +1,10 @@
 # Site settings
 title:            Emma
-email:            your-email@domain.com
+email:            ""
 description:      Emma is a Scala API for scalable data analysis. The goal of Emma is to improve developer productivity by hiding parallelism aspects behind a high-level, declarative API.
-baseurl:          "" # the subpath of your site, e.g. /blog/
-url:              "http://emma-language.org" # the base hostname & protocol for your site
-twitter_username: jekyllrb
+baseurl:          "http://emma-language.org" # the subpath of your site, e.g. /blog/
+url:              "" # the base hostname & protocol for your site
+twitter_username: ""
 github_username:  stratosphere/emma
 
 # Build settings

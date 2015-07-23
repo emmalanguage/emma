@@ -15,7 +15,7 @@ Database Management Systems (DBMSs) will first translate SQL expressions from th
 (abstract) algebraic expression of `filter`, `project`, `cross`, and `join` operators, and then decide upon the optimal 
 physical execution strategy for that expression.
 
-Due to [Generalization (I)]({% post_url 2015-06-19-origin %}), parallel dataflow systems accept programs in a form close to the one of the logical 
+Due to [Generalization (I)]({{site.baseurl}}{% post_url 2015-06-19-origin %}), parallel dataflow systems accept programs in a form close to the one of the logical 
 expression, i.e. trees over abstract second-order operators. Due to it's native support for **for**-comprehensions, 
 **Emma** allows a level of abstraction similar to SQL directly in the embedded language (Scala).
 

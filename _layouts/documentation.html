@@ -14,39 +14,23 @@ layout: default
             {{ content }}
         </article>
 
-        <hr>
-
-        {% for doc in docs %}
-            {% if doc.title == page.title %}
-                {% assign prevIndex = forloop.index | minus:2 %}
-                {% if prevIndex >= 0 %}
-                    {% assign prev = docs[prevIndex] %}
-                {% endif %}
-                {% assign next = docs[forloop.index] %}
-            {% endif %}
-        {% endfor %}
-
-        <div class="row">
-            <div class="small-6 columns">
-                {% if prev %}
-                    <a href="{{prev.url | prepend: site.url}}"><i class="fi-arrow-left"></i> {{prev.title}}</a>
-                {% endif %}
-            </div>
-            <div class="small-6 columns" style="text-align:right">
-                {% if next %}
-                    <a href="{{next.url | prepend: site.url}}">{{next.title}} <i class="fi-arrow-right"></i></a>
-                {% endif %}
-            </div>
-        </div>
+        {% include pagination.html items=docs %}
     </div>
 
-    <div class="large-3 columns">
-        <hr class="hide-for-large-up">
+    <div class="large-3 toc show-for-large-up">
         <h5>Table of Contents</h5>
         <ul class="side-nav">
         {% for doc in docs %}
-            <li><a class="page-link{% if page.url == doc.url %} active{% endif %}" href="{{ doc.url | prepend: site.url }}">{{ doc.title }}</a></li>
+            <li><a class="page-link{% if page.url == doc.url %} active{% endif %}" href="{{ doc.url | prepend: site.baseurl }}">{{ doc.title }}</a></li>
         {% endfor %}
         </ul>
     </div>
 </div>
+
+<script type="text/javascript">
+    $(function(){
+        setTimeout(function(){
+            followTo('.toc');
+        },500)
+    });
+</script>

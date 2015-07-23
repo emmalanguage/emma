@@ -305,3 +305,10 @@ hr.faded {
 .side-nav .active {
     font-weight: bold;
 }
+
+.toc {
+    position: fixed;
+    width: initial !important;
+    margin-left: 900px;
+    overflow: auto;
+}

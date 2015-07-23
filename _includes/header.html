@@ -1,7 +1,7 @@
 <header class="site-header">
 
   <div class="wrapper">
-    <a class="site-title" href="{{ site.url }}/" style="font-family: 'Libre Baskerville', serif;">{{ site.title }}</a>
+    <a class="site-title" href="{{ site.baseurl }}/" style="font-family: 'Libre Baskerville', serif;">{{ site.title }}</a>
 
     <nav class="site-nav">
       <a href="#" class="menu-icon">
@@ -15,9 +15,10 @@
       <div class="trigger">
         {% for page in site.pages %}
           {% if page.title %}
-          <a class="page-link" href="{{ page.url | prepend: site.url }}">{{ page.title }}</a>
+          <a class="page-link" href="{{ page.url | prepend: site.baseurl }}">{{ page.title }}</a>
           {% endif %}
         {% endfor %}
+          <a class="page-link" href="{{ site.baseurl }}/tutorials/Quickstart.html">Tutorials</a>
         {% if site.github_username %}
           <a class="page-link" href="https://github.com/{{ site.github_username }}" title="https://github.com/{{ site.github_username }}">
           <span class="icon icon--github">
