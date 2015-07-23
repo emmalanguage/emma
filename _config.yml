@@ -16,6 +16,8 @@ collections:
     output:       true
   docs:
     output:       true
+  legal:
+    output:       true
 
 defaults:
   - scope:
