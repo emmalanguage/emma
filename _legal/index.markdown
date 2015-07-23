@@ -25,9 +25,13 @@ This page was created by the [TU Berlin, Database Systems and Information Manage
     <a href="http://bbdc.berlin">
     <img style="width: 120px; border-width: 0px; border-style: solid; margin: 0 0.5em;" src="{{ site.baseurl }}/img/logo/bbdc-logo.png" alt="Berlin Big Data Center">
   </a>
+
+      <a href="http://www.dfg.de/en/">
+    <img style="width: 120px; border-width: 0px; border-style: solid; margin: 0 0.5em;" src="{{ site.baseurl }}/img/logo/dfg_logo_blau.jpg" alt="DFG">
+  </a>
 </p>
 
-<p>This project is partly funded by the DFG as FOR 1306 (<a href="http://stratosphere.eu">Stratosphere II project)</a> and the <a href="http://bbdc.berlin">Berlin Big Data Center.</a></p>
+<p>This project is partly funded by the <a href="http://www.dfg.de/en/">DFG</a> as FOR 1306 (<a href="http://stratosphere.eu">Stratosphere II project)</a> and the <a href="http://bbdc.berlin">Berlin Big Data Center.</a></p>
 
 #### Project Responsible
 
