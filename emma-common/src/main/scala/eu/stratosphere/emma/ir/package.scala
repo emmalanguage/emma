@@ -183,6 +183,8 @@ package object ir {
     }
 
     def body = tree.body.asInstanceOf[Function].body
+
+    def func = q"(..$params) => $body"
   }
 
   object UDF {
