@@ -9,8 +9,6 @@ import scala.language.experimental.macros
  */
 trait Folds[+E] extends Any {
 
-  def fold[R](z: R, s: E => R, p: (R, R) => R): R
-
   /**
    * Test the collection for emptiness.
    * @return `true` if the collection contains no elements at all

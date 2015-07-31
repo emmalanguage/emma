@@ -15,9 +15,16 @@ import scala.reflect.macros.blackbox
 class FoldMacros(val c: blackbox.Context) {
   import c.universe._
 
-  private lazy val self = c.prefix
+  private lazy val self = unbox(c.prefix.tree)
 
-  def freshName(prefix: String): TermName =
+  // unbox implicit type conversions
+  private def unbox(tree: Tree) = tree match {
+    case       Apply(_: TypeApply, arg :: Nil)     => arg
+    case Typed(Apply(_: TypeApply, arg :: Nil), _) => arg
+    case _ => tree
+  }
+
+  private def freshName(prefix: String): TermName =
     TermName(c freshName prefix)
 
   def isEmpty = q"!$self.nonEmpty"

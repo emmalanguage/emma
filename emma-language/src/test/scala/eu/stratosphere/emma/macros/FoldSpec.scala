@@ -1,5 +1,7 @@
 package eu.stratosphere.emma.macros
 
+import java.io.ByteArrayOutputStream
+
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.runtime.Native
 import org.junit.runner.RunWith
@@ -216,6 +218,20 @@ class FoldSpec extends FunSuite with Matchers with PropertyChecks {
         case Some(_) => negative.get should be < 0
         case None    => negative should be ('empty)
       }
+    }
+  }
+
+  test("fold group fusion (char count)") {
+    forAll { str: String =>
+      val buffer = new ByteArrayOutputStream()
+      Console.withOut(buffer) {
+        emma.comprehend {
+          for (g <- DataBag(str) groupBy identity)
+            yield g.key -> g.values.count()
+        }
+      }
+
+      buffer.toString.toLowerCase should include ("foldgroup")
     }
   }
 }
