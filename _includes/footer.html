@@ -1,3 +1,6 @@
+<div id="top-link" class="hide-for-large-up">
+    <a class="panel radius">&#8679;</a>
+</div>
 <footer class="site-footer">
 
   <div class="wrapper">
@@ -55,7 +58,31 @@
 
     <script>
         $(function(){
-            $(document).foundation();
+            $(document).foundation({
+                offcanvas : {
+                    open_method: 'move',
+                    close_on_click : true
+                }
+            });
+            $('#top-link').click(function(){
+                $("html, body").animate({
+                    scrollTop: "0"
+                }, {
+                  duration: 300,
+                  easing: "swing"
+                });
+            });
+
+            $window = $(window);
+
+            //show link if scroll over 100px
+            $window.scroll(function(){
+                if ($window.scrollTop() > 100) {
+                    $("#top-link a").show();
+                } else {
+                    $("#top-link a").hide();
+                }
+            });
         });
     </script>
 

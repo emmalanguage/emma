@@ -5,20 +5,21 @@ layout: index
 <div class="home">
 
     <div class="row" style="padding-top:80px;">
-        <div class="small-4 columns">
-            <!--img width="270" src="{{ "/img/girl.png" | prepend: site.url }}">-->
-        </div>
-        <div class="small-8 columns">
-            <div class="row">
-                <div class="small-12 columns text-center">
-                    <h1 style="font-weight: 700;font-family: 'Libre Baskerville', serif;">Emma</h1>
-                    <h1><small style="color:white;">Huge data in little words</small></h1>
+        <div class="small-12 columns left">
+            <h1 style="font-weight: 700;font-family: 'Libre Baskerville', serif;">Emma</h1>
+            <h1><small style="color:white;">Huge data in little words</small></h1>
+            <div class="row hide-for-medium-down">
+                <div class="small-12 columns">
                     <a href="https://github.com/stratosphere/emma/releases/latest" class="button huge success radius" style="margin:0px;">latest Download</a>
                     <a href="{{ '/documentation' | prepend: site.url }}" class="button huge warning radius" style="margin:0px;">Documentation</a>
-                    <!--<br><a href="#" style="color:white;"><small>&gt; older versions</small></a>-->
                 </div>
             </div>
-
+            <div class="row show-for-medium-down">
+                <div class="small-12 columns">
+                    <a href="https://github.com/stratosphere/emma/releases/latest" class="button tiny success radius" style="margin:0px;">latest Download</a>
+                    <a href="{{ '/documentation' | prepend: site.url }}" class="button tiny warning radius" style="margin:0px;">Documentation</a>
+                </div>
+            </div>
         </div>
     </div>
     <div class="row" style="margin-top:45px;">
