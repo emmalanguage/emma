@@ -1,43 +1,46 @@
 <!DOCTYPE html>
 <html>
 
-  {% include head.html %}
+{% include head.html %}
 
-  <body>
+<body>
 
-    {% include header.html %}
+<div class="off-canvas-wrap" data-offcanvas>
+    <div class="inner-wrap">
+        {% include header.html %}
 
-    <div class="home-content">
-        <div class="pattern">
-            &nbsp;
-        </div>
-        <div class="wrapper" style="z-index: 10;">
-            {{ content }}
-        </div>
-    </div>
-
-    {% assign tuts = site.tutorials | sort: 'date' %}
-    <div class="page-content">
-        <div class="wrapper">
-            <div class="row">
-                <div class="small-12 columns">
-                    <h2 class="heading">{{ tuts.first.title }}</h2>
-                    {{ tuts.first.content }}
-                </div>
+        <div class="home-content">
+            <div class="pattern">
+                &nbsp;
             </div>
-
+            <div class="wrapper" style="z-index: 10;">
+                {{ content }}
+            </div>
         </div>
-    </div>
 
-    <div class="page-content grey-dark">
-        <div class="wrapper">
-            {% include features.html %}
+        {% assign tuts = site.tutorials | sort: 'date' %}
+        <div class="page-content">
+            <div class="wrapper">
+                <div class="row">
+                    <div class="small-12 columns">
+                        <h2 class="heading">{{ tuts.first.title }}</h2>
+                        {{ tuts.first.content }}
+                    </div>
+                </div>
+
+            </div>
         </div>
+
+        <div class="page-content grey-dark">
+            <div class="wrapper">
+                {% include features.html %}
+            </div>
+        </div>
+
+        <a class="exit-off-canvas"></a>
+        {% include footer.html %}
     </div>
-
-
-    {% include footer.html %}
-
-  </body>
+</div>
+</body>
 
 </html>

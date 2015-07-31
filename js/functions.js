@@ -6,7 +6,6 @@ var followTo = function (selector) {
     var pos = 0;
     if (sectionHeight > $this.height()) {
         pos = sectionHeight - $this.height();
-        console.log(sectionHeight, $this.height(), pos);
     }
 
     $window.scroll(function (e) {

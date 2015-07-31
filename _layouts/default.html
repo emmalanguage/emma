@@ -1,20 +1,57 @@
 <!DOCTYPE html>
 <html>
 
-  {% include head.html %}
+    {% include head.html %}
 
-  <body>
+    <body>
+        <div class="off-canvas-wrap" data-offcanvas>
+            <div class="inner-wrap">
+                {% include header.html nav=page.nav%}
 
-    {% include header.html %}
+                <section class="page-content">
+                    <div class="wrapper">
+                        {{ content }}
+                    </div>
+                </section>
 
-    <section class="page-content">
-        <div class="wrapper">
-            {{ content }}
+
+                {% include footer.html %}
+
+                <div id="top-link" class="hide-for-large-up">
+                    <a class="panel radius">&#8679;</a>
+                </div>
+
+                <a class="exit-off-canvas"></a>
+            </div>
         </div>
-    </section>
+    </body>
+    <script type="text/javascript">
+        $(function(){
+            $(document).foundation({
+                offcanvas : {
+                    open_method: 'move',
+                    close_on_click : true
+                }
+            });
+            $('#top-link').click(function(){
+                $("html, body").animate({
+                    scrollTop: "0"
+                }, {
+                  duration: 300,
+                  easing: "swing"
+                });
+            });
 
-    {% include footer.html %}
+            $window = $(window);
 
-  </body>
-
+            //show link if scroll over 100px
+            $window.scroll(function(){
+                if ($window.scrollTop() > 100) {
+                    $("#top-link a").show();
+                } else {
+                    $("#top-link a").hide();
+                }
+            });
+        });
+    </script>
 </html>

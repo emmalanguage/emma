@@ -8,8 +8,6 @@ dl, dd, ol, ul, figure {
     padding: 0;
 }
 
-
-
 /**
  * Basic styling
  */
@@ -29,10 +27,7 @@ body {
     background: -ms-linear-gradient(top,  #efefef 0%,#d3d3d3 100%); /* IE10+ */
     background: linear-gradient(to bottom,  #efefef 0%,#d3d3d3 100%); /* W3C */
     filter: progid:DXImageTransform.Microsoft.gradient( startColorstr='#efefef', endColorstr='#d3d3d3',GradientType=0 ); /* IE6-9 */
-
 }
-
-
 
 /**
  * Set `margin-bottom` to maintain vertical rhythm
@@ -44,8 +39,6 @@ ul, ol, dl, figure,
     margin-bottom: $spacing-unit / 2;
 }
 
-
-
 /**
  * Images
  */
@@ -53,8 +46,6 @@ img {
     max-width: 100%;
     vertical-align: middle;
 }
-
-
 
 /**
  * Figures
@@ -66,8 +57,6 @@ figure > img {
 figcaption {
     font-size: $small-font-size;
 }
-
-
 
 /**
  * Lists
@@ -83,8 +72,6 @@ li {
     }
 }
 
-
-
 /**
  * Headings
  */
@@ -92,8 +79,6 @@ h1, h2, h3, h4, h5, h6 {
     font-family: $second-font !important;
     font-weight: 300;
 }
-
-
 
 /**
  * Links
@@ -106,8 +91,6 @@ a {
         color: darken($brand-color, 15%);
     }
 }
-
-
 
 /**
  * Blockquotes
@@ -125,8 +108,6 @@ blockquote {
     }
 }
 
-
-
 /**
  * Code formatting
  */
@@ -135,10 +116,11 @@ code {
     font-size: 15px;
     border: 1px solid $grey-color-light;
     border-radius: 3px;
-    background-color: #eef;
+    background-color: #eee;
+    padding: 1px;
 }
 
-code {
+code.language-text {
     padding: 5px;
 }
 
@@ -151,8 +133,6 @@ pre {
         display: block;
     }
 }
-
-
 
 /**
  * Wrapper
@@ -192,8 +172,6 @@ pre {
         clear: both;
     }
 }
-
-
 
 /**
  * Icons

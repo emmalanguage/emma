@@ -4,90 +4,69 @@
 .site-header {
     border-top: 5px solid $grey-color-dark;
     border-bottom: 1px solid $grey-color-light;
-    min-height: 56px;
 
     // Positioning context for the mobile navigation icon
     position: relative;
 }
 
+header section.left-small {
+    border: 0;
+}
+
+header section.right-small {
+    border: 0;
+}
+
 .site-title {
-    font-size: 26px;
-    line-height: 56px;
-    letter-spacing: -1px;
-    margin-bottom: 0;
-    float: left;
+    color: #222222;
+    font-size: 2rem;
+}
 
-    &,
-    &:visited {
-        color: $grey-color-dark;
+.site-title:visited {
+    color: black;
+}
+
+.header-wrapper {
+    max-width: -webkit-calc(#{$content-width} - (#{$spacing-unit} * 2));
+    max-width:         calc(#{$content-width} - (#{$spacing-unit} * 2));
+    margin-right: auto;
+    margin-left: auto;
+    @extend %clearfix;
+
+    @include media-query($on-laptop) {
+        max-width: -webkit-calc(#{$content-width} - (#{$spacing-unit}));
+        max-width:         calc(#{$content-width} - (#{$spacing-unit}));
     }
 }
 
-.site-nav {
+.main-nav {
     float: right;
-    line-height: 56px;
-    z-index: 100;
+    margin-top: 20px;
+}
 
-    .menu-icon {
-        display: none;
-    }
+.main-nav a{
+    margin: 0px 5px;
+}
 
-    .page-link {
-        color: $text-color;
-        line-height: $base-line-height;
+header .page-link {
+    color: #222222;
+}
 
-        // Gaps between nav items, but not on the first one
-        &:not(:first-child) {
-            margin-left: 20px;
-        }
-    }
+header .page-link:visited {
+    color: #222222;
+}
 
-    @include media-query($on-palm) {
-        position: absolute;
-        top: 9px;
-        right: 30px;
-        background-color: $background-color;
-        border: 1px solid $grey-color-light;
-        border-radius: 5px;
-        text-align: right;
+nav.tab-bar {
+    background-color: white;
 
-        .menu-icon {
-            display: block;
-            float: right;
-            width: 36px;
-            height: 26px;
-            line-height: 0;
-            padding-top: 10px;
-            text-align: center;
-
-            > svg {
-                width: 18px;
-                height: 15px;
-
-                path {
-                    fill: $grey-color-dark;
-                }
-            }
-        }
-
-        .trigger {
-            clear: both;
-            display: none;
-        }
-
-        &:hover .trigger {
-            display: block;
-            padding-bottom: 5px;
-        }
-
-        .page-link {
-            display: block;
-            padding: 5px 10px;
-        }
+    section a{
+        color: #222222;
     }
 }
 
-
+nav.tab-bar .menu-icon:after {
+    color: #222222;
+}
 
 /**
  * Site footer
@@ -302,13 +281,24 @@ hr.faded {
   background-image: -moz-linear-gradient(left center, #424242 0%, #666 10%, #666 90%, #424242 100%);
 }
 
-.side-nav .active {
-    font-weight: bold;
-}
-
 .toc {
     position: fixed;
     width: initial !important;
     margin-left: 900px;
     overflow: auto;
+}
+
+#top-link {
+    position:fixed;
+    bottom:10px;
+    right:0px;
+}
+
+#top-link a{
+    padding: 5px;
+    padding-right: 10px;
+    margin: 0;
+    font-size: 30px;
+    border: 0;
+    display: none;
 }
