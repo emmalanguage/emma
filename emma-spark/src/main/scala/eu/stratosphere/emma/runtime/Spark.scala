@@ -25,7 +25,7 @@ abstract class Spark(val host: String, val port: Int) extends Engine {
 
   val sc: SparkContext
 
-  val dataflowCompiler = new DataflowCompiler(mirror)
+  val dataflowCompiler = new DataflowCompiler(runtimeMirror(getClass.getClassLoader))
 
   val dataflowGenerator = new DataflowGenerator(dataflowCompiler, envSessionID)
 

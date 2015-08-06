@@ -24,8 +24,6 @@ package object runtime {
 
   private[emma] val logger = Logger(LoggerFactory.getLogger(classOf[Engine]))
 
-  val mirror = runtimeMirror(getClass.getClassLoader)
-
   abstract class Engine {
 
     val envSessionID = UUID.randomUUID()
@@ -105,8 +103,8 @@ package object runtime {
 
   def factory(name: String, host: String, port: Int) = {
     // reflect engine
-    val engineClazz = mirror.staticClass(s"${getClass.getPackage.getName}.${toCamelCase(name)}")
-    val engineClazzMirror = mirror.reflectClass(engineClazz)
+    val engineClazz = rootMirror.staticClass(s"${getClass.getPackage.getName}.${toCamelCase(name)}")
+    val engineClazzMirror = rootMirror.reflectClass(engineClazz)
     val engineClassType = appliedType(engineClazz)
 
     if (!(engineClassType <:< typeOf[Engine]))

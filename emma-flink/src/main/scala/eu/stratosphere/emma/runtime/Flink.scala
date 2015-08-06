@@ -28,7 +28,7 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
 
   val env: ExecutionEnvironment
 
-  val dataflowCompiler = new DataflowCompiler(mirror)
+  val dataflowCompiler = new DataflowCompiler(runtimeMirror(getClass.getClassLoader))
 
   val dataflowGenerator = new DataflowGenerator(dataflowCompiler, envSessionID)
 

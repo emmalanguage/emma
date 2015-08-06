@@ -1,7 +1,5 @@
 package eu.stratosphere.emma
 
-import java.util.UUID
-
 import eu.stratosphere.emma.api.{DataBag, InputFormat, OutputFormat}
 
 import scala.collection.mutable
@@ -174,18 +172,9 @@ package object ir {
 
   object UDF {
 
-    val fnSymbols = Set[Symbol](
-      runtime.mirror.staticClass("scala.Function0"),
-      runtime.mirror.staticClass("scala.Function1"),
-      runtime.mirror.staticClass("scala.Function2"),
-      runtime.mirror.staticClass("scala.Function3"),
-      runtime.mirror.staticClass("scala.Function4"),
-      runtime.mirror.staticClass("scala.Function5"),
-      runtime.mirror.staticClass("scala.Function6"),
-      runtime.mirror.staticClass("scala.Function7"),
-      runtime.mirror.staticClass("scala.Function8"),
-      runtime.mirror.staticClass("scala.Function9"),
-      runtime.mirror.staticClass("scala.Function10"))
+    val fnSymbols: Set[Symbol] = {
+      for (n <- 0 to 22) yield rootMirror.staticClass(s"scala.Function$n")
+    }.toSet
 
     def apply(fn: Tree, tpe: Type, tb: ToolBox[ru.type]) = new UDF(fn.asInstanceOf[Function], tpe, tb)
 
