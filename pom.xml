@@ -120,7 +120,7 @@
             </dependency>
             <dependency>
                 <groupId>eu.stratosphere</groupId>
-                <artifactId>emma-sketchbook</artifactId>
+                <artifactId>emma-examples</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -437,8 +437,8 @@
         <module>emma-common-macros</module>
         <module>emma-flink</module>
         <module>emma-language</module>
-        <module>emma-sketchbook</module>
         <module>emma-spark</module>
+        <module>emma-examples</module>
     </modules>
 
 </project>

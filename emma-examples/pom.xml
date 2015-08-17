@@ -9,7 +9,7 @@
     </parent>
 
 
-    <artifactId>emma-sketchbook</artifactId>
+    <artifactId>emma-examples</artifactId>
     <name>${project.artifactId}</name>
 
     <properties>
