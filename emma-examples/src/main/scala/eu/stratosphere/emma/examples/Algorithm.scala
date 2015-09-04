@@ -38,7 +38,7 @@ object Algorithm {
       // runtime type
       parser.addArgument(s"--${Command.KEY_RT_TYPE}")
         .`type`[String](classOf[String])
-        .choices("native", "flink-local", "flink-remote", "spark")
+        .choices("native", "flink-local", "flink-remote", "spark-local", "spark-remote")
         .dest(Command.KEY_RT_TYPE)
         .metavar("RT")
         .help(s"runtime type (default ${Command.KEY_RT_TYPE_DEFAULT}})")
@@ -84,4 +84,3 @@ abstract class Algorithm(val rt: runtime.Engine) {
 
   def run(): Unit
 }
-

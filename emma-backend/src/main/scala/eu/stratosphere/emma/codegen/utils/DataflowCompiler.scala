@@ -1,5 +1,6 @@
 package eu.stratosphere.emma.codegen.utils
 
+import java.net.URLClassLoader
 import java.nio.file.{Files, Paths}
 
 import scala.reflect.runtime.universe._
@@ -18,8 +19,14 @@ class DataflowCompiler(val mirror: Mirror) {
     path.toAbsolutePath.toString
   }
 
-  /** The generating Scala toolbox */
-  val tb = mirror.mkToolBox(options = s"-d $codeGenDir")
+  /** The generating Scala toolbox */  
+  val cl = getClass.getClassLoader
+  val cp = cl match {
+    case urlCL: URLClassLoader => urlCL.getURLs().map(_.getFile()).mkString(System.getProperty("path.separator"))
+    case _ => logger.warn("This type of classloader is not supported: " + cl.getClass); ""
+  }
+
+  val tb = mirror.mkToolBox(options = s"-d $codeGenDir -cp $cp")
 
   logger.info(s"Dataflow compiler will use '$codeGenDir' as a target directory")
 
