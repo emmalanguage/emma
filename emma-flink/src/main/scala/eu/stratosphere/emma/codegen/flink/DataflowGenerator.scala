@@ -6,7 +6,6 @@ import java.util.UUID
 import eu.stratosphere.emma.api.{TextInputFormat, CSVInputFormat, CSVOutputFormat}
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir
-import eu.stratosphere.emma.macros.ReflectUtil._
 import eu.stratosphere.emma.macros.RuntimeUtil
 import eu.stratosphere.emma.runtime.logger
 import org.apache.commons.io.FilenameUtils

@@ -5,7 +5,6 @@ import java.util.UUID
 import eu.stratosphere.emma.api.{CSVOutputFormat, CSVInputFormat, TextInputFormat}
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir
-import eu.stratosphere.emma.macros.ReflectUtil._
 import eu.stratosphere.emma.macros.RuntimeUtil
 import eu.stratosphere.emma.runtime.logger
 import eu.stratosphere.emma.util.Counter
@@ -306,7 +305,7 @@ class DataflowGenerator(
     val y = freshName("y$spark$")
 
     q"""$xs.map({ (..${keyUDF.params}) =>
-        (${keyUDF.body}, ${bind(sngUDF.body, aliases: _*)})
+        (${keyUDF.body}, ${sngUDF.body.bind(aliases: _*)})
       }).reduceByKey({ (..${unionUDF.params}) =>
         ${unionUDF.body}
       }).map({ case ($x, $y) =>
