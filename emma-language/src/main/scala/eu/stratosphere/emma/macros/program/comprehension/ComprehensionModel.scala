@@ -1,16 +1,13 @@
 package eu.stratosphere.emma.macros.program.comprehension
 
-import eu.stratosphere.emma.macros.program.ContextHolder
-
+import eu.stratosphere.emma.macros.BlackBox
 import scala.collection.mutable
-import scala.reflect.macros.blackbox
 
 /**
  * Model and helper functions for the intermediate representation of comprehended terms.
  */
-private[emma] trait ComprehensionModel[C <: blackbox.Context] extends ContextHolder[C] {
-
-  import c.universe._
+private[emma] trait ComprehensionModel extends BlackBox {
+  import universe._
 
   // --------------------------------------------------------------------------
   // Comprehension Model

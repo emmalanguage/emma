@@ -1,16 +1,9 @@
 package eu.stratosphere.emma.macros.program.comprehension.rewrite
 
-import eu.stratosphere.emma.macros.program.ContextHolder
 import eu.stratosphere.emma.macros.program.util.ProgramUtils
 
-import scala.reflect.macros.blackbox
-
-trait ComprehensionCombination[C <: blackbox.Context]
-  extends ContextHolder[C]
-  with ComprehensionRewriteEngine[C]
-  with ProgramUtils[C] {
-
-  import c.universe._
+trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUtils {
+  import universe._
 
   def combine(root: ExpressionRoot) = {
     // states for the state machine

@@ -1,23 +1,16 @@
 package eu.stratosphere.emma.macros.program.comprehension
 
 import eu.stratosphere.emma.macros.program.comprehension.rewrite.ComprehensionNormalization
-import eu.stratosphere.emma.macros.program.util.ProgramUtils
-
-import scala.collection.mutable
-import eu.stratosphere.emma.macros.program.ContextHolder
 import eu.stratosphere.emma.macros.program.controlflow.ControlFlowModel
-
+import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
-import scala.reflect.macros._
 
-private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
-  extends ContextHolder[C]
-  with ControlFlowModel[C]
-  with ComprehensionModel[C]
-  with ComprehensionNormalization[C]
-  with ProgramUtils[C] {
+private[emma] trait ComprehensionAnalysis
+    extends ControlFlowModel
+    with ComprehensionModel
+    with ComprehensionNormalization {
 
-  import c.universe._
+  import universe._
 
   /**
    * A set of API method symbols to be comprehended.
@@ -411,7 +404,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
 
   /**
    * Apply deMorgan's Rules to predicates (move negations as far in as possible)
-   * @param expr
+   * @param tree
    * @return
    */
   def applyDeMorgan(tree: Tree): Tree = {

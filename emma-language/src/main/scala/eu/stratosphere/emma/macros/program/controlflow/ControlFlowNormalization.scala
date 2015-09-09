@@ -1,16 +1,10 @@
 package eu.stratosphere.emma.macros.program.controlflow
 
-import eu.stratosphere.emma.macros.program.ContextHolder
 import eu.stratosphere.emma.macros.program.util.ProgramUtils
 import eu.stratosphere.emma.util.Counter
 
-import scala.reflect.macros.blackbox
-
-private[emma] trait ControlFlowNormalization[C <: blackbox.Context]
-  extends ContextHolder[C]
-  with ProgramUtils[C] {
-
-  import c.universe._
+private[emma] trait ControlFlowNormalization extends ProgramUtils {
+  import universe._
 
   /** Normalize */
   def normalize(tree: Tree): Tree = {

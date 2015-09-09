@@ -1,16 +1,13 @@
 package eu.stratosphere.emma.macros.program.controlflow
 
-import eu.stratosphere.emma.macros.program.ContextHolder
-
+import eu.stratosphere.emma.macros.BlackBox
 import scala.collection._
 import scala.language.existentials
-import scala.reflect.macros._
 import scalax.collection.edge.LkDiEdge
 import scalax.collection.mutable.Graph
 
-private[emma] trait ControlFlowModel[C <: blackbox.Context] extends ContextHolder[C] {
-
-  import c.universe._
+private[emma] trait ControlFlowModel extends BlackBox {
+  import universe._
 
   // --------------------------------------------------------------------------
   // Control flow Graph

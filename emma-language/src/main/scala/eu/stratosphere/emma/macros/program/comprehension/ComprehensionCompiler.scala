@@ -1,21 +1,14 @@
 package eu.stratosphere.emma.macros.program.comprehension
 
-import eu.stratosphere.emma.macros.program.ContextHolder
 import eu.stratosphere.emma.macros.program.comprehension.rewrite.ComprehensionCombination
 import eu.stratosphere.emma.macros.program.controlflow.ControlFlowModel
-import eu.stratosphere.emma.macros.program.util.ProgramUtils
 
-import scala.reflect.macros._
+private[emma] trait ComprehensionCompiler
+    extends ControlFlowModel
+    with ComprehensionAnalysis
+    with ComprehensionCombination {
 
-private[emma] trait ComprehensionCompiler[C <: blackbox.Context]
-  extends ContextHolder[C]
-  with ControlFlowModel[C]
-  with ComprehensionAnalysis[C]
-  with ComprehensionModel[C]
-  with ComprehensionCombination[C]
-  with ProgramUtils[C] {
-
-  import c.universe._
+  import universe._
 
   /**
    * Compiles a generic driver for a data-parallel runtime.

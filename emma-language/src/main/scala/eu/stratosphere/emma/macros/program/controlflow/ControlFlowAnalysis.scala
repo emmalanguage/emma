@@ -1,20 +1,12 @@
 package eu.stratosphere.emma.macros.program.controlflow
 
-
-import eu.stratosphere.emma.macros.program.util.ProgramUtils
 import eu.stratosphere.emma.util.Counter
-
-import scala.reflect.macros._
 import scalax.collection.GraphPredef._
 import scalax.collection.edge.LkDiEdge
 import scalax.collection.mutable.Graph
 
-private[emma] trait ControlFlowAnalysis[C <: blackbox.Context]
-    extends ControlFlowModel[C]
-      with ProgramUtils[C]
-      with ControlFlowNormalization[C] { this: ControlFlowModel[C] =>
-
-  import c.universe._
+private[emma] trait ControlFlowAnalysis extends ControlFlowModel with ControlFlowNormalization {
+  import universe._
 
   def createControlFlowGraph(tree: Tree): CFGraph = {
 

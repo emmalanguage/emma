@@ -1,13 +1,9 @@
 package eu.stratosphere.emma.macros.program.util
 
-import eu.stratosphere.emma.macros.program.ContextHolder
 import eu.stratosphere.emma.macros.program.comprehension.ComprehensionModel
 
-import scala.reflect.macros.blackbox
-
-private[emma] trait ProgramUtils[C <: blackbox.Context] extends ContextHolder[C] with ComprehensionModel[C] {
-
-  import c.universe._
+private[emma] trait ProgramUtils extends ComprehensionModel {
+  import universe._
 
   /**
    * This is a workaround for issue https://issues.scala-lang.org/browse/SI-5464.

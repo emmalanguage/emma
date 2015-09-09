@@ -1,15 +1,9 @@
 package eu.stratosphere.emma.macros.program.comprehension.rewrite
 
-import eu.stratosphere.emma.macros.program.ContextHolder
 import eu.stratosphere.emma.macros.program.comprehension.ComprehensionModel
 import eu.stratosphere.emma.rewrite.RewriteEngine
 
-import scala.reflect.macros.blackbox
-
-trait ComprehensionRewriteEngine[C <: blackbox.Context]
-  extends ContextHolder[C]
-  with ComprehensionModel[C]
-  with RewriteEngine {
+trait ComprehensionRewriteEngine extends ComprehensionModel with RewriteEngine {
 
   /**
    * Constructs a rule application function that breaks after one successful application.

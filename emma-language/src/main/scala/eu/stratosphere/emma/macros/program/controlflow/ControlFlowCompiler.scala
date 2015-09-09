@@ -2,12 +2,9 @@ package eu.stratosphere.emma.macros.program.controlflow
 
 import scala.collection.Set
 import scala.collection.mutable.ListBuffer
-import scala.reflect.macros._
 
-private[emma] trait ControlFlowCompiler[C <: blackbox.Context] extends ControlFlowModel[C] {
-  this: ControlFlowModel[C] =>
-
-  import c.universe._
+private[emma] trait ControlFlowCompiler extends ControlFlowModel {
+  import universe._
 
   def compileDriver[T: c.WeakTypeTag](cfGraph: CFGraph): ListBuffer[Tree] = {
     // build driver tree startin from the (per construction unique) head block
