@@ -19,7 +19,7 @@ private[emma] trait ComprehensionCompiler
    * @return A tree representing the compiled triver.
    */
   def compile(tree: Tree, cfGraph: CFGraph, comprehensionView: ComprehensionView): Tree =
-    untypecheck(new Compiler(cfGraph, comprehensionView).transform(tree))
+    new Compiler(cfGraph, comprehensionView).transform(tree).unTypeChecked
 
   private class Compiler(cfGraph: CFGraph, comprehensionView: ComprehensionView) extends Transformer {
 
@@ -55,7 +55,7 @@ private[emma] trait ComprehensionCompiler
       val root = combine(t.comprehension).expr
 
       // extract the comprehension closure
-      val c = closure(t.comprehension)
+      val c = t.comprehension.freeTerms
 
       // get the TermName associated with this comprehended term
       val name = t.definition.collect({
@@ -99,25 +99,25 @@ private[emma] trait ComprehensionCompiler
         case combinator.TempSink(name, xs) =>
           q"ir.TempSink(${name.toString}, ${serialize(xs)})"
         case combinator.Map(f, xs) =>
-          q"ir.Map[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(f)}, ${serialize(xs)})"
+          q"ir.Map[${e.elementType}, ${xs.elementType}](${serialize(f)}, ${serialize(xs)})"
         case combinator.FlatMap(f, xs) =>
-          q"ir.FlatMap[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(f)}, ${serialize(xs)})"
+          q"ir.FlatMap[${e.elementType}, ${xs.elementType}](${serialize(f)}, ${serialize(xs)})"
         case combinator.Filter(p, xs) =>
-          q"ir.Filter[${elementType(e.tpe)}](${serialize(p)}, ${serialize(xs)})"
+          q"ir.Filter[${e.elementType}](${serialize(p)}, ${serialize(xs)})"
         case combinator.EquiJoin(keyx, keyy, xs, ys) =>
-          val xsTpe = elementType(xs.tpe)
-          val ysTpe = elementType(ys.tpe)
-          q"ir.EquiJoin[${elementType(e.tpe)}, $xsTpe, $ysTpe](${serialize(keyx)}, ${serialize(keyy)}, ${serialize(c.typecheck(q"(x: $xsTpe, y: $ysTpe) => (x, y)"))}, ${serialize(xs)}, ${serialize(ys)})"
+          val xsTpe = xs.elementType
+          val ysTpe = ys.elementType
+          q"ir.EquiJoin[${e.elementType}, $xsTpe, $ysTpe](${serialize(keyx)}, ${serialize(keyy)}, ${serialize(c.typecheck(q"(x: $xsTpe, y: $ysTpe) => (x, y)"))}, ${serialize(xs)}, ${serialize(ys)})"
         case combinator.Cross(xs, ys) =>
-          val xsTpe = elementType(xs.tpe)
-          val ysTpe = elementType(ys.tpe)
-          q"ir.Cross[${elementType(e.tpe)}, $xsTpe, $ysTpe](${serialize(c.typecheck(q"(x: $xsTpe, y: $ysTpe) => (x, y)"))}, ${serialize(xs)}, ${serialize(ys)})"
+          val xsTpe = xs.elementType
+          val ysTpe = ys.elementType
+          q"ir.Cross[${e.elementType}, $xsTpe, $ysTpe](${serialize(c.typecheck(q"(x: $xsTpe, y: $ysTpe) => (x, y)"))}, ${serialize(xs)}, ${serialize(ys)})"
         case combinator.Group(key, xs) =>
-          q"ir.Group[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(key)}, ${serialize(xs)})"
+          q"ir.Group[${e.elementType}, ${xs.elementType}](${serialize(key)}, ${serialize(xs)})"
         case combinator.Fold(empty, sng, union, xs, _) =>
-          q"ir.Fold[${e.tpe}, ${elementType(xs.tpe)}](${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
+          q"ir.Fold[${e.tpe}, ${xs.elementType}](${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
         case combinator.FoldGroup(key, empty, sng, union, xs) =>
-          q"ir.FoldGroup[${elementType(e.tpe)}, ${elementType(xs.tpe)}](${serialize(key)}, ${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
+          q"ir.FoldGroup[${e.elementType}, ${xs.elementType}](${serialize(key)}, ${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
         case combinator.Distinct(xs) =>
           q"ir.Distinct(${serialize(xs)})"
         case combinator.Union(xs, ys) =>
@@ -135,67 +135,12 @@ private[emma] trait ComprehensionCompiler
     /**
      * Emits a reified version of the given term tree.
      *
-     * @param e The tree to be serialized.
+     * @param tree The tree to be serialized.
      * @return
      */
-    private def serialize(e: Tree): String = showCode(c.typecheck( q"""
-      (..${for (s <- closure(e)) yield ValDef(Modifiers(Flag.PARAM), s.name, tq"${s.info}", EmptyTree)}) => ${untypecheck(e)}
-      """))
-
-    /**
-     * Fetches the element type `A` of a `DataBag[A]` type.
-     *
-     * @param t The reflected `DataBag[A]` type.
-     * @return The `A` type.
-     */
-    private def elementType(t: Type): Type = t.typeArgs.head
-
-
-    /**
-     * Extract the `comprehension` closure, i.e. all term symbols that are defined outside of the comprehended tree.
-     *
-     * As per passing convention adhered by the environment implementations, the computed closure is returned
-     * as a list lexicographically ordered by the symbol's term names.
-     *
-     * @param comprehension The comprehension to be inspected.
-     * @return The closure as a list lexicographically ordered by the symbol's term names.
-     */
-    private def closure(comprehension: ExpressionRoot): List[TermSymbol] = comprehension.expr.collect({
-      // Combinators
-      case combinator.Map(f, _) => closure(f)
-      case combinator.FlatMap(f, _) => closure(f)
-      case combinator.Filter(p, _) => closure(p)
-      case combinator.EquiJoin(keyx, keyy, _, _) => closure(keyx) ++ closure(keyy)
-      case combinator.Group(key, _) => closure(key)
-      case combinator.Fold(empty, sng, union, _, _) => closure(empty) ++ closure(sng) ++ closure(union)
-      case combinator.FoldGroup(key, empty, sng, union, _) => closure(key) ++ closure(empty) ++ closure(sng) ++ closure(union)
-      case combinator.TempSource(id) => List[TermSymbol](id.symbol.asTerm)
-    }).flatten.distinct.sortBy(_.name.toString)
-
-    /**
-     * Find all symbols which are not defined in the given tree `t`.
-     *
-     * @param t The tree to inspect.
-     */
-    private def closure(t: Tree): Set[TermSymbol] = {
-      // find all term symbols referenced within the comprehended term
-      val referenced = t.collect({
-        case i@Ident(TermName(_)) if i.symbol != NoSymbol && (i.symbol.asTerm.isVal || i.symbol.asTerm.isVar) => i.symbol.asTerm
-      }).toSet
-
-      // find all term symbols defined within the term
-      val defined = t.collect({
-        case vd@ValDef(_, _, _, _) => vd.symbol.asTerm
-      }).toSet
-
-      // find all term symbols bound within the term
-      val bound = t.collect({
-        case bind@Bind(_, _) => bind.symbol.asTerm
-      }).toSet
-
-      // the closure is the difference between the referenced and the defined symbols
-      referenced diff defined diff bound
-    }
+    private def serialize(tree: Tree): String = showCode(q"""(..${for (sym <- tree.freeTerms)
+      yield ValDef(Modifiers(Flag.PARAM), sym.name, tq"${sym.info}", EmptyTree)}) => {
+        ${tree.unTypeChecked}
+    }""".typeChecked, printRootPkg = true)
   }
-
 }

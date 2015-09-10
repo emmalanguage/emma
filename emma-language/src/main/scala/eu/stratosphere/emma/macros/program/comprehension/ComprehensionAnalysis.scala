@@ -271,36 +271,33 @@ private[emma] trait ComprehensionAnalysis
    * @param comprehensionView A view over the comprehended terms in the tree.
    * @return An inlined inlined tree.
    */
-  def inlineComprehensions(tree: Tree)(implicit cfGraph: CFGraph, comprehensionView: ComprehensionView) = {
+  def inlineComprehensions(tree: Tree)
+      (implicit cfGraph: CFGraph, comprehensionView: ComprehensionView) = {
 
     var inlinedTree = tree
 
     // find all valdefs that can be inlined
-    var valdefs = (for (cv <- comprehensionView.terms; d <- cv.definition) yield cv.definition.collect({
-      // make sure that the associated definition is a non-mutable ValDef
-      case valdef@ValDef(mods, name: TermName, _, rhs) if (mods.flags | Flag.MUTABLE) != mods.flags =>
-        // get the ValDef symbol
-        val symbol = d.symbol
+    var valDefs = (for (cv <- comprehensionView.terms; d <- cv.definition)
+      yield cv.definition collect {
+        // make sure that the associated definition is a non-mutable ValDef
+        case vd @ ValDef(mods, _, _, _) if (mods.flags | Flag.MUTABLE) != mods.flags =>
+          // get the identifiers referencing this ValDef symbol
+          val idents = tree collect { case id: Ident if id.symbol == d.symbol => id }
+          // if the symbol is referenced only once, inline the ValDef rhs in place of the ident
+          if (idents.size == 1) Some(vd) else None
+      }).flatten.flatten
 
-        // get the identifiers referencing this ValDef symbol
-        val idents = tree.collect({
-          case x@Ident(_) if x.symbol == symbol => x
-        })
-
-        // if the symbol is referenced only once, inline the ValDef rhs in place of the ident
-        if (idents.size == 1) Some(valdef) else Option.empty[ValDef]
-    })).flatten.flatten
-
-    while (valdefs.nonEmpty) {
+    while (valDefs.nonEmpty) {
       // get a ValDef to inline
-      val valdef = valdefs.head
+      val vd = valDefs.head
       // inline current ValDef in the tree
-      inlinedTree = inline(inlinedTree, valdef)
+      inlinedTree = inlinedTree inline vd
       // inline in all other ValDefs and continue with those
-      valdefs = for (other <- valdefs.filter(_.symbol != valdef.symbol)) yield inline(other, valdef).asInstanceOf[ValDef]
+      valDefs = for (other <- valDefs filter { _.symbol != vd.symbol })
+        yield other.inline(vd).as[ValDef]
     }
 
-    c.typecheck(inlinedTree)
+    inlinedTree.typeChecked
   }
 
   /**
@@ -644,22 +641,24 @@ private[emma] trait ComprehensionAnalysis
       val empty = c.typecheck(q"(..${folds.map(_.empty)})")
 
       // derive the unique product 'sng' function
-      val sng = c.typecheck(q"(x: $elemTpe) => (..${
+      val x   = freshName("x$")
+      val y   = freshName("y$")
+      val sng = q"($x: $elemTpe) => (..${
         for (fold <- folds) yield {
-          val sng = fold.sng.asInstanceOf[Function]
-          substitute(sng.body, sng.vparams(0).name, q"x")
+          val sng = fold.sng.as[Function]
+          sng.body.rename(sng.vparams.head.name, x)
         }
-      })")
+      })".typeChecked
 
       // derive the unique product 'union' function
-      val union = c.typecheck(q"(x: ${empty.tpe}, y: ${empty.tpe}) => (..${
+      val union = q"($x: ${empty.tpe}, $y: ${empty.tpe}) => (..${
         for ((fold, i) <- folds.zipWithIndex) yield {
-          val union = fold.union.asInstanceOf[Function]
-          substitute(union.body, Map(
-            union.vparams(0).name -> q"x.${TermName(s"_${i + 1}")}",
-            union.vparams(1).name -> q"y.${TermName(s"_${i + 1}")}"))
+          val union = fold.union.as[Function]
+          union.body substitute Map(
+            union.vparams.head.name -> q"$x.${TermName(s"_${i + 1}")}",
+            union.vparams( 1 ).name -> q"$y.${TermName(s"_${i + 1}")}")
         }
-      })")
+      })".typeChecked
 
       combinator.FoldGroup(group.key, empty, sng, union, group.xs)
   }

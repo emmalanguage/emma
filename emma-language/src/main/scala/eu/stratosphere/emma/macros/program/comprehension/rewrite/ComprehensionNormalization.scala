@@ -51,7 +51,8 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine with Program
       val (xs, ys) = m.parent.qualifiers.span(_ != m.generator)
       m.parent.qualifiers = xs ++ m.child.qualifiers ++ ys.tail
 
-      for (e <- rest; if e.isInstanceOf[ScalaExpr]) substitute(e.asInstanceOf[ScalaExpr], name, term)
+      for (e <- rest if e.isInstanceOf[ScalaExpr])
+        e.as[ScalaExpr].substitute(name, term)
 
       // new parent
       m.parent
@@ -188,12 +189,15 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine with Program
     override protected def guard(m: RuleMatch) = true //FIXME
 
     override protected def fire(m: RuleMatch) = {
-      val head = substitute(m.map.head.asInstanceOf[ScalaExpr].tree, m.child.lhs, q"x")
-      val sng = c.typecheck(q"(x: ${m.child.tpe}) => ${substitute(m.fold.sng.asInstanceOf[Function].body, TermName("x"), head)}")
+      val x      = freshName("x$")
+      val head   = m.map.head.as[ScalaExpr].tree.rename(m.child.lhs, x)
+      val oldSng = m.fold.sng.as[Function]
+      val newSng = q"""($x: ${m.child.tpe}) => {
+        ${oldSng.body.substitute(oldSng.vparams.head.name, head)}
+      }""".typeChecked
 
-      m.fold.sng = sng
-      m.fold.xs = m.child.rhs
-
+      m.fold.sng = newSng
+      m.fold.xs  = m.child.rhs
       // return new root
       m.fold
     }

@@ -7,12 +7,10 @@ private[emma] trait ControlFlowNormalization extends ProgramUtils {
   import universe._
 
   /** Normalize */
-  def normalize(tree: Tree): Tree = {
-    c.typecheck( q"""{
-      import _root_.scala.reflect._
-      ${normalizeControlFlowTests(untypecheck(/*normalizeClassNames*/ (normalizeEnclosingParameters(tree))))}
-    }""").asInstanceOf[Block].expr
-  }
+  def normalize(tree: Tree): Tree = q"""{
+    import _root_.scala.reflect._
+    ${tree ->> normalizeEnclosingParameters ->> unTypeCheck ->> normalizeControlFlowTests}
+  }""".typeChecked.as[Block].expr
 
   // --------------------------------------------------------------------------
   // Normalize control flow condition tests.

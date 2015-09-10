@@ -60,7 +60,7 @@ class TestMacros(val c: blackbox.Context) extends ControlFlow with Comprehension
          }
 
          private def runNative(): ${c.weakTypeOf[T]} = {
-           ${untypecheck(e.tree)}
+           ${e.tree.unTypeChecked}
          }
 
          private def runParallel(engine: eu.stratosphere.emma.runtime.Engine): ${c.weakTypeOf[T]} = {

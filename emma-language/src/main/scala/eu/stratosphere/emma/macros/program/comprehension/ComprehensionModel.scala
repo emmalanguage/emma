@@ -1,12 +1,12 @@
 package eu.stratosphere.emma.macros.program.comprehension
 
-import eu.stratosphere.emma.macros.BlackBox
+import eu.stratosphere.emma.macros.BlackBoxUtil
 import scala.collection.mutable
 
 /**
  * Model and helper functions for the intermediate representation of comprehended terms.
  */
-private[emma] trait ComprehensionModel extends BlackBox {
+private[emma] trait ComprehensionModel extends BlackBoxUtil {
   import universe._
 
   // --------------------------------------------------------------------------
@@ -14,7 +14,31 @@ private[emma] trait ComprehensionModel extends BlackBox {
   // --------------------------------------------------------------------------
 
   case class ExpressionRoot(var expr: Expression) {
+
     override def toString = prettyprint(expr)
+
+    /**
+     * Extract the `comprehension` closure, i.e. all [[TermSymbol]]s that are defined outside of
+     * the comprehended [[Tree]].
+     *
+     * As per passing convention adhered by the environment implementations, the computed closure
+     * is returned as a list lexicographically ordered by the [[Symbol]]s' [[TermName]]s.
+     *
+     * @return The closure as a list lexicographically ordered by the [[Symbol]]s' [[TermName]]s
+     */
+    lazy val freeTerms: List[TermSymbol] = {
+      val c = combinator
+      expr.collect { // Combinators
+        case c.Map(f, _)                    => f.freeTerms
+        case c.FlatMap(f, _)                => f.freeTerms
+        case c.Filter(p, _)                 => p.freeTerms
+        case c.EquiJoin(kx, ky, _, _)       => kx.freeTerms union ky.freeTerms
+        case c.Group(k, _)                  => k.freeTerms
+        case c.Fold(em, sg, un, _, _)       => Set(em, sg, un)    flatMap { _.freeTerms }
+        case c.FoldGroup(k, em, sg, un, _)  => Set(k, em, sg, un) flatMap { _.freeTerms }
+        case c.TempSource(id) if id.hasTerm => Set(id.term)
+      }.flatten.distinct sortBy { _.fullName }
+    }
   }
 
   case class Variable(name: TermName, tpt: Tree) {
@@ -24,6 +48,9 @@ private[emma] trait ComprehensionModel extends BlackBox {
   sealed trait Expression {
 
     def tpe: Type
+
+    def elementType: Type =
+      tpe.elementType
 
     /** Apply `f` to each subtree */
     def sequence() = collect({
@@ -82,6 +109,20 @@ private[emma] trait ComprehensionModel extends BlackBox {
         case Ident(t: TermName) => t
       }).toSet[TermName]
       vars.filter(x => termNames.contains(x.name))
+    }
+
+    /**
+     * Simultaneously substitutes all free occurrences of `key` with `value` in this expression
+     * and adapts its environment.
+     *
+     * @param key The old node to be substituted
+     * @param value The new node to be substituted in place of the old one
+     */
+    def substitute(key: TermName, value: ScalaExpr): Unit = {
+      // remove key from vars
+      vars = vars.filter { _.name != key } ++ (value.vars diff vars)
+      // add all additional value.vars
+      tree = tree.substitute(key, value.tree).typeChecked
     }
   }
 

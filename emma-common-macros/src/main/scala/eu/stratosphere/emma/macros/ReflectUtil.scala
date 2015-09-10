@@ -14,6 +14,7 @@ import scala.reflect.api.Universe
  */
 trait ReflectUtil {
   val universe: Universe
+
   import universe._
 
   /** Alias of [[PartialFunction]]. */
@@ -76,7 +77,10 @@ trait ReflectUtil {
       new TreeOps(tree)
 
     /** @return `true` if this [[Tree]] is annotated with a [[Type]], `false` otherwise */
-    def isTypeChecked: Boolean = self.tpe != null
+    def hasType: Boolean = self.tpe != null
+
+    /** @return `true` if this [[Tree]] is annotated with a [[Symbol]], `false` otherwise */
+    def hasSymbol: Boolean = self.symbol != null
 
     /** @return An un-type-checked version of this [[Tree]] */
     def unTypeChecked: Tree = unTypeCheck(self)
@@ -85,24 +89,39 @@ trait ReflectUtil {
     def reTypeChecked: Tree = reTypeCheck(self)
 
     /** @return The most precise [[Type]] of this [[Tree]] */
-    def trueType: Type = typeChecked.tpe.precise
+    def trueType: Type = {
+      if (hasType) self.tpe
+      else if (hasSymbol) self.symbol.info
+      else typeChecked.tpe
+    }.precise
+
+    /** @return The [[Type]] argument used to initialize the [[Type]] if this [[Tree]] */
+    def elementType: Type = trueType.typeArgs.head
+
+    /** @return The [[TermSymbol]] of this [[Tree]] */
+    def term: TermSymbol = self.symbol.asTerm
+
+    /** @return `true` if this [[Tree]] has a [[Symbol]] and it's a [[TermSymbol]] */
+    def hasTerm: Boolean = hasSymbol && self.symbol.isTerm
 
     /** Type-check this [[Tree]] if it doesn't have a [[Type]]. */
-    lazy val typeChecked: Tree = if (isTypeChecked) self else typeCheck(self)
+    lazy val typeChecked: Tree = if (hasType) self else typeCheck(self)
 
-    /** Collect the names of all bound variables in this [[Tree]]. */
-    lazy val definitions: Set[TermName] = self.collect {
-      case vd: ValDef              => vd.name
-      case dd: DefDef              => dd.name
-      case Bind(name: TermName, _) => name
+    /** Collect the [[Symbol]]s of all bound variables in this [[Tree]]. */
+    lazy val definitions: Set[TermSymbol] = typeChecked.collect {
+      case vd: ValDef if vd.hasTerm => vd.term
+      case bd: Bind   if bd.hasTerm => bd.term
     }.toSet
 
-    /** Collect the names of all variables referenced in this [[Tree]]. */
-    lazy val references: Set[TermName] = self.collect {
-      case Ident(name: TermName) => name
+    /** Collect the [[Symbol]]s of all variables referenced in this [[Tree]]. */
+    lazy val references: Set[TermSymbol] = typeChecked.collect {
+      case id: Ident if id.hasTerm && (id.term.isVal || id.term.isVar) => id.term
     }.toSet
 
-    /** Collect the names of all free variables in this [[Tree]]. */
+    /** Collect the [[Symbol]]s of all free variables in this [[Tree]]. */
+    lazy val freeTerms: Set[TermSymbol] = references diff definitions
+
+    /** Collect the [[TermName]]s of all free variables in this [[Tree]]. */
     lazy val closure: Set[TermName] = self match {
       case Ident(name: TermName) => // reference
         Set(name)
@@ -113,18 +132,14 @@ trait ReflectUtil {
       case ValDef(_, name, _, rhs) => // val name = ...
         rhs.closure - name
 
-      case DefDef(_, name, _, args, _, rhs) => // def name(args: _*) = ...
-        args.flatten.flatMap { _.closure }.toSet union (rhs.closure - name)
+      case Function(args, body) => // (args: _*) => ...
+        body.closure diff args.map { _.name }.toSet
 
-      case block: Block => // { ... }
-        block.children.foldLeft(Set.empty[TermName], Set.empty[TermName]) {
+      case bl: Block => // { ... }
+        bl.children.foldLeft(Set.empty[TermName], Set.empty[TermName]) {
           case ((bound, free), vd: ValDef) => // { val name = ... }
             val defined = if (isLazy(vd)) bound + vd.name else bound
             (bound + vd.name, free union vd.closure diff defined)
-
-          case ((bound, free), dd: DefDef) => // { def name(args: _*) = ... }
-            val defined = bound + dd.name
-            (defined, free union dd.closure diff defined)
 
           case ((bound, free), child) => // default
             (bound, free union child.closure diff bound)
@@ -174,18 +189,28 @@ trait ReflectUtil {
     def bind(bindings: (TermName, Tree)*): Tree =
       q"{ ..${for ((k, v) <- bindings) yield q"val $k = $v"}; $self }"
 
+
+    /**
+     * Replace a sequence of identifiers in this [[Tree]] with fresh [[TermName]]s.
+     *
+     * @param names The sequence of identifiers to rename
+     * @return This [[Tree]] with the specified names replaced
+     */
+    def refresh(names: TermName*): Tree =
+      rename((for (n <- names) yield n -> freshName(s"$n$$")): _*)
+
     /**
      * Replace a specified identifier in this [[Tree]] with a new one.
      *
-     * @param name The [[TermName]] to replace
+     * @param key The [[TermName]] to replace
      * @param alias A new [[TermName]] to use in place of the old one
      * @return This [[Tree]] with the specified name replaced
      */
-    def rename(name: TermName, alias: TermName): Tree =
-      rename(name -> alias)
+    def rename(key: TermName, alias: TermName): Tree =
+      rename(key -> alias)
 
     /**
-     * Rename a sequence of identifiers in this [[Tree]].
+     * Replace a sequence of identifiers in this [[Tree]] with their respective aliases.
      *
      * @param aliases The sequence of identifiers to rename
      * @return This [[Tree]] with the specified names replaced
@@ -194,7 +219,7 @@ trait ReflectUtil {
       rename(aliases.toMap)
 
     /**
-     * Replace a [[Map]] of identifier in this [[Tree]] with their respective aliases.
+     * Replace a [[Map]] of identifiers in this [[Tree]] with their respective aliases.
      *
      * @param dict A dictionary of aliases to be renames
      * @return This [[Tree]] with the specified names replaced
@@ -211,66 +236,94 @@ trait ReflectUtil {
       // val name = ...
       case ValDef(mods, name, tpt, rhs) if dict contains name =>
         ValDef(mods, dict(name), tpt, rhs rename dict)
-
-      // def name(args: _*) = ...
-      case DefDef(mods, name, typeArgs, args, tpt, rhs) if dict contains name =>
-        val params = args map { _ map { _.rename(dict).as[ValDef] } }
-        DefDef(mods, dict(name), typeArgs, params, tpt, rhs rename dict)
     }
 
     /**
-     * Replace a specified identifier with a source code snippet in this [[Tree]].
+     * Replace all free occurrences of an identifier with a source code snippet in this [[Tree]].
      *
-     * @param name The [[TermName]] to replace
+     * @param key The [[TermName]] to replace
      * @param value The source code [[Tree]] to substitute
      * @return This [[Tree]] with the substituted source code
      */
-    def substitute(name: TermName, value: Tree): Tree =
-      substitute(name -> value)
+    def substitute(key: TermName, value: Tree): Tree = {
+      val closure = value.closure
+      transform {
+        // reference
+        case Ident(`key`) => value
+        case Typed(Ident(`key`), _) => value
+
+        // case name => ...
+        case bd @ Bind(`key`, _) => bd
+        case bd @ Bind(name: TermName, _) if closure(name) =>
+          bd.refresh(name).substitute(key, value)
+
+        // val name = ...
+        case vd @ ValDef(_, `key`, _, _) => vd
+        case vd @ ValDef(_, name, _, _) if closure(name) =>
+          vd.refresh(name).substitute(key, value)
+
+        // (args: _*) => ...
+        case fn @ Function(args, body) if args map { _.name } contains key => fn
+        case fn @ Function(args, body) if args map { _.name } exists closure =>
+          fn.refresh(args map { _.name } filter closure: _*).substitute(key, value)
+
+        // { ... lazy val name = ... }
+        case bl: Block if bl.children exists {
+          case vd @ ValDef(_, `key`, _, _) => isLazy(vd)
+          case _ => false
+        } => bl
+
+        // { ... }
+        case bl: Block if bl.children exists {
+          case vd @ ValDef(_, name, _, _) => closure(name)
+          case _ => false
+        } => bl.refresh(bl.children collect {
+          case vd @ ValDef(_, name, _, _) if closure(name) => name
+        }: _*).substitute(key, value)
+
+        // { ... val name = ... }
+        case bl: Block if bl.children exists {
+          case vd: ValDef => vd.name == key
+          case _ => false
+        } => bl.children span {
+          case vd: ValDef => vd.name != key
+          case _ => true
+        } match { case (pre, post) =>
+          Block(pre.map { _.substitute(key, value) } ::: post.init, post.last)
+        }
+      }
+    }
 
     /**
-     * Replace a sequence of identifiers with their respective source code snippets in this
-     * [[Tree]].
+     * Replace all free occurrences of a sequence of identifiers with their respective source code
+     * snippets in this [[Tree]].
      *
      * @param kvs A sequence of [[TermName]]s and code snippets to substitute
      * @return This [[Tree]] with the substituted code snippets
      */
     def substitute(kvs: (TermName, Tree)*): Tree =
-      substitute(kvs.toMap)
+      kvs.foldLeft(self) { case (tree, (key, value)) => tree.substitute(key, value) }
 
     /**
-     * Replace a [[Map]] of identifiers with their respective source code snippets in this
-     * [[Tree]].
+     * Replace all free occurrences of a [[Map]] of identifiers with their respective source code
+     * snippets in this [[Tree]].
      *
      * @param dict A dictionary of [[TermName]]s and code snippets to substitute
      * @return This [[Tree]] with the substituted code snippets
      */
-    def substitute(dict: Map[TermName, Tree]): Tree = transform {
-      // reference
-      case Ident(name: TermName) if dict contains name =>
-        dict(name)
-
-      // case name => ...
-      case Bind(name: TermName, body) if dict contains name =>
-        Bind(termNames.WILDCARD, body substitute dict)
-
-      // val name = ...
-      case ValDef(_, name, _, _) => q"()"
-
-      // def name(args: _*) = ...
-      case DefDef(_, name, _, args, _, _)
-        if args.flatten forall isImplicit => q"()"
-    }
+    def substitute(dict: Map[TermName, Tree]): Tree =
+      substitute(dict.toSeq: _*)
 
     /**
-     * Inline a sequence of value definitions in this [[Tree]]. It's assumed that all of them are
-     * part of the [[Tree]].
+     * Inline a value definitions in this [[Tree]]. It's assumed that it's part of the [[Tree]].
      *
-     * @param defs the [[ValDef]]s to inline
+     * @param valDef the [[ValDef]] to inline
      * @return this [[Tree]] with the specified value definitions inlined
      */
-    def inline(defs: ValDef*): Tree =
-      substitute((for (ValDef(_, name, _, rhs) <- defs) yield name -> rhs): _*)
+    def inline(valDef: ValDef): Tree = transform {
+      case vd: ValDef if vd.symbol == valDef.symbol => q"()"
+      case id: Ident  if id.symbol == valDef.symbol => valDef.rhs
+    }
   }
 
   /** Syntax sugar for [[Type]]s. */
@@ -279,13 +332,17 @@ trait ReflectUtil {
     /** @return The de-aliased and widened version of this [[Type]] */
     def precise: Type = self.finalResultType.widen
 
+    /** @return The [[Type]] argument used to initialize this [[Type]] constructor */
+    def elementType: Type = precise.typeArgs.head
+
     /**
      * Apply this [[Type]] as a [[Type]] constructor.
      *
      * @param args The [[Type]] arguments
      * @return The specialized version of this [[Type]]
      */
-    def apply(args: Type*): Type = appliedType(self, args: _*)
+    def apply(args: Type*): Type =
+      appliedType(self, args: _*)
   }
 
   /** Syntax sugar for function call chain emulation. */

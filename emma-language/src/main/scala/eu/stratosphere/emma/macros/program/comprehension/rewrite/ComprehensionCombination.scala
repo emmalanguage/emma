@@ -204,14 +204,14 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUt
       m.parent.qualifiers = prefix ++ List(Generator(v.name, join)) ++ suffix.tail.tail.filter(_ != m.filter)
 
       // substitute [v._1/x] in affected expressions
-      for (e <- m.parent.collect({
-        case e@ScalaExpr(vars, expr) if vars.map(_.name).contains(m.xs.lhs) => e
-      })) substitute(e, m.xs.lhs, ScalaExpr(List(v), q"${v.name}._1"))
+      for (e <- m.parent collect {
+        case e @ ScalaExpr(vars, expr) if vars map { _.name } contains m.xs.lhs => e
+      }) e.substitute(m.xs.lhs, ScalaExpr(v :: Nil, q"${v.name}._1"))
 
       // substitute [v._2/y] in affected expressions
-      for (e <- m.parent.collect({
-        case e@ScalaExpr(vars, expr) if vars.map(_.name).contains(m.ys.lhs) => e
-      })) substitute(e, m.ys.lhs, ScalaExpr(List(v), q"${v.name}._2"))
+      for (e <- m.parent collect {
+        case e @ ScalaExpr(vars, expr) if vars map { _.name } contains m.ys.lhs => e
+      }) e.substitute(m.ys.lhs, ScalaExpr(v :: Nil, q"${v.name}._2"))
 
       // return the modified parent
       m.parent
@@ -306,14 +306,14 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUt
       m.parent.qualifiers = prefix ++ List(Generator(v.name, cross)) ++ suffix.tail.tail
 
       // substitute [v._1/x] in affected expressions
-      for (e <- m.parent.collect({
-        case e@ScalaExpr(vars, expr) if vars.map(_.name).contains(m.xs.lhs) => e
-      })) substitute(e, m.xs.lhs, ScalaExpr(List(v), q"${v.name}._1"))
+      for (e <- m.parent collect {
+        case e @ ScalaExpr(vars, expr) if vars map { _.name } contains m.xs.lhs => e
+      }) e.substitute(m.xs.lhs, ScalaExpr(v :: Nil, q"${v.name}._1"))
 
       // substitute [v._2/y] in affected expressions
-      for (e <- m.parent.collect({
-        case e@ScalaExpr(vars, expr) if vars.map(_.name).contains(m.ys.lhs) => e
-      })) substitute(e, m.ys.lhs, ScalaExpr(List(v), q"${v.name}._2"))
+      for (e <- m.parent collect {
+        case e @ ScalaExpr(vars, expr) if vars map { _.name } contains m.ys.lhs => e
+      }) e.substitute(m.ys.lhs, ScalaExpr(v :: Nil, q"${v.name}._2"))
 
       // return the modified parent
       m.parent
