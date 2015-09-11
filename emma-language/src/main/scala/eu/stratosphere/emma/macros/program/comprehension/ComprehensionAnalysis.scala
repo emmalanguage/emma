@@ -184,22 +184,22 @@ private[emma] trait ComprehensionAnalysis
       // in.map(fn)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(fn@Function(List(arg), body))) if select.symbol == api.map =>
         val bind = Generator(arg.term, comprehend(vars)(in))
-        val head = comprehend(arg :: vars)(body, input = false)
+        val head = comprehend(arg.reset :: vars)(body, input = false)
 
         Comprehension(head, bind :: Nil)
 
       // in.flatMap(fn)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(fn@Function(List(arg), body))) if select.symbol == api.flatMap =>
         val bind = Generator(arg.term, comprehend(vars)(in))
-        val head = comprehend(arg :: vars)(body, input = false)
+        val head = comprehend(arg.reset :: vars)(body, input = false)
 
         MonadJoin(Comprehension(head, bind :: Nil))
 
       // in.withFilter(fn)
       case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.withFilter =>
         val bind = Generator(arg.term, comprehend(vars)(in))
-        val filter = Filter(comprehend(arg :: vars)(body))
-        val head = comprehend(arg :: vars)(q"${arg.name}", input = false)
+        val filter = Filter(comprehend(arg.reset :: vars)(body))
+        val head = comprehend(arg.reset :: vars)(q"${arg.name}", input = false)
 
         Comprehension(head, bind :: filter :: Nil)
 

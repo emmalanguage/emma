@@ -14,7 +14,6 @@ import scala.reflect.api.Universe
  */
 trait ReflectUtil {
   val universe: Universe
-
   import universe._
 
   /** Alias of [[PartialFunction]]. */
@@ -36,24 +35,6 @@ trait ReflectUtil {
    */
   def typeCheck(tree: Tree): Tree
 
-  /**
-   * Check if a value definition is lazy.
-   *
-   * @param vd The [[ValDef]] to check
-   * @return `true` if the value definition is lazy, `false` otherwise
-   */
-  def isLazy(vd: ValDef): Boolean =
-    vd.mods hasFlag Flag.LAZY
-
-  /**
-   * Check if a value definition (or parameter) is implicit.
-   *
-   * @param vd The [[ValDef]] to check
-   * @return `true` if the value definition is implicit, `false` otherwise
-   */
-  def isImplicit(vd: ValDef): Boolean =
-    vd.mods hasFlag Flag.IMPLICIT
-
   /** Generate a new [[TermName]]. */
   val freshName = internal.reificationSupport.freshTermName _
 
@@ -61,7 +42,7 @@ trait ReflectUtil {
   val freshType = internal.reificationSupport.freshTypeName _
 
   /** Remove all [[Type]] annotations from this [[Tree]]. */
-  // FIXME: Replace with c.untypecheck once https://issues.scala-lang.org/browse/SI-5464 resolved.
+  // FIXME: Replace with c.untypecheck once https://issues.scala-lang.org/browse/SI-5464 resolved
   val unTypeCheck = showCode(_: Tree, printRootPkg = true) ->> parse
 
   /** Alias for `typeCheck compose unTypeCheck`. */
@@ -69,6 +50,17 @@ trait ReflectUtil {
 
   /** Alias for `typeCheck compose parse`. */
   val parseCheck = typeCheck _ compose parse
+
+  /**
+   * Create a synthetic non-initialized value definition. Most convenient to use as a [[Function]]
+   * argument or a method parameter.
+   *
+   * @param name The [[Name]] of the new [[ValDef]]
+   * @param tpt The [[Type]] of the new [[ValDef]]
+   * @return A new [[ValDef]] according to the provided specification
+   */
+  def valDef(name: TermName, tpt: Tree): ValDef =
+    ValDef(Modifiers(Flag.SYNTHETIC), name, tpt, EmptyTree)
 
   /** Syntactic sugar for [[Tree]]s. */
   class TreeOps(self: Tree) {
@@ -138,7 +130,7 @@ trait ReflectUtil {
       case bl: Block => // { ... }
         bl.children.foldLeft(Set.empty[TermName], Set.empty[TermName]) {
           case ((bound, free), vd: ValDef) => // { val name = ... }
-            val defined = if (isLazy(vd)) bound + vd.name else bound
+            val defined = if (vd.isLazy) bound + vd.name else bound
             (bound + vd.name, free union vd.closure diff defined)
 
           case ((bound, free), child) => // default
@@ -269,7 +261,7 @@ trait ReflectUtil {
 
         // { ... lazy val name = ... }
         case bl: Block if bl.children exists {
-          case vd @ ValDef(_, `key`, _, _) => isLazy(vd)
+          case vd @ ValDef(_, `key`, _, _) => vd.isLazy
           case _ => false
         } => bl
 
@@ -336,6 +328,19 @@ trait ReflectUtil {
       val varSet = vars.map { _.name }.toSet
       transform { case Ident(name: TermName) if varSet(name) => Ident(name) }
     }
+  }
+
+  /** Syntax sugar for [[ValDef]]s. */
+  implicit class ValDefOps(self: ValDef) {
+
+    /** @return `true` if the value definition is lazy, `false` otherwise */
+    def isLazy: Boolean = self.mods hasFlag Flag.LAZY
+
+    /** @return `true` if the value definition is implicit, `false` otherwise */
+    def isImplicit: Boolean = self.mods hasFlag Flag.IMPLICIT
+
+    /** @return This [[ValDef]] without a [[Symbol]] and a `rhs` */
+    def reset: ValDef = ValDef(self.mods, self.name, self.tpt, EmptyTree)
   }
 
   /** Syntax sugar for [[Type]]s. */
