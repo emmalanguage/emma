@@ -42,12 +42,12 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine with Program
     override protected def guard(m: RuleMatch) = true
 
     override protected def fire(m: RuleMatch) = {
-      val name = m.generator.lhs
+      val name = m.generator.lhs.name
       val term = m.child.hd.asInstanceOf[ScalaExpr]
       val rest = m.parent
         .span { _ != m.generator }._2.tail // trim prefix
         .span { x => !x.isInstanceOf[Generator] ||
-          x.as[Generator].lhs.toString != m.generator.toString
+          x.as[Generator].lhs.fullName != m.generator.toString
         }._1 // trim suffix
 
       val (xs, ys) = m.parent.qualifiers span { _ != m.generator }
@@ -192,7 +192,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine with Program
 
     override protected def fire(m: RuleMatch) = {
       val x      = freshName("x$")
-      val head   = m.map.hd.as[ScalaExpr].tree.rename(m.child.lhs, x)
+      val head   = m.map.hd.as[ScalaExpr].tree.rename(m.child.lhs.name, x)
       val oldSng = m.fold.sng.as[Function]
       val newSng = q"""($x: ${m.child.tpe}) => {
         ${oldSng.body.substitute(oldSng.vparams.head.name, head)}

@@ -40,23 +40,23 @@ class AlternatingLeastSquares2(
     val outputFormat = new CSVOutputFormat[Rating]
 
     val ratings = for { // read input and gather all ratings
-      gr <- read(input, inputFormat) groupBy { _.identity }
+      g <- read(input, inputFormat) groupBy { _.identity }
     } yield {
-      val avg = gr.values.map(_.value).sum() / gr.values.count()
-      Rating(gr.key._1, gr.key._2, avg)
+      val avg = g.values.map(_.value).sum() / g.values.count()
+      Rating(g.key._1, g.key._2, avg)
     }
 
     // initialize users partition
-    var users = for (gu <- ratings groupBy { _.user })
-      yield Vertex(gu.key, gu.values.count(), V0)
+    var users = for (g <- ratings groupBy { _.user })
+      yield Vertex(g.key, g.values.count(), V0)
 
     // initialize items partition
-    var items = for (gi <- ratings groupBy { _.item }) yield {
-      val rnd = new Random(gi.key.hashCode)
-      val cnt = gi.values.count()
-      val avg = gi.values.map(_.value).sum() / cnt
+    var items = for (g <- ratings groupBy { _.item }) yield {
+      val rnd = new Random(g.key.hashCode)
+      val cnt = g.values.count()
+      val avg = g.values.map(_.value).sum() / cnt
       val Fi  = Vector.iterate(avg, _features) { _ => rnd.nextDouble() }
-      Vertex(gi.key, cnt, Fi)
+      Vertex(g.key, cnt, Fi)
     }
 
     // initialize dummy messages
@@ -75,12 +75,12 @@ class AlternatingLeastSquares2(
       } yield Message(user.id, user.degree, item.F, rating.value)
 
       users = for { // update state of users
-        gum <- messages groupBy { m => m.dst -> m.degree }
+        g <- messages groupBy { m => m.dst -> m.degree }
       } yield { // calculate new feature vector
-        val Vu = gum.values.fold[Vec](V0, m => m.F * m.rating, _ + _)
-        val Au = gum.values.fold[Mat](M0, m => m.F outer m.F,  _ + _)
-        val Eu = E * (_lambda * gum.key._2)
-        Vertex(gum.key._1, gum.key._2, (Au + Eu) invMul Vu)
+        val Vu = g.values.fold[Vec](V0, m => m.F * m.rating, _ + _)
+        val Au = g.values.fold[Mat](M0, m => m.F outer m.F,  _ + _)
+        val Eu = E * (_lambda * g.key._2)
+        Vertex(g.key._1, g.key._2, (Au + Eu) invMul Vu)
       }
 
       messages = for { // derive preferences
@@ -92,12 +92,12 @@ class AlternatingLeastSquares2(
       } yield Message(item.id, item.degree, user.F, rating.value)
 
       items = for { // update state of users
-        gim <- messages groupBy { m => m.dst -> m.degree }
+        g <- messages groupBy { m => m.dst -> m.degree }
       } yield { // calculate new feature vector
-        val Vi = gim.values.fold[Vec](V0, m => m.F * m.rating, _ + _)
-        val Ai = gim.values.fold[Mat](M0, m => m.F outer m.F,  _ + _)
-        val Ei = E * (_lambda * gim.key._2)
-        Vertex(gim.key._1, gim.key._2, (Ai + Ei) invMul Vi)
+        val Vi = g.values.fold[Vec](V0, m => m.F * m.rating, _ + _)
+        val Ai = g.values.fold[Mat](M0, m => m.F outer m.F,  _ + _)
+        val Ei = E * (_lambda * g.key._2)
+        Vertex(g.key._1, g.key._2, (Ai + Ei) invMul Vi)
       }
     }
 

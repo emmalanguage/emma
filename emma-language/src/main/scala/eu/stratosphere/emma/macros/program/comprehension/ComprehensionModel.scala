@@ -113,8 +113,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
     def descend[U](f: Expression => U) = expr foreach f
   }
 
-  // TODO: Modify to work with Symbols instead of TermNames
-  case class Generator(lhs: TermName, var rhs: Expression) extends Qualifier {
+  case class Generator(lhs: TermSymbol, var rhs: Expression) extends Qualifier {
     def tpe = rhs.elementType
     def descend[U](f: Expression => U) = rhs foreach f
   }
@@ -128,7 +127,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
     def descend[U](f: Expression => U) = ()
 
     /** @return All `vars` referenced in the expression `tree` */
-    def usedVars = {
+    def usedVars: List[Variable] = {
       // collect the term names
       val names = tree.collect { case Ident(name: TermName) => name }.toSet
       for (v <- vars if names(v.name)) yield v
@@ -449,7 +448,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         s"${pp(expr)}"
 
       case Generator(lhs, rhs) =>
-        s"$lhs ← ${pp(rhs, offset + " " * 3 + " " * lhs.toString.length)}"
+        s"${lhs.name} ← ${pp(rhs, offset + " " * 3 + " " * lhs.fullName.length)}"
 
       // Environment & Host Language Connectors
       case ScalaExpr(_, expr) =>

@@ -185,7 +185,7 @@ private[emma] trait ComprehensionAnalysis
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(fn@Function(List(arg), body))) if select.symbol == api.map =>
         val v = Variable(arg.name, arg.tpt)
 
-        val bind = Generator(arg.name, comprehend(vars)(in))
+        val bind = Generator(arg.term, comprehend(vars)(in))
         val head = comprehend(v :: vars)(body, input = false)
 
         Comprehension(head, bind :: Nil)
@@ -194,7 +194,7 @@ private[emma] trait ComprehensionAnalysis
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(fn@Function(List(arg), body))) if select.symbol == api.flatMap =>
         val v = Variable(arg.name, arg.tpt)
 
-        val bind = Generator(arg.name, comprehend(vars)(in))
+        val bind = Generator(arg.term, comprehend(vars)(in))
         val head = comprehend(v :: vars)(body, input = false)
 
         MonadJoin(Comprehension(head, bind :: Nil))
@@ -203,7 +203,7 @@ private[emma] trait ComprehensionAnalysis
       case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.withFilter =>
         val v = Variable(arg.name, arg.tpt)
 
-        val bind = Generator(arg.name, comprehend(vars)(in))
+        val bind = Generator(arg.term, comprehend(vars)(in))
         val filter = Filter(comprehend(v :: vars)(body))
         val head = comprehend(v :: vars)(q"${arg.name}", input = false)
 
@@ -317,7 +317,7 @@ private[emma] trait ComprehensionAnalysis
     // compute a flattened list of all expressions in the comprehensionView
     val allExpressions = comprehensionView.terms flatMap { _.comprehension.expr }
 
-    for (groupValDef <- groupValDefs; (generator, group) <- generatorFor(groupValDef.name, allExpressions)) {
+    for (groupValDef <- groupValDefs; (generator, group) <- generatorFor(groupValDef.term, allExpressions)) {
       // the symbol associated with 'g'
       val groupSymbol = groupValDef.symbol
 
@@ -617,7 +617,7 @@ private[emma] trait ComprehensionAnalysis
     case _ => false
   }
 
-  private def generatorFor(name: TermName, allExpressions: Seq[Expression]) = allExpressions.collectFirst({
+  private def generatorFor(name: TermSymbol, allExpressions: Seq[Expression]) = allExpressions.collectFirst({
     case generator@Generator(lhs, group@combinator.Group(_, _)) if lhs == name => (generator, group)
   })
 

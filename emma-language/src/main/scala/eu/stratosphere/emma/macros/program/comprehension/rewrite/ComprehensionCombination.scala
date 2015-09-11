@@ -4,6 +4,7 @@ import eu.stratosphere.emma.macros.program.util.ProgramUtils
 
 trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUtils {
   import universe._
+  import c.internal._
 
   def combine(root: ExpressionRoot) = {
     // states for the state machine
@@ -74,7 +75,8 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUt
     override protected def guard(m: RuleMatch) = {
       // TODO: add support for comprehension filter expressions
       m.filter.expr match {
-        case expr: ScalaExpr => expr.usedVars.size == 1 && expr.usedVars.head.name == m.generator.lhs
+        case expr: ScalaExpr => expr.usedVars.size == 1 &&
+          expr.usedVars.head.name == m.generator.lhs.name
         case _ => false
       }
     }
@@ -200,18 +202,19 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUt
       val join = combinator.EquiJoin(m.keyx, m.keyy, m.xs.rhs, m.ys.rhs)
 
       // bind join result to a fresh variable
-      val v = Variable(TermName(c.freshName("x")), tq"(${m.keyx.vparams.head.tpt}, ${m.keyy.vparams.head.tpt})")
-      m.parent.qualifiers = prefix ++ List(Generator(v.name, join)) ++ suffix.tail.tail.filter(_ != m.filter)
+      val v   = Variable(TermName(c.freshName("x")), tq"(${m.keyx.vparams.head.tpt}, ${m.keyy.vparams.head.tpt})")
+      val sym = newFreeTerm(v.name.toString, ())
+      m.parent.qualifiers = prefix ++ List(Generator(sym, join)) ++ suffix.tail.tail.filter(_ != m.filter)
 
       // substitute [v._1/x] in affected expressions
       for (e <- m.parent collect {
-        case e @ ScalaExpr(vars, expr) if vars map { _.name } contains m.xs.lhs => e
-      }) e.substitute(m.xs.lhs, ScalaExpr(v :: Nil, q"${v.name}._1"))
+        case e @ ScalaExpr(vars, expr) if vars map { _.name } contains m.xs.lhs.name => e
+      }) e.substitute(m.xs.lhs.name, ScalaExpr(v :: Nil, q"${v.name}._1"))
 
       // substitute [v._2/y] in affected expressions
       for (e <- m.parent collect {
-        case e @ ScalaExpr(vars, expr) if vars map { _.name } contains m.ys.lhs => e
-      }) e.substitute(m.ys.lhs, ScalaExpr(v :: Nil, q"${v.name}._2"))
+        case e @ ScalaExpr(vars, expr) if vars map { _.name } contains m.ys.lhs.name => e
+      }) e.substitute(m.ys.lhs.name, ScalaExpr(v :: Nil, q"${v.name}._2"))
 
       // return the modified parent
       m.parent
@@ -238,17 +241,17 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUt
 
           if (lhsUsedVars.size != 1 || rhsUsedVars.size != 1) {
             None // both `lhs` and `rhs` must refer to exactly one variable
-          } else if (lhsUsedVars.map(_.name).contains(xs.lhs) && rhsUsedVars.map(_.name).contains(ys.lhs)) {
+          } else if (lhsUsedVars.map(_.name).contains(xs.lhs.name) && rhsUsedVars.map(_.name).contains(ys.lhs.name)) {
             // filter expression has the type `f(xs.lhs) == h(ys.lhs)`
-            val vx = lhsUsedVars.find(v => v.name == xs.lhs).get
-            val vy = rhsUsedVars.find(v => v.name == ys.lhs).get
+            val vx = lhsUsedVars.find(v => v.name == xs.lhs.name).get
+            val vy = rhsUsedVars.find(v => v.name == ys.lhs.name).get
             val keyx = c.typecheck(q"(${vx.name}: ${vx.tpt}) => ${freeEnv(p.vars)(lhs)}").asInstanceOf[Function]
             val keyy = c.typecheck(q"(${vy.name}: ${vy.tpt}) => ${freeEnv(p.vars)(rhs)}").asInstanceOf[Function]
             Some((keyx, keyy))
-          } else if (lhsUsedVars.map(_.name).contains(ys.lhs) && rhsUsedVars.map(_.name).contains(xs.lhs)) {
+          } else if (lhsUsedVars.map(_.name).contains(ys.lhs.name) && rhsUsedVars.map(_.name).contains(xs.lhs.name)) {
             // filter expression has the type `f(ys.lhs) == h(xs.lhs)`
-            val vx = rhsUsedVars.find(v => v.name == xs.lhs).get
-            val vy = lhsUsedVars.find(v => v.name == ys.lhs).get
+            val vx = rhsUsedVars.find(v => v.name == xs.lhs.name).get
+            val vy = lhsUsedVars.find(v => v.name == ys.lhs.name).get
             val keyx = c.typecheck(q"(${vx.name}: ${vx.tpt}) => ${freeEnv(p.vars)(rhs)}").asInstanceOf[Function]
             val keyy = c.typecheck(q"(${vy.name}: ${vy.tpt}) => ${freeEnv(p.vars)(lhs)}").asInstanceOf[Function]
             Some((keyx, keyy))
@@ -302,18 +305,19 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUt
       val cross = combinator.Cross(m.xs.rhs, m.ys.rhs)
 
       // bind join result to a fresh variable
-      val v = Variable(TermName(c.freshName("x")), tq"(${m.xs.tpe}, ${m.ys.tpe})")
-      m.parent.qualifiers = prefix ++ List(Generator(v.name, cross)) ++ suffix.tail.tail
+      val v   = Variable(TermName(c.freshName("x")), tq"(${m.xs.tpe}, ${m.ys.tpe})")
+      val sym = newFreeTerm(v.name.toString, ())
+      m.parent.qualifiers = prefix ++ List(Generator(sym, cross)) ++ suffix.tail.tail
 
       // substitute [v._1/x] in affected expressions
       for (e <- m.parent collect {
-        case e @ ScalaExpr(vars, expr) if vars map { _.name } contains m.xs.lhs => e
-      }) e.substitute(m.xs.lhs, ScalaExpr(v :: Nil, q"${v.name}._1"))
+        case e @ ScalaExpr(vars, expr) if vars map { _.name } contains m.xs.lhs.name => e
+      }) e.substitute(m.xs.lhs.name, ScalaExpr(v :: Nil, q"${v.name}._1"))
 
       // substitute [v._2/y] in affected expressions
       for (e <- m.parent collect {
-        case e @ ScalaExpr(vars, expr) if vars map { _.name } contains m.ys.lhs => e
-      }) e.substitute(m.ys.lhs, ScalaExpr(v :: Nil, q"${v.name}._2"))
+        case e @ ScalaExpr(vars, expr) if vars map { _.name } contains m.ys.lhs.name => e
+      }) e.substitute(m.ys.lhs.name, ScalaExpr(v :: Nil, q"${v.name}._2"))
 
       // return the modified parent
       m.parent
