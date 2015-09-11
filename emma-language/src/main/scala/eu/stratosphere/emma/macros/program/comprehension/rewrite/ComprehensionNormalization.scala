@@ -43,13 +43,15 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine with Program
 
     override protected def fire(m: RuleMatch) = {
       val name = m.generator.lhs
-      val term = m.child.head.asInstanceOf[ScalaExpr]
-      val rest = m.parent.sequence()
-        .span(_ != m.generator)._2.tail // trim prefix
-        .span(x => !x.isInstanceOf[Generator] || x.asInstanceOf[Generator].lhs.toString != m.generator.toString)._1 // trim suffix
+      val term = m.child.hd.asInstanceOf[ScalaExpr]
+      val rest = m.parent
+        .span { _ != m.generator }._2.tail // trim prefix
+        .span { x => !x.isInstanceOf[Generator] ||
+          x.as[Generator].lhs.toString != m.generator.toString
+        }._1 // trim suffix
 
-      val (xs, ys) = m.parent.qualifiers.span(_ != m.generator)
-      m.parent.qualifiers = xs ++ m.child.qualifiers ++ ys.tail
+      val (xs, ys) = m.parent.qualifiers span { _ != m.generator }
+      m.parent.qualifiers = xs ::: m.child.qualifiers ::: ys.tail
 
       for (e <- rest if e.isInstanceOf[ScalaExpr])
         e.as[ScalaExpr].substitute(name, term)
@@ -85,7 +87,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine with Program
 
     override protected def fire(m: RuleMatch) = {
       m.parent.qualifiers = m.parent.qualifiers ++ m.child.qualifiers
-      m.parent.head = m.child.head
+      m.parent.hd = m.child.hd
 
       // return new root
       m.parent
@@ -190,7 +192,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine with Program
 
     override protected def fire(m: RuleMatch) = {
       val x      = freshName("x$")
-      val head   = m.map.head.as[ScalaExpr].tree.rename(m.child.lhs, x)
+      val head   = m.map.hd.as[ScalaExpr].tree.rename(m.child.lhs, x)
       val oldSng = m.fold.sng.as[Function]
       val newSng = q"""($x: ${m.child.tpe}) => {
         ${oldSng.body.substitute(oldSng.vparams.head.name, head)}

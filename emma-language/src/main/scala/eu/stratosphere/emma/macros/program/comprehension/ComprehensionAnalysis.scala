@@ -255,7 +255,7 @@ private[emma] trait ComprehensionAnalysis
 
       // interpret as boxed Scala expression (default)
       case _ =>
-        ScalaExpr(vars, typechecked(vars, t)) // trees created by the caller with q"..." have to be explicitly typechecked
+        ScalaExpr(vars, typeCheckWith(vars, t)) // trees created by the caller with q"..." have to be explicitly typechecked
     }
   }
 
@@ -315,7 +315,7 @@ private[emma] trait ComprehensionAnalysis
     })
 
     // compute a flattened list of all expressions in the comprehensionView
-    val allExpressions = comprehensionView.terms.map(_.comprehension.expr.sequence()).flatten
+    val allExpressions = comprehensionView.terms flatMap { _.comprehension.expr }
 
     for (groupValDef <- groupValDefs; (generator, group) <- generatorFor(groupValDef.name, allExpressions)) {
       // the symbol associated with 'g'
@@ -348,22 +348,22 @@ private[emma] trait ComprehensionAnalysis
 
             if (enclosedComrehendedFolds.nonEmpty) {
               expr.vars = expr.vars.map(v => if (v.name == groupValDef.name) Variable(groupValDef.name, tq"${generator.rhs.tpe.typeArgs.head}") else v)
-              expr.tree = typechecked(expr.vars, new FoldTermsReplacer(enclosedComrehendedFolds, q"${groupValDef.name}.values").transform(expr.tree))
+              expr.tree = typeCheckWith(expr.vars, new FoldTermsReplacer(enclosedComrehendedFolds, q"${groupValDef.name}.values").transform(expr.tree))
             }
           // adapt comprehensions that contain the fold as a head
           case expr@Comprehension(fold: combinator.Fold, _) if foldExpressions.contains(fold) =>
             // find all value selects with associated enclosed in this ScalaExpr
             val enclosedComrehendedFolds = Map(fold.origin -> foldToIndex(fold.origin))
             val newHeadVars = List(Variable(groupValDef.name, tq"${generator.rhs.tpe.typeArgs.head}"))
-            val newHeadTree = typechecked(newHeadVars, new FoldTermsReplacer(enclosedComrehendedFolds, q"${groupValDef.name}.values").transform(fold.origin))
-            expr.head = ScalaExpr(newHeadVars, newHeadTree)
+            val newHeadTree = typeCheckWith(newHeadVars, new FoldTermsReplacer(enclosedComrehendedFolds, q"${groupValDef.name}.values").transform(fold.origin))
+            expr.hd = ScalaExpr(newHeadVars, newHeadTree)
 
           // adapt comprehensions that contain the fold as a filter
           case expr@Filter(fold: combinator.Fold) if foldExpressions.contains(fold) =>
             // find all value selects with associated enclosed in this ScalaExpr
             val enclosedComrehendedFolds = Map(fold.origin -> foldToIndex(fold.origin))
             val newHeadVars = List(Variable(groupValDef.name, tq"${generator.rhs.tpe.typeArgs.head}"))
-            val newHeadTree = typechecked(newHeadVars, new FoldTermsReplacer(enclosedComrehendedFolds, q"${groupValDef.name}.values").transform(fold.origin))
+            val newHeadTree = typeCheckWith(newHeadVars, new FoldTermsReplacer(enclosedComrehendedFolds, q"${groupValDef.name}.values").transform(fold.origin))
             expr.expr = ScalaExpr(newHeadVars, newHeadTree)
           // ignore the rest
           case _ =>
