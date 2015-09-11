@@ -45,11 +45,6 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       prettyPrint(expr)
   }
 
-  // TODO: Could be replaced with ValDef
-  case class Variable(name: TermName, tpt: Tree) {
-    def tpe = tpt.trueType
-  }
-
   sealed trait Expression extends Traversable[Expression] {
 
     /** @return The [[Type]] of this [[Expression]] */
@@ -120,14 +115,14 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
   // Environment & Host Language Connectors
 
-  case class ScalaExpr(var vars: List[Variable], var tree: Tree) extends Expression {
+  case class ScalaExpr(var vars: List[ValDef], var tree: Tree) extends Expression {
 
     def tpe = tree.trueType
 
     def descend[U](f: Expression => U) = ()
 
     /** @return All `vars` referenced in the expression `tree` */
-    def usedVars: List[Variable] = {
+    def usedVars: List[ValDef] = {
       // collect the term names
       val names = tree.collect { case Ident(name: TermName) => name }.toSet
       for (v <- vars if names(v.name)) yield v
@@ -372,14 +367,14 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
   // --------------------------------------------------------------------------
 
   /**
-   * Type-check a [[Tree]] given a set of environment [[Variable]]s as a closure. Performed only if
+   * Type-check a [[Tree]] given a set of environment [[ValDef]]s as a closure. Performed only if
    * the [[Tree]] hasn't already been type-checked.
    *
-   * @param env A [[List]] of [[Variable]]s that can be free in the [[Tree]]
+   * @param env A [[List]] of [[ValDef]]s that can be free in the [[Tree]]
    * @param tree The [[Tree]] to be type-checked
    * @return A type-checked version of the [[Tree]]
    */
-  def typeCheckWith(env: List[Variable], tree: Tree) =
+  def typeCheckWith(env: List[ValDef], tree: Tree) =
     if (tree.hasType) tree
     else {
       val bindings = for (v <- env.reverse) yield v.name -> q"null.asInstanceOf[${v.tpt}]"

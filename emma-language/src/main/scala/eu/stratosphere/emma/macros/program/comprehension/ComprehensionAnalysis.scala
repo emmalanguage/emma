@@ -166,7 +166,7 @@ private[emma] trait ComprehensionAnalysis
    * @param tree The tree to be lifted
    * @return A lifted, MC syntax version of the given tree
    */
-  private def comprehend(vars: List[Variable])(tree: Tree, input: Boolean = true): Expression = {
+  private def comprehend(vars: List[ValDef])(tree: Tree, input: Boolean = true): Expression = {
 
     // ignore a top-level Typed node (side-effect of the Algebra inlining macros)
     val t = tree match {
@@ -183,29 +183,23 @@ private[emma] trait ComprehensionAnalysis
 
       // in.map(fn)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(fn@Function(List(arg), body))) if select.symbol == api.map =>
-        val v = Variable(arg.name, arg.tpt)
-
         val bind = Generator(arg.term, comprehend(vars)(in))
-        val head = comprehend(v :: vars)(body, input = false)
+        val head = comprehend(arg :: vars)(body, input = false)
 
         Comprehension(head, bind :: Nil)
 
       // in.flatMap(fn)
       case Apply(TypeApply(select@Select(in, _), List(tpt)), List(fn@Function(List(arg), body))) if select.symbol == api.flatMap =>
-        val v = Variable(arg.name, arg.tpt)
-
         val bind = Generator(arg.term, comprehend(vars)(in))
-        val head = comprehend(v :: vars)(body, input = false)
+        val head = comprehend(arg :: vars)(body, input = false)
 
         MonadJoin(Comprehension(head, bind :: Nil))
 
       // in.withFilter(fn)
       case Apply(select@Select(in, _), List(fn@Function(List(arg), body))) if select.symbol == api.withFilter =>
-        val v = Variable(arg.name, arg.tpt)
-
         val bind = Generator(arg.term, comprehend(vars)(in))
-        val filter = Filter(comprehend(v :: vars)(body))
-        val head = comprehend(v :: vars)(q"${arg.name}", input = false)
+        val filter = Filter(comprehend(arg :: vars)(body))
+        val head = comprehend(arg :: vars)(q"${arg.name}", input = false)
 
         Comprehension(head, bind :: filter :: Nil)
 
@@ -347,14 +341,14 @@ private[emma] trait ComprehensionAnalysis
             }): _*)
 
             if (enclosedComrehendedFolds.nonEmpty) {
-              expr.vars = expr.vars.map(v => if (v.name == groupValDef.name) Variable(groupValDef.name, tq"${generator.rhs.tpe.typeArgs.head}") else v)
+              expr.vars = expr.vars.map(v => if (v.name == groupValDef.name) ValDef(Modifiers(), groupValDef.name, tq"${generator.rhs.tpe.typeArgs.head}", EmptyTree) else v)
               expr.tree = typeCheckWith(expr.vars, new FoldTermsReplacer(enclosedComrehendedFolds, q"${groupValDef.name}.values").transform(expr.tree))
             }
           // adapt comprehensions that contain the fold as a head
           case expr@Comprehension(fold: combinator.Fold, _) if foldExpressions.contains(fold) =>
             // find all value selects with associated enclosed in this ScalaExpr
             val enclosedComrehendedFolds = Map(fold.origin -> foldToIndex(fold.origin))
-            val newHeadVars = List(Variable(groupValDef.name, tq"${generator.rhs.tpe.typeArgs.head}"))
+            val newHeadVars = List(ValDef(Modifiers(), groupValDef.name, tq"${generator.rhs.tpe.typeArgs.head}", EmptyTree))
             val newHeadTree = typeCheckWith(newHeadVars, new FoldTermsReplacer(enclosedComrehendedFolds, q"${groupValDef.name}.values").transform(fold.origin))
             expr.hd = ScalaExpr(newHeadVars, newHeadTree)
 
@@ -362,7 +356,7 @@ private[emma] trait ComprehensionAnalysis
           case expr@Filter(fold: combinator.Fold) if foldExpressions.contains(fold) =>
             // find all value selects with associated enclosed in this ScalaExpr
             val enclosedComrehendedFolds = Map(fold.origin -> foldToIndex(fold.origin))
-            val newHeadVars = List(Variable(groupValDef.name, tq"${generator.rhs.tpe.typeArgs.head}"))
+            val newHeadVars = List(ValDef(Modifiers(), groupValDef.name, tq"${generator.rhs.tpe.typeArgs.head}", EmptyTree))
             val newHeadTree = typeCheckWith(newHeadVars, new FoldTermsReplacer(enclosedComrehendedFolds, q"${groupValDef.name}.values").transform(fold.origin))
             expr.expr = ScalaExpr(newHeadVars, newHeadTree)
           // ignore the rest

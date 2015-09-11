@@ -1,8 +1,6 @@
 package eu.stratosphere.emma.macros.program.comprehension.rewrite
 
-import eu.stratosphere.emma.macros.program.util.ProgramUtils
-
-trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUtils {
+trait ComprehensionCombination extends ComprehensionRewriteEngine {
   import universe._
   import c.internal._
 
@@ -86,7 +84,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUt
       m.filter.expr match {
         case filter@ScalaExpr(vars, tree) =>
           val x = filter.usedVars.head
-          val p = c.typecheck(q"(${x.name}: ${x.tpt}) => ${freeEnv(vars)(tree)}")
+          val p = c.typecheck(q"(${x.name}: ${x.tpt}) => ${tree.freeEnv(vars: _*)}")
           m.generator.rhs = combinator.Filter(p, m.generator.rhs)
           m.root.qualifiers = m.root.qualifiers.filter(_ != m.filter)
           // return new parent
@@ -120,7 +118,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUt
     override protected def guard(m: RuleMatch) = m.head.usedVars.size == 1
 
     override protected def fire(m: RuleMatch) = {
-      val f = c.typecheck(q"(..${for (v <- m.head.vars.reverse) yield q"val ${v.name}: ${v.tpt}"}) => ${freeEnv(m.head.vars)(m.head.tree)}")
+      val f = c.typecheck(q"(..${for (v <- m.head.vars.reverse) yield q"val ${v.name}: ${v.tpt}"}) => ${m.head.tree.freeEnv(m.head.vars: _*)}")
       combinator.Map(f, m.child.rhs)
     }
   }
@@ -148,7 +146,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUt
     override protected def guard(m: RuleMatch) = m.head.usedVars.size == 1
 
     override protected def fire(m: RuleMatch) = {
-      val f = c.typecheck(q"(..${for (v <- m.head.vars.reverse) yield q"val ${v.name}: ${v.tpt}"}) => ${freeEnv(m.head.vars)(m.head.tree)}")
+      val f = c.typecheck(q"(..${for (v <- m.head.vars.reverse) yield q"val ${v.name}: ${v.tpt}"}) => ${m.head.tree.freeEnv(m.head.vars: _*)}")
       combinator.FlatMap(f, m.child.rhs)
     }
   }
@@ -202,7 +200,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUt
       val join = combinator.EquiJoin(m.keyx, m.keyy, m.xs.rhs, m.ys.rhs)
 
       // bind join result to a fresh variable
-      val v   = Variable(TermName(c.freshName("x")), tq"(${m.keyx.vparams.head.tpt}, ${m.keyy.vparams.head.tpt})")
+      val v   = ValDef(Modifiers(Flag.SYNTHETIC), freshName("x$"), tq"(${m.keyx.vparams.head.tpt}, ${m.keyy.vparams.head.tpt})", EmptyTree)
       val sym = newFreeTerm(v.name.toString, ())
       m.parent.qualifiers = prefix ++ List(Generator(sym, join)) ++ suffix.tail.tail.filter(_ != m.filter)
 
@@ -245,15 +243,15 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUt
             // filter expression has the type `f(xs.lhs) == h(ys.lhs)`
             val vx = lhsUsedVars.find(v => v.name == xs.lhs.name).get
             val vy = rhsUsedVars.find(v => v.name == ys.lhs.name).get
-            val keyx = c.typecheck(q"(${vx.name}: ${vx.tpt}) => ${freeEnv(p.vars)(lhs)}").asInstanceOf[Function]
-            val keyy = c.typecheck(q"(${vy.name}: ${vy.tpt}) => ${freeEnv(p.vars)(rhs)}").asInstanceOf[Function]
+            val keyx = c.typecheck(q"(${vx.name}: ${vx.tpt}) => ${lhs.freeEnv(p.vars: _*)}").as[Function]
+            val keyy = c.typecheck(q"(${vy.name}: ${vy.tpt}) => ${rhs.freeEnv(p.vars: _*)}").as[Function]
             Some((keyx, keyy))
           } else if (lhsUsedVars.map(_.name).contains(ys.lhs.name) && rhsUsedVars.map(_.name).contains(xs.lhs.name)) {
             // filter expression has the type `f(ys.lhs) == h(xs.lhs)`
             val vx = rhsUsedVars.find(v => v.name == xs.lhs.name).get
             val vy = lhsUsedVars.find(v => v.name == ys.lhs.name).get
-            val keyx = c.typecheck(q"(${vx.name}: ${vx.tpt}) => ${freeEnv(p.vars)(rhs)}").asInstanceOf[Function]
-            val keyy = c.typecheck(q"(${vy.name}: ${vy.tpt}) => ${freeEnv(p.vars)(lhs)}").asInstanceOf[Function]
+            val keyx = c.typecheck(q"(${vx.name}: ${vx.tpt}) => ${rhs.freeEnv(p.vars: _*)}").as[Function]
+            val keyy = c.typecheck(q"(${vy.name}: ${vy.tpt}) => ${lhs.freeEnv(p.vars: _*)}").as[Function]
             Some((keyx, keyy))
           } else {
             None // something else
@@ -305,7 +303,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine with ProgramUt
       val cross = combinator.Cross(m.xs.rhs, m.ys.rhs)
 
       // bind join result to a fresh variable
-      val v   = Variable(TermName(c.freshName("x")), tq"(${m.xs.tpe}, ${m.ys.tpe})")
+      val v   = ValDef(Modifiers(Flag.SYNTHETIC), freshName("x$"), tq"(${m.xs.tpe}, ${m.ys.tpe})", EmptyTree)
       val sym = newFreeTerm(v.name.toString, ())
       m.parent.qualifiers = prefix ++ List(Generator(sym, cross)) ++ suffix.tail.tail
 

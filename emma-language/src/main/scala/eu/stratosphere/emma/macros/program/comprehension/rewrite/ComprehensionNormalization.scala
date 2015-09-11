@@ -1,8 +1,6 @@
 package eu.stratosphere.emma.macros.program.comprehension.rewrite
 
-import eu.stratosphere.emma.macros.program.util.ProgramUtils
-
-trait ComprehensionNormalization extends ComprehensionRewriteEngine with ProgramUtils {
+trait ComprehensionNormalization extends ComprehensionRewriteEngine {
   import universe._
 
   def normalize(root: ExpressionRoot) = {

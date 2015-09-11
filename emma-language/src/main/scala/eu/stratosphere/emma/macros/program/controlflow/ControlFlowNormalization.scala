@@ -1,9 +1,9 @@
 package eu.stratosphere.emma.macros.program.controlflow
 
-import eu.stratosphere.emma.macros.program.util.ProgramUtils
+import eu.stratosphere.emma.macros.BlackBoxUtil
 import eu.stratosphere.emma.util.Counter
 
-private[emma] trait ControlFlowNormalization extends ProgramUtils {
+private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
   import universe._
 
   /** Normalize */

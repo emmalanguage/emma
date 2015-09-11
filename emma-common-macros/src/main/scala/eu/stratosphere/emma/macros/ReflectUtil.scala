@@ -263,8 +263,8 @@ trait ReflectUtil {
           vd.refresh(name).substitute(key, value)
 
         // (args: _*) => ...
-        case fn @ Function(args, body) if args map { _.name } contains key => fn
-        case fn @ Function(args, body) if args map { _.name } exists closure =>
+        case fn @ Function(args, _) if args exists { _.name == key } => fn
+        case fn @ Function(args, _) if args exists { arg => closure(arg.name) } =>
           fn.refresh(args map { _.name } filter closure: _*).substitute(key, value)
 
         // { ... lazy val name = ... }
@@ -323,6 +323,18 @@ trait ReflectUtil {
     def inline(valDef: ValDef): Tree = transform {
       case vd: ValDef if vd.symbol == valDef.symbol => q"()"
       case id: Ident  if id.symbol == valDef.symbol => valDef.rhs
+    }
+
+    /**
+     * Create a function that replaces all occurrences of identifiers from the given environment with
+     * fresh identifiers. This can be used to "free" identifiers from their original [[Symbol]]s.
+     *
+     * @param vars An environment consisting of a list of [[ValDef]]s
+     * @return A function that can "free" the environment of a [[Tree]]
+     */
+    def freeEnv(vars: ValDef*): Tree = {
+      val varSet = vars.map { _.name }.toSet
+      transform { case Ident(name: TermName) if varSet(name) => Ident(name) }
     }
   }
 

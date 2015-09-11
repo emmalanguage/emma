@@ -59,7 +59,7 @@ trait BlackBoxUtil extends BlackBox with ReflectUtil {
      * @return This [[Tree]] with all [[Symbol]] owner changed from `prev` to `next`
      */
     def withOwner(prev: Symbol, next: Symbol): Tree =
-      changeOwner(typeChecked, prev, next)
+      changeOwner(self, prev, next)
 
     /**
      * Transform this [[Tree]] while repairing the [[Symbol]] owner chain. After this there should
@@ -73,7 +73,7 @@ trait BlackBoxUtil extends BlackBox with ReflectUtil {
     def typingTransform(pf: (Tree, TypingTransformApi) ~> Tree): Tree =
       c.internal.typingTransform(typeChecked) {
         case x if pf isDefinedAt x => pf(x)
-        case (tree, transform) => transform default tree
+        case (tree, xform) => xform default tree
       }
 
     /**
@@ -89,7 +89,7 @@ trait BlackBoxUtil extends BlackBox with ReflectUtil {
     def typingTransform(owner: Symbol)(pf: (Tree, TypingTransformApi) ~> Tree): Tree =
       c.internal.typingTransform(typeChecked, owner) {
         case x if pf isDefinedAt x => pf(x)
-        case (tree, transform) => transform default tree
+        case (tree, xform) => xform default tree
       }
   }
 }
