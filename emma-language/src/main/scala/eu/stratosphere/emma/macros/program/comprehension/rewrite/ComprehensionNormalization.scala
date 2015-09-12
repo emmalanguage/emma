@@ -1,5 +1,7 @@
 package eu.stratosphere.emma.macros.program.comprehension.rewrite
 
+import scala.util.matching.Regex
+
 trait ComprehensionNormalization extends ComprehensionRewriteEngine {
   import universe._
 
@@ -10,7 +12,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
   }
 
   /**
-   * Unnests a comprehended head in its parent.
+   * Un-nests a comprehended head in its parent.
    *
    * ==Rule Description==
    *
@@ -22,40 +24,35 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
    */
   object UnnestGenerator extends Rule {
 
-    case class RuleMatch(parent: Comprehension, generator: Generator, child: Comprehension)
+    case class RuleMatch(parent: Comprehension, gen: Generator, child: Comprehension)
 
-    override protected def bind(r: Expression) = r match {
-      case parent@Comprehension(_, qualifiers) =>
-        qualifiers.find({
-          case Generator(_, Comprehension(ScalaExpr(_, _), _)) => true
-          case _ => false
-        }) match {
-          case Some(generator@Generator(_, child@Comprehension(ScalaExpr(_, _), _))) => Some(RuleMatch(parent, generator, child))
-          case _ => Option.empty[RuleMatch]
-        }
-      case _ =>
-        Option.empty[RuleMatch]
+    def bind(expr: Expression) = expr match {
+      case parent @ Comprehension(_, qualifiers) => qualifiers collectFirst {
+        case gen @ Generator(_, child @ Comprehension(_: ScalaExpr, _)) =>
+          RuleMatch(parent, gen, child)
+      }
+      
+      case _ => None
     }
 
-    override protected def guard(m: RuleMatch) = true
+    def guard(rm: RuleMatch) = true
 
-    override protected def fire(m: RuleMatch) = {
-      val name = m.generator.lhs.name
-      val term = m.child.hd.asInstanceOf[ScalaExpr]
-      val rest = m.parent
-        .span { _ != m.generator }._2.tail // trim prefix
-        .span { x => !x.isInstanceOf[Generator] ||
-          x.as[Generator].lhs.fullName != m.generator.toString
-        }._1 // trim suffix
+    def fire(rm: RuleMatch) = {
+      val RuleMatch(parent, gen, child) = rm
+      val rest = parent
+        .dropWhile { _ != gen }.tail // trim prefix
+        .takeWhile { expr => !expr.isInstanceOf[Generator] ||
+          expr.as[Generator].lhs.fullName != gen.toString
+        } // trim suffix
 
-      val (xs, ys) = m.parent.qualifiers span { _ != m.generator }
-      m.parent.qualifiers = xs ::: m.child.qualifiers ::: ys.tail
+      val (xs, ys) = parent.qualifiers span { _ != gen }
+      parent.qualifiers = xs ::: child.qualifiers ::: ys.tail
 
-      for (e <- rest if e.isInstanceOf[ScalaExpr])
-        e.as[ScalaExpr].substitute(name, term)
+      for (expr <- rest if expr.isInstanceOf[ScalaExpr])
+        expr.as[ScalaExpr].substitute(gen.lhs.name, child.hd.as[ScalaExpr])
 
       // new parent
-      m.parent
+      rm.parent
     }
   }
 
@@ -74,94 +71,84 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
 
     case class RuleMatch(parent: Comprehension, child: Comprehension)
 
-    override protected def bind(r: Expression) = r match {
-      case MonadJoin(parent@Comprehension(child@Comprehension(_, _), _)) =>
+    def bind(expr: Expression) = expr match {
+      case MonadJoin(parent @ Comprehension(child: Comprehension, _)) =>
         Some(RuleMatch(parent, child))
-      case _ =>
-        Option.empty[RuleMatch]
+      
+      case _ => None
     }
 
-    override protected def guard(m: RuleMatch) = true //FIXME
+    def guard(rm: RuleMatch) = true //FIXME
 
-    override protected def fire(m: RuleMatch) = {
-      m.parent.qualifiers = m.parent.qualifiers ++ m.child.qualifiers
-      m.parent.hd = m.child.hd
-
-      // return new root
-      m.parent
+    def fire(rm: RuleMatch) = {
+      val RuleMatch(parent, child) = rm
+      parent.qualifiers ++= child.qualifiers
+      parent.hd = child.hd
+      parent // return new root
     }
   }
 
   object SimplifyTupleProjection extends Rule {
 
-    val projectionPattern = "_(\\d{1,2})".r
+    val regex = "_(\\d{1,2})".r
 
     case class RuleMatch(expr: ScalaExpr)
 
-    override protected def bind(r: Expression) = r match {
-      case expr@ScalaExpr(_, _) =>
-        Some(RuleMatch(expr))
-      case _ =>
-        Option.empty[RuleMatch]
+    def bind(expr: Expression) = expr match {
+      case expr: ScalaExpr => Some(RuleMatch(expr))
+      case _ => None
     }
 
-    override protected def guard(m: RuleMatch) = containsPattern(m.expr.tree)
+    def guard(rm: RuleMatch) =
+      new PatternMatcher(regex) apply rm.expr.tree
 
-    override protected def fire(m: RuleMatch) = {
-      m.expr.tree = simplify(m.expr.tree)
-
-      // return new root
-      m.expr
+    def fire(rm: RuleMatch) = {
+      rm.expr.tree = new Simplifier(regex) apply rm.expr.tree
+      rm.expr // return new root
     }
 
-    object containsPattern extends Traverser with (Tree => Boolean) {
+    class PatternMatcher(pattern: Regex) extends Traverser with (Tree => Boolean) {
 
       var result = false
 
-      override def traverse(tree: Tree): Unit = tree match {
-        case Select(Apply(TypeApply(Select(tuple@Select(Ident(TermName("scala")), _), TermName("apply")), types), args), TermName(_)) =>
-          val isTupleConstructor = tuple.name.toString.startsWith("Tuple") && tuple.symbol.isModule && tuple.symbol.companion.asClass.baseClasses.contains(symbolOf[Product])
-          val isProjectionMethod = tree.symbol.isMethod && projectionPattern.findFirstIn(tree.symbol.name.toString).isDefined
-          if (isTupleConstructor && isProjectionMethod) {
-            result = true
-          } else {
-            super.traverse(tree)
-          }
-        case _ =>
-          super.traverse(tree)
+      override def traverse(tree: Tree) = tree match {
+        case Select(Apply(TypeApply(Select(tuple @ Select(Ident(TermName("scala")), _), TermName("apply")), _), _), _: TermName)
+          if isProjection(tree, tuple, pattern) => result = true
+          
+        case _ => super.traverse(tree)
       }
 
-      override def apply(tree: Tree): Boolean = {
-        containsPattern.result = false
-        containsPattern.traverse(tree)
-        containsPattern.result
+      def apply(tree: Tree) = {
+        result = false
+        traverse(tree)
+        result
       }
     }
 
-    object simplify extends Transformer with (Tree => Tree) {
+    class Simplifier(pattern: Regex) extends Transformer with (Tree => Tree) {
 
       var result = false
 
-      override def transform(tree: Tree): Tree = tree match {
-        case Select(Apply(TypeApply(Select(tuple@Select(Ident(TermName("scala")), _), TermName("apply")), types), args), TermName(_)) =>
-          val isTupleConstructor = tuple.name.toString.startsWith("Tuple") && tuple.symbol.isModule && tuple.symbol.companion.asClass.baseClasses.contains(symbolOf[Product])
-          val projectionMatch = projectionPattern.findFirstMatchIn(tree.symbol.name.toString)
-          if (isTupleConstructor && tree.symbol.isMethod && projectionMatch.isDefined) {
-            val offset = projectionMatch.get.group(1).toInt
-            if (args.size >= offset && types.size >= offset)
-              q"${args(offset - 1)}"
-            else
-              super.transform(tree)
-          } else {
-            super.transform(tree)
-          }
-        case _ =>
-          super.transform(tree)
+      override def transform(tree: Tree) = tree match {
+        case Select(Apply(TypeApply(Select(tuple @ Select(Ident(TermName("scala")), _), TermName("apply")), types), args), _: TermName)
+          if isProjection(tree, tuple, pattern) =>
+            val offset = pattern.findFirstMatchIn(tree.symbol.fullName).get.group(1).toInt
+            if (args.size >= offset && types.size >= offset) q"${args(offset - 1)}"
+            else super.transform(tree)
+
+        case _ => super.transform(tree)
       }
 
-      override def apply(tree: Tree): Tree = transform(tree)
+      def apply(tree: Tree) =
+        transform(tree)
     }
 
+    private def isProjection(tree: Tree, tuple: Select, pattern: Regex) =
+      tuple.name.toString.startsWith("Tuple") &&
+      tuple.hasSymbol && tuple.symbol.isModule &&
+      tuple.symbol.companion.asClass.baseClasses.contains(symbolOf[Product]) &&
+      tree.hasSymbol && tree.symbol.isMethod &&
+      pattern.findFirstIn(tree.symbol.fullName).isDefined
   }
 
   /**
@@ -176,31 +163,28 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
    * {{{ fold( empty, sng[e[x\z]\x], union[e[x\z]\x, e[y\z]\y], e' ]] ) }}}
    */
   object FoldFusion extends Rule {
+    val c = combinator
 
-    case class RuleMatch(fold: combinator.Fold, map: Comprehension, child: Generator)
+    case class RuleMatch(fold: c.Fold, map: Comprehension, child: Generator)
 
-    override protected def bind(r: Expression) = r match {
-      case fold@combinator.Fold(_, _, _, map@Comprehension(ScalaExpr(_, _), List(child@Generator(_, _))), _) =>
+    def bind(expr: Expression) = expr match {
+      case fold @ c.Fold(_, _, _, map @ Comprehension(_: ScalaExpr, List(child: Generator)), _) =>
         Some(RuleMatch(fold, map, child))
-      case _ =>
-        Option.empty[RuleMatch]
+      
+      case _ => None
     }
 
-    override protected def guard(m: RuleMatch) = true //FIXME
+    def guard(rm: RuleMatch) = true //FIXME
 
-    override protected def fire(m: RuleMatch) = {
-      val x      = freshName("x$")
-      val head   = m.map.hd.as[ScalaExpr].tree.rename(m.child.lhs.name, x)
-      val oldSng = m.fold.sng.as[Function]
-      val newSng = q"""($x: ${m.child.tpe}) => {
-        ${oldSng.body.substitute(oldSng.vparams.head.name, head)}
-      }""".typeChecked
-
-      m.fold.sng = newSng
-      m.fold.xs  = m.child.rhs
-      // return new root
-      m.fold
+    def fire(rm: RuleMatch) = {
+      val RuleMatch(fold, map, child) = rm
+      val x    = freshName("x$")
+      val head = map.hd.as[ScalaExpr].tree.rename(child.lhs.name, x)
+      val sng  = fold.sng.as[Function]
+      val body = sng.body.substitute(sng.vparams.head.name, head)
+      fold.sng = q"($x: ${child.tpe}) => $body".typeChecked
+      fold.xs  = child.rhs
+      fold // return new root
     }
   }
-
 }
