@@ -11,136 +11,187 @@ private[emma] trait ComprehensionCompiler
   import universe._
 
   /**
-   * Compiles a generic driver for a data-parallel runtime.
+   * Compile a generic driver for a data-parallel runtime.
    *
-   * @param tree The original program tree.
-   * @param cfGraph The control flow graph representation of the tree.
-   * @param comprehensionView A view over the comprehended terms in the tree.
-   * @return A tree representing the compiled triver.
+   * @param tree The original program [[Tree]]
+   * @param cfGraph The control flow graph representation of the [[Tree]]
+   * @param compView A view over the comprehended terms in the [[Tree]]
+   * @return A [[Tree]] representing the compiled driver
    */
-  def compile(tree: Tree, cfGraph: CFGraph, comprehensionView: ComprehensionView): Tree =
-    new Compiler(cfGraph, comprehensionView).transform(tree).unTypeChecked
+  def compile(tree: Tree, cfGraph: CFGraph, compView: ComprehensionView): Tree =
+    new Compiler(cfGraph, compView).transform(tree).unTypeChecked
 
-  private class Compiler(cfGraph: CFGraph, comprehensionView: ComprehensionView) extends Transformer {
+  private class Compiler(cfGraph: CFGraph, compView: ComprehensionView) extends Transformer {
 
-    override def transform(tree: Tree): Tree = comprehensionView.getByTerm(tree) match {
-      case Some(t) =>
-        expandComprehensionTerm(tree, cfGraph, comprehensionView)(t)
-      case _ => tree match {
-        case Apply(fn, List(values)) if api.apply.alternatives.contains(fn.symbol) =>
-          expandScatterTerm(transform(values))
-        case _ =>
-          super.transform(tree)
+    override def transform(tree: Tree): Tree = compView getByTerm tree match {
+      case Some(term) => expandComprehension(tree, cfGraph, compView)(term)
+      case None       => tree match {
+        case Apply(fn, values :: Nil) if api.apply.alternatives.contains(fn.symbol) =>
+          expandScatter(transform(values))
+
+        case _ => super.transform(tree)
       }
     }
 
     /**
-     * Expands a local collection constructor as a scatter call to the underlying engine.
+     * Expand a local collection constructor as a scatter call to the underlying engine.
      *
-     * @param values A Seq[T] typed term that provides the values for the local constructor call.
+     * @param values A `Seq[T]` typed term that provides the values for the local constructor call
+     * @return The [[Tree]] of a scatter call to the underlying engine
      */
-    private def expandScatterTerm(values: Tree) = q"engine.scatter($values)"
+    private def expandScatter(values: Tree) = q"engine.scatter($values)"
 
     /**
-     * Expands a comprehended term in the compiled driver.
+     * Expand a comprehended term in the compiled driver.
      *
-     * @param tree The original program tree.
-     * @param cfGraph The control flow graph representation of the tree.
-     * @param comprehensionView A view over the comprehended terms in the tree.
-     * @param t The comprehended term to be expanded.
-     * @return A tree representing the expanded comprehension.
+     * @param tree The original program [[Tree]]
+     * @param cfGraph The control flow graph representation of the [[Tree]]
+     * @param compView A view over the comprehended terms in the [[Tree]]
+     * @param term The comprehended term to be expanded
+     * @return A [[Tree]] representing the expanded comprehension
      */
-    private def expandComprehensionTerm(tree: Tree, cfGraph: CFGraph, comprehensionView: ComprehensionView)(t: ComprehendedTerm) = {
-      // apply combinators to get a purely-functional, logical plan
-      val root = combine(t.comprehension).expr
+    private def expandComprehension(tree: Tree, cfGraph: CFGraph, compView: ComprehensionView)
+        (term: ComprehendedTerm) = {
 
-      // extract the comprehension closure
-      val c = t.comprehension.freeTerms
+      // Apply combinators to get a purely-functional, logical plan
+      val root = combine(term.comprehension).expr
 
-      // get the TermName associated with this comprehended term
-      val name = t.definition.collect({
+      // Extract the comprehension closure
+      val closure = term.comprehension.freeTerms
+
+      // Get the TermName associated with this comprehended term
+      val name = term.definition collect {
         case ValDef(_, n, _, _) => n.encodedName
-      }).getOrElse(t.id.encodedName)
+      } getOrElse term.id.encodedName
 
-      val executeMethod = root match {
-        case combinator.Write(_, _, xs) => TermName("executeWrite")
-        case combinator.Fold(_, _, _, _, _) => TermName("executeFold")
+      val execute = root match {
+        case _: combinator.Write => TermName("executeWrite")
+        case _: combinator.Fold  => TermName("executeFold")
         case _ => TermName("executeTempSink")
       }
 
-      q"""
-      {
-        // required imports
+      q"""{
         import _root_.scala.reflect.runtime.universe._
         import _root_.eu.stratosphere.emma.ir
-
         val __root = ${serialize(root)}
-
-        // execute the plan and return a reference to the result
-        engine.$executeMethod(__root, ${Literal(Constant(name.toString))}, ..${c.map(s => q"${s.name}")})
-      }
-      """
+        engine.$execute(__root, ${name.toString}, ..${for (s <- closure) yield q"${s.name}"})
+      }"""
     }
 
     /**
-     * Serializes a macro-level IR tree as code constructing an equivalent runtime-level IR tree.
+     * Serializes a macro-level IR [[Tree]] as code constructing an equivalent runtime-level IR
+     * [[Tree]].
      *
-     * @param e The expression in IR to be serialized.
-     * @return
+     * @param expr The [[Expression]] in IR to be serialized
+     * @return A [[String]] representation of the [[Expression]]
      */
-    private def serialize(e: Expression): Tree = {
-      e match {
-        case combinator.Read(location, format) =>
-          q"ir.Read($location, $format)"
-        case combinator.Write(location, format, xs) =>
-          q"ir.Write($location, $format, ${serialize(xs)})"
-        case combinator.TempSource(ident) =>
-          q"ir.TempSource($ident)"
-        case combinator.TempSink(name, xs) =>
-          q"ir.TempSink(${name.toString}, ${serialize(xs)})"
-        case combinator.Map(f, xs) =>
-          q"ir.Map[${e.elementType}, ${xs.elementType}](${serialize(f)}, ${serialize(xs)})"
-        case combinator.FlatMap(f, xs) =>
-          q"ir.FlatMap[${e.elementType}, ${xs.elementType}](${serialize(f)}, ${serialize(xs)})"
-        case combinator.Filter(p, xs) =>
-          q"ir.Filter[${e.elementType}](${serialize(p)}, ${serialize(xs)})"
-        case combinator.EquiJoin(keyx, keyy, xs, ys) =>
-          val xsTpe = xs.elementType
-          val ysTpe = ys.elementType
-          q"ir.EquiJoin[${e.elementType}, $xsTpe, $ysTpe](${serialize(keyx)}, ${serialize(keyy)}, ${serialize(c.typecheck(q"(x: $xsTpe, y: $ysTpe) => (x, y)"))}, ${serialize(xs)}, ${serialize(ys)})"
-        case combinator.Cross(xs, ys) =>
-          val xsTpe = xs.elementType
-          val ysTpe = ys.elementType
-          q"ir.Cross[${e.elementType}, $xsTpe, $ysTpe](${serialize(c.typecheck(q"(x: $xsTpe, y: $ysTpe) => (x, y)"))}, ${serialize(xs)}, ${serialize(ys)})"
-        case combinator.Group(key, xs) =>
-          q"ir.Group[${e.elementType}, ${xs.elementType}](${serialize(key)}, ${serialize(xs)})"
-        case combinator.Fold(empty, sng, union, xs, _) =>
-          q"ir.Fold[${e.tpe}, ${xs.elementType}](${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
-        case combinator.FoldGroup(key, empty, sng, union, xs) =>
-          q"ir.FoldGroup[${e.elementType}, ${xs.elementType}](${serialize(key)}, ${serialize(empty)}, ${serialize(sng)}, ${serialize(union)}, ${serialize(xs)})"
-        case combinator.Distinct(xs) =>
-          q"ir.Distinct(${serialize(xs)})"
-        case combinator.Union(xs, ys) =>
-          q"ir.Union(${serialize(xs)}, ${serialize(ys)})"
-        case combinator.Diff(xs, ys) =>
-          q"ir.Diff(${serialize(xs)}, ${serialize(ys)})"
-        case ScalaExpr(_, Apply(fn, List(values))) if api.apply.alternatives.contains(fn.symbol) =>
+    private def serialize(expr: Expression): Tree = expr match {
+      case combinator.Read(location, fmt) =>
+        q"ir.Read($location, $fmt)"
+
+      case combinator.Write(location, fmt, xs) =>
+        q"ir.Write($location, $fmt, ${serialize(xs)})"
+
+      case combinator.TempSource(id) =>
+        q"ir.TempSource($id)"
+
+      case combinator.TempSink(name, xs) =>
+        q"ir.TempSink(${name.toString}, ${serialize(xs)})"
+
+      case combinator.Map(f, xs) =>
+        val elTpe = expr.elementType
+        val xsTpe = xs.elementType
+        val fStr  = serialize(f)
+        val xsStr = serialize(xs)
+        q"ir.Map[$elTpe, $xsTpe]($fStr, $xsStr)"
+
+      case combinator.FlatMap(f, xs) =>
+        val elTpe = expr.elementType
+        val xsTpe = xs.elementType
+        val fStr  = serialize(f)
+        val xsStr = serialize(xs)
+        q"ir.FlatMap[$elTpe, $xsTpe]($fStr, $xsStr)"
+
+      case combinator.Filter(p, xs) =>
+        val elTpe = expr.elementType
+        val pStr  = serialize(p)
+        val xsStr = serialize(xs)
+        q"ir.Filter[$elTpe]($pStr, $xsStr)"
+
+      case combinator.EquiJoin(kx, ky, xs, ys) =>
+        val elTpe = expr.elementType
+        val xsTpe = xs.elementType
+        val ysTpe = ys.elementType
+        val kxStr = serialize(kx)
+        val kyStr = serialize(ky)
+        val xsStr = serialize(xs)
+        val ysStr = serialize(ys)
+        val join  = serialize(q"(x: $xsTpe, y: $ysTpe) => (x, y)".typeChecked)
+        q"ir.EquiJoin[$elTpe, $xsTpe, $ysTpe]($kxStr, $kyStr, $join, $xsStr, $ysStr)"
+
+      case combinator.Cross(xs, ys) =>
+        val elTpe = expr.elementType
+        val xsTpe = xs.elementType
+        val ysTpe = ys.elementType
+        val xsStr = serialize(xs)
+        val ysStr = serialize(ys)
+        val join  = serialize(q"(x: $xsTpe, y: $ysTpe) => (x, y)".typeChecked)
+        q"ir.Cross[$elTpe, $xsTpe, $ysTpe]($join, $xsStr, $ysStr)"
+
+      case combinator.Group(key, xs) =>
+        val elTpe = expr.elementType
+        val xsTpe = xs.elementType
+        val kStr  = serialize(key)
+        val xsStr = serialize(xs)
+        q"ir.Group[$elTpe, $xsTpe]($kStr, $xsStr)"
+
+      case combinator.Fold(empty, sng, union, xs, _) =>
+        val exprTpe  = expr.tpe
+        val xsTpe    = xs.elementType
+        val emptyStr = serialize(empty)
+        val sngStr   = serialize(sng)
+        val unionStr = serialize(union)
+        val xsStr    = serialize(xs)
+        q"ir.Fold[$exprTpe, $xsTpe]($emptyStr, $sngStr, $unionStr, $xsStr)"
+
+      case combinator.FoldGroup(key, empty, sng, union, xs) =>
+        val elTpe    = expr.elementType
+        val xsTpe    = xs.elementType
+        val keyStr   = serialize(key)
+        val emptyStr = serialize(empty)
+        val sngStr   = serialize(sng)
+        val unionStr = serialize(union)
+        val xsStr    = serialize(xs)
+        q"ir.FoldGroup[$elTpe, $xsTpe]($keyStr, $emptyStr, $sngStr, $unionStr, $xsStr)"
+
+      case combinator.Distinct(xs) =>
+        q"ir.Distinct(${serialize(xs)})"
+
+      case combinator.Union(xs, ys) =>
+        q"ir.Union(${serialize(xs)}, ${serialize(ys)})"
+
+      case combinator.Diff(xs, ys) =>
+        q"ir.Diff(${serialize(xs)}, ${serialize(ys)})"
+
+      case ScalaExpr(_, Apply(fn, values :: Nil))
+        if api.apply.alternatives.contains(fn.symbol) =>
           q"ir.Scatter(${transform(values)})"
-        case _ =>
-          EmptyTree
-        //throw new RuntimeException("Unsupported serialization of non-combinator expression:\n" + prettyprint(e) + "\n")
-      }
+
+      case e => EmptyTree
+      //throw new RuntimeException(
+      //  s"Unsupported serialization of non-combinator expression:\n${prettyPrint(e)}\n")
     }
 
     /**
-     * Emits a reified version of the given term tree.
+     * Emits a reified version of the given term [[Tree]].
      *
-     * @param tree The tree to be serialized.
-     * @return
+     * @param tree The [[Tree]] to be serialized
+     * @return A [[String]] representation of the [[Tree]]
      */
-    private def serialize(tree: Tree): String = showCode(q"""(..${for (sym <- tree.freeTerms)
-      yield ValDef(Modifiers(Flag.PARAM), sym.name, tq"${sym.info}", EmptyTree)}) => {
-        ${tree.unTypeChecked}
-    }""".typeChecked, printRootPkg = true)
+    private def serialize(tree: Tree): String =
+      showCode(q"""(..${for (sym <- tree.freeTerms)
+        yield ValDef(Modifiers(Flag.PARAM), sym.name, tq"${sym.info}", EmptyTree)}) => {
+          ${tree.unTypeChecked}
+        }""".typeChecked, printRootPkg = true)
   }
 }
