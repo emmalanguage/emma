@@ -12,20 +12,17 @@ import scala.reflect.macros.blackbox
  * makes for better extensibility and testability.
  * @param c the current macro context
  */
-class FoldMacros(val c: blackbox.Context) {
-  import c.universe._
+class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
+  import universe._
 
   private lazy val self = unbox(c.prefix.tree)
 
-  // unbox implicit type conversions
+  // Unbox implicit type conversions
   private def unbox(tree: Tree) = tree match {
     case       Apply(_: TypeApply, arg :: Nil)     => arg
     case Typed(Apply(_: TypeApply, arg :: Nil), _) => arg
     case _ => tree
   }
-
-  private def freshName(prefix: String): TermName =
-    TermName(c freshName prefix)
 
   def isEmpty = q"!$self.nonEmpty"
   def nonEmpty = q"$self.exists(_ => true)"
@@ -37,8 +34,8 @@ class FoldMacros(val c: blackbox.Context) {
     q"$self.fold3($z)(_root_.scala.Predef.identity, $p)"
 
   def fold1[E: c.WeakTypeTag](p: Expr[(E, E) => E]) = {
-    val x = freshName("x$")
-    val y = freshName("y$")
+    val x  = freshName("x$")
+    val y  = freshName("y$")
     val oa = weakTypeOf[Option[E]]
     q"""$self.fold3($None: $oa)(x => _root_.scala.Some(x): $oa, {
       case ($x, $None) => $x
@@ -100,15 +97,15 @@ class FoldMacros(val c: blackbox.Context) {
     q"$self.fold3(true)($p, _ && _)"
 
   def find[E: c.WeakTypeTag](p: Expr[E => Boolean]) = {
-    val x = freshName("x$")
+    val x  = freshName("x$")
     val oa = weakTypeOf[Option[E]]
     q"""$self.fold3($None: $oa)({
       case $x if $p($x) => _root_.scala.Some($x)
-      case _            => $None
+      case _  => $None
     }, {
-      case ($x@Some(_), _) => $x
-      case (_, $x@Some(_)) => $x
-      case (_, _)          => $None
+      case ($x @ _root_.scala.Some(_), _) => $x
+      case (_, $x @ _root_.scala.Some(_)) => $x
+      case (_, _) => $None
     })"""
   }
 
