@@ -2,131 +2,152 @@ package eu.stratosphere.emma.macros.program.controlflow
 
 import eu.stratosphere.emma.macros.BlackBoxUtil
 import eu.stratosphere.emma.util.Counter
+import scala.annotation.tailrec
+import scala.collection.mutable
 
 private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
   import universe._
+  import c.internal._
 
-  /** Normalize */
+  /**
+   * Normalize the control flow of a [[Tree]].
+   * 
+   * @param tree the [[Tree]] to be normalized
+   * @return A copy if the [[Tree]] with normalized control flow
+   */
   def normalize(tree: Tree): Tree = q"""{
     import _root_.scala.reflect._
-    ${tree ->> normalizeEnclosingParameters ->> unTypeCheck ->> normalizeControlFlowTests}
+    ${tree ->> EnclosingParamNormalizer ->> unTypeCheck ->> ControlFlowTestNormalizer}
   }""".typeChecked.as[Block].expr
 
   // --------------------------------------------------------------------------
   // Normalize control flow condition tests.
   // --------------------------------------------------------------------------
 
-  /** Normalizes the tests in an expression tree.
-    *
-    * This process includes:
-    *
-    * - unnesting of compex trees ouside while loop tests.
-    * - unnesting of compex trees ouside do-while loop tests.
-    * - unnesting of compex trees ouside if-then-else conditions.
-    */
-  object normalizeControlFlowTests extends Transformer with (Tree => Tree) {
+  /** 
+   * Normalizes all [[Boolean]] predicate tests in an expression [[Tree]].
+   *
+   * This process includes:
+   *
+   * - un-nesting of complex [[Tree]]s outside while loop tests
+   * - un-nesting of complex [[Tree]]s outside do-while loop tests
+   * - un-nesting of complex [[Tree]]s outside if-then-else conditionals
+   */
+  object ControlFlowTestNormalizer extends Transformer with (Tree => Tree) {
     val testCounter = new Counter()
 
-    override def transform(tree: Tree): Tree = tree match {
+    override def transform(tree: Tree) = tree match {
       // while (`cond`) { `body` }
       case LabelDef(_, _, If(cond, Block(body, _), _)) =>
         cond match {
-          case Ident(_: TermName) =>
-            // if condition is a simple identifier, no normalization needed
+          case _: Ident =>
+            // If condition is a simple identifier, no normalization needed
             super.transform(tree)
           case _ =>
-            // introduce condition variable
+            // Introduce condition variable
             val condVar = TermName(f"testA${testCounter.advance.get}%03d")
-            // move the complex test outside the condition
+            // Move the complex test outside the condition
             q"{ var $condVar = $cond; while ($condVar) { $body; $condVar = $cond } }"
         }
 
       // do { `body` } while (`cond`)
       case LabelDef(_, _, Block(body, If(cond, _, _))) =>
         cond match {
-          case Ident(_: TermName) =>
-            // if condition is a simple identifier, no normalization needed
+          case _: Ident =>
+            // If condition is a simple identifier, no normalization needed
             super.transform(tree)
           case _ =>
-            // introduce condition variable
+            // Introduce condition variable
             val condVar = TermName(f"testB${testCounter.advance.get}%03d")
-            // move the complex test outside the condition
-            q"{ var $condVar = null.asInstanceOf[Boolean]; do { $body; $condVar = $cond } while ($condVar) }"
+            // Move the complex test outside the condition
+            q"""{
+              var $condVar = null.asInstanceOf[Boolean]
+              do { $body; $condVar = $cond } while ($condVar)
+            }"""
         }
 
-      // if (`cond`) `thenp` else `elsep`
-      case If(cond, thenp, elsep) =>
+      // if (`cond`) `thn` else `els`
+      case If(cond, thn, els) =>
         cond match {
-          case Ident(_: TermName) =>
-            // if condition is a simple identifier, no normalization needed
+          case _: Ident =>
+            // If condition is a simple identifier, no normalization needed
             super.transform(tree)
           case _ =>
-            // introduce condition value
+            // Introduce condition value
             val condVal = TermName(f"testC${testCounter.advance.get}%03d")
-            // move the complex test outside the condition
-            q"val $condVal = $cond; ${If(Ident(condVal), thenp, elsep)}"
+            // Move the complex test outside the condition
+            q"val $condVal = $cond; if ($condVal) $thn else $els"
         }
 
-      // default case
-      case _ =>
-        super.transform(tree)
+      // Default case
+      case _ => super.transform(tree)
     }
 
-    def apply(tree: Tree): Tree = transform(tree)
+    def apply(tree: Tree) = transform(tree)
   }
 
   // --------------------------------------------------------------------------
-  // Normalize encolsing object parameter access.
+  // Normalize enclosing object parameter access.
   // --------------------------------------------------------------------------
 
-  private class normalizeEnclosingParameters(val classSymbol: Symbol) extends Transformer {
-    val aliases = collection.mutable.Map.empty[Symbol, ValDef]
+  private class EnclosingParamNormalizer(val clazz: Symbol) extends Transformer {
+    val aliases = mutable.Map.empty[Symbol, ValDef]
 
-    override def transform(t: Tree) = t match {
-      case select@Select(encl@This(_), n) if needsSubstitution(encl, select) =>
-        val alias = aliases.getOrElseUpdate(select.symbol, newValDef(TermName(s"__this$$$n"), select.tpe.widen, rhs = Some(select)))
-        Ident(alias.symbol)
-      case _ =>
-        super.transform(t)
+    override def transform(tree: Tree) = tree match {
+      case sel @ Select(enclosing: This, name) if needsSubstitution(enclosing, sel) =>
+        val alias = aliases.getOrElseUpdate(sel.symbol,
+          mk.valDef(TermName(s"__this$$$name"), sel.trueType, rhs = sel))
+
+        Ident(alias.name)
+
+      case _ => super.transform(tree)
     }
 
-    /** Check if a select from an enclosing 'this' needs to be substituted. */
-    def needsSubstitution(encl: This, select: Select) = {
-      encl.symbol == classSymbol && // enclosing 'this' is a class
-        select.symbol.isTerm && // term selection
-        (select.symbol.asTerm.isStable || select.symbol.asTerm.isGetter) // getter or val select
-    }
+    /**
+     * Check if a [[Select]] from an enclosing 'this' needs to be substituted.
+     *
+     * @param enclosing The enclosing `this` reference
+     * @param select The referenced field to normalize
+     * @return `true` if the `this` reference should be substituted
+     */
+    def needsSubstitution(enclosing: This, select: Select): Boolean =
+      enclosing.symbol == clazz &&                     // Enclosing 'this' is a class
+        select.hasTerm &&                              // Term selection
+        (select.term.isStable || select.term.isGetter) // Getter or val select
   }
 
-  /** Normalize encolsing object parameter access.
-    *
-    * - Identifies usages of enclosing object parameters.
-    * - Replaces the selects with values of the form `__this${name}`.
-    * - Assign the accessed parameters to local values of the form `__this${name}` at the beginning of the code.
-    */
-  object normalizeEnclosingParameters extends (Tree => Tree) {
+  /**
+   * Normalizes enclosing object parameter access.
+   *
+   * - Identifies usages of enclosing object parameters.
+   * - Replaces the [[Select]]s with values of the form `__this${name}`.
+   * - Assigns the accessed parameters to local values of the form `__this${name}` at the beginning
+   *   of the code.
+   */
+  object EnclosingParamNormalizer extends (Tree => Tree) {
 
-    def apply(root: Tree): Tree = {
-      val ownerClassSym = getOwnerClass(c.internal.enclosingOwner)
+    def apply(root: Tree) = findOwnerClass(enclosingOwner) match {
+      case Some(clazz) =>
+        // Construct function
+        val normalize = new EnclosingParamNormalizer(clazz)
+        // Normalize tree and collect alias symbols
+        val normTree  = normalize transform root
+        // Construct normalized code snippet
+        q"{ ..${normalize.aliases.values}; ..$normTree }"
 
-      val normalize = new normalizeEnclosingParameters(ownerClassSym) // construct function
-      val normalizedTree = normalize.transform(root) // normalize tree and collect alias symbols
-
-      // construct normalized code snippet
-      q"""
-      ..${normalize.aliases.values.toSeq}
-      ..$normalizedTree
-      """
+      case None => root
     }
 
-    /** Return the first class owner of this symbol.
-      *
-      * @param c The symbol to test.
-      * @return
-      */
-    private def getOwnerClass(c: Symbol): Symbol = {
-      if (c.isClass) c else getOwnerClass(c.owner) // FIXME: this does not have a safe termination criterion
-    }
+    /**
+     * Maybe return the first class owner of the [[Symbol]].
+     *
+     * @param sym The [[Symbol]] to test
+     * @return The first class owner of the [[Symbol]], if any
+     */
+    @tailrec private def findOwnerClass(sym: Symbol): Option[Symbol] =
+      if (sym == null || sym == NoSymbol) None
+      else if (sym.isClass) Some(sym)
+      else findOwnerClass(sym.owner)
   }
 
   // --------------------------------------------------------------------------
@@ -134,72 +155,33 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
   // --------------------------------------------------------------------------
 
   /** Substitutes the names of local classes to fully qualified names. */
-  object normalizeClassNames extends Transformer with (Tree => Tree) {
+  object ClassNameNormalizer extends Transformer with (Tree => Tree) {
 
-    override def transform(t: Tree): Tree = {
-      t match {
-        // search for a class call without 'new'
-        case a@Apply(Select(i@Ident(_: TermName), termName), args) if !isParam(i.symbol) =>
-          val selectChain = mkSelect(i.symbol, apply = true)
-          val result = Apply(Select(selectChain, termName), args.map(transform))
-          result
-        // search for a class call with 'new'
-        case a@Apply(Select(n@New(i@Ident(_: TypeName)), termNames.CONSTRUCTOR), args) if !i.symbol.owner.isTerm =>
-          val selectChain = mkSelect(i.symbol, apply = false)
-          val result = Apply(Select(New(selectChain), termNames.CONSTRUCTOR), args.map(transform))
-          result
-        case _ =>
-          super.transform(t)
-      }
+    override def transform(tree: Tree): Tree = tree match {
+      // Search for a class call without 'new'
+      case Apply(Select(id: Ident, name), args) if !isParam(id.symbol) =>
+        val selChain = mk.select(id.symbol, apply = true)
+        Apply(Select(selChain, name), args map transform)
+
+      // Search for a class call with 'new'
+      case Apply(Select(New(id: Ident), termNames.CONSTRUCTOR), args)
+        if id.hasSymbol && !id.symbol.owner.isTerm =>
+          val selChain = mk.select(id.symbol, apply = false)
+          Apply(Select(New(selChain), termNames.CONSTRUCTOR), args map transform)
+
+      case _ => super.transform(tree)
     }
 
-    def apply(root: Tree): Tree = transform(root)
+    def apply(root: Tree) = transform(root)
 
-    /** Check if the symbol is, a parameter of a function, a `val`, or a `var`. */
-    def isParam(symbol: Symbol): Boolean = {
-      (symbol.isTerm && (symbol.asTerm.isVal || symbol.asTerm.isVar)) || (symbol.owner.isMethod && symbol.isParameter)
-    }
-
-    /** Creates a select chain for a class. Example: Select(Select(Ident("...", ...
-      *
-      * @param sym root symbol
-      * @param apply set to true if a function is applied on the symbol
-      * @return Tree with select chain
-      */
-    def mkSelect(sym: Symbol, apply: Boolean): Tree = {
-      if (sym.owner != c.mirror.RootClass) {
-        val newSymbol: Name =
-          if (apply)
-            sym.name.toTermName
-          else if (!sym.isPackage)
-            sym.name.toTypeName
-          else
-            sym.name.toTermName
-
-        Select(mkSelect(sym.owner, apply), newSymbol)
-      } else {
-        Ident(c.mirror.staticPackage(sym.fullName))
-      }
-    }
-  }
-
-  // --------------------------------------------------------------------------
-  // Normalize an expression tree.
-  // --------------------------------------------------------------------------
-
-  /** Creates a new symbol PARAM ValDef.
-    *
-    * @param name The name of the new term.
-    * @param tpe The type of the new term.
-    * @param owner The owner symbol of this ValDef.
-    */
-  def newValDef(name: TermName, tpe: Type, owner: Symbol = c.internal.enclosingOwner, flags: FlagSet = NoFlags, rhs: Option[Tree] = Option.empty[Tree]) = {
-    val symbol = c.internal.newTermSymbol(c.internal.enclosingOwner, name, flags = flags)
-    val valdef =
-      if (rhs.isDefined)
-        c.internal.valDef(c.internal.setInfo(symbol, tpe), rhs.get)
-      else
-        c.internal.valDef(c.internal.setInfo(symbol, tpe))
-    valdef
+    /**
+     * Check if whether a [[Symbol]] is a parameter, function, `val` or a `var`.
+     *
+     * @param sym The [[Symbol]] to check
+     * @return `true` if the [[Symbol]] is any of the above
+     */
+    def isParam(sym: Symbol): Boolean =
+      (sym.isTerm && (sym.asTerm.isVal || sym.asTerm.isVar)) ||
+        (sym.owner.isMethod && sym.isParameter)
   }
 }

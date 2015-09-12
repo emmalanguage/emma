@@ -19,6 +19,29 @@ trait BlackBoxUtil extends BlackBox with ReflectUtil {
   override val freshName = (prefix: String) => TermName(c.freshName(prefix))
   override val freshType = (prefix: String) => TypeName(c.freshName(prefix))
 
+  object mk {
+    def valDef(
+        name:  TermName,
+        tpe:   Type,
+        owner: Symbol   = enclosingOwner,
+        flags: FlagSet  = NoFlags,
+        pos:   Position = c.enclosingPosition,
+        rhs:   Tree     = EmptyTree): ValDef = {
+
+      val sym = newTermSymbol(owner, name, flags = flags, pos = pos)
+      c.internal.valDef(setInfo(sym, tpe), rhs)
+    }
+
+    def select(sym: Symbol, apply: Boolean): Tree = {
+      if (sym.owner != c.mirror.RootClass) {
+        val name = if (!apply && !sym.isPackage)
+          sym.name.toTypeName else sym.name.toTermName
+
+        Select(select(sym.owner, apply), name)
+      } else Ident(c.mirror.staticPackage(sym.fullName))
+    }
+  }
+
   /** Syntactic sugar for [[Tree]]s. */
   implicit class BlackBoxTreeOps(self: Tree) extends TreeOps(self) {
 
