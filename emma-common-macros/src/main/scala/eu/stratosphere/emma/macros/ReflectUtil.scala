@@ -16,6 +16,9 @@ trait ReflectUtil {
   val universe: Universe
   import universe._
 
+  // predefined types
+  val BOOL = typeOf[Boolean]
+
   /** Alias of [[PartialFunction]]. */
   type ~>[A, B] = PartialFunction[A, B]
 
