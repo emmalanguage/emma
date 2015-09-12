@@ -13,29 +13,26 @@ private[emma] trait ControlFlowModel extends BlackBox {
   // Control flow Graph
   // --------------------------------------------------------------------------
 
-  /**
-   * Control flow graph type
-   */
+  /** Control flow graph type. */
   type CFGraph = Graph[CFBlock, LkDiEdge]
 
-  /**
-   * Control flow graph: node type
-   */
+  /** Control flow graph: node type. */
   class CFBlock(implicit val id: Int) {
-    // the kind of the block
+
+    /** The kind of the block. */
     var kind: BlockKind = Linear
 
-    // statemetns used in this block
-    val stats = mutable.ListBuffer[Tree]()
+    /** Statements used in this block. */
+    val stats = mutable.ListBuffer.empty[Tree]
 
-    // value definitions in this block
-    val defs = mutable.ListBuffer[(Name, Int)]()
+    /** Value definitions in this block. */
+    val defs = mutable.ListBuffer.empty[(Name, Int)]
 
-    // value usages in this block
-    val uses = mutable.ListBuffer[(Name, Int)]()
+    /** Value usages in this block. */
+    val refs = mutable.ListBuffer.empty[(Name, Int)]
 
     override def equals(other: Any): Boolean = other match {
-      case that: CFBlock => that.id == this.id
+      case that: CFBlock => id == that.id
       case _ => false
     }
 
@@ -47,11 +44,9 @@ private[emma] trait ControlFlowModel extends BlackBox {
 
     def defType = if (stats.nonEmpty && stats.last.tpe != NoType)
       stats.last.tpe match {
-        case c.universe.ConstantType(constant) => constant.tpe
-        case _ => stats.last.tpe
-      }
-    else
-      c.typeOf[Unit]
+        case ConstantType(const) => const.tpe
+        case tpe => tpe
+      } else typeOf[Unit]
   }
 
   // --------------------------------------------------------------------------
@@ -59,32 +54,23 @@ private[emma] trait ControlFlowModel extends BlackBox {
   // --------------------------------------------------------------------------
 
   sealed trait BlockKind
-
-  case object Linear extends BlockKind
-
-  case object Cond extends BlockKind
-
-  case class WhileBegin(x: Int) extends BlockKind
-
-  case class WhileEnd(x: Int) extends BlockKind
-
-  case class DoWhileBegin(x: Int) extends BlockKind
-
-  case class DoWhileEnd(x: Int) extends BlockKind
+  case object Linear              extends BlockKind
+  case object Cond                extends BlockKind
+  case class WhileBegin  (i: Int) extends BlockKind
+  case class WhileEnd    (i: Int) extends BlockKind
+  case class DoWhileBegin(i: Int) extends BlockKind
+  case class DoWhileEnd  (i: Int) extends BlockKind
 
   // --------------------------------------------------------------------------
   // Environment entries
   // --------------------------------------------------------------------------
 
-  /**
-   * Data flow graph type
-   */
+  /** Data flow graph type. */
   type DFGraph = Graph[CFBlock, LkDiEdge]
 
   case class EnvEntry(name: TermName) {
-
-    override def equals(o: Any) = o match {
-      case that: EnvEntry => this.name.equals(that.name)
+    override def equals(other: Any) = other match {
+      case that: EnvEntry => name == that.name
       case _ => false
     }
 
@@ -96,5 +82,7 @@ private[emma] trait ControlFlowModel extends BlackBox {
   // --------------------------------------------------------------------------
 
   private[program] def findByLabel(source: CFGraph#NodeT, label: Boolean): Option[CFGraph#NodeT] =
-    source.outgoing.foldLeft(Option.empty[CFGraph#NodeT])((n, e) => if (e.label == label) Some[CFGraph#NodeT](e._2) else n)
+    source.outgoing.foldLeft(Option.empty[CFGraph#NodeT]) { (node, edge) =>
+      if (edge.label == label) Some(edge._2) else node
+    }
 }
