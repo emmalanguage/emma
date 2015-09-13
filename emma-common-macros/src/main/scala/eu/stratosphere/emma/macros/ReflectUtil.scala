@@ -20,9 +20,33 @@ trait ReflectUtil {
 
   // predefined types
 
-  lazy val UNIT = typeOf[Unit]
-  lazy val BOOL = typeOf[Boolean]
-  lazy val PAIR = TUPLE(2)
+  lazy val UNIT    = typeOf[Unit]
+  lazy val BOOL    = typeOf[Boolean]
+  lazy val CHAR    = typeOf[Char]
+  lazy val BYTE    = typeOf[Byte]
+  lazy val SHORT   = typeOf[Short]
+  lazy val INT     = typeOf[Int]
+  lazy val LONG    = typeOf[Long]
+  lazy val FLOAT   = typeOf[Float]
+  lazy val DOUBLE  = typeOf[Double]
+  lazy val STRING  = typeOf[String]
+  lazy val BIG_INT = typeOf[BigInt]
+  lazy val BIG_DEC = typeOf[BigDecimal]
+
+  lazy val VOID      = typeOf[java.lang.Void]
+  lazy val J_BOOL    = typeOf[java.lang.Boolean]
+  lazy val J_CHAR    = typeOf[java.lang.Character]
+  lazy val J_BYTE    = typeOf[java.lang.Byte]
+  lazy val J_SHORT   = typeOf[java.lang.Short]
+  lazy val J_INT     = typeOf[java.lang.Integer]
+  lazy val J_LONG    = typeOf[java.lang.Long]
+  lazy val J_FLOAT   = typeOf[java.lang.Float]
+  lazy val J_DOUBLE  = typeOf[java.lang.Double]
+  lazy val J_BIG_INT = typeOf[java.math.BigInteger]
+  lazy val J_BIG_DEC = typeOf[java.math.BigDecimal]
+
+  lazy val PAIR  = TUPLE(2)
+  lazy val ARRAY = typeOf[Array[Nothing]].typeConstructor
 
   lazy val TUPLE = (for (n <- 1 to 22)
     yield n -> rootMirror.staticClass(s"scala.Tuple$n").toTypeConstructor).toMap
@@ -64,10 +88,14 @@ trait ReflectUtil {
      pos:   Position = NoPosition): TypeSymbol
 
   /** Generate a new [[TermName]]. */
-  val freshName = freshTermName _
+  def freshName(prefix: String): TermName =
+    if (prefix.nonEmpty && prefix.last == '$') freshTermName(prefix)
+    else freshTermName(s"$prefix$$")
 
   /** Generate a new [[TypeName]]. */
-  val freshType = freshTypeName _
+  def freshType(prefix: String): TypeName =
+    if (prefix.nonEmpty && prefix.last == '$') freshTypeName(prefix)
+    else freshTypeName(s"$prefix$$")
 
   /** Remove all [[Type]] annotations from this [[Tree]]. */
   // FIXME: Replace with c.untypecheck once https://issues.scala-lang.org/browse/SI-5464 resolved
@@ -303,7 +331,7 @@ trait ReflectUtil {
      * @return This [[Tree]] with the specified names replaced
      */
     def refresh(names: TermName*): Tree =
-      rename((for (n <- names) yield n -> freshName(s"$n$$")): _*)
+      rename((for (n <- names) yield n -> freshName(n.toString)): _*)
 
     /**
      * Replace a specified identifier in this [[Tree]] with a new one.

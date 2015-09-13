@@ -152,5 +152,6 @@ package object api {
    */
   implicit class DataBagWithFolds[+E](val self: DataBag[E]) extends AnyVal with Folds[E]
 
-  implicit def materializeCSVConvertors[T]: CSVConvertors[T] = macro ConvertorsMacros.materializeCSVConvertorsImpl[T]
+  implicit def materializeCSVConvertors[T]: CSVConvertors[T] =
+    macro ConvertorsMacros.materializeCSVConvertors[T]
 }
