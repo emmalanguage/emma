@@ -10,9 +10,9 @@ abstract class InputFormat[T] {
   def read(is: InputStream): Seq[T]
 }
 
-class CSVInputFormat[T: CSVConvertors](val separator: Char) extends InputFormat[T] {
+class CSVInputFormat[T: CSVConverters](val separator: Char) extends InputFormat[T] {
 
-  val convert = implicitly[CSVConvertors[T]]
+  val convert = implicitly[CSVConverters[T]]
 
   def this() = this('\t')
 

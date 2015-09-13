@@ -3,14 +3,14 @@ package eu.stratosphere.emma.macros
 import scala.reflect.macros.blackbox
 
 // TODO: add DateTime support
-class ConvertorsMacros(val c: blackbox.Context) extends BlackBoxUtil {
+class ConvertersMacros(val c: blackbox.Context) extends BlackBoxUtil {
   import c.universe._
 
   val nextIndex = freshName("nextIndex")
   val builder   = freshName("builder")
 
   /** Entry macro for emma algorithms. */
-  def materializeCSVConvertors[T: c.WeakTypeTag] = {
+  def materializeCSVConverters[T: c.WeakTypeTag] = {
     val tpe = weakTypeOf[T]
     val v   = freshName("value")
     val i   = freshName("i")
@@ -30,7 +30,7 @@ class ConvertorsMacros(val c: blackbox.Context) extends BlackBoxUtil {
         $builder.result()
       }"""
 
-    q"""new _root_.eu.stratosphere.emma.api.CSVConvertors[$tpe] {
+    q"""new _root_.eu.stratosphere.emma.api.CSVConverters[$tpe] {
       val $builder = _root_.scala.collection.mutable.ArrayBuilder.make[$STRING]
       $fromStringFn
       $toStringFn

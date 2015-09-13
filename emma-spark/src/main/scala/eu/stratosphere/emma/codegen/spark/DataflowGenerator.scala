@@ -117,7 +117,7 @@ class DataflowGenerator(
         val line = freshName("line$spark$")
         val name = closure nextTermName "converter"
         closure.UDFs += q"""val $name =
-          _root_.eu.stratosphere.emma.api.`package`.materializeCSVConvertors[$tpe]"""
+          _root_.eu.stratosphere.emma.api.`package`.materializeCSVConverters[$tpe]"""
 
         q"""$sc.textFile($path).map({ ($line: ${typeOf[String]}) =>
           $name.fromCSV($line.split(${fmt.separator}))

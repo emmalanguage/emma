@@ -4,7 +4,7 @@ import java.io.{File, FileInputStream, FileOutputStream}
 import java.net.URI
 
 import eu.stratosphere.emma.api.model.Identity
-import eu.stratosphere.emma.macros.{Folds, ConvertorsMacros}
+import eu.stratosphere.emma.macros.{Folds, ConvertersMacros}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
@@ -140,7 +140,7 @@ package object api {
   }
 
   // -----------------------------------------------------
-  // convertors
+  // Converters
   // -----------------------------------------------------
 
   /**
@@ -152,6 +152,6 @@ package object api {
    */
   implicit class DataBagWithFolds[+E](val self: DataBag[E]) extends AnyVal with Folds[E]
 
-  implicit def materializeCSVConvertors[T]: CSVConvertors[T] =
-    macro ConvertorsMacros.materializeCSVConvertors[T]
+  implicit def materializeCSVConverters[T]: CSVConverters[T] =
+    macro ConvertersMacros.materializeCSVConverters[T]
 }

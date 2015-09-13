@@ -8,9 +8,9 @@ abstract class OutputFormat[T] {
   def write(in: DataBag[T], os: OutputStream): Unit
 }
 
-class CSVOutputFormat[T: CSVConvertors](val separator: Char) extends OutputFormat[T] {
+class CSVOutputFormat[T: CSVConverters](val separator: Char) extends OutputFormat[T] {
 
-  val convert = implicitly[CSVConvertors[T]]
+  val convert = implicitly[CSVConverters[T]]
 
   def this() = this('\t')
 

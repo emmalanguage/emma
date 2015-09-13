@@ -77,7 +77,7 @@ abstract class BaseCodegenTest(rtName: String) {
       EdgeWithLabel(3L, 6L, "C")))
   }
 
-  private def testCSVReadWrite[A: TypeTag : CSVConvertors](inp: Seq[A]): Unit = {
+  private def testCSVReadWrite[A: TypeTag : CSVConverters](inp: Seq[A]): Unit = {
     // construct a parameterized algorithm family
     val alg = (suffix: String) => emma.parallelize {
       val outputPath = s"$outBase/csv.$suffix"
