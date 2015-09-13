@@ -39,7 +39,6 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
     val minus        = bagSymbol.info.decl(TermName("minus"))
     val plus         = bagSymbol.info.decl(TermName("plus"))
     val distinct     = bagSymbol.info.decl(TermName("distinct"))
-    val empty        = bagSymbol.info.decl(TermName("empty"))
 
     val methods = Set(
       read, write,
@@ -47,8 +46,7 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       fold,
       map, flatMap, withFilter,
       groupBy,
-      minus, plus, distinct,
-      empty
+      minus, plus, distinct
     ) ++ apply.alternatives
 
     val monadic = Set(map, flatMap, withFilter)
@@ -245,11 +243,6 @@ private[emma] trait ComprehensionAnalysis[C <: blackbox.Context]
       // in.fold(empty, sng, union)
       case Apply(TypeApply(select@Select(in, _), _), List(empty, sng, union)) if select.symbol == api.fold =>
         combinator.Fold(empty, sng, union, comprehend(Nil)(in), t)
-
-      // in.empty()(n)
-      case Apply(select@Select(in, _), Nil) if select.symbol == api.empty =>
-        val comprehendedIn = comprehend(Nil)(in)
-        combinator.Fold(c.typecheck(q"false"), c.typecheck(q"(x: ${comprehendedIn.tpe.typeArgs.head}) => true"), c.typecheck(q"(x: Boolean, y: Boolean) => x || y"), comprehendedIn, t)
 
       // ----------------------------------------------------------------------
       // Environment & Host Language Connectors

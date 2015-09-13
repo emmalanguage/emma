@@ -118,11 +118,6 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) {
    */
   def distinct(): DataBag[A] = DataBag(impl.distinct)
 
-  @deprecated("use `isEmpty` and `nonEmpty` instead", "31.05.2015")
-  def empty(): Boolean = impl.isEmpty
-
-  def isEmpty: Boolean = impl.isEmpty
-
   // -----------------------------------------------------
   // Conversion Methods
   // -----------------------------------------------------

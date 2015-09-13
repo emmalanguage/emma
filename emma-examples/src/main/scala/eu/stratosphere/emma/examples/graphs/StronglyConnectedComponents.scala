@@ -61,7 +61,13 @@ object StronglyConnectedComponents {
       def identity = id
     }
 
-    case class State(@id vertexID: VID, neighborIDs: DataBag[VID], transposeNeigborIDs: DataBag[VID], component: VID, active: Boolean = true) extends Identity[VID] {
+    case class State(
+          @id vertexID:   VID,
+          var neighbors:  DataBag[VID],
+          var neighborsT: DataBag[VID],
+          var component:  VID,
+          var active:     Boolean = true)
+        extends Identity[VID] {
       def identity = vertexID
     }
 
@@ -101,12 +107,16 @@ class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: Engin
       val vertices = read(inputUrl, new CSVInputFormat[Vertex])
 
       // initialize state
-      val transposeNeighbors = (for (x <- vertices; y <- x.neighborIDs) yield (y, x.id)).groupBy(_._1)
-      val state = stateful[State, VID] {
-        for (
-          n <- vertices;
-          t <- transposeNeighbors; if t.key == n.id) yield State(n.id, n.neighborIDs, t.values.map(_._2), n.id)
-      }
+      val neighborsT = (for {
+        v <- vertices
+        n <- v.neighborIDs
+      } yield n -> v.id) groupBy { _._1 }
+
+      val state = stateful[State, VID](for {
+        v <- vertices
+        n <- neighborsT
+        if n.key == v.id
+      } yield State(v.id, v.neighborIDs, n.values map { _._2 }, v.id))
 
       var i = 1
       while (state.bag().exists(_.active)) {
@@ -117,7 +127,14 @@ class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: Engin
           // trimming
           println(" - trimming")
 
-          state.update(s => if (s.active) Some(s.copy(component = s.vertexID, active = !(s.neighborIDs.empty() && s.transposeNeigborIDs.empty()))) else None)
+          state updateWithZero { state =>
+            if (state.active) {
+              state.component = state.vertexID
+              state.active    = state.neighbors.nonEmpty || state.neighborsT.nonEmpty
+            }
+
+            DataBag()
+          }
         }
 
         {
@@ -127,16 +144,24 @@ class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: Engin
           var changed = true
           while (changed) {
             // send messages to neighbors
-            val messages = for (
-              s <- state.bag(); if s.active;
-              n <- s.neighborIDs) yield Message(n, s.component)
+            val messages = for {
+              state <- state.bag()
+              if state.active
+              n <- state.neighbors
+            } yield Message(n, state.component)
 
             // aggregate updates from incoming messages
-            val updates = for (g <- messages.groupBy(m => m.receiver)) yield UpdateComponent(g.key, g.values.map(_.payload).max())
+            val updates = for (g <- messages groupBy { _.receiver })
+              yield UpdateComponent(g.key, g.values.map { _.payload }.max())
 
             // update state
-            val delta = state.update(updates)((s: State, u: UpdateComponent) => if (u.component > s.component) Some(s.copy(component = u.component)) else None)
-            changed = !delta.empty()
+            val delta = state.updateWithOne(updates)(_.id, (state, update) =>
+              if (update.component > state.component) {
+                state.component = update.component
+                DataBag(state :: Nil)
+              } else DataBag())
+
+            changed = delta.nonEmpty
           }
         }
 
@@ -145,23 +170,36 @@ class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: Engin
           println(" - backward traversal")
 
           // send messages to neighbors of wcc roots
-          var updates = for (
-            s <- state.bag(); if s.active && s.vertexID == s.component;
-            n <- s.transposeNeigborIDs) yield UpdateComponent(n, s.component)
+          var updates = for {
+            state <- state.bag()
+            if state.active
+            if state.vertexID == state.component
+            n <- state.neighborsT
+          } yield UpdateComponent(n, state.component)
 
           // mark wcc "roots" as inactive
-          state.update(s => if (s.active && s.vertexID == s.component) Some(s.copy(active = false)) else None)
+          state updateWithZero { state =>
+            if (state.active && state.vertexID == state.component)
+              state.active = false
+
+            DataBag()
+          }
 
           var convergedVertexExists = true
           while (convergedVertexExists) {
             // compute state delta
-            val delta = state.update(updates)((s, u) => if (s.active && s.component == u.component) Some(s.copy(active = false)) else None)
+            val delta = state.updateWithOne(updates)(_.id, (state, update) =>
+              if (state.active && state.component == update.component) {
+                state.active = false
+                DataBag(state :: Nil)
+              } else DataBag())
 
             // compute new updates
-            updates = for (d <- delta; n <- d.transposeNeigborIDs) yield UpdateComponent(n, d.component)
+            updates = for (d <- delta; n <- d.neighborsT)
+              yield UpdateComponent(n, d.component)
 
             // update termination condition
-            convergedVertexExists = !delta.empty()
+            convergedVertexExists = delta.nonEmpty
           }
         }
 
@@ -170,22 +208,37 @@ class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: Engin
           // graph prunig
           println(" - graph prunig")
 
-          val neighborIDs = (for (
-            s <- state.bag(); if s.active;
-            n <- s.transposeNeigborIDs) yield Message(n, s.vertexID)).groupBy(_.receiver)
-          state.update(neighborIDs)((s, u) => if (s.active) Some(s.copy(neighborIDs = u.values map { v => v.payload})) else None)
+          val neighbors = (for {
+            state <- state.bag()
+            if state.active
+            n <- state.neighborsT
+          } yield Message(n, state.vertexID)) groupBy { _.receiver }
 
-          val transposeNeigborIDs = (for (
-            s <- state.bag(); if s.active;
-            n <- s.transposeNeigborIDs) yield Message(n, s.vertexID)).groupBy(_.receiver)
-          state.update(transposeNeigborIDs)((s, u) => if (s.active) Some(s.copy(transposeNeigborIDs = u.values map { v => v.payload})) else None)
+          state.updateWithOne(neighbors)(_.key, (state, update) =>
+            if (state.active) {
+              state.neighbors = update.values map { _.payload }
+              DataBag(state :: Nil)
+            } else DataBag())
+
+          val neighborsT = (for {
+            state <- state.bag()
+            if state.active
+            n <- state.neighborsT
+          } yield Message(n, state.vertexID)) groupBy { _.receiver }
+
+          state.updateWithOne(neighborsT)(_.key, (state, update) =>
+            if (state.active) {
+              state.neighborsT = update.values map { _.payload }
+              DataBag(state :: Nil)
+            } else DataBag())
         }
 
-        i = i + 1
+        i += 1
       }
 
       // construct components from state
-      val components = for (s <- state.bag()) yield Component(s.vertexID, s.component)
+      val components = for (state <- state.bag())
+        yield Component(state.vertexID, state.component)
 
       // write result
       write(outputUrl, new CSVOutputFormat[Component])(components)

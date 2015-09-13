@@ -57,7 +57,10 @@ object ConnectedComponents {
       def identity = id
     }
 
-    case class State(@id vertexID: VID, neighborIDs: DataBag[VID], component: VID) extends Identity[VID] {
+    case class State(
+        @id vertexID:  VID,
+        var neighbors: DataBag[VID],
+        var component: VID) extends Identity[VID] {
       def identity = vertexID
     }
 
@@ -100,17 +103,23 @@ class ConnectedComponents(inputUrl: String, outputUrl: String, rt: Engine) exten
       val state = stateful[State, VID](delta)
 
       // forward propagation
-      while (!delta.empty()) {
+      while (delta.nonEmpty) {
         // send messages to neighbors
-        val messages = for (
-          s <- delta;
-          n <- s.neighborIDs) yield Message(n, s.component)
+        val messages = for {
+          state <- delta
+          n <- state.neighbors
+        } yield Message(n, state.component)
 
         // aggregate updates from incoming messages
-        val updates = for (g <- messages.groupBy(m => m.receiver)) yield Update(g.key, g.values.map(_.component).max())
+        val updates = for (g <- messages groupBy { _.receiver })
+          yield Update(g.key, g.values.map { _.component }.max())
 
         // update state
-        delta = state.update(updates)((s, u) => if (u.component > s.component) Some(s.copy(component = u.component)) else None)
+        delta = state.updateWithOne(updates)(_.id, (state, update) =>
+          if (update.component > state.component) {
+            state.component = update.component
+            DataBag(state :: Nil)
+          } else DataBag())
       }
 
       // construct components from state

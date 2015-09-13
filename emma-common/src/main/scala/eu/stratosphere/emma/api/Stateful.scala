@@ -24,33 +24,8 @@ object Stateful {
      *
      * @param bag A DataBag containing elements with identity to be indexed and managed by this stateful Bag.
      */
-    private[api] def this(bag: DataBag[A]) = this(bag.fold[mutable.Map[K, A]](mutable.Map.empty[K, A], s => mutable.Map((s.identity, s)), (x, y) => x ++ y))
-
-    /**
-     * Computes and applies a delta without additional inputs.
-     *
-     * @param f the update function to be applied for each point in the distributed state.
-     */
-    @deprecated("Use updateWithZero instead.", "28.04.2015")
-    def update(f: A => Option[A]): DataBag[A] = DataBag(for (
-      s <- state.values.toList;
-      d <- f(s)) yield {
-        state(d.identity) = d; d
-      })
-
-    /**
-     * Computes and applies a delta with one additional input.
-     *
-     * @param f the update function to be applied for each point with matching update in the distributed state.
-     * @tparam B A set of update messages to be passed as first extra agument to the update function.
-     */
-    @deprecated("Use updateWithOne instead.", "28.04.2015")
-    def update[B <: Identity[K]](updates: DataBag[B])(f: (A, B) => Option[A]): DataBag[A] = DataBag(for (
-      u <- updates.impl;
-      s <- state.get(u.identity);
-      d <- f(s, u)) yield {
-        state(d.identity) = d; d
-      })
+    private[api] def this(bag: DataBag[A]) =
+      this(bag.fold[mutable.Map[K, A]](mutable.Map.empty[K, A], s => mutable.Map((s.identity, s)), (x, y) => x ++ y))
 
     /**
      * Computes and flattens a delta without additional inputs. The UDF `f` is allowed to modify the state element `s`,
@@ -60,11 +35,10 @@ object Stateful {
      * @tparam C The type of the output elements.
      * @return The flattened result of all update invocations.
      */
-    def updateWithZero[C](f: A => DataBag[C]): DataBag[C] =
-      for {
-        state  <- bag()
-        result <- f(state)
-      } yield result
+    def updateWithZero[C](f: A => DataBag[C]): DataBag[C] = for {
+      state  <- bag()
+      result <- f(state)
+    } yield result
 
     /**
      * Computes and flattens the `leftJoin` with `updates` which passes for each update element `u` it's
@@ -78,8 +52,8 @@ object Stateful {
      * @tparam C The type of the output elements.
      * @return The flattened result of all update invocations.
      */
-    def updateWithOne[B, C](updates: DataBag[B])(k: B => K, f: (A, B) => DataBag[C]): DataBag[C] =
-      for {
+    def updateWithOne[B, C](updates: DataBag[B])
+      (k: B => K, f: (A, B) => DataBag[C]): DataBag[C] = for {
         update <- updates
         state  <- DataBag(state.get(k(update)).toSeq)
         result <- f(state, update)
@@ -111,8 +85,8 @@ object Stateful {
      * @tparam C The type of the output elements.
      * @return The flattened collection
      */
-    def updateWithMany[B, C](updates: DataBag[B])(k: B => K, f: (A, DataBag[B]) => DataBag[C]): DataBag[C] =
-      for {
+    def updateWithMany[B, C](updates: DataBag[B])
+      (k: B => K, f: (A, DataBag[B]) => DataBag[C]): DataBag[C] = for {
         state  <- bag()
         result <- f(state, updates withFilter { k(_) == state.identity })
       } yield result
@@ -124,5 +98,4 @@ object Stateful {
      */
     def bag(): DataBag[A] = DataBag((for (x <- state) yield x._2).toSeq)
   }
-
 }

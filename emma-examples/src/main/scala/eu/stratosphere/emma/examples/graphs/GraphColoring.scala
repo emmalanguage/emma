@@ -39,7 +39,7 @@ class GraphColoring(input: String, output: String, rt: Engine)
         yield Message(src, dst)
 
       // resolve conflicting colors until convergence
-      while (!messages.empty()) {
+      while (messages.nonEmpty) {
         messages = vertices.updateWithMany(messages)(
           _.dst, (v, ms) => { // if the color is taken choose a new one
             if (ms exists { _.col == v.col }) {

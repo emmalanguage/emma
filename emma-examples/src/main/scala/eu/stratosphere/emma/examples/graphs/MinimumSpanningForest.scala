@@ -87,7 +87,7 @@ class MinimumSpanningForest(inputUrl: String, outputUrl: String, rt: Engine) ext
       val V = (edges.map(_.src) plus edges.map(_.dst)).distinct() // re-construct V
       var S = DataBag[EdgeWithLabel[Int, Double]]()
 
-      while (V.empty()) {
+      while (V.nonEmpty) {
         //---------------------------------------------------------------------
         // Phase 1. min-edge picking (TODO: resolve ties)
         //---------------------------------------------------------------------
