@@ -14,10 +14,21 @@ import scala.reflect.api.Universe
  */
 trait ReflectUtil {
   val universe: Universe
+
   import universe._
+  import internal.reificationSupport._
 
   // predefined types
-  val BOOL = typeOf[Boolean]
+
+  lazy val UNIT = typeOf[Unit]
+  lazy val BOOL = typeOf[Boolean]
+  lazy val PAIR = TUPLE(2)
+
+  lazy val TUPLE = (for (n <- 1 to 22)
+    yield n -> rootMirror.staticClass(s"scala.Tuple$n").toTypeConstructor).toMap
+
+  lazy val FUN = (for (n <- 0 to 22)
+    yield n -> rootMirror.staticClass(s"scala.Function$n").toTypeConstructor).toMap
 
   /** Alias of [[PartialFunction]]. */
   type ~>[A, B] = PartialFunction[A, B]
@@ -38,11 +49,25 @@ trait ReflectUtil {
    */
   def typeCheck(tree: Tree): Tree
 
+  /** Create a new [[TermSymbol]]. */
+  def termSym(
+      owner: Symbol, 
+      name:  TermName, 
+      flags: FlagSet  = NoFlags,
+      pos:   Position = NoPosition): TermSymbol
+
+  /** Create a new [[TypeSymbol]]. */
+  def typeSym(
+     owner: Symbol,
+     name:  TypeName,
+     flags: FlagSet  = NoFlags,
+     pos:   Position = NoPosition): TypeSymbol
+
   /** Generate a new [[TermName]]. */
-  val freshName = internal.reificationSupport.freshTermName _
+  val freshName = freshTermName _
 
   /** Generate a new [[TypeName]]. */
-  val freshType = internal.reificationSupport.freshTypeName _
+  val freshType = freshTypeName _
 
   /** Remove all [[Type]] annotations from this [[Tree]]. */
   // FIXME: Replace with c.untypecheck once https://issues.scala-lang.org/browse/SI-5464 resolved
@@ -54,28 +79,85 @@ trait ReflectUtil {
   /** Alias for `typeCheck compose parse`. */
   val parseCheck = typeCheck _ compose parse
 
-  /**
-   * Create a synthetic non-initialized value definition. Most convenient to use as a [[Function]]
-   * argument or a method parameter.
-   *
-   * @param name The [[Name]] of the new [[ValDef]]
-   * @param tpt The [[Type]] of the new [[ValDef]]
-   * @return A new [[ValDef]] according to the provided specification
-   */
-  def valDef(name: TermName, tpt: Tree): ValDef =
-    ValDef(Modifiers(Flag.SYNTHETIC), name, tpt, EmptyTree)
+  /** Syntax sugar for [[Tree]]s. */
+  private implicit def fromTree(tree: Tree): TreeOps =
+    new TreeOps(tree)
+
+  /** [[Tree]] constructors. */
+  object mk {
+
+    def freeTerm(
+        name:   String,
+        value:  => Any  = (),
+        flags:  FlagSet = Flag.SYNTHETIC,
+        origin: String  = null) =
+      newFreeTerm(name, value, flags, origin)
+
+    def freeType(
+        name:   String,
+        flags:  FlagSet = Flag.SYNTHETIC,
+        origin: String  = null) =
+      newFreeType(name, flags, origin)
+
+    def valDef(sym: TermSymbol): ValDef =
+      valDef(sym, EmptyTree)
+
+    def valDef(sym: TermSymbol, rhs: Tree): ValDef =
+      internal.valDef(sym, rhs).withType(sym.info).as[ValDef]
+
+    def valDef(name: TermName, tpt: Tree): ValDef =
+      valDef(name, tpt, EmptyTree)
+
+    def valDef(name: TermName, tpt: Tree, rhs: Tree): ValDef =
+      valDef(name, tpt, Flag.SYNTHETIC, rhs)
+
+    def valDef(name: TermName, tpt: Tree, flags: FlagSet, rhs: Tree): ValDef =
+      ValDef(Modifiers(flags), name, tpt, rhs).withType(tpt.trueType).as[ValDef]
+
+    def valDef(
+        name:  TermName,
+        tpe:   Type,
+        owner: Symbol   = NoSymbol,
+        flags: FlagSet  = Flag.SYNTHETIC,
+        pos:   Position = NoPosition,
+        rhs:   Tree     = EmptyTree): ValDef = {
+      val sym = termSym(owner, name, flags, pos) withInfo tpe
+      valDef(sym.asTerm, rhs)
+    }
+
+    def anonFun(
+        args:  List[(TermName, Type)],
+        body:  Tree,
+        reTpe: Type     = UNIT,
+        owner: Symbol   = NoSymbol,
+        flags: FlagSet  = Flag.SYNTHETIC,
+        pos:   Position = NoPosition): Function = {
+      val tpe    = FUN(args.size)(args.map { _._2 } :+ reTpe: _*)
+      val sym    = termSym(owner, TermName("anonfun"), flags, pos) withInfo tpe
+      val params = for ((name, tpe) <- args)
+        yield valDef(name, tpe, sym, Flag.SYNTHETIC | Flag.PARAM, pos)
+
+      Function(params, body).withSym(sym).as[Function]
+    }
+
+    def select(sym: Symbol, apply: Boolean): Tree = {
+      if (sym.owner != rootMirror.RootClass) {
+        val name = if (!apply && !sym.isPackage)
+          sym.name.toTypeName else sym.name.toTermName
+
+        Select(select(sym.owner, apply), name) withSym sym
+      } else mkIdent(rootMirror.staticPackage(sym.fullName)) withType sym.info
+    }
+  }
 
   /** Syntactic sugar for [[Tree]]s. */
   class TreeOps(self: Tree) {
 
-    private implicit def fromTree(tree: Tree): TreeOps =
-      new TreeOps(tree)
-
     /** @return `true` if this [[Tree]] is annotated with a [[Type]], `false` otherwise */
-    def hasType: Boolean = self.tpe != null
+    def hasType: Boolean = self.tpe != null && self.tpe != NoType
 
     /** @return `true` if this [[Tree]] is annotated with a [[Symbol]], `false` otherwise */
-    def hasSymbol: Boolean = self.symbol != null
+    def hasSymbol: Boolean = self.symbol != null && self.symbol != NoSymbol
 
     /** @return An un-type-checked version of this [[Tree]] */
     def unTypeChecked: Tree = unTypeCheck(self)
@@ -86,7 +168,7 @@ trait ReflectUtil {
     /** @return The most precise [[Type]] of this [[Tree]] */
     def trueType: Type = {
       if (hasType) self.tpe
-      else if (hasSymbol) self.symbol.info
+      else if (hasSymbol && self.symbol.hasInfo) self.symbol.info
       else typeChecked.tpe
     }.precise
 
@@ -98,6 +180,35 @@ trait ReflectUtil {
 
     /** @return `true` if this [[Tree]] has a [[Symbol]] and it's a [[TermSymbol]] */
     def hasTerm: Boolean = hasSymbol && self.symbol.isTerm
+
+    /**
+     * Annotate this [[Tree]] with a specified [[Type]].
+     *
+     * @param tpe The [[Type]] to use for this [[Tree]]
+     * @return This [[Tree]] with its [[Type]] set
+     */
+    def withType(tpe: Type): Tree =
+      setType(self, tpe)
+
+    /**
+     * Annotate this [[Tree]] with a specified [[Type]].
+     *
+     * @tparam T The [[Type]] to use for this [[Tree]]
+     * @return This [[Tree]] with its [[Type]] set
+     */
+    def withType[T: TypeTag]: Tree =
+      withType(typeOf[T])
+
+    /**
+     * Annotate this [[Tree]] with a specified [[Symbol]].
+     *
+     * @param sym The [[Symbol]] to use for this [[Tree]]
+     * @return This [[Tree]] with its [[Symbol]] set
+     */
+    def withSym(sym: Symbol): Tree = {
+      val tree = setSymbol(self, sym)
+      if (sym.hasInfo) tree withType sym.info else tree
+    }
 
     /** Type-check this [[Tree]] if it doesn't have a [[Type]]. */
     lazy val typeChecked: Tree = if (hasType) self else typeCheck(self)
@@ -316,7 +427,7 @@ trait ReflectUtil {
      * @return this [[Tree]] with the specified value definitions inlined
      */
     def inline(valDef: ValDef): Tree = transform {
-      case vd: ValDef if vd.symbol == valDef.symbol => q"()"
+      case vd: ValDef if vd.symbol == valDef.symbol => q"()".withType[Unit]
       case id: Ident  if id.symbol == valDef.symbol => valDef.rhs
     }
 
@@ -343,7 +454,7 @@ trait ReflectUtil {
     def isImplicit: Boolean = self.mods hasFlag Flag.IMPLICIT
 
     /** @return This [[ValDef]] without a [[Symbol]] and a `rhs` */
-    def reset: ValDef = ValDef(self.mods, self.name, self.tpt, EmptyTree)
+    def reset: ValDef = mk.valDef(self.name, self.tpt, self.mods.flags, EmptyTree)
   }
 
   /** Syntax sugar for [[Type]]s. */
@@ -363,6 +474,21 @@ trait ReflectUtil {
      */
     def apply(args: Type*): Type =
       appliedType(self, args: _*)
+  }
+
+  /** Syntax sugar for [[Symbol]]s. */
+  implicit class SymbolOps(self: Symbol) {
+
+    /** Check if this [[Symbol]] has an associated [[Type]]. */
+    def hasInfo: Boolean = self.info != null && self.info != NoType
+
+    /** Set the `info` of this [[Symbol]]. */
+    def withInfo(info: Type): Symbol =
+      setInfo(self, info)
+
+    /** Set the `info` of this [[Symbol]]. */
+    def withInfo[T: TypeTag]: Symbol =
+      withInfo(typeOf[T])
   }
 
   /** Syntax sugar for function call chain emulation. */

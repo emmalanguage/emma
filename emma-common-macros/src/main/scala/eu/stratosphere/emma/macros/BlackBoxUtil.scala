@@ -16,61 +16,22 @@ trait BlackBoxUtil extends BlackBox with ReflectUtil {
     if (tree.isType) c.typecheck(tree, c.TYPEmode)
     else c.typecheck(tree)
 
-  override val freshName = (prefix: String) => TermName(c.freshName(prefix))
-  override val freshType = (prefix: String) => TypeName(c.freshName(prefix))
+  def termSym(
+      owner: Symbol,
+      name:  TermName,
+      flags: FlagSet  = NoFlags,
+      pos:   Position = NoPosition) =
+    newTermSymbol(owner, name, pos, flags)
 
-  object mk {
-    def valDef(
-        name:  TermName,
-        tpe:   Type,
-        owner: Symbol   = enclosingOwner,
-        flags: FlagSet  = NoFlags,
-        pos:   Position = c.enclosingPosition,
-        rhs:   Tree     = EmptyTree): ValDef = {
-
-      val sym = newTermSymbol(owner, name, flags = flags, pos = pos)
-      c.internal.valDef(setInfo(sym, tpe), rhs)
-    }
-
-    def select(sym: Symbol, apply: Boolean): Tree = {
-      if (sym.owner != c.mirror.RootClass) {
-        val name = if (!apply && !sym.isPackage)
-          sym.name.toTypeName else sym.name.toTermName
-
-        Select(select(sym.owner, apply), name)
-      } else Ident(c.mirror.staticPackage(sym.fullName))
-    }
-  }
+  def typeSym(
+       owner: Symbol,
+       name:  TypeName,
+       flags: FlagSet  = NoFlags,
+       pos:   Position = NoPosition) =
+    newTypeSymbol(owner, name, pos, flags)
 
   /** Syntactic sugar for [[Tree]]s. */
   implicit class BlackBoxTreeOps(self: Tree) extends TreeOps(self) {
-
-    /**
-     * Annotate this [[Tree]] with a specified [[Type]].
-     *
-     * @param tpe The [[Type]] to use for this [[Tree]]
-     * @return This [[Tree]] with its [[Type]] set
-     */
-    def withType(tpe: Type): Tree =
-      setType(self, tpe)
-
-    /**
-     * Annotate this [[Tree]] with a specified [[Type]].
-     *
-     * @tparam T The [[Type]] to use for this [[Tree]]
-     * @return This [[Tree]] with its [[Type]] set
-     */
-    def withType[T: TypeTag]: Tree =
-      withType(typeOf[T])
-
-    /**
-     * Annotate this [[Tree]] with a specified [[Symbol]].
-     *
-     * @param sym The [[Symbol]] to use for this [[Tree]]
-     * @return This [[Tree]] with its [[Symbol]] set
-     */
-    def withSymbol(sym: Symbol): Tree =
-      setSymbol(self, sym)
 
     /**
      * Replace the owner of all [[Symbol]]s in this [[Tree]].

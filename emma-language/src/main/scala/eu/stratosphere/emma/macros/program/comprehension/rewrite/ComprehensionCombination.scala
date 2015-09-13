@@ -206,8 +206,8 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
       // bind join result to a fresh variable
       val tpt = tq"(${kx.vparams.head.tpt}, ${ky.vparams.head.tpt})"
-      val vd  = valDef(freshName("x$"), tpt)
-      val sym = newFreeTerm(vd.name.toString, ())
+      val vd  = mk.valDef(freshName("x$"), tpt)
+      val sym = mk.freeTerm(vd.name.toString)
       val qs  = suffix drop 2 filter { _ != filter }
       parent.qualifiers = prefix ::: Generator(sym, join) :: qs
 
@@ -300,8 +300,8 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       val cross = combinator.Cross(xs.rhs, ys.rhs)
 
       // bind join result to a fresh variable
-      val vd  = valDef(freshName("x$"), tq"(${rm.xs.tpe}, ${rm.ys.tpe})")
-      val sym = newFreeTerm(vd.name.toString, ())
+      val vd  = mk.valDef(freshName("x$"), tq"(${rm.xs.tpe}, ${rm.ys.tpe})")
+      val sym = mk.freeTerm(vd.name.toString)
       parent.qualifiers = prefix ::: Generator(sym, cross) :: suffix.drop(2)
 
       // substitute [v._1/x] in affected expressions

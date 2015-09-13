@@ -10,7 +10,6 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
   // type constructors
   val DATA_BAG = typeOf[api.DataBag[Nothing]].typeConstructor
   val GROUP    = typeOf[api.Group[Nothing, Nothing]].typeConstructor
-  val PAIR     = typeOf[(Nothing, Nothing)].typeConstructor
 
   // --------------------------------------------------------------------------
   // Comprehension Model

@@ -14,6 +14,7 @@ trait RuntimeUtil extends ReflectUtil {
   val tb: ToolBox[universe.type]
   
   import universe._
+  import internal._
 
   def parse(str: String) =
     tb.parse(str)
@@ -21,6 +22,21 @@ trait RuntimeUtil extends ReflectUtil {
   def typeCheck(tree: Tree) =
     if (tree.isType) tb.typecheck(tree, tb.TYPEmode)
     else tb.typecheck(tree)
+
+  def termSym(
+      owner: Symbol,
+      name:  TermName,
+      flags: FlagSet  = NoFlags,
+      pos:   Position = NoPosition) =
+    newTermSymbol(owner, name, pos, flags)
+
+  def typeSym(
+      owner: Symbol,
+      name:  TypeName,
+      flags: FlagSet  = NoFlags,
+      pos:   Position = NoPosition) =
+    newTypeSymbol(owner, name, pos, flags)
+
 
   /** Syntax sugar for [[Tree]]s. */
   implicit def fromTree(self: Tree): TreeOps =

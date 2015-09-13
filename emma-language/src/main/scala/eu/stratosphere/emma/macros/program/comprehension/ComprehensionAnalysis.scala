@@ -366,7 +366,7 @@ private[emma] trait ComprehensionAnalysis
 
             if (enclosed.nonEmpty) {
               expr.vars = for (v <- vars) yield if (v.name == gDef.name)
-                valDef(gDef.name, tq"${gen.rhs.elementType}") else v
+                mk.valDef(gDef.name, gen.rhs.elementType) else v
 
               val replacer = new FoldTermReplacer(enclosed, q"${gDef.name}.values")
               expr.tree    = typeCheckWith(vars, replacer transform body)
@@ -376,7 +376,7 @@ private[emma] trait ComprehensionAnalysis
           case expr @ Comprehension(fold: combinator.Fold, _) if folds contains fold =>
             // Find all value selects with associated enclosed in this ScalaExpr
             val enclosed = Map(fold.origin -> foldToIndex(fold.origin))
-            val vars     = valDef(gDef.name, tq"${gen.rhs.elementType}") :: Nil
+            val vars     = mk.valDef(gDef.name, gen.rhs.elementType) :: Nil
             val replacer = new FoldTermReplacer(enclosed, q"${gDef.name}.values")
             val body     = typeCheckWith(vars, replacer transform fold.origin)
             expr.hd      = ScalaExpr(vars, body)
@@ -385,7 +385,7 @@ private[emma] trait ComprehensionAnalysis
           case expr @ Filter(fold: combinator.Fold) if folds contains fold =>
             // Find all value selects with associated enclosed in this ScalaExpr
             val enclosed = Map(fold.origin -> foldToIndex(fold.origin))
-            val vars     = valDef(gDef.name, tq"${gen.rhs.elementType}") :: Nil
+            val vars     = mk.valDef(gDef.name, gen.rhs.elementType) :: Nil
             val replacer = new FoldTermReplacer(enclosed, q"${gDef.name}.values")
             val body     = typeCheckWith(vars, replacer transform fold.origin)
             expr.expr    = ScalaExpr(vars, body)
