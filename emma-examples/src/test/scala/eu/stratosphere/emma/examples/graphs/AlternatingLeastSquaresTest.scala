@@ -16,6 +16,7 @@ import org.scalatest.prop.PropertyChecks
 
 import scala.io.Source
 
+// FIXME: Doesn't run on Flink/Spark back-ends
 @RunWith(classOf[JUnitRunner])
 class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matchers {
 
@@ -27,7 +28,7 @@ class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matc
   val features   = 8
   val lambda     = 0.065
   val iterations = 10
-  val rt         = runtime.default()
+  val rt         = runtime.Native() //runtime.default()
 
   // initialize resources
   new File(path).mkdirs()
