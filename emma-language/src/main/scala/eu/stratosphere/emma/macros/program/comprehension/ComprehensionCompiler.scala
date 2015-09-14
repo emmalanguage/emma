@@ -26,7 +26,7 @@ private[emma] trait ComprehensionCompiler
     override def transform(tree: Tree): Tree = compView getByTerm tree match {
       case Some(term) => expandComprehension(tree, cfGraph, compView)(term)
       case None       => tree match {
-        case Apply(fn, values :: Nil) if api.apply.alternatives.contains(fn.symbol) =>
+        case Apply(fn, values :: Nil) if api.apply.alternatives contains fn.symbol =>
           expandScatter(transform(values))
 
         case _ => super.transform(tree)
@@ -61,13 +61,13 @@ private[emma] trait ComprehensionCompiler
 
       // Get the TermName associated with this comprehended term
       val name = term.definition collect {
-        case ValDef(_, n, _, _) => n.encodedName
+        case vd: ValDef => vd.name.encodedName
       } getOrElse term.id.encodedName
 
       val execute = root match {
         case _: combinator.Write => TermName("executeWrite")
         case _: combinator.Fold  => TermName("executeFold")
-        case _ => TermName("executeTempSink")
+        case _                   => TermName("executeTempSink")
       }
 
       q"""{
@@ -86,11 +86,11 @@ private[emma] trait ComprehensionCompiler
      * @return A [[String]] representation of the [[Expression]]
      */
     private def serialize(expr: Expression): Tree = expr match {
-      case combinator.Read(location, fmt) =>
-        q"ir.Read($location, $fmt)"
+      case combinator.Read(loc, fmt) =>
+        q"ir.Read($loc, $fmt)"
 
-      case combinator.Write(location, fmt, xs) =>
-        q"ir.Write($location, $fmt, ${serialize(xs)})"
+      case combinator.Write(loc, fmt, xs) =>
+        q"ir.Write($loc, $fmt, ${serialize(xs)})"
 
       case combinator.TempSource(id) =>
         q"ir.TempSource($id)"
@@ -174,7 +174,7 @@ private[emma] trait ComprehensionCompiler
         q"ir.Diff(${serialize(xs)}, ${serialize(ys)})"
 
       case ScalaExpr(_, Apply(fn, values :: Nil))
-        if api.apply.alternatives.contains(fn.symbol) =>
+        if api.apply.alternatives contains fn.symbol =>
           q"ir.Scatter(${transform(values)})"
 
       case e => EmptyTree
@@ -188,10 +188,13 @@ private[emma] trait ComprehensionCompiler
      * @param tree The [[Tree]] to be serialized
      * @return A [[String]] representation of the [[Tree]]
      */
-    private def serialize(tree: Tree): String =
-      showCode(q"""(..${for (sym <- tree.freeTerms)
-        yield ValDef(Modifiers(Flag.PARAM), sym.name, tq"${sym.info}", EmptyTree)}) => {
-          ${tree.unTypeChecked}
-        }""".typeChecked, printRootPkg = true)
+    private def serialize(tree: Tree): String = {
+      val args = tree.freeTerms.toList
+        .sortBy { _.fullName }
+        .map { sym => sym.name -> sym.info }
+
+      val fun = mk.anonFun(args, tree)
+      showCode(fun, printRootPkg = true)
+    }
   }
 }

@@ -7,7 +7,8 @@ import scala.collection.mutable
 /** Model and helper functions for the intermediate representation of comprehended terms. */
 private[emma] trait ComprehensionModel extends BlackBoxUtil {
   import universe._
-  // type constructors
+
+  // Type constructors
   val DATA_BAG = typeOf[api.DataBag[Nothing]].typeConstructor
   val GROUP    = typeOf[api.Group[Nothing, Nothing]].typeConstructor
 
@@ -374,8 +375,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
    * @return A type-checked version of the [[Tree]]
    */
   def typeCheckWith(env: List[ValDef], tree: Tree) =
-    if (tree.hasType) tree
-    else {
+    if (tree.hasType) tree else {
       val bindings = for (v <- env.reverse) yield v.name -> q"null.asInstanceOf[${v.tpt}]"
       tree.bind(bindings: _*).typeChecked.as[Block].expr
     }

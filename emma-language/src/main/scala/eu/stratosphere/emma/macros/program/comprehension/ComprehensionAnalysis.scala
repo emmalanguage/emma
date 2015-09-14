@@ -64,22 +64,22 @@ private[emma] trait ComprehensionAnalysis
     // Step #1: compute the set of maximal terms that can be translated to comprehension syntax
     val terms = (for (block <- cfBlockTraverser; stmt <- block.stats) yield {
       // Find all value applications on methods from the comprehended API for this statement
-      implicit val comprehendedTerms: mutable.Set[Tree] =
-        mutable.Set(stmt collect { case app @ Apply(f, _) if api.methods(f.symbol) => app }: _*)
+      implicit val compTerms: mutable.Set[Tree] =
+        mutable.Set(stmt collect { case app @ Apply(f, _) if api methods f.symbol => app }: _*)
 
       // Reduce by removing nodes that will be comprehended with their parent
       var obsolete = mutable.Set.empty[Tree]
 
       do {
-        comprehendedTerms --= obsolete
+        compTerms --= obsolete
         obsolete = for {
-          term  <- comprehendedTerms
+          term  <- compTerms
           child <- compChild(term)
         } yield child
       } while (obsolete.nonEmpty)
 
       // Return the reduced set of applies
-      comprehendedTerms
+      compTerms
     }).flatten.toSet
 
     // Step #2: create ComprehendedTerm entries for the identified terms
@@ -111,30 +111,23 @@ private[emma] trait ComprehensionAnalysis
    * @return An option holding the comprehended parent term (if such exists)
    */
   // FIXME: Make this consistent with the `comprehend` method patterns
-  private def compChild(term: Tree)(implicit compTerms: mutable.Set[Tree]) = term match {
-    case Apply(f, Function(_, body) :: Nil)
+  private def compChild(term: Tree)
+      (implicit compTerms: mutable.Set[Tree]): Option[Tree] = term match {
+    case q"${f: Tree}[$_](($_) => $body)"
       if (f.symbol == api.map || f.symbol == api.flatMap) && compTerms(body) =>
         Some(body)
 
-    case Apply(Apply(TypeApply(_: Select, _), _), parent :: Nil)
-      if compTerms(parent) =>
-        Some(parent)
+    case q"$_[..$_](..$_)($parent)"
+      if compTerms(parent) => Some(parent)
 
-    case Apply(TypeApply(_: Select, _), parent :: Nil)
-      if compTerms(parent) =>
-        Some(parent)
+    case q"$_[..$_]($parent)"
+      if compTerms(parent) => Some(parent)
 
-    case Apply(TypeApply(Select(parent, _), _), _)
-      if compTerms(parent) =>
-        Some(parent)
+    case q"$parent.$_[..$_](...$_)"
+      if compTerms(parent) => Some(parent)
 
-    case Apply(Select(parent, _), _)
-      if compTerms(parent) =>
-        Some(parent)
-
-    case Apply(parent: Apply, _)
-      if compTerms(parent) =>
-        Some(parent)
+    case q"${parent: Apply}(...$_)"
+      if compTerms(parent) => Some(parent)
 
     case _ => None
   }
@@ -148,8 +141,9 @@ private[emma] trait ComprehensionAnalysis
   private def compTermDef(term: Tree)(implicit cfBlocks: TraversableOnce[CFBlock]) = {
     var termDef = Option.empty[Tree]
     for (block <- cfBlocks; stmt <- block.stats) stmt foreach {
-      case vd @ ValDef(_, _, _,  rhs) if term == rhs => termDef = Some(vd)
-      case as @ Assign(_: Ident, rhs) if term == rhs => termDef = Some(as)
+      case vd @ q"$_ val $_: $_ = ${`term`}" => termDef = Some(vd)
+      case vd @ q"$_ var $_: $_ = ${`term`}" => termDef = Some(vd)
+      case as @ q"${_: Ident} = ${`term`}"   => termDef = Some(as)
       case _ =>
     }
 
@@ -162,10 +156,11 @@ private[emma] trait ComprehensionAnalysis
    * @param term The term to lookup
    * @return The name of the term
    */
-  private def compTermName(term: Option[Tree], default: TermName) =
+  private def compTermName(term: Option[Tree], default: TermName): TermName =
     term getOrElse default match {
-      case ValDef(_, name, _, _)            => name
-      case Assign(Ident(name: TermName), _) => name
+      case q"$_ val $name: $_ = $_"  => name
+      case q"$_ var $name: $_ = $_"  => name
+      case q"${name: TermName} = $_" => name
       case _ => default
     }
 
@@ -182,7 +177,7 @@ private[emma] trait ComprehensionAnalysis
    */
   private def comprehend(vars: List[ValDef])(tree: Tree, input: Boolean = true): Expression =
     (tree match { // Ignore a top-level Typed node (side-effect of the Algebra inlining macros)
-      case Typed(inner, _) => inner
+      case q"${inner: Tree}: $_" => inner
       case _ => tree
     }) match { // translate based on matched expression type
 
@@ -191,22 +186,22 @@ private[emma] trait ComprehensionAnalysis
       // -----------------------------------------------------
 
       // xs.map(f)
-      case Apply(TypeApply(sel @ Select(xs, _), _ :: Nil), Function(arg :: Nil, body) :: Nil)
-        if sel.symbol == api.map =>
+      case q"${map @ Select(xs, _)}[$_]((${arg: ValDef}) => $body)"
+        if map.symbol == api.map =>
           val bind = Generator(arg.term, comprehend(vars)(xs))
           val head = comprehend(arg.reset :: vars)(body, input = false)
           Comprehension(head, bind :: Nil)
 
       // xs.flatMap(f)
-      case Apply(TypeApply(sel @ Select(xs, _), _ :: Nil), Function(arg :: Nil, body) :: Nil)
-        if sel.symbol == api.flatMap =>
+      case q"${flatMap @ Select(xs, _)}[$_]((${arg: ValDef}) => $body)"
+        if flatMap.symbol == api.flatMap =>
           val bind = Generator(arg.term, comprehend(vars)(xs))
           val head = comprehend(arg.reset :: vars)(body, input = false)
           MonadJoin(Comprehension(head, bind :: Nil))
 
       // xs.withFilter(f)
-      case Apply(sel @ Select(xs, _), Function(arg :: Nil, body) :: Nil)
-        if sel.symbol == api.withFilter =>
+      case q"${withFilter @ Select(xs, _)}((${arg: ValDef}) => $body)"
+        if withFilter.symbol == api.withFilter =>
           val bind   = Generator(arg.term, comprehend(vars)(xs))
           val filter = Filter(comprehend(arg.reset :: vars)(body))
           val head   = comprehend(arg.reset :: vars)(q"${arg.name}", input = false)
@@ -216,24 +211,24 @@ private[emma] trait ComprehensionAnalysis
       // Grouping and Set operations
       // -----------------------------------------------------
 
-      // xs.groupBy(k)
-      case Apply(TypeApply(sel @ Select(xs, _), _ :: Nil), List(k: Function))
-        if sel.symbol == api.groupBy =>
-          combinator.Group(k, comprehend(Nil)(xs))
+      // xs.groupBy(key)
+      case q"${groupBy @ Select(xs, _)}[$_]($key)"
+        if groupBy.symbol == api.groupBy =>
+          combinator.Group(key, comprehend(Nil)(xs))
 
       // xs.minus(ys)
-      case Apply(TypeApply(sel @ Select(xs, _), _ :: Nil), ys :: Nil)
-        if sel.symbol == api.minus =>
+      case q"${minus @ Select(xs, _)}[$_]($ys)"
+        if minus.symbol == api.minus =>
           combinator.Diff(comprehend(Nil)(xs), comprehend(Nil)(ys))
 
       // xs.plus(ys)
-      case Apply(TypeApply(sel @ Select(xs, _), _ :: Nil), ys :: Nil)
-        if sel.symbol == api.plus =>
+      case q"${plus @ Select(xs, _)}[$_]($ys)"
+        if plus.symbol == api.plus =>
           combinator.Union(comprehend(Nil)(xs), comprehend(Nil)(ys))
 
       // xs.distinct()
-      case Apply(sel @ Select(xs, _), Nil)
-        if sel.symbol == api.distinct =>
+      case q"${distinct @ Select(xs, _)}()"
+        if distinct.symbol == api.distinct =>
           combinator.Distinct(comprehend(Nil)(xs))
 
       // -----------------------------------------------------
@@ -241,25 +236,25 @@ private[emma] trait ComprehensionAnalysis
       // -----------------------------------------------------
 
       // xs.fold(empty, sng, union)
-      case tree @ Apply(TypeApply(sel @ Select(xs, _), _), empty :: sng :: union :: Nil)
-        if sel.symbol == api.fold =>
+      case tree @ q"${fold @ Select(xs, _)}[$_]($empty, $sng, $union)"
+        if fold.symbol == api.fold =>
           combinator.Fold(empty, sng, union, comprehend(Nil)(xs), tree)
-      
+
       // ----------------------------------------------------------------------
       // Environment & Host Language Connectors
       // ----------------------------------------------------------------------
 
-      // write[T](location, fmt)(xs)
-      case Apply(Apply(TypeApply(fn, _ :: Nil), location :: fmt :: Nil), xs :: Nil)
-        if fn.symbol == api.write =>
-          combinator.Write(location, fmt, comprehend(vars)(xs))
+      // write[T](loc, fmt)(xs)
+      case q"${write: Tree}[$_]($loc, $fmt)($xs)"
+        if write.symbol == api.write =>
+          combinator.Write(loc, fmt, comprehend(vars)(xs))
 
-      // read[T](location, fmt)
-      case Apply(TypeApply(fn, _ :: Nil), location :: fmt :: Nil)
-        if fn.symbol == api.read =>
-          combinator.Read(location, fmt)
+      // read[T](loc, fmt)
+      case q"${read: Tree}[$_]($loc, $fmt)"
+        if read.symbol == api.read =>
+          combinator.Read(loc, fmt)
 
-      // temp result identifier
+      // Temp result identifier
       case id: Ident if input =>
         combinator.TempSource(id)
 
@@ -286,23 +281,23 @@ private[emma] trait ComprehensionAnalysis
     var inlined = tree
 
     // Find all value definitions that can be inlined
-    var valDefs = (for (cv <- compView.terms; d <- cv.definition)
+    var definitions = (for (cv <- compView.terms; d <- cv.definition)
       yield cv.definition collect {
         // Make sure that the associated definition is a non-mutable ValDef
-        case vd @ ValDef(mods, _, _, _) if (mods.flags | Flag.MUTABLE) != mods.flags =>
+        case vd @ q"$_ val $_: $_ = $_" =>
           // Get the identifiers referencing this ValDef symbol
           val ids = tree collect { case id: Ident if id.symbol == d.symbol => id }
           // If the symbol is referenced only once, inline the ValDef rhs in place of the ident
-          if (ids.size == 1) Some(vd) else None
+          if (ids.size == 1) Some(vd.as[ValDef]) else None
       }).flatten.flatten
 
-    while (valDefs.nonEmpty) {
+    while (definitions.nonEmpty) {
       // Get a ValDef to inline
-      val vd = valDefs.head
+      val vd  = definitions.head
       // Inline current value definition in the tree
       inlined = inlined inline vd
       // Inline in all other value definitions and continue with those
-      valDefs = for (other <- valDefs if other.symbol != vd.symbol)
+      definitions = for (other <- definitions if other.symbol != vd.symbol)
         yield other.inline(vd).as[ValDef]
     }
 
@@ -320,34 +315,34 @@ private[emma] trait ComprehensionAnalysis
       (implicit cfGraph: CFGraph, compView: ComprehensionView): Unit = {
 
     // find the symbols of all "Group[K, V]" definitions 'g'
-    val groupDefs = tree collect { case vd: ValDef if hasGroupType(vd) => vd }
+    val groupDefinitions = tree collect { case vd: ValDef if hasGroupType(vd) => vd }
 
     // compute a flattened list of all expressions in the comprehension view
     val expressions = compView.terms flatMap { _.comprehension.expr }
 
     for {
-      gDef <- groupDefs if gDef.hasTerm
+      gDef <- groupDefinitions if gDef.hasTerm
       (gen, group) <- generatorFor(gDef.term, expressions)
     } {
       // the symbol associated with 'g'
       val gSym = gDef.symbol
 
       // find all 'g.values' expressions for the group symbol
-      val groupSels = tree collect {
-        case sel @ Select(id: Ident, TermName("values")) if id.symbol == gSym => sel
+      val groupSelects = tree collect {
+        case sel @ q"${id: Ident}.values" if id.symbol == gSym => sel.as[Select]
       }
 
       // For each 'g.values' expression, find an associated 'g.values.fold(...)' comprehension,
       // if one exists
       val folds = for {
-        sel  <- groupSels
+        sel  <- groupSelects
         expr <- expressions
         fold <- foldOverSelect(sel, expr)
       } yield fold
 
       // !!! All 'g.values' expressions are used directly in a comprehended 'fold' =>
       // apply Fold-Group-Fusion !!!
-      if (folds.nonEmpty && groupSels.size == folds.size) {
+      if (folds.nonEmpty && groupSelects.size == folds.size) {
         // Create an auxiliary map
         val foldToIndex = folds.map { _.origin }.zipWithIndex.toMap
 
@@ -360,8 +355,8 @@ private[emma] trait ComprehensionAnalysis
           // Adapt Scala expression nodes referencing the group
           case expr @ ScalaExpr(vars, body) if vars exists { _.name == gDef.name } =>
             // Find all value selects with associated enclosed in this ScalaExpr
-            val enclosed = body.collect { case tree: Tree
-              if foldToIndex.contains(tree) => tree -> foldToIndex(tree)
+            val enclosed = body.collect {
+              case t if foldToIndex contains t => t -> foldToIndex(t)
             }.toMap
 
             if (enclosed.nonEmpty) {
@@ -431,23 +426,14 @@ private[emma] trait ComprehensionAnalysis
   def applyDeMorgan(tree: Tree): Tree = {
     object DeMorganTransformer extends Transformer {
       def moveNegationsInside(tree: Tree): Tree = tree match {
-        case Apply(Select(q, n), as) => n match {
-          // !(A || B) => !A && !B
-          case TermName("$bar$bar") => transform(q"(!$q && !${as.head})")
-          // !(A && B) => !A || !B
-          case TermName("$amp$amp") => transform(q"(!$q || !${as.head})")
-          // !A => !A
-          // This should cover the cases for atoms that we don't want to reduce further
-          case _ => q"!$tree"
-        }
-
-        case _ => c.abort(c.enclosingPosition,
-          s"Unexpected tree in DeMorgan's transformer: ${showCode(tree)}")
+        case q"$p || $q" => transform(q"!$p && !$q")
+        case q"$p && $q" => transform(q"!$p || !$q")
+        case _           => q"!$tree"
       }
 
       override def transform(tree: Tree) = tree match {
-        case Select(q, TermName("unary_$bang")) => moveNegationsInside(q)
-        case _ => super.transform(tree)
+        case q"!$p" => moveNegationsInside(p)
+        case _      => super.transform(tree)
       }
     }
 
@@ -463,27 +449,8 @@ private[emma] trait ComprehensionAnalysis
   def distributeOrOverAnd(tree: Tree): Tree = {
     object DistributeTransformer extends Transformer {
       override def transform(tree: Tree): Tree = tree match {
-        case Apply(Select(lhs1, TermName("$bar$bar")), rhs1) =>
-          (lhs1, rhs1.head) match {
-            // C || (A && B) => (A || C) && (C || B)
-            // This also covers:
-            // (A && B) || (C && D)
-            // => ((A && B) || C) && ((A && B) || D)
-            // => (((A || C) && (B || C)) && ((A || D) && (B || D))
-            case (_, Apply(Select(lhs2, TermName("$amp$amp")), rhs2)) =>
-              val modLhs = transform(q"($lhs1 || $lhs2)")
-              val modRhs = transform(q"($lhs1 || ${rhs2.head})")
-              q"$modLhs && $modRhs"
-
-            // (A && B) || C => (A || C) && (C || B)
-            case (Apply(Select(lhs2, TermName("$amp$amp")), rhs2), _) =>
-              val modLhs = transform(q"($lhs2 || ${rhs1.head})")
-              val modRhs = transform(q"(${rhs2.head} || ${rhs1.head})")
-              q"$modLhs && $modRhs"
-
-            case _ => super.transform(tree)
-          }
-        
+        case q"$a || ($b && $c)" => q"${transform(q"$a || $b")} && ${transform(q"$a || $c")}"
+        case q"($a && $b) || $c" => q"${transform(q"$a || $c")} && ${transform(q"$b || $c")}"
         case _ => super.transform(tree)
       }
     }
@@ -505,55 +472,53 @@ private[emma] trait ComprehensionAnalysis
    *          `Some(tree)` with the tree of the cleaned/reduced disjunction.
    */
   def cleanConjuncts(tree: Tree): List[Option[Tree]] = {
-    val conjunct = ListBuffer.empty[Disjunct]
+    val conjunctions = ListBuffer.empty[Disjunction]
 
     object DisjunctTraverser extends Traverser {
-      
-      var disjunct = new Disjunct()
+      var disjunction = new Disjunction()
 
       override def traverse(tree: Tree) = tree match {
         // (A || B || ... || Y || Z)
-        case Apply(Select(lhs, TermName("$bar$bar")), rhs) =>
-          traverse(lhs)
-          traverse(rhs.head)
+        case q"$p || $q" =>
+          traverse(p); traverse(q)
 
         // Here we have a negated atom
-        case Select(app @ Apply(_: Select,_), TermName("unary_$bang")) =>
-          disjunct addPredicate Predicate(app, neg = true)
+        case q"!${app: Apply}" =>
+          disjunction addPredicate Predicate(app, neg = true)
 
         // Here we have an atom with a method select attached
-        case Select(lhs, _) => traverse(lhs)
+        case q"$lhs.$_" =>
+          traverse(lhs)
 
         // Here we should have only atoms
         case app: Apply =>
-          disjunct addPredicate Predicate(app, neg = false)
+          disjunction addPredicate Predicate(app, neg = false)
 
         case expr => c.abort(c.enclosingPosition,
-          s"Unexpected structure in predicate Disjunct: ${showCode(expr)}")
+          s"Unexpected structure in predicate disjunction: ${showCode(expr)}")
       }
     }
 
     object ConjunctTraverser extends Traverser {
       override def traverse(tree: Tree) = tree match {
         // C1 && C2 && C3 && ... && C4
-        case Apply(Select(lhs, TermName("$amp$amp")), rhs) =>
-          traverse(lhs)
-          traverse(rhs.head)
+        case q"$p && $q" =>
+          traverse(p); traverse(q)
 
-        // we found a disjunct
+        // We found a disjunction
         case app: Apply =>
           DisjunctTraverser traverse app
-          conjunct += DisjunctTraverser.disjunct
-          DisjunctTraverser.disjunct = new Disjunct()
+          conjunctions += DisjunctTraverser.disjunction
+          DisjunctTraverser.disjunction = new Disjunction()
 
         case _ =>
           //super.traverse(tree)
-          //throw new RuntimeException("Unexpected structure in predicate Conjunct")
+          //throw new RuntimeException("Unexpected structure in predicate conjunction")
       }
     }
 
     ConjunctTraverser traverse tree
-    conjunct.toList map { _.getTree }
+    conjunctions.toList map { _.getTree }
   }
 
   case class Predicate(tree: Apply, neg: Boolean) {
@@ -562,17 +527,17 @@ private[emma] trait ComprehensionAnalysis
       Predicate(tree, neg = !neg)
 
     def getTree: Tree =
-      if (neg) Select(tree, TermName("unary_$bang")) else tree
+      if (neg) q"!$tree" else tree
 
     override def equals(that: Any) = that match {
       case Predicate(t, n) => tree.equalsStructure(t) && neg == n
       case _ => false
     }
 
-    //TODO: Implement hashcode
+    // TODO: Implement hashcode
   }
 
-  class Disjunct(predicates: ListBuffer[Predicate] = ListBuffer.empty[Predicate]) {
+  class Disjunction(predicates: ListBuffer[Predicate] = ListBuffer.empty) {
 
     // Add predicate if it is not contained yet
     def addPredicate(p: Predicate) =
@@ -583,14 +548,8 @@ private[emma] trait ComprehensionAnalysis
       if (alwaysTrue) None else predicates.map { _.getTree }
         .reduceOption { (p, q) => q"$p || $q" }
 
-    def alwaysTrue: Boolean = {
-      for {
-        ListBuffer(p, q) <- predicates combinations 2
-        if p.tree equalsStructure q.tree
-        if p.neg != q.neg
-      } return true
-      
-      false
+    def alwaysTrue: Boolean = predicates combinations 2 exists {
+      case ListBuffer(p, q) => p.neg != q.neg && p.tree.equalsStructure(q.tree)
     }
   }
 
@@ -625,8 +584,8 @@ private[emma] trait ComprehensionAnalysis
       val empty = q"(..${for (f <- folds) yield f.empty})".typeChecked
 
       // Derive the unique product 'sng' function
-      val x   = freshName("x$")
-      val y   = freshName("y$")
+      val x   = freshName("x")
+      val y   = freshName("y")
       val sng = q"($x: ${xs.elementType}) => (..${
         for (f <- folds) yield {
           val sng = f.sng.as[Function]

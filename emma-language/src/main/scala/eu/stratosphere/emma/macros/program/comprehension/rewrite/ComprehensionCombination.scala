@@ -206,7 +206,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
       // bind join result to a fresh variable
       val tpt = tq"(${kx.vparams.head.tpt}, ${ky.vparams.head.tpt})"
-      val vd  = mk.valDef(freshName("x$"), tpt)
+      val vd  = mk.valDef(freshName("x"), tpt)
       val sym = mk.freeTerm(vd.name.toString)
       val qs  = suffix drop 2 filter { _ != filter }
       parent.qualifiers = prefix ::: Generator(sym, join) :: qs
@@ -225,23 +225,22 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
     private def parseJoinPredicate(xs: Generator, ys: Generator, p: ScalaExpr):
       Option[(Function, Function)] = p.tree match {
-        // check if the predicate expression has the type `lhs == rhs`
-        case Apply(Select(lhs, name), List(rhs)) if name.toString == "$eq$eq" =>
-          val lhsVars = { // find expr.vars used in the `lhs`
+        case q"${lhs: Tree} == ${rhs: Tree}" =>
+          val lhsVars = { // Find expr.vars used in the `lhs`
             val names = lhs.collect { case Ident(n: TermName) => n }.toSet
             p.vars filter { v => names(v.name) }
           }
 
-          val rhsVars = { // find expr.vars used in the `rhs`
+          val rhsVars = { // Find expr.vars used in the `rhs`
             val names = rhs.collect { case Ident(n: TermName) => n }.toSet
             p.vars filter { v => names(v.name) }
           }
 
           if (lhsVars.size != 1 || rhsVars.size != 1) {
-            None // both `lhs` and `rhs` must refer to exactly one variable
+            None // Both `lhs` and `rhs` must refer to exactly one variable
           } else if (lhsVars.exists { _.name == xs.lhs.name } &&
                      rhsVars.exists { _.name == ys.lhs.name }) {
-            // filter expression has the type `f(xs.lhs) == h(ys.lhs)`
+            // Filter expression has the type `f(xs.lhs) == h(ys.lhs)`
             val vx = lhsVars.find { _.name == xs.lhs.name }.get
             val vy = rhsVars.find { _.name == ys.lhs.name }.get
             val kx = q"($vx) => ${lhs.freeEnv(p.vars: _*)}".typeChecked.as[Function]
@@ -249,15 +248,15 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
             Some(kx, ky)
           } else if (lhsVars.exists { _.name == ys.lhs.name } &&
                      rhsVars.exists { _.name == xs.lhs.name }) {
-            // filter expression has the type `f(ys.lhs) == h(xs.lhs)`
+            // Filter expression has the type `f(ys.lhs) == h(xs.lhs)`
             val vx = rhsVars.find { _.name == xs.lhs.name }.get
             val vy = lhsVars.find { _.name == ys.lhs.name }.get
             val kx = q"($vx) => ${rhs.freeEnv(p.vars: _*)}".typeChecked.as[Function]
             val ky = q"($vy) => ${lhs.freeEnv(p.vars: _*)}".typeChecked.as[Function]
             Some(kx, ky)
-          } else None  // something else
+          } else None  // Something else
 
-        case _ => None // something else
+        case _ => None // Something else
       }
   }
 
@@ -300,7 +299,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       val cross = combinator.Cross(xs.rhs, ys.rhs)
 
       // bind join result to a fresh variable
-      val vd  = mk.valDef(freshName("x$"), tq"(${rm.xs.tpe}, ${rm.ys.tpe})")
+      val vd  = mk.valDef(freshName("x"), tq"(${rm.xs.tpe}, ${rm.ys.tpe})")
       val sym = mk.freeTerm(vd.name.toString)
       parent.qualifiers = prefix ::: Generator(sym, cross) :: suffix.drop(2)
 

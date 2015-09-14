@@ -156,11 +156,10 @@ trait ReflectUtil {
     def anonFun(
         args:  List[(TermName, Type)],
         body:  Tree,
-        reTpe: Type     = UNIT,
         owner: Symbol   = NoSymbol,
         flags: FlagSet  = Flag.SYNTHETIC,
         pos:   Position = NoPosition): Function = {
-      val tpe    = FUN(args.size)(args.map { _._2 } :+ reTpe: _*)
+      val tpe    = FUN(args.size)(args.map { _._2 } :+ body.trueType: _*)
       val sym    = termSym(owner, TermName("anonfun"), flags, pos) withInfo tpe
       val params = for ((name, tpe) <- args)
         yield valDef(name, tpe, sym, Flag.SYNTHETIC | Flag.PARAM, pos)
@@ -186,6 +185,14 @@ trait ReflectUtil {
 
     /** @return `true` if this [[Tree]] is annotated with a [[Symbol]], `false` otherwise */
     def hasSymbol: Boolean = self.symbol != null && self.symbol != NoSymbol
+
+    /** @return `true` if this [[Tree]] has an owner, `false` otherwise */
+    def hasOwner: Boolean = hasSymbol &&
+      self.symbol.owner != null &&
+      self.symbol.owner != NoSymbol
+
+    /** @return This [[Tree]]'s owner */
+    def owner: Symbol = self.symbol.owner
 
     /** @return An un-type-checked version of this [[Tree]] */
     def unTypeChecked: Tree = unTypeCheck(self)

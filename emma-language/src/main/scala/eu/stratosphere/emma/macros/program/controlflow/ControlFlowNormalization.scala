@@ -37,47 +37,31 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
     val testCounter = new Counter()
 
     override def transform(tree: Tree) = tree match {
-      // while (`cond`) { `body` }
-      case LabelDef(_, _, If(cond, Block(body, _), _)) =>
-        cond match {
-          case _: Ident =>
-            // If condition is a simple identifier, no normalization needed
-            super.transform(tree)
-          case _ =>
-            // Introduce condition variable
-            val condVar = TermName(f"testA${testCounter.advance.get}%03d")
-            // Move the complex test outside the condition
-            q"{ var $condVar = $cond; while ($condVar) { $body; $condVar = $cond } }"
-        }
+      // If condition is a simple identifier, no normalization needed
+      case q"while (${_: Ident}) $_"      => super.transform(tree)
+      case q"do $_ while (${_: Ident})"   => super.transform(tree)
+      case q"if (${_: Ident}) $_ else $_" => super.transform(tree)
 
-      // do { `body` } while (`cond`)
-      case LabelDef(_, _, Block(body, If(cond, _, _))) =>
-        cond match {
-          case _: Ident =>
-            // If condition is a simple identifier, no normalization needed
-            super.transform(tree)
-          case _ =>
-            // Introduce condition variable
-            val condVar = TermName(f"testB${testCounter.advance.get}%03d")
-            // Move the complex test outside the condition
-            q"""{
-              var $condVar = null.asInstanceOf[Boolean]
-              do { $body; $condVar = $cond } while ($condVar)
-            }"""
-        }
+      case q"while ($cond) $body" =>
+        // Introduce condition variable
+        val condVar = freshName("testWhile")
+        // Move the complex test outside the condition
+        q"{ var $condVar = $cond; while ($condVar) { $body; $condVar = $cond } }"
 
-      // if (`cond`) `thn` else `els`
-      case If(cond, thn, els) =>
-        cond match {
-          case _: Ident =>
-            // If condition is a simple identifier, no normalization needed
-            super.transform(tree)
-          case _ =>
-            // Introduce condition value
-            val condVal = TermName(f"testC${testCounter.advance.get}%03d")
-            // Move the complex test outside the condition
-            q"val $condVal = $cond; if ($condVal) $thn else $els"
-        }
+      case q"do $body while ($cond)" =>
+        // Introduce condition variable
+        val condVar = freshName("testDoWhile")
+        // Move the complex test outside the condition
+        q"""{
+          var $condVar = null.asInstanceOf[Boolean]
+          do { $body; $condVar = $cond } while ($condVar)
+        }"""
+
+      case q"if ($cond) $thn else $els" =>
+        // Introduce condition value
+        val condVal = freshName("testIf")
+        // Move the complex test outside the condition
+        q"val $condVal = $cond; if ($condVal) $thn else $els"
 
       // Default case
       case _ => super.transform(tree)
@@ -111,9 +95,9 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
      * @return `true` if the `this` reference should be substituted
      */
     def needsSubstitution(enclosing: This, select: Select): Boolean =
-      enclosing.symbol == clazz &&                     // Enclosing 'this' is a class
-        select.hasTerm &&                              // Term selection
-        (select.term.isStable || select.term.isGetter) // Getter or val select
+      // Enclosing 'this' is a class, term selection, getter or val select
+      enclosing.symbol == clazz && select.hasTerm &&
+        (select.term.isStable || select.term.isGetter)
   }
 
   /**
@@ -159,15 +143,16 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
 
     override def transform(tree: Tree): Tree = tree match {
       // Search for a class call without 'new'
-      case Apply(Select(id: Ident, name), args) if !isParam(id.symbol) =>
-        val selChain = mk.select(id.symbol, apply = true)
-        Apply(Select(selChain, name), args map transform)
+      case q"${id: Ident}.$name[..$types](..${args: List[Tree]})"
+        if !isParam(id.symbol) =>
+          val selChain = mk.select(id.symbol, apply = true)
+          q"$selChain.$name[..$types](..${args map transform})"
 
       // Search for a class call with 'new'
-      case Apply(Select(New(id: Ident), termNames.CONSTRUCTOR), args)
-        if id.hasSymbol && !id.symbol.owner.isTerm =>
+      case q"new ${id: Ident}[..$types](..${args: List[Tree]})"
+        if id.hasOwner && !id.owner.isTerm =>
           val selChain = mk.select(id.symbol, apply = false)
-          Apply(Select(New(selChain), termNames.CONSTRUCTOR), args map transform)
+          q"new $selChain[..$types](..${args map transform})"
 
       case _ => super.transform(tree)
     }

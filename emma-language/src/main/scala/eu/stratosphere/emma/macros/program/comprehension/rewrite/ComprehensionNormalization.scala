@@ -1,7 +1,5 @@
 package eu.stratosphere.emma.macros.program.comprehension.rewrite
 
-import scala.util.matching.Regex
-
 trait ComprehensionNormalization extends ComprehensionRewriteEngine {
   import universe._
 
@@ -90,7 +88,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
 
   object SimplifyTupleProjection extends Rule {
 
-    val regex = "_(\\d{1,2})".r
+    val offset = "_([1-9]+)".r
 
     case class RuleMatch(expr: ScalaExpr)
 
@@ -99,56 +97,20 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
       case _ => None
     }
 
-    def guard(rm: RuleMatch) =
-      new PatternMatcher(regex) apply rm.expr.tree
+    def guard(rm: RuleMatch) = rm.expr.tree exists {
+      case q"(..${List(_, _, _*)}).${TermName(offset(_))}" => true
+      case _ => false
+    }
 
     def fire(rm: RuleMatch) = {
-      rm.expr.tree = new Simplifier(regex) apply rm.expr.tree
-      rm.expr // return new root
-    }
-
-    class PatternMatcher(pattern: Regex) extends Traverser with (Tree => Boolean) {
-
-      var result = false
-
-      override def traverse(tree: Tree) = tree match {
-        case Select(Apply(TypeApply(Select(tuple @ Select(Ident(TermName("scala")), _), TermName("apply")), _), _), _: TermName)
-          if isProjection(tree, tuple, pattern) => result = true
-          
-        case _ => super.traverse(tree)
+      val expr  = rm.expr
+      expr.tree = expr.tree transform {
+        case q"(..${args: List[Tree]}).${TermName(offset(i))}"
+          if args.size > 1 => args(i.toInt - 1)
       }
 
-      def apply(tree: Tree) = {
-        result = false
-        traverse(tree)
-        result
-      }
+      expr
     }
-
-    class Simplifier(pattern: Regex) extends Transformer with (Tree => Tree) {
-
-      var result = false
-
-      override def transform(tree: Tree) = tree match {
-        case Select(Apply(TypeApply(Select(tuple @ Select(Ident(TermName("scala")), _), TermName("apply")), types), args), _: TermName)
-          if isProjection(tree, tuple, pattern) =>
-            val offset = pattern.findFirstMatchIn(tree.symbol.fullName).get.group(1).toInt
-            if (args.size >= offset && types.size >= offset) q"${args(offset - 1)}"
-            else super.transform(tree)
-
-        case _ => super.transform(tree)
-      }
-
-      def apply(tree: Tree) =
-        transform(tree)
-    }
-
-    private def isProjection(tree: Tree, tuple: Select, pattern: Regex) =
-      tuple.name.toString.startsWith("Tuple") &&
-      tuple.hasSymbol && tuple.symbol.isModule &&
-      tuple.symbol.companion.asClass.baseClasses.contains(symbolOf[Product]) &&
-      tree.hasSymbol && tree.symbol.isMethod &&
-      pattern.findFirstIn(tree.symbol.fullName).isDefined
   }
 
   /**
@@ -174,11 +136,11 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
       case _ => None
     }
 
-    def guard(rm: RuleMatch) = true //FIXME
+    def guard(rm: RuleMatch) = true // FIXME
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(fold, map, child) = rm
-      val x    = freshName("x$")
+      val x    = freshName("x")
       val head = map.hd.as[ScalaExpr].tree.rename(child.lhs.name, x)
       val sng  = fold.sng.as[Function]
       val body = sng.body.substitute(sng.vparams.head.name, head)

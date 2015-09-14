@@ -29,45 +29,18 @@ private[emma] trait ControlFlowAnalysis extends ControlFlowModel with ControlFlo
         for (stmt <- stats) block = createCFG(stmt, block)
         createCFG(expr, block)
 
-      case ValDef(_, _, _, rhs) =>
-        // Ensure that the `rhs` tree is a "simple" term (no blocks or conditionals)
-        if (rhs match {
-          case _: Block => true
-          case _: If    => true
-          case _        => false
-        }) c.abort(curTree.pos,
-          "Emma does not support assignments with conditionals on the rhs at the moment")
+      case ValDef(_, _, _,  _ @ (_: Block | _: If))
+        |  Assign(_: Ident, _ @ (_: Block | _: If))
+        => c.abort(curTree.pos,
+            "Emma does not support assignments with conditionals on the rhs at the moment")
 
+      case _: ValDef | Assign(_: Ident, _) =>
         // Add assignment to the current block
         curBlock.stats += curTree
         curBlock
 
-      // `name` = `rhs`
-      case Assign(_: Ident, rhs) =>
-        // Ensure that the `rhs` tree is a "simple" term (no blocks or conditionals)
-        if (rhs match {
-          case _: Block => true
-          case _: If    => true
-          case _        => false
-        }) c.abort(curTree.pos,
-          "Emma does not support assignments with conditionals on the rhs at the moment")
-
-        // Add assignment to the current block
-        curBlock.stats += curTree
-        curBlock
-
-      // do  { `body` } while (`cond`)
-      case LabelDef(_, _, Block(b, If(cond, _, _))) =>
-        // Ensure that the `cond` tree is a simple identifier
-        // Should not happen after normalization
-        if (cond match {
-          case _: Ident => false
-          case _        => true
-        }) c.abort(curTree.pos,
-          s"Invalid do-while test expression: ${showCode(cond)}")
-
+      case q"do $body while (${cond: Ident})" =>
         // Create body block
-        val body       = if (b.size > 1) Block(b.init, b.last) else b.head
         val startBlock = new CFBlock()
         val endBlock   = createCFG(body, startBlock)
 
@@ -90,22 +63,12 @@ private[emma] trait ControlFlowAnalysis extends ControlFlowModel with ControlFlo
 
         nextBlock
 
-      // while (`cond`) { `body` }
-      case LabelDef(_, _, If(cond, Block(b, _), _)) =>
-        // Ensure that the `cond` tree is a simple identifier
-        // Should not happen after normalization
-        if (cond match {
-          case _: Ident => false
-          case _        => true
-        }) c.abort(curTree.pos,
-          s"Invalid while test expression: ${showCode(cond)}")
-
+      case q"while (${cond: Ident}) $body" =>
         // Create condition block with the `cond` term
         val condBlock = new CFBlock()
         condBlock.stats += cond
 
         // Create body block
-        val body       = if (b.size > 1) Block(b.init, b.last) else b.head
         val startBlock = new CFBlock()
         val endBlock   = createCFG(body, startBlock)
 
@@ -126,16 +89,7 @@ private[emma] trait ControlFlowAnalysis extends ControlFlowModel with ControlFlo
 
         nextBlock
 
-      // if (`cond`) `thn` else `els`
-      case If(cond, thn, els) =>
-        // Ensure that the `cond` tree is a simple identifier
-        // Should not happen after normalization
-        if (cond match {
-          case _: Ident => false
-          case _        => true
-        }) c.abort(curTree.pos,
-          s"Invalid if-then-else test expression: ${showCode(cond)}")
-
+      case q"if (${cond: Ident}) $thn else $els" =>
         // Create condition block with the `cond` term
         val condBlock = new CFBlock()
         condBlock.stats += cond
