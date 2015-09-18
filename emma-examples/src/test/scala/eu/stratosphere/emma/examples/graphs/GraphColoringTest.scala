@@ -4,6 +4,7 @@ import java.io.File
 
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
+import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit.JUnitRunner
@@ -11,6 +12,7 @@ import org.scalatest.prop.PropertyChecks
 
 import scala.io.Source
 
+@Category(Array(classOf[ExampleTest]))
 @RunWith(classOf[JUnitRunner])
 class GraphColoringTest extends FunSuite with PropertyChecks with Matchers {
   // default parameters

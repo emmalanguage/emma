@@ -5,8 +5,11 @@ import java.io.File
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.runtime.Engine
 import eu.stratosphere.emma.testutil._
+import org.junit.experimental.categories.Category
+import org.junit.runner.RunWith
 import org.junit.{Before, Test}
 
+@Category(Array(classOf[ExampleTest]))
 class TPCHTest {
 
   var rt: Engine = _

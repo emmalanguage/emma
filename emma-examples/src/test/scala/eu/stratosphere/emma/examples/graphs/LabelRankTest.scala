@@ -6,6 +6,7 @@ import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
 
 import org.apache.commons.io.FileUtils
+import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit.JUnitRunner
@@ -13,6 +14,7 @@ import org.scalatest.prop.PropertyChecks
 
 import scala.io.Source
 
+@Category(Array(classOf[ExampleTest]))
 @RunWith(classOf[JUnitRunner])
 class LabelRankTest extends FlatSpec with PropertyChecks with Matchers {
   // default parameters

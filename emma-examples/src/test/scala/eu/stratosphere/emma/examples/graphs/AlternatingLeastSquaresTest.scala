@@ -7,6 +7,7 @@ import breeze.stats.distributions._
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
 import org.apache.commons.io.FileUtils
+import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.scalacheck.Gen._
 import org.scalacheck.{Arbitrary => Arb}
@@ -17,6 +18,7 @@ import org.scalatest.prop.PropertyChecks
 import scala.io.Source
 
 // FIXME: Doesn't run on Flink/Spark back-ends
+@Category(Array(classOf[ExampleTest]))
 @RunWith(classOf[JUnitRunner])
 class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matchers {
 

@@ -9,11 +9,13 @@ import java.nio.charset.StandardCharsets
 
 import java.io.File
 
+import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 
 import org.scalatest._
 import org.scalatest.junit.JUnitRunner
 
+@Category(Array(classOf[ExampleTest]))
 @RunWith(classOf[JUnitRunner])
 class WordCountTest extends FunSuite with Matchers {
   // default parameters
