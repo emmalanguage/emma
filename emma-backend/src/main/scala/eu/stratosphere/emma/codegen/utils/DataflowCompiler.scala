@@ -1,5 +1,6 @@
 package eu.stratosphere.emma.codegen.utils
 
+import java.net.URLClassLoader
 import java.nio.file.{Files, Paths}
 
 import scala.reflect.runtime.universe._
@@ -18,8 +19,20 @@ class DataflowCompiler(val mirror: Mirror) {
     path.toAbsolutePath.toString
   }
 
-  /** The generating Scala toolbox */
-  val tb = mirror.mkToolBox(options = s"-d $codeGenDir")
+  /** The generating Scala toolbox */  
+  val tb = {
+    val cl = getClass.getClassLoader
+
+    cl match {
+      case urlCL: URLClassLoader =>
+        // append current classpath to the toolbox in case of a URL classloader (fixes a bug in Spark)
+        val cp = urlCL.getURLs.map(_.getFile).mkString(System.getProperty("path.separator"))
+        mirror.mkToolBox(options = s"-d $codeGenDir -cp $cp")
+      case _ =>
+        // use toolbox without extra classpath entries otherwise
+        mirror.mkToolBox(options = s"-d $codeGenDir")
+    }
+  }
 
   logger.info(s"Dataflow compiler will use '$codeGenDir' as a target directory")
 

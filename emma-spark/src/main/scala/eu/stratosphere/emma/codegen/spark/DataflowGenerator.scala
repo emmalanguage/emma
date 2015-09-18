@@ -113,7 +113,7 @@ class DataflowGenerator(
       case fmt: CSVInputFormat[tp] =>
         if (!(tpe <:< weakTypeOf[Product]))
           throw new RuntimeException(
-            s"Cannot create Flink CsvInputFormat for non-product type ${typeOf(op.tag)}")
+            s"Cannot create Spark CsvInputFormat for non-product type ${typeOf(op.tag)}")
 
         val line = freshName("line$spark$")
         val name = closure nextTermName "converter"
