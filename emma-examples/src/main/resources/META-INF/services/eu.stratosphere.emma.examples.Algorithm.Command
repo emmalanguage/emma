@@ -3,8 +3,9 @@ eu.stratosphere.emma.examples.graphs.AlternatingLeastSquares$Command
 eu.stratosphere.emma.examples.graphs.BeliefPropagation$Command
 eu.stratosphere.emma.examples.graphs.ConnectedComponents$Command
 eu.stratosphere.emma.examples.graphs.GraphColoring$Command
-eu.stratosphere.emma.examples.graphs.GraphColoring$Command
+eu.stratosphere.emma.examples.graphs.LabelRank$Command
 eu.stratosphere.emma.examples.graphs.StronglyConnectedComponents$Command
+eu.stratosphere.emma.examples.graphs.TriangleCount$Command
 eu.stratosphere.emma.examples.tpch.Query01$Command
 eu.stratosphere.emma.examples.tpch.Query03$Command
 eu.stratosphere.emma.examples.tpch.Query05$Command
