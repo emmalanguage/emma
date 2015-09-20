@@ -18,7 +18,7 @@ trait ReflectUtil {
   import universe._
   import internal.reificationSupport._
 
-  // predefined types
+  // Predefined types
 
   lazy val UNIT    = typeOf[Unit]
   lazy val BOOL    = typeOf[Boolean]
@@ -48,11 +48,13 @@ trait ReflectUtil {
   lazy val PAIR  = TUPLE(2)
   lazy val ARRAY = typeOf[Array[Nothing]].typeConstructor
 
-  lazy val TUPLE = (for (n <- 1 to 22)
-    yield n -> rootMirror.staticClass(s"scala.Tuple$n").toTypeConstructor).toMap
+  lazy val TUPLE = Map(1 to 22 map { n =>
+    n -> rootMirror.staticClass(s"scala.Tuple$n").toTypeConstructor
+  }: _*)
 
-  lazy val FUN = (for (n <- 0 to 22)
-    yield n -> rootMirror.staticClass(s"scala.Function$n").toTypeConstructor).toMap
+  lazy val FUN = Map(0 to 22 map { n =>
+    n -> rootMirror.staticClass(s"scala.Function$n").toTypeConstructor
+  }: _*)
 
   /** Alias of [[PartialFunction]]. */
   type ~>[A, B] = PartialFunction[A, B]
@@ -75,16 +77,17 @@ trait ReflectUtil {
 
   /** Create a new [[TermSymbol]]. */
   def termSym(
-      owner: Symbol, 
-      name:  TermName, 
-      flags: FlagSet  = NoFlags,
+      owner: Symbol,
+      name:  TermName,
+      tpe:   Type,
+      flags: FlagSet  = Flag.SYNTHETIC,
       pos:   Position = NoPosition): TermSymbol
 
   /** Create a new [[TypeSymbol]]. */
   def typeSym(
      owner: Symbol,
      name:  TypeName,
-     flags: FlagSet  = NoFlags,
+     flags: FlagSet  = Flag.SYNTHETIC,
      pos:   Position = NoPosition): TypeSymbol
 
   /** Generate a new [[TermName]]. */
@@ -99,13 +102,13 @@ trait ReflectUtil {
 
   /** Remove all [[Type]] annotations from this [[Tree]]. */
   // FIXME: Replace with c.untypecheck once https://issues.scala-lang.org/browse/SI-5464 resolved
-  val unTypeCheck = showCode(_: Tree, printRootPkg = true) ->> parse
+  val unTypeCheck = { showCode(_: Tree, printRootPkg = true) } andThen parse
 
   /** Alias for `typeCheck compose unTypeCheck`. */
   val reTypeCheck = unTypeCheck andThen typeCheck
 
   /** Alias for `typeCheck compose parse`. */
-  val parseCheck = typeCheck _ compose parse
+  val parseCheck = parse _ andThen typeCheck
 
   /** Syntax sugar for [[Tree]]s. */
   private implicit def fromTree(tree: Tree): TreeOps =
@@ -114,17 +117,23 @@ trait ReflectUtil {
   /** [[Tree]] constructors. */
   object mk {
 
+    def ref(sym: TermSymbol): Ident =
+      mkIdent(sym).withType(sym.info).as[Ident]
+
+    def bind(sym: TermSymbol, rhs: Tree = EmptyTree): Bind =
+      Bind(sym.name, rhs).withSym(sym).as[Bind]
+
     def freeTerm(
         name:   String,
-        value:  => Any  = (),
+        tpe:    Type,
         flags:  FlagSet = Flag.SYNTHETIC,
-        origin: String  = null) =
-      newFreeTerm(name, value, flags, origin)
+        origin: String  = null): TermSymbol =
+      newFreeTerm(name, null, flags, origin).withInfo(tpe).asTerm
 
     def freeType(
         name:   String,
         flags:  FlagSet = Flag.SYNTHETIC,
-        origin: String  = null) =
+        origin: String  = null): TypeSymbol =
       newFreeType(name, flags, origin)
 
     def valDef(sym: TermSymbol): ValDef =
@@ -148,10 +157,8 @@ trait ReflectUtil {
         owner: Symbol   = NoSymbol,
         flags: FlagSet  = Flag.SYNTHETIC,
         pos:   Position = NoPosition,
-        rhs:   Tree     = EmptyTree): ValDef = {
-      val sym = termSym(owner, name, flags, pos) withInfo tpe
-      valDef(sym.asTerm, rhs)
-    }
+        rhs:   Tree     = EmptyTree): ValDef =
+      valDef(termSym(owner, name, tpe, flags, pos).asTerm, rhs)
 
     def anonFun(
         args:  List[(TermName, Type)],
@@ -160,7 +167,7 @@ trait ReflectUtil {
         flags: FlagSet  = Flag.SYNTHETIC,
         pos:   Position = NoPosition): Function = {
       val tpe    = FUN(args.size)(args.map { _._2 } :+ body.trueType: _*)
-      val sym    = termSym(owner, TermName("anonfun"), flags, pos) withInfo tpe
+      val sym    = termSym(owner, TermName("anonfun"), tpe, flags, pos)
       val params = for ((name, tpe) <- args)
         yield valDef(name, tpe, sym, Flag.SYNTHETIC | Flag.PARAM, pos)
 
@@ -173,7 +180,7 @@ trait ReflectUtil {
           sym.name.toTypeName else sym.name.toTermName
 
         Select(select(sym.owner, apply), name) withSym sym
-      } else mkIdent(rootMirror.staticPackage(sym.fullName)) withType sym.info
+      } else ref(rootMirror staticPackage sym.fullName)
     }
   }
 
@@ -181,15 +188,22 @@ trait ReflectUtil {
   class TreeOps(self: Tree) {
 
     /** @return `true` if this [[Tree]] is annotated with a [[Type]], `false` otherwise */
-    def hasType: Boolean = self.tpe != null && self.tpe != NoType
+    def hasType: Boolean = {
+      val tpe = self.tpe
+      tpe != null && tpe != NoType
+    }
 
     /** @return `true` if this [[Tree]] is annotated with a [[Symbol]], `false` otherwise */
-    def hasSymbol: Boolean = self.symbol != null && self.symbol != NoSymbol
+    def hasSymbol: Boolean = {
+      val sym = self.symbol
+      sym != null && sym != NoSymbol
+    }
 
     /** @return `true` if this [[Tree]] has an owner, `false` otherwise */
-    def hasOwner: Boolean = hasSymbol &&
-      self.symbol.owner != null &&
-      self.symbol.owner != NoSymbol
+    def hasOwner: Boolean = hasSymbol && {
+      val owner = self.symbol.owner
+      owner != null && owner != NoSymbol
+    }
 
     /** @return This [[Tree]]'s owner */
     def owner: Symbol = self.symbol.owner
@@ -263,32 +277,7 @@ trait ReflectUtil {
     lazy val freeTerms: Set[TermSymbol] = references diff definitions
 
     /** Collect the [[TermName]]s of all free variables in this [[Tree]]. */
-    lazy val closure: Set[TermName] = self match {
-      case Ident(name: TermName) => // reference
-        Set(name)
-
-      case Bind(name: TermName, body) => // case name => ...
-        body.closure - name
-
-      case ValDef(_, name, _, rhs) => // val name = ...
-        rhs.closure - name
-
-      case Function(args, body) => // (args: _*) => ...
-        body.closure diff args.map { _.name }.toSet
-
-      case bl: Block => // { ... }
-        bl.children.foldLeft(Set.empty[TermName], Set.empty[TermName]) {
-          case ((bound, free), vd: ValDef) => // { val name = ... }
-            val defined = if (vd.isLazy) bound + vd.name else bound
-            (bound + vd.name, free union vd.closure diff defined)
-
-          case ((bound, free), child) => // default
-            (bound, free union child.closure diff bound)
-        }._2
-
-      case tree => // default
-        tree.children.flatMap { _.closure }.toSet
-    }
+    lazy val closure: Set[TermName] = freeTerms map { _.name }
 
     /**
      * Recursively apply a depth-first transformation to this [[Tree]].
@@ -515,7 +504,10 @@ trait ReflectUtil {
   implicit class SymbolOps(self: Symbol) {
 
     /** Check if this [[Symbol]] has an associated [[Type]]. */
-    def hasInfo: Boolean = self.info != null && self.info != NoType
+    def hasInfo: Boolean = {
+      val info = self.info
+      info != null && info != NoType
+    }
 
     /** Set the `info` of this [[Symbol]]. */
     def withInfo(info: Type): Symbol =
@@ -527,22 +519,25 @@ trait ReflectUtil {
   }
 
   /** Syntax sugar for function call chain emulation. */
-  implicit class ApplyWith[A](self: A) {
+  implicit class Chain[A](self: A) {
 
     /**
      * Emulation of a function call chain starting with `this`, similar to Clojure's thread macros
-     * (-> and/or ->>). E.g. `x ->> f ->> g == g(f(x)) == (g compose f)(x)`.
+     * (-> and/or ->>). E.g. `x ->> f ->> g == g(f(x)) == (g compose f)(x) == (f andThen g)(x)`.
      *
      * @param f Next function to thread in the call chain
      * @tparam B Return type of the next function
      */
-    def ->>[B](f: A => B) = f(self)
+    def ->>[B](f: A => B): B = f(self)
+
+    /** Alias for `this ->> f`. */
+    def chain[B](f: A => B): B = f(self)
   }
 
-  /** Syntax sugar for subclass testing and class casting. */
-  implicit class InstanceOf[A](self: A) {
-    
-    /** Alias of `asInstanceOf[B]`. */
+  /** Syntax sugar for class casting. */
+  implicit class As[A](self: A) {
+
+    /** Alias for `this.asInstanceOf[B]`. */
     def as[B]: B = self.asInstanceOf[B]
   }
 }

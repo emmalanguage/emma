@@ -207,17 +207,23 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       // bind join result to a fresh variable
       val tpt = tq"(${kx.vparams.head.tpt}, ${ky.vparams.head.tpt})"
       val vd  = mk.valDef(freshName("x"), tpt)
-      val sym = mk.freeTerm(vd.name.toString)
+      val sym = mk.freeTerm(vd.name.toString, vd.trueType)
       val qs  = suffix drop 2 filter { _ != filter }
       parent.qualifiers = prefix ::: Generator(sym, join) :: qs
 
       // substitute [v._1/x] in affected expressions
-      for (expr @ ScalaExpr(vars, _) <- parent if vars exists { _.name == xs.lhs.name })
-        expr.substitute(xs.lhs.name, ScalaExpr(vd :: Nil, q"${vd.name}._1"))
+      for {
+        expr @ ScalaExpr(vars, _) <- parent
+        if vars exists { _.name == xs.lhs.name }
+        tree = q"${mk ref sym}._1" withType vd.elementType
+      } expr.substitute(xs.lhs.name, ScalaExpr(vd :: Nil, tree))
 
       // substitute [v._2/y] in affected expressions
-      for (expr @ ScalaExpr(vars, _) <- parent if vars exists { _.name == ys.lhs.name })
-        expr.substitute(ys.lhs.name, ScalaExpr(vd :: Nil, q"${vd.name}._2"))
+      for {
+        expr @ ScalaExpr(vars, _) <- parent
+        if vars exists { _.name == ys.lhs.name }
+        tree = q"${mk ref sym}._2" withType vd.trueType.typeArgs(1)
+      } expr.substitute(ys.lhs.name, ScalaExpr(vd :: Nil, tree))
 
       // return the modified parent
       parent
@@ -300,16 +306,22 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
       // bind join result to a fresh variable
       val vd  = mk.valDef(freshName("x"), tq"(${rm.xs.tpe}, ${rm.ys.tpe})")
-      val sym = mk.freeTerm(vd.name.toString)
+      val sym = mk.freeTerm(vd.name.toString, vd.trueType)
       parent.qualifiers = prefix ::: Generator(sym, cross) :: suffix.drop(2)
 
       // substitute [v._1/x] in affected expressions
-      for (expr @ ScalaExpr(vars, _) <- parent if vars exists { _.name == xs.lhs.name })
-        expr.substitute(xs.lhs.name, ScalaExpr(vd :: Nil, q"${vd.name}._1"))
+      for {
+        expr @ ScalaExpr(vars, _) <- parent
+        if vars exists { _.name == xs.lhs.name }
+        tree = q"${mk ref sym}._1" withType vd.elementType
+      } expr.substitute(xs.lhs.name, ScalaExpr(vd :: Nil, tree))
 
       // substitute [v._2/y] in affected expressions
-      for (expr @ ScalaExpr(vars, _) <- parent if vars exists { _.name == ys.lhs.name })
-        expr.substitute(ys.lhs.name, ScalaExpr(vd :: Nil, q"${vd.name}._2"))
+      for {
+        expr @ ScalaExpr(vars, _) <- parent
+        if vars exists { _.name == ys.lhs.name }
+        tree = q"${mk ref sym}._2" withType vd.trueType.typeArgs(1)
+      } expr.substitute(ys.lhs.name, ScalaExpr(vd :: Nil, tree))
 
       // return the modified parent
       rm.parent

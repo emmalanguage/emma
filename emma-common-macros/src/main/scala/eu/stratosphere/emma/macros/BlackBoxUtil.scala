@@ -10,24 +10,16 @@ trait BlackBoxUtil extends BlackBox with ReflectUtil {
   import c.internal._
 
   def parse(str: String) =
-    c.parse(str)
+    c parse str
 
   def typeCheck(tree: Tree) =
     if (tree.isType) c.typecheck(tree, c.TYPEmode)
-    else c.typecheck(tree)
+    else c typecheck tree
 
-  def termSym(
-      owner: Symbol,
-      name:  TermName,
-      flags: FlagSet  = NoFlags,
-      pos:   Position = NoPosition) =
-    newTermSymbol(owner, name, pos, flags)
+  def termSym(owner: Symbol, name: TermName, tpe: Type, flags: FlagSet, pos: Position) =
+    newTermSymbol(owner, name, pos, flags).withInfo(tpe).asTerm
 
-  def typeSym(
-       owner: Symbol,
-       name:  TypeName,
-       flags: FlagSet  = NoFlags,
-       pos:   Position = NoPosition) =
+  def typeSym(owner: Symbol, name: TypeName, flags: FlagSet, pos: Position) =
     newTypeSymbol(owner, name, pos, flags)
 
   /** Syntactic sugar for [[Tree]]s. */

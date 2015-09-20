@@ -596,10 +596,14 @@ private[emma] trait ComprehensionAnalysis
       // Derive the unique product 'union' function
       val union = q"($x: ${empty.tpe}, $y: ${empty.tpe}) => (..${
         for ((f, i) <- folds.zipWithIndex) yield {
+          val tpe   = empty.tpe typeArgs i
           val union = f.union.as[Function]
           union.body substitute Map(
-            union.vparams.head.name -> q"$x.${TermName(s"_${i + 1}")}",
-            union.vparams( 1 ).name -> q"$y.${TermName(s"_${i + 1}")}")
+            union.vparams.head.name ->
+              q"$x.${TermName(s"_${i + 1}")}".withType(tpe),
+
+            union.vparams(1).name ->
+              q"$y.${TermName(s"_${i + 1}")}".withType(tpe))
         }
       })".typeChecked
 
