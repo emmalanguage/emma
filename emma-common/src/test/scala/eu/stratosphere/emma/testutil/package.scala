@@ -74,7 +74,7 @@ package object testutil {
    * Lazy initialization & execution wrapper for a piece of code that depends on a runtime object.
    *
    * @param rt A call-by-name parameter for the runtime to use.
-   * @param f  A lambda that depends on the initialized runtime and retuns a value of type T.
+   * @param f  A lambda that depends on the initialized runtime and returns a value of type T.
    * @tparam T The type of the returned value.
    * @return The result of `f` applied to the initialized `rt`.
    */
