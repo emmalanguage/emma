@@ -7,7 +7,7 @@ import eu.stratosphere.emma.codegen.testschema._
 import eu.stratosphere.emma.codegen.predicates._
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
-import org.junit.{Ignore, Test, After, Before}
+import org.junit.{Test, After, Before}
 
 import scala.reflect.runtime.universe._
 import scala.util.Random
@@ -539,6 +539,30 @@ abstract class BaseCodegenTest(rtName: String) {
 
     // assert that the result contains the expected values
     compareBags(act, exp)
+  }
+
+  @Test def testMultipleGroupByUsingTheSameNames() = {
+    val alg = emma.parallelize {
+      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+
+      val r1 = for {
+        g <- imdbTop100.groupBy(x => x.year / 10)
+      } yield (g.key, g.values.count(), g.values.map(_.rating).min())
+
+      val r2 = for {
+        g <- imdbTop100.groupBy(x => x.year / 10)
+      } yield (g.key, g.values.count(), g.values.map(_.rating).max())
+
+      (r1, r2)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    compareBags(act._1.fetch(), exp._1.fetch())
+    compareBags(act._2.fetch(), exp._2.fetch())
   }
 
   // --------------------------------------------------------------------------
