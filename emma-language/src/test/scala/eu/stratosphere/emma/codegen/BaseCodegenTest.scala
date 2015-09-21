@@ -209,6 +209,18 @@ abstract class BaseCodegenTest(rtName: String) {
     })
   }
 
+  @Test def testMapWithLocalFunction(): Unit = {
+    compareWithNative(emma.parallelize {
+      def double(x: Int) = 2 * x
+      val b1 = for (x <- DataBag(1 to 100)) yield double(x)
+
+      def add(x: Int, y: Int) = x + y
+      val b2 = for (x <- DataBag(1 to 100)) yield add(x, 5)
+
+      b1 plus b2
+    })
+  }
+
   // --------------------------------------------------------------------------
   // FlatMap
   // --------------------------------------------------------------------------

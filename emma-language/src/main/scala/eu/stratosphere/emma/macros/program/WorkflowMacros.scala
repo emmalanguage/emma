@@ -51,7 +51,7 @@ class WorkflowMacros(val c: blackbox.Context) extends ControlFlow with Comprehen
     // ----------------------------------------------------------------------
 
     // Construct algorithm object
-    q"""new _root_.eu.stratosphere.emma.api.Algorithm[${weakTypeOf[T]}] {
+    q"""new _root_.eu.stratosphere.emma.api.Algorithm[${weakTypeOf[T]}] with Serializable {
       import _root_.scala.reflect._
 
       def run(engine: $ENGINE): ${weakTypeOf[T]} = engine match {

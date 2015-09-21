@@ -74,7 +74,9 @@ private[emma] trait ComprehensionCompiler
         import _root_.scala.reflect.runtime.universe._
         import _root_.eu.stratosphere.emma.ir
         val __root = ${serialize(root)}
-        engine.$execute(__root, ${name.toString}, ..${for (s <- closure) yield q"${s.name}"})
+        engine.$execute(__root, ${name.toString}, ..${
+          for (s <- closure) yield if (s.isMethod) q"${s.name} _" else q"${s.name}"
+        })
       }"""
     }
 
@@ -191,7 +193,15 @@ private[emma] trait ComprehensionCompiler
     private def serialize(tree: Tree): String = {
       val args = tree.freeTerms.toList
         .sortBy { _.fullName }
-        .map { sym => sym.name -> sym.info }
+        .map { sym =>
+          sym.name ->
+            (sym.info match {
+              // The following line converts a method type to a function type (eg. from "(x: Int)Int" to "Int => Int").
+              // This is necessary, because this will go into a parameter list, where we can't have method types.
+              case _: MethodType => q"$sym _".trueType
+              case _             => sym.info
+            })
+        }
 
       val fun = mk.anonFun(args, tree)
       showCode(fun, printRootPkg = true)

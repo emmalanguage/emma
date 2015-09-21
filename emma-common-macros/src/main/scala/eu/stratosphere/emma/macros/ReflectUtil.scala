@@ -268,13 +268,14 @@ trait ReflectUtil {
 
     /** Collect the [[Symbol]]s of all bound variables in this [[Tree]]. */
     lazy val definitions: Set[TermSymbol] = typeChecked.collect {
+      case dd: DefDef if dd.hasTerm => dd.term
       case vd: ValDef if vd.hasTerm => vd.term
       case bd: Bind   if bd.hasTerm => bd.term
     }.toSet
 
     /** Collect the [[Symbol]]s of all variables referenced in this [[Tree]]. */
     lazy val references: Set[TermSymbol] = typeChecked.collect {
-      case id: Ident if id.hasTerm && (id.term.isVal || id.term.isVar) => id.term
+      case id: Ident if id.hasTerm && (id.term.isVal || id.term.isVar || id.term.isMethod) => id.term
     }.toSet
 
     /** Collect the [[Symbol]]s of all free variables in this [[Tree]]. */
