@@ -5,7 +5,7 @@ import scala.language.experimental.macros
 /**
  * An abstraction for homogeneous collections.
  */
-sealed class DataBag[+A] private(private[api] val impl: Seq[A]) {
+sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Serializable {
 
   // -----------------------------------------------------
   // Structural recursion
