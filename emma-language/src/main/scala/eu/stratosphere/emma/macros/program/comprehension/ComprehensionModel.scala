@@ -72,6 +72,34 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
     override def toString() =
       prettyPrint(this)
+
+    /** Which of the vars defined in the given Comprehension context are used by this monad expression **/
+    def usedVars(context: Expression): Set[TermSymbol] = {
+      // Which variables are defined in the given context
+      val defined = definedVars(context)
+      // Which variables are used in the given context
+      val used = collect({
+        // Environment & Host Language Connectors
+        case ScalaExpr(env, tree)                             => Set(tree)
+        // Combinators
+        case combinator.Map(f, xs)                            => Set(f)
+        case combinator.FlatMap(f, xs)                        => Set(f)
+        case combinator.Filter(p, xs)                         => Set(p)
+        case combinator.EquiJoin(keyx, keyy, xs, ys)          => Set(keyx, keyy)
+        case combinator.Group(key, xs)                        => Set(key)
+        case combinator.Fold(empty, sng, union, xs, origin)   => Set(empty, sng, union)
+        case combinator.FoldGroup(key, empty, sng, union, xs) => Set(key, empty, sng, union)
+      }).flatten.flatMap(_.freeTerms).toSet
+      // Result is the intersection of both
+      defined intersect used
+    }
+
+    /** Which genertor-defined vars in the given Comprehension context are visible in bu this monad expression **/
+    def definedVars(context: Expression): Set[TermSymbol] = {
+      val cet = new CollectEnvironmentTraverser(this)
+      cet.traverse(context)
+      cet.env
+    }
   }
 
   // Monads
@@ -308,7 +336,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       definition:    Option[Tree])
 
   // --------------------------------------------------------------------------
-  // Transformation
+  // Transformation & Traversal
   // --------------------------------------------------------------------------
 
   /** Provides methods for top-down recursive transformation of [[Expression]]s. */
@@ -360,6 +388,61 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
     protected def xform(q: Qualifier): Qualifier =
       transform(q).as[Qualifier]
+  }
+
+  trait ExpressionTraverser {
+
+    def traverse(e: Expression): Unit = e match {
+      // Monads
+      case MonadUnit(expr)                      => traverse(expr)
+      case MonadJoin(expr)                      => traverse(expr)
+      case Comprehension(head, qualifiers)      => qualifiers foreach traverse; traverse(head)
+      // Qualifiers
+      case Filter(expr) => traverse(expr)
+      case Generator(_, rhs)                    => traverse(rhs)
+      // Environment & Host Language Connectors
+      case ScalaExpr(_, _)                      =>
+      // Combinators
+      case combinator.Read(_, _)                =>
+      case combinator.Write(_, _, xs)           => traverse(xs)
+      case combinator.TempSource(_)             =>
+      case combinator.TempSink(_, xs)           => traverse(xs)
+      case combinator.Map(_, xs)                => traverse(xs)
+      case combinator.FlatMap(_, xs)            => traverse(xs)
+      case combinator.Filter(_, xs)             => traverse(xs)
+      case combinator.EquiJoin(_, _, xs, ys)    => traverse(xs); traverse(ys)
+      case combinator.Cross(xs, ys)             => traverse(xs); traverse(ys)
+      case combinator.Group(_, xs)              => traverse(xs)
+      case combinator.Fold(_, _, _, xs, _)      => traverse(xs)
+      case combinator.FoldGroup(_, _, _, _, xs) => traverse(xs)
+      case combinator.Distinct(xs)              => traverse(xs)
+      case combinator.Union(xs, ys)             => traverse(xs); traverse(ys)
+      case combinator.Diff(xs, ys)              => traverse(xs); traverse(ys)
+    }
+  }
+
+  private class CollectEnvironmentTraverser(needle: Expression) extends ExpressionTraverser {
+    private val S = mutable.Stack[mutable.Set[TermSymbol]]()
+    private var T = false
+
+    def env = S.toSet.flatten
+
+    override def traverse(t: Expression) = if (!T) {
+      if (t == needle)
+        T = true
+      else
+        t match {
+          case Comprehension(head, qualifiers) =>
+            S.push(mutable.Set.empty[TermSymbol])
+            qualifiers foreach traverse; traverse(head)
+            if (!T) S.pop()
+          case Generator(lhs, rhs) =>
+            traverse(rhs)
+            S.top += lhs
+          case _ =>
+            super.traverse(t)
+        }
+    }
   }
 
   // --------------------------------------------------------------------------
