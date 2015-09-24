@@ -204,7 +204,7 @@ private[emma] trait ComprehensionAnalysis
         if withFilter.symbol == api.withFilter =>
           val bind   = Generator(arg.term, comprehend(vars)(xs))
           val filter = Filter(comprehend(arg.reset :: vars)(body))
-          val head   = comprehend(arg.reset :: vars)(q"${arg.name}", input = false)
+          val head   = comprehend(arg.reset :: vars)(mk ref arg.term, input = false)
           Comprehension(head, bind :: filter :: Nil)
 
       // -----------------------------------------------------
@@ -325,7 +325,7 @@ private[emma] trait ComprehensionAnalysis
       (gen, group) <- generatorFor(gDef.term, expressions)
     } {
       // the symbol associated with 'g'
-      val gSym = gDef.symbol
+      val gSym = gDef.term
 
       // find all 'g.values' expressions for the group symbol
       val groupSelects = tree collect {
@@ -363,7 +363,7 @@ private[emma] trait ComprehensionAnalysis
               expr.vars = for (v <- vars) yield if (v.name == gDef.name)
                 mk.valDef(gDef.name, gen.rhs.elementType) else v
 
-              val replacer = new FoldTermReplacer(enclosed, q"${gDef.name}.values")
+              val replacer = new FoldTermReplacer(enclosed, q"${mk ref gSym}.values")
               expr.tree    = typeCheckWith(vars, replacer transform body)
             }
 
@@ -372,7 +372,7 @@ private[emma] trait ComprehensionAnalysis
             // Find all value selects with associated enclosed in this ScalaExpr
             val enclosed = Map(fold.origin -> foldToIndex(fold.origin))
             val vars     = mk.valDef(gDef.name, gen.rhs.elementType) :: Nil
-            val replacer = new FoldTermReplacer(enclosed, q"${gDef.name}.values")
+            val replacer = new FoldTermReplacer(enclosed, q"${mk ref gSym}.values")
             val body     = typeCheckWith(vars, replacer transform fold.origin)
             expr.hd      = ScalaExpr(vars, body)
 
@@ -381,7 +381,7 @@ private[emma] trait ComprehensionAnalysis
             // Find all value selects with associated enclosed in this ScalaExpr
             val enclosed = Map(fold.origin -> foldToIndex(fold.origin))
             val vars     = mk.valDef(gDef.name, gen.rhs.elementType) :: Nil
-            val replacer = new FoldTermReplacer(enclosed, q"${gDef.name}.values")
+            val replacer = new FoldTermReplacer(enclosed, q"${mk ref gSym}.values")
             val body     = typeCheckWith(vars, replacer transform fold.origin)
             expr.expr    = ScalaExpr(vars, body)
 

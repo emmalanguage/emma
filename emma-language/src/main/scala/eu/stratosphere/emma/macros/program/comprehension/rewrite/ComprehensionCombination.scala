@@ -44,14 +44,14 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
    */
   object MatchFilter extends Rule {
 
-    case class RuleMatch(root: Comprehension, gen: Generator, filter: Filter)
+    case class RuleMatch(root: Expression, parent: Comprehension, gen: Generator, filter: Filter)
 
     def bind(expr: Expression, root: Expression) = new Traversable[RuleMatch] {
       def foreach[U](f: RuleMatch => U) = expr match {
         case parent @ Comprehension(_, qualifiers) => for {
           filter @ Filter(_)    <- qualifiers
           gen @ Generator(_, _) <- qualifiers takeWhile { _ != filter }
-        } f(RuleMatch(parent, gen, filter))
+        } f(RuleMatch(root, parent, gen, filter))
           
         case _ =>
       }
@@ -65,8 +65,9 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
      */
     // TODO: add support for comprehension filter expressions
     def guard(rm: RuleMatch) = rm.filter.expr match {
-      case expr: ScalaExpr => expr.usedVars match {
-        case List(v) => v.name == rm.gen.lhs.name
+      case expr: ScalaExpr => expr.usedVars(rm.root).toSeq match {
+        case Seq(v) =>
+          v == rm.gen.lhs
         case _ => false
       }
         
@@ -76,13 +77,12 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     // TODO: add support for comprehension filter expressions
     def fire(rm: RuleMatch) = rm.filter.expr match {
       case expr @ ScalaExpr(vars, tree) =>
-        val RuleMatch(root, gen, filter) = rm
-        val arg  = expr.usedVars.head
-        val body = tree.freeEnv(vars: _*)
-        val p    = q"($arg) => $body".typeChecked
-        gen.rhs         = combinator.Filter(p, gen.rhs)
-        root.qualifiers = root.qualifiers diff List(filter)
-        root // return new parent
+        val RuleMatch(root, parent, gen, filter) = rm
+        val arg  = expr.usedVars(rm.root).head
+        val p    = mk anonFun (List(arg.name -> arg.info), tree)
+        gen.rhs           = combinator.Filter(p, gen.rhs)
+        parent.qualifiers = parent.qualifiers diff List(filter)
+        parent // return new parent
 
       case filter => c.abort(c.enclosingPosition,
         s"Unexpected filter expression type: ${filter.getClass}")
@@ -102,20 +102,21 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
    */
   object MatchMap extends Rule {
 
-    case class RuleMatch(head: ScalaExpr, child: Generator)
+    case class RuleMatch(root: Expression, head: ScalaExpr, child: Generator)
 
     def bind(expr: Expression, root: Expression) = expr match {
       case Comprehension(head: ScalaExpr, List(child: Generator)) =>
-        Some(RuleMatch(head, child))
+        Some(RuleMatch(root, head, child))
       
       case _ => None
     }
 
-    def guard(rm: RuleMatch) = 
-      rm.head.usedVars.size == 1
+    def guard(rm: RuleMatch) = {
+      rm.head.usedVars(rm.root).size == 1
+    }
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(ScalaExpr(vars, tree), child) = rm
+      val RuleMatch(_, ScalaExpr(vars, tree), child) = rm
       val args = vars.reverse
       val body = tree.freeEnv(vars: _*)
       val f    = q"(..$args) => $body".typeChecked
@@ -136,20 +137,21 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
    */
   object MatchFlatMap extends Rule {
 
-    case class RuleMatch(head: ScalaExpr, child: Generator)
+    case class RuleMatch(root: Expression, head: ScalaExpr, child: Generator)
 
     def bind(expr: Expression, root: Expression) = expr match {
       case MonadJoin(Comprehension(head: ScalaExpr, List(child: Generator))) =>
-        Some(RuleMatch(head, child))
+        Some(RuleMatch(root, head, child))
       
       case _ => None
     }
 
-    def guard(rm: RuleMatch) =
-      rm.head.usedVars.size == 1
+    def guard(rm: RuleMatch) = {
+      rm.head.usedVars(rm.root).size == 1
+    }
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(ScalaExpr(vars, tree), child) = rm
+      val RuleMatch(_, ScalaExpr(vars, tree), child) = rm
       val args = vars.reverse
       val body = tree.freeEnv(vars: _*)
       val f    = q"(..$args) => $body".typeChecked
