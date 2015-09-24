@@ -149,13 +149,6 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
     def descend[U](f: Expression => U) = ()
 
-    /** @return All `vars` referenced in the expression `tree` */
-    def usedVars: List[ValDef] = {
-      // collect the term names
-      val names = tree.collect { case Ident(name: TermName) => name }.toSet
-      for (v <- vars if names(v.name)) yield v
-    }
-
     /**
      * Simultaneously substitutes all free occurrences of `key` with `value` in this expression
      * and adapts its environment.
