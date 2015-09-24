@@ -2,7 +2,6 @@ package eu.stratosphere.emma.macros.program.comprehension.rewrite
 
 trait ComprehensionCombination extends ComprehensionRewriteEngine {
   import universe._
-  import c.internal._
 
   def combine(root: ExpressionRoot) = {
     // states for the state machine
@@ -47,7 +46,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
     case class RuleMatch(root: Comprehension, gen: Generator, filter: Filter)
 
-    def bind(expr: Expression) = new Traversable[RuleMatch] {
+    def bind(expr: Expression, root: Expression) = new Traversable[RuleMatch] {
       def foreach[U](f: RuleMatch => U) = expr match {
         case parent @ Comprehension(_, qualifiers) => for {
           filter @ Filter(_)    <- qualifiers
@@ -105,7 +104,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
     case class RuleMatch(head: ScalaExpr, child: Generator)
 
-    def bind(expr: Expression) = expr match {
+    def bind(expr: Expression, root: Expression) = expr match {
       case Comprehension(head: ScalaExpr, List(child: Generator)) =>
         Some(RuleMatch(head, child))
       
@@ -139,7 +138,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
     case class RuleMatch(head: ScalaExpr, child: Generator)
 
-    def bind(expr: Expression) = expr match {
+    def bind(expr: Expression, root: Expression) = expr match {
       case MonadJoin(Comprehension(head: ScalaExpr, List(child: Generator))) =>
         Some(RuleMatch(head, child))
       
@@ -183,7 +182,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       kx:     Function,
       ky:     Function)
 
-    def bind(expr: Expression) = new Traversable[RuleMatch] {
+    def bind(expr: Expression, root: Expression) = new Traversable[RuleMatch] {
       def foreach[U](f: RuleMatch => U) = expr match {
         case parent @ Comprehension(_, qualifiers) => for {
           filter @ Filter(p: ScalaExpr) <- qualifiers
@@ -285,7 +284,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
     case class RuleMatch(parent: Comprehension, xs: Generator, ys: Generator)
 
-    def bind(expr: Expression) = new Traversable[RuleMatch] {
+    def bind(expr: Expression, root: Expression) = new Traversable[RuleMatch] {
       def foreach[U](f: RuleMatch => U) = expr match {
         case parent @ Comprehension(_, qs) =>
           for ((xs: Generator) :: (ys: Generator) :: Nil <- qs sliding 2)

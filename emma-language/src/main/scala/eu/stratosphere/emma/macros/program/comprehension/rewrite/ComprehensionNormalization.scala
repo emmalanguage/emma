@@ -24,7 +24,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
 
     case class RuleMatch(parent: Comprehension, gen: Generator, child: Comprehension)
 
-    def bind(expr: Expression) = expr match {
+    def bind(expr: Expression, root: Expression) = expr match {
       case parent @ Comprehension(_, qualifiers) => qualifiers collectFirst {
         case gen @ Generator(_, child @ Comprehension(_: ScalaExpr, _)) =>
           RuleMatch(parent, gen, child)
@@ -69,7 +69,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
 
     case class RuleMatch(parent: Comprehension, child: Comprehension)
 
-    def bind(expr: Expression) = expr match {
+    def bind(expr: Expression, root: Expression) = expr match {
       case MonadJoin(parent @ Comprehension(child: Comprehension, _)) =>
         Some(RuleMatch(parent, child))
       
@@ -92,7 +92,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
 
     case class RuleMatch(expr: ScalaExpr)
 
-    def bind(expr: Expression) = expr match {
+    def bind(expr: Expression, root: Expression) = expr match {
       case expr: ScalaExpr => Some(RuleMatch(expr))
       case _ => None
     }
@@ -129,7 +129,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
 
     case class RuleMatch(fold: c.Fold, map: Comprehension, child: Generator)
 
-    def bind(expr: Expression) = expr match {
+    def bind(expr: Expression, root: Expression) = expr match {
       case fold @ c.Fold(_, _, _, map @ Comprehension(_: ScalaExpr, List(child: Generator)), _) =>
         Some(RuleMatch(fold, map, child))
       

@@ -14,10 +14,11 @@ trait ComprehensionRewriteEngine extends ComprehensionModel with RewriteEngine {
   protected def applyAny(rules: Rule*): ExpressionRoot => Boolean =
     new ExpressionTransformer with (ExpressionRoot => Boolean) {
       
-      var changed = false
+      var changed: Boolean     = false
+      var root: ExpressionRoot = null
   
       override def transform(expr: Expression) = {
-        if (!changed) applyFirst(rules: _*)(expr) match {
+        if (!changed) applyFirst(rules: _*)(expr, root.expr) match {
           case Some(x) => changed = true; x
           case None    => super.transform(expr)
         } else expr
@@ -30,7 +31,9 @@ trait ComprehensionRewriteEngine extends ComprehensionModel with RewriteEngine {
        * @return A [[Boolean]] indicating whether some rule was applied at all
        */
       def apply(root: ExpressionRoot) = {
-        changed   = false
+        this.changed   = false
+        this.root      = root
+
         root.expr = transform(root.expr)
         changed
       }
@@ -43,12 +46,13 @@ trait ComprehensionRewriteEngine extends ComprehensionModel with RewriteEngine {
    * @return An exhaustive rule application function
    */
   protected def applyExhaustively(rules: Rule*): ExpressionRoot => Boolean =
-    new ExpressionTransformer with  (ExpressionRoot => Boolean) {
-      
-      var changed = false
+    new ExpressionTransformer with (ExpressionRoot => Boolean) {
+
+      var changed: Boolean     = false
+      var root: ExpressionRoot = null
   
       override def transform(expr: Expression) =
-        applyFirst(rules: _*)(expr) match {
+        applyFirst(rules: _*)(expr, root.expr) match {
           case Some(x) => changed = true; x
           case None    => super.transform(expr)
         }
@@ -61,7 +65,8 @@ trait ComprehensionRewriteEngine extends ComprehensionModel with RewriteEngine {
        */
       def apply(root: ExpressionRoot) = {
         var i = -1
-  
+        this.root = root
+
         do {
           i += 1
           changed   = false
@@ -78,9 +83,9 @@ trait ComprehensionRewriteEngine extends ComprehensionModel with RewriteEngine {
    * @param rules A sequence of rules to be applied
    * @return A one-off rule application function
    */
-  protected def applyFirst(rules: Rule*): Expression => Option[Expression] =
-    expr => rules.foldLeft(Option.empty[Expression]) {
+  protected def applyFirst(rules: Rule*): (Expression, Expression) => Option[Expression] =
+    (expr, root) => rules.foldLeft(Option.empty[Expression]) {
       case (Some(x), _) => Some(x)
-      case (None, rule) => rule apply expr
+      case (None, rule) => rule apply (expr, root)
     }
 }
