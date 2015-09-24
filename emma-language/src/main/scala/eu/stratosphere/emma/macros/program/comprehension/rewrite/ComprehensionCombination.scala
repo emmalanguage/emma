@@ -215,7 +215,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       for {
         expr @ ScalaExpr(vars, _) <- parent
         if vars exists { _.name == xs.lhs.name }
-        tree = q"${mk ref sym}._1" withType vd.elementType
+        tree = q"${mk ref sym}._1" withType vd.trueType.typeArgs(0)
       } expr.substitute(xs.lhs.name, ScalaExpr(vd :: Nil, tree))
 
       // substitute [v._2/y] in affected expressions
@@ -313,7 +313,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       for {
         expr @ ScalaExpr(vars, _) <- parent
         if vars exists { _.name == xs.lhs.name }
-        tree = q"${mk ref sym}._1" withType vd.elementType
+        tree = q"${mk ref sym}._1" withType vd.trueType.typeArgs(0)
       } expr.substitute(xs.lhs.name, ScalaExpr(vd :: Nil, tree))
 
       // substitute [v._2/y] in affected expressions
