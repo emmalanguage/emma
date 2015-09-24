@@ -79,7 +79,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
   sealed trait MonadExpression extends Expression
 
   case class MonadJoin(var expr: MonadExpression) extends MonadExpression {
-    def tpe = expr.tpe
+    def tpe = DATA_BAG(expr.tpe)
     def descend[U](f: Expression => U) = expr foreach f
   }
 
