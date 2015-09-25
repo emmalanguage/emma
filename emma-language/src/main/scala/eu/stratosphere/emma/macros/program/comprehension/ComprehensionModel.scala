@@ -27,7 +27,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
      *
      * @return The closure as a list lexicographically ordered by the [[Symbol]]s' [[TermName]]s
      */
-    lazy val freeTerms: List[TermSymbol] = {
+    def freeTerms: List[TermSymbol] = {
       val c = combinator
       expr.collect { // Combinators
         case c.Map(f, _)                    => f.freeTerms
