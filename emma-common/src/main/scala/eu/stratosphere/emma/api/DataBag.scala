@@ -81,7 +81,9 @@ sealed abstract class DataBag[+A] extends Serializable {
    * @tparam K Key type.
    * @return A version of this bag with the entries grouped by key.
    */
-  def groupBy[K](k: (A) => K): DataBag[Group[K, DataBag[A]]] = for (key <- this.map(k).distinct()) yield Group(key, for (y <- this; if k(y) == key) yield y)
+  def groupBy[K](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
+    //for (key <- this.map(k).distinct()) yield Group(key, for (y <- this; if k(y) == key) yield y)
+    DataBag(vals.groupBy(k).toSeq.map{case (k, v) => Group(k, DataBag(v))}) // this is faster
 
   /**
    * Difference operator. Respects duplicates, e.g.:
