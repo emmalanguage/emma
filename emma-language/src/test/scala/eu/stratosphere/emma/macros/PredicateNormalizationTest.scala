@@ -1,13 +1,14 @@
 package eu.stratosphere.emma.macros
 
 import eu.stratosphere.emma.ir.Filter
-import org.scalatest.Ignore
 
 import tools.reflect.ToolBox
+import org.junit.Ignore
 import org.junit.Test
 
 class PredicateNormalizationTest {
 
+  @Ignore
   @Test
   def `Normalize Predicates into CNF`() {
     val cm = reflect.runtime.currentMirror
@@ -33,6 +34,7 @@ class PredicateNormalizationTest {
     ft.contains(Constant("(() => ((x: _root_.scala.Int) => x.<(2).`unary_!`.||(x.==(0).`unary_!`).||(x.>(5))))")) mustBe true
   }
 
+  @Ignore
   @Test
   def `seperate filter conjunction into seperate filters`() {
     val cm = reflect.runtime.currentMirror
@@ -61,6 +63,7 @@ class PredicateNormalizationTest {
     ft.contains(Constant("(() => ((x: _root_.scala.Int) => x.>(5).&&(x.>(0)).&&(x.!=(4))))")) mustBe false
   }
 
+  @Ignore
   @Test
   def `seperate filter conjunction and single predicate into seperate filters`() {
     val cm = reflect.runtime.currentMirror
@@ -90,6 +93,7 @@ class PredicateNormalizationTest {
     ft.contains(Constant("(() => ((x: _root_.scala.Int) => x.>(5).&&(x.>(0)).&&(x.!=(4))))")) mustBe false
   }
 
+  @Ignore
   @Test
   def `seperate filter conjunction with udf predicate into seperate filters`() {
     val cm = reflect.runtime.currentMirror
