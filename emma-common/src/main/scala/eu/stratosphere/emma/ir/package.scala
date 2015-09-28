@@ -3,6 +3,7 @@ package eu.stratosphere.emma
 import java.util.UUID
 
 import eu.stratosphere.emma.api.{DataBag, InputFormat, OutputFormat}
+import eu.stratosphere.emma.runtime.AbstractStatefulBackend
 
 import scala.collection.mutable
 
@@ -100,6 +101,19 @@ package object ir {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
+  final case class StatefulCreate[+S: TypeTag, +K: TypeTag](xs: Combinator[_ <: S]) extends Combinator[Unit] {
+    override val tag: TypeTag[Unit] = typeTag[Unit]
+    val tagS: TypeTag[_ <: S] = typeTag[S]
+    val tagK: TypeTag[_ <: K] = typeTag[K]
+  }
+
+  //todo: add variance (+A, +K)
+  final case class StatefulFetch[A: TypeTag, K: TypeTag](name: String, stateful: AbstractStatefulBackend[A, K]) extends Combinator[A] {
+    override val tag: TypeTag[_ <: A] = typeTag[A]
+    val tagK: TypeTag[_ <: K] = typeTag[K]
+    val tagAbstractStatefulBackend: TypeTag[AbstractStatefulBackend[A, K]] = typeTag[AbstractStatefulBackend[A, K]]
+  }
+
   // --------------------------------------------------------------------------
   // Traversal
   // --------------------------------------------------------------------------
@@ -124,6 +138,8 @@ package object ir {
       case Union(xs, ys) => traverse(xs); traverse(ys)
       case Diff(xs, ys) => traverse(xs); traverse(ys)
       case Scatter(_) =>
+      case StatefulCreate(xs) => traverse(xs)
+      case StatefulFetch(name, stateful) =>
     }
   }
 

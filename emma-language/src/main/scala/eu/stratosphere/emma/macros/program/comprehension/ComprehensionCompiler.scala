@@ -65,16 +65,18 @@ private[emma] trait ComprehensionCompiler
       } getOrElse term.id.encodedName
 
       val execute = root match {
-        case _: combinator.Write => TermName("executeWrite")
-        case _: combinator.Fold  => TermName("executeFold")
-        case _                   => TermName("executeTempSink")
+        case _: combinator.Write          => TermName("executeWrite")
+        case _: combinator.Fold           => TermName("executeFold")
+        case _: combinator.StatefulCreate => TermName("executeStatefulCreate")
+        case _                            => TermName("executeTempSink")
       }
 
       q"""{
         import _root_.scala.reflect.runtime.universe._
         import _root_.eu.stratosphere.emma.ir
         val __root = ${serialize(root)}
-        engine.$execute(__root, ${name.toString}, ..${for (s <- closure) yield q"${s.name}"})
+        val __result = engine.$execute(__root, ${name.toString}, ..${for (s <- closure) yield q"${s.name}"})
+        __result
       }"""
     }
 
@@ -176,6 +178,12 @@ private[emma] trait ComprehensionCompiler
       case ScalaExpr(Apply(fn, values :: Nil))
         if api.apply.alternatives contains fn.symbol =>
           q"ir.Scatter(${transform(values)})"
+
+      case combinator.StatefulCreate(xs, stateType, keyType) =>
+        q"ir.StatefulCreate[$stateType, $keyType](${serialize(xs)})"
+
+      case combinator.StatefulFetch(stateful) =>
+        q"ir.StatefulFetch(${stateful.name.toString}, $stateful)"
 
       case e => EmptyTree
       //throw new RuntimeException(

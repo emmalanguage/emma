@@ -99,6 +99,7 @@ class DataflowGenerator(
     case op: ir.Distinct[_]       => opCode(op)
     case op: ir.Union[_]          => opCode(op)
     case op: ir.Group[_, _]       => opCode(op)
+    case op: ir.StatefulCreate[_,_] => throw new NotImplementedError("Stateful only works with native and Flink")
     case _ => throw new RuntimeException(
       s"Unsupported ir node of type '${combinator.getClass}'")
   }

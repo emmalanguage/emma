@@ -7,7 +7,7 @@ import eu.stratosphere.emma.api.{ParallelizedDataBag, TextInputFormat, CSVInputF
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir
 import eu.stratosphere.emma.macros.RuntimeUtil
-import eu.stratosphere.emma.runtime.logger
+import eu.stratosphere.emma.runtime.{StatefulBackend, logger}
 import org.apache.commons.io.FilenameUtils
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 
@@ -116,6 +116,15 @@ class DataflowGenerator(
             ()
           }"""
 
+        // todo: this won't work if there are multiple statefuls in one comprehension
+        case op: ir.StatefulCreate[_,_] =>
+          val res = freshName("res$flink$")
+          q"""def run($env: $ExecEnv, ..$params, ..$localInputs) = {
+            val $res = $opCode
+            $env.execute(${s"Emma[$sessionID][$dataFlowName]"})
+            $res
+          }"""
+
         case _ => throw new RuntimeException(
           s"Unsupported root IR node type '${root.getClass}'")
       }
@@ -139,21 +148,23 @@ class DataflowGenerator(
 
   private def generateOpCode(combinator: ir.Combinator[_])
       (implicit closure: DataFlowClosure): Tree = combinator match {
-    case op: ir.Read[_]           => opCode(op)
-    case op: ir.Write[_]          => opCode(op)
-    case op: ir.TempSource[_]     => opCode(op)
-    case op: ir.TempSink[_]       => opCode(op)
-    case op: ir.Scatter[_]        => opCode(op)
-    case op: ir.Map[_, _]         => opCode(op)
-    case op: ir.FlatMap[_, _]     => opCode(op)
-    case op: ir.Filter[_]         => opCode(op)
-    case op: ir.EquiJoin[_, _, _] => opCode(op)
-    case op: ir.Cross[_, _, _]    => opCode(op)
-    case op: ir.Fold[_, _]        => opCode(op)
-    case op: ir.FoldGroup[_, _]   => opCode(op)
-    case op: ir.Distinct[_]       => opCode(op)
-    case op: ir.Union[_]          => opCode(op)
-    case op: ir.Group[_, _]       => opCode(op)
+    case op: ir.Read[_]              => opCode(op)
+    case op: ir.Write[_]             => opCode(op)
+    case op: ir.TempSource[_]        => opCode(op)
+    case op: ir.TempSink[_]          => opCode(op)
+    case op: ir.Scatter[_]           => opCode(op)
+    case op: ir.Map[_, _]            => opCode(op)
+    case op: ir.FlatMap[_, _]        => opCode(op)
+    case op: ir.Filter[_]            => opCode(op)
+    case op: ir.EquiJoin[_, _, _]    => opCode(op)
+    case op: ir.Cross[_, _, _]       => opCode(op)
+    case op: ir.Fold[_, _]           => opCode(op)
+    case op: ir.FoldGroup[_, _]      => opCode(op)
+    case op: ir.Distinct[_]          => opCode(op)
+    case op: ir.Union[_]             => opCode(op)
+    case op: ir.Group[_, _]          => opCode(op)
+    case op: ir.StatefulCreate[_, _] => opCode(op)
+    case op: ir.StatefulFetch[_, _]  => opCode(op)
     case _ => throw new RuntimeException(
       s"Unsupported ir node of type '${combinator.getClass}'")
   }
@@ -429,6 +440,23 @@ class DataflowGenerator(
             ${keyUDF.func}($stream.head),
             _root_.eu.stratosphere.emma.api.DataBag($stream))
       })"""
+  }
+
+  private def opCode[A, K](op: ir.StatefulCreate[A, K])
+      (implicit closure: DataFlowClosure): Tree = {
+    val stateType = typeOf(op.tagS).dealias
+    val keyType = typeOf(op.tagK).dealias
+    // assemble input fragment
+    val xs = generateOpCode(op.xs)
+    q"""
+      import _root_.eu.stratosphere.emma.runtime.StatefulBackend
+      new StatefulBackend[$stateType,$keyType]($env,$xs)"""
+  }
+
+  private def opCode[A, K](op: ir.StatefulFetch[A, K])
+       (implicit closure: DataFlowClosure): Tree = {
+    closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
+    q"${TermName(op.name)}.asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[${typeOf(op.tag).dealias}, ${typeOf(op.tagK).dealias}]].fetchToStateLess()"
   }
 
   // --------------------------------------------------------------------------

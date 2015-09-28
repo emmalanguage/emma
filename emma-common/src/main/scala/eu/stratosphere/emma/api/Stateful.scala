@@ -9,7 +9,7 @@ import scala.collection.mutable
 object Stateful {
 
   /**
-   * An abstraction for statful collections.
+   * An abstraction for stateful collections.
    *
    * Allows pointwise updates with zero or one additional arguments.
    *

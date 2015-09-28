@@ -5,7 +5,9 @@ import java.util.UUID
 import com.typesafe.scalalogging.slf4j.Logger
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.ir.{Fold, TempSink, Write}
+import eu.stratosphere.emma.ir.{Fold, TempSink, Write, StatefulCreate}
 import org.slf4j.LoggerFactory
+import eu.stratosphere.emma.api.model.Identity
 
 import scala.reflect.runtime.universe._
 
@@ -50,6 +52,8 @@ package object runtime {
 
     def scatter[A: TypeTag](values: Seq[A]): DataBag[A]
 
+    def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag](root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K]
+
     def gather[A: TypeTag](ref: DataBag[A]): DataBag[A]
 
     final def closeSession() = if (!closed) {
@@ -77,6 +81,8 @@ package object runtime {
     override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = ???
 
     override def scatter[A: TypeTag](values: Seq[A]): DataBag[A] = ???
+
+    override def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag](root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K] = ???
 
     override def gather[A: TypeTag](ref: DataBag[A]): DataBag[A] = ???
   }
