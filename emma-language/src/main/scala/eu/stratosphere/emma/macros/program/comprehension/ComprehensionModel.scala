@@ -41,6 +41,26 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       }.flatten.toList.distinct sortBy { _.fullName }
     }
 
+    /**
+     * Extract the nested Scala trees which can be found under this comprehension.
+     *
+     * @return The set of [[Tree]] nodes which can be found under this expression.
+     */
+    def trees: Traversable[Tree] = {
+      val c = combinator
+      expr.collect { // Combinators
+        case ScalaExpr(_, e)                => Seq(e)
+        case c.Map(f, _)                    => Seq(f)
+        case c.FlatMap(f, _)                => Seq(f)
+        case c.Filter(p, _)                 => Seq(p)
+        case c.EquiJoin(kx, ky, _, _)       => Seq(kx) union Seq(ky)
+        case c.Group(k, _)                  => Seq(k)
+        case c.Fold(em, sg, un, _, _)       => Seq(em, sg, un)
+        case c.FoldGroup(k, em, sg, un, _)  => Seq(k, em, sg, un)
+        case c.TempSource(id) if id.hasTerm => Seq(id)
+      }.flatten
+    }
+
     override def toString =
       prettyPrint(expr)
   }
