@@ -76,7 +76,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
     // TODO: add support for comprehension filter expressions
     def fire(rm: RuleMatch) = rm.filter.expr match {
-      case expr @ ScalaExpr(vars, tree) =>
+      case expr @ ScalaExpr(tree) =>
         val RuleMatch(root, parent, gen, filter) = rm
         val arg  = expr.usedVars(rm.root).head
         val p    = mk anonFun (List(arg.name -> arg.info), tree)
@@ -116,7 +116,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     }
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(root, expr @ ScalaExpr(vars, tree), child) = rm
+      val RuleMatch(root, expr @ ScalaExpr(tree), child) = rm
       val args = expr.usedVars(rm.root).toList.sortBy { _.name.toString }
       val f    = mk anonFun (for (a <- args) yield a.name -> a.info, tree)
       combinator.Map(f, child.rhs)
@@ -150,7 +150,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     }
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(root, expr @ ScalaExpr(vars, tree), child) = rm
+      val RuleMatch(root, expr @ ScalaExpr(tree), child) = rm
       val args = expr.usedVars(rm.root).toList.sortBy { _.name.toString }
       val f    = mk anonFun (for (a <- args) yield a.name -> a.info, tree)
       combinator.FlatMap(f, child.rhs)
@@ -212,17 +212,17 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
       // substitute [v._1/x] in affected expressions
       for {
-        expr @ ScalaExpr(vars, _) <- parent
+        expr @ ScalaExpr(_) <- parent
         if expr.usedVars(root) contains { xs.lhs }
         tree = q"${mk ref sym}._1" withType vd.trueType.typeArgs(0)
-      } expr.substitute(xs.lhs.name, ScalaExpr(vd :: Nil, tree))
+      } expr.substitute(xs.lhs.name, ScalaExpr(tree))
 
       // substitute [v._2/y] in affected expressions
       for {
-        expr @ ScalaExpr(vars, _) <- parent
+        expr @ ScalaExpr(_) <- parent
         if expr.usedVars(root) contains { ys.lhs }
         tree = q"${mk ref sym}._2" withType vd.trueType.typeArgs(1)
-      } expr.substitute(ys.lhs.name, ScalaExpr(vd :: Nil, tree))
+      } expr.substitute(ys.lhs.name, ScalaExpr(tree))
 
       // modify parent qualifier list
       parent.qualifiers = prefix ::: Generator(sym, join) :: qs
@@ -287,13 +287,13 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
    */
   object MatchCross extends Rule {
 
-    case class RuleMatch(parent: Comprehension, xs: Generator, ys: Generator)
+    case class RuleMatch(root: Expression, parent: Comprehension, xs: Generator, ys: Generator)
 
     def bind(expr: Expression, root: Expression) = new Traversable[RuleMatch] {
       def foreach[U](f: RuleMatch => U) = expr match {
         case parent @ Comprehension(_, qs) =>
           for ((xs: Generator) :: (ys: Generator) :: Nil <- qs sliding 2)
-            f(RuleMatch(parent, xs, ys))
+            f(RuleMatch(root, parent, xs, ys))
 
         case _ =>
       }
@@ -302,7 +302,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     def guard(rm: RuleMatch) = true
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(parent, xs, ys) = rm
+      val RuleMatch(root, parent, xs, ys) = rm
       val (prefix, suffix) = parent.qualifiers span { _ != xs }
 
       // construct combinator node with input and predicate sides aligned
@@ -311,21 +311,23 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       // bind join result to a fresh variable
       val vd  = mk.valDef(freshName("x"), tq"(${rm.xs.tpe}, ${rm.ys.tpe})")
       val sym = mk.freeTerm(vd.name.toString, vd.trueType)
-      parent.qualifiers = prefix ::: Generator(sym, cross) :: suffix.drop(2)
 
       // substitute [v._1/x] in affected expressions
       for {
-        expr @ ScalaExpr(vars, _) <- parent
-        if vars exists { _.name == xs.lhs.name }
+        expr @ ScalaExpr(_) <- parent
+        if expr.usedVars(root) contains { xs.lhs }
         tree = q"${mk ref sym}._1" withType vd.trueType.typeArgs(0)
-      } expr.substitute(xs.lhs.name, ScalaExpr(vd :: Nil, tree))
+      } expr.substitute(xs.lhs.name, ScalaExpr(tree))
 
       // substitute [v._2/y] in affected expressions
       for {
-        expr @ ScalaExpr(vars, _) <- parent
-        if vars exists { _.name == ys.lhs.name }
+        expr @ ScalaExpr(_) <- parent
+        if expr.usedVars(root) contains { ys.lhs }
         tree = q"${mk ref sym}._2" withType vd.trueType.typeArgs(1)
-      } expr.substitute(ys.lhs.name, ScalaExpr(vd :: Nil, tree))
+      } expr.substitute(ys.lhs.name, ScalaExpr(tree))
+
+      // modify parent qualifier list
+      parent.qualifiers = prefix ::: Generator(sym, cross) :: suffix.drop(2)
 
       // return the modified parent
       rm.parent

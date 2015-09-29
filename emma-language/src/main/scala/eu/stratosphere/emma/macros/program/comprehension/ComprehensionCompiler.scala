@@ -173,7 +173,7 @@ private[emma] trait ComprehensionCompiler
       case combinator.Diff(xs, ys) =>
         q"ir.Diff(${serialize(xs)}, ${serialize(ys)})"
 
-      case ScalaExpr(_, Apply(fn, values :: Nil))
+      case ScalaExpr(Apply(fn, values :: Nil))
         if api.apply.alternatives contains fn.symbol =>
           q"ir.Scatter(${transform(values)})"
 

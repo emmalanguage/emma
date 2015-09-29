@@ -260,7 +260,7 @@ private[emma] trait ComprehensionAnalysis
 
       // Interpret as boxed Scala expression (default)
       // Trees created by the caller with q"..." have to be explicitly type-checked
-      case expr => ScalaExpr(vars, typeCheckWith(vars, expr))
+      case expr => ScalaExpr(expr)
     }
 
   // --------------------------------------------------------------------------
@@ -359,11 +359,6 @@ private[emma] trait ComprehensionAnalysis
               q"${mk ref gen.lhs}.values".typeChecked
             }
             com.comprehension.substitute(foldTree, replTree)
-          }
-
-          com.comprehension.expr.collect {
-            case expr @ ScalaExpr(vars, _) =>
-              expr.vars = vars.filter { _.name != gNew.name } ::: List(gNew)
           }
         }
 
@@ -488,10 +483,10 @@ private[emma] trait ComprehensionAnalysis
       ComprehendedTerm(_, _, ExpressionRoot(expr), _) <- compView.terms
       comprehension @ Comprehension(_, qualifiers)    <- expr
     } comprehension.qualifiers = qualifiers flatMap {
-      case Filter(ScalaExpr(vars, x)) =>
+      case Filter(ScalaExpr(x)) =>
         // Normalize the tree
         (x ->> applyDeMorgan ->> distributeOrOverAnd ->> cleanConjuncts)
-          .collect { case Some(nf) => Filter(ScalaExpr(vars, nf))}
+          .collect { case Some(nf) => Filter(ScalaExpr(nf))}
 
       case q => q :: Nil
     }

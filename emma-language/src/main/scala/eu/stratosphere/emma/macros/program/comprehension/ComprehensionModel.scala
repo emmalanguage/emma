@@ -49,7 +49,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
     def trees: Traversable[Tree] = {
       val c = combinator
       expr.collect { // Combinators
-        case ScalaExpr(_, e)                => Seq(e)
+        case ScalaExpr(e)                   => Seq(e)
         case c.Map(f, _)                    => Seq(f)
         case c.FlatMap(f, _)                => Seq(f)
         case c.Filter(p, _)                 => Seq(p)
@@ -108,7 +108,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       // Which variables are used in the given context
       val used = collect({
         // Environment & Host Language Connectors
-        case ScalaExpr(env, tree)                             => Set(tree)
+        case ScalaExpr(tree)                                  => Set(tree)
         // Combinators
         case combinator.Map(f, xs)                            => Set(f)
         case combinator.FlatMap(f, xs)                        => Set(f)
@@ -171,7 +171,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
   // Environment & Host Language Connectors
 
-  case class ScalaExpr(var vars: List[ValDef], var tree: Tree) extends Expression {
+  case class ScalaExpr(var tree: Tree) extends Expression {
 
     def tpe = tree.trueType
 
@@ -185,10 +185,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
      * @param value The new node to be substituted in place of the old one
      */
     def substitute(key: TermName, value: ScalaExpr): Unit = {
-      // remove key from vars
-      vars = vars.filter { _.name != key } ::: (value.vars diff vars)
       // add all additional value.vars
-      tree = tree.substitute(key, value.tree).typeChecked
+      tree = tree.substitute(key, value.tree)
     }
   }
 
@@ -382,7 +380,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       case Filter(xs)                     => Filter(xform(xs))
       case Generator(lhs, rhs)            => Generator(lhs, xform(rhs))
       // Environment & Host Language Connectors
-      case ScalaExpr(vars, tree)          => ScalaExpr(vars, xform(tree))
+      case ScalaExpr(tree)                => ScalaExpr(xform(tree))
       // Combinators
       case read: c.Read                   => read
       case c.Write(loc, fmt, xs)          => c.Write(xform(loc), xform(fmt), xform(xs))
@@ -426,7 +424,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       case Filter(expr) => traverse(expr)
       case Generator(_, rhs)                    => traverse(rhs)
       // Environment & Host Language Connectors
-      case ScalaExpr(_, _)                      =>
+      case ScalaExpr(_)                         =>
       // Combinators
       case combinator.Read(_, _)                =>
       case combinator.Write(_, _, xs)           => traverse(xs)
@@ -553,7 +551,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         s"${lhs.name} ← ${pp(rhs, offset + " " * 3 + " " * lhs.fullName.length)}"
 
       // Environment & Host Language Connectors
-      case ScalaExpr(_, expr) =>
+      case ScalaExpr(expr) =>
         s"${pp(expr)}"
 
       // Combinators
