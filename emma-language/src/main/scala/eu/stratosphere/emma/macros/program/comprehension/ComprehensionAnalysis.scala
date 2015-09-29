@@ -314,81 +314,163 @@ private[emma] trait ComprehensionAnalysis
   def foldGroupFusion(tree: Tree)
       (implicit cfGraph: CFGraph, compView: ComprehensionView): Unit = {
 
-    // find the symbols of all "Group[K, V]" definitions 'g'
-    val groupDefinitions = tree collect { case vd: ValDef if hasGroupType(vd) => vd }
-
-    // compute a flattened list of all expressions in the comprehension view
-    val expressions = compView.terms flatMap { _.comprehension.expr }
-
     for {
-      gDef <- groupDefinitions if gDef.hasTerm
-      (gen, group) <- generatorFor(gDef.term, expressions)
-    } {
-      // the symbol associated with 'g'
-      val gSym = gDef.term
+      com <- compView.terms // For each comprehended term
+      gen <- com.comprehension.expr // For each of it's sub-expressions
+    } gen match {
+      // If this is a generator binding a proper group
+      case gen@Generator(gSym, group: combinator.Group) if hasProperGroupType(gen.tpe) =>
 
-      // find all 'g.values' expressions for the group symbol
-      val groupSelects = tree collect {
-        case sel @ q"${id: Ident}.values" if id.symbol == gSym => sel.as[Select]
-      }
+        // Check if all 'group.values' usages within the enclosing comprehensions are of type "fold"
+        val groupValuesUsages = (for (ctx <- com.comprehension.trees) yield ctx.collect {
+          case grpVals @ q"${id: Ident}.values" if id.symbol == gSym =>
+            (grpVals, findEnclosingFold(grpVals, ctx))
+        }).flatten.toList
 
-      // For each 'g.values' expression, find an associated 'g.values.fold(...)' comprehension,
-      // if one exists
-      val folds = for {
-        sel  <- groupSelects
-        expr <- expressions
-        fold <- foldOverSelect(sel, expr)
-      } yield fold
+        // Check if all 'group.values' usages within the enclosing comprehensions are of type "fold"
+        val allGroupValuesUsedInFold = groupValuesUsages forall { case (_, enclosingFold) => enclosingFold.isDefined }
 
-      // !!! All 'g.values' expressions are used directly in a comprehended 'fold' =>
-      // apply Fold-Group-Fusion !!!
-      if (folds.nonEmpty && groupSelects.size == folds.size) {
-        // Create an auxiliary map
-        val foldToIndex = folds.map { _.origin }.zipWithIndex.toMap
+        if (groupValuesUsages.nonEmpty && allGroupValuesUsedInFold) {
+          val comprehendedGroupValuesUsages = for {
+            ((grpVals, foldOpt), idx) <- groupValuesUsages.zipWithIndex
+            (foldTree)                <- foldOpt
+          } yield {
+            val foldComp = ExpressionRoot(comprehend(Nil)(foldTree)) ->> normalize
+            (idx, grpVals, foldTree, foldComp)
+          }
 
-        // 1) Fuse the group with the folds and replace the Group with a GroupFold in the
-        // enclosing generator
-        gen.rhs = foldGroup(group, folds)
+          // Project out folds
+          val folds = for {
+            (_, _, _, foldComp) <- comprehendedGroupValuesUsages
+          } yield foldComp.expr.as[combinator.Fold]
 
-        // 2) Replace the comprehended fold expressions
-        for (expr <- expressions) expr match {
-          // Adapt Scala expression nodes referencing the group
-          case expr @ ScalaExpr(vars, body) if vars exists { _.name == gDef.name } =>
-            // Find all value selects with associated enclosed in this ScalaExpr
-            val enclosed = body.collect {
-              case t if foldToIndex contains t => t -> foldToIndex(t)
-            }.toMap
+          // Fuse the group with the folds and replace the Group with a GroupFold in the enclosing generator
+          val fGrp = foldGroup(group, folds)
+          val gNew = mk.valDef(gSym.name, fGrp.elementType)
+          gen.rhs  = fGrp
+          gen.lhs  = gNew.term
 
-            if (enclosed.nonEmpty) {
-              expr.vars = for (v <- vars) yield if (v.name == gDef.name)
-                mk.valDef(gDef.name, gen.rhs.elementType) else v
-
-              val replacer = new FoldTermReplacer(enclosed, q"${mk ref gSym}.values")
-              expr.tree    = typeCheckWith(vars, replacer transform body)
+          // For each 'foldTree' -> 'idx' pair
+          for ((idx, _, foldTree, _) <- comprehendedGroupValuesUsages) {
+            // Replace 'foldTree' with '${valSel}._${idx}' in all trees that can be found under the enclosing 'com'
+            val replTree = if (comprehendedGroupValuesUsages.length > 1) {
+              q"${mk ref gen.lhs}.values.${TermName(s"_${idx + 1}")}".typeChecked
+            } else {
+              q"${mk ref gen.lhs}.values".typeChecked
             }
+            com.comprehension.substitute(foldTree, replTree)
+          }
 
-          // Adapt comprehensions that contain the fold as a head
-          case expr @ Comprehension(fold: combinator.Fold, _) if folds contains fold =>
-            // Find all value selects with associated enclosed in this ScalaExpr
-            val enclosed = Map(fold.origin -> foldToIndex(fold.origin))
-            val vars     = mk.valDef(gDef.name, gen.rhs.elementType) :: Nil
-            val replacer = new FoldTermReplacer(enclosed, q"${mk ref gSym}.values")
-            val body     = typeCheckWith(vars, replacer transform fold.origin)
-            expr.hd      = ScalaExpr(vars, body)
-
-          // Adapt comprehensions that contain the fold as a filter
-          case expr @ Filter(fold: combinator.Fold) if folds contains fold =>
-            // Find all value selects with associated enclosed in this ScalaExpr
-            val enclosed = Map(fold.origin -> foldToIndex(fold.origin))
-            val vars     = mk.valDef(gDef.name, gen.rhs.elementType) :: Nil
-            val replacer = new FoldTermReplacer(enclosed, q"${mk ref gSym}.values")
-            val body     = typeCheckWith(vars, replacer transform fold.origin)
-            expr.expr    = ScalaExpr(vars, body)
-
-          case _ => // Ignore the rest
+          com.comprehension.expr.collect {
+            case expr @ ScalaExpr(vars, _) =>
+              expr.vars = vars.filter { _.name != gNew.name } ::: List(gNew)
+          }
         }
+
+      // Ignore other expression types
+      case _ =>
+    }
+  }
+
+  /**
+   * A quick and dirty solution for a deterministic automaton that recognizes a
+   *
+   * {{{ sel ->> [ withFilter | map ]* ->> fold }}}
+   *
+   * set of terms in the given `context`. The set of interesting terms are thereby precisely the ones in which
+   * the given `sel` tree is followed by arbitrary many `withFilter` or `map` invocations and ends with a `fold`.
+   *
+   * @param sel The bottom of the tree.
+   * @param ctx The context within
+   * @return
+   */
+  def findEnclosingFold(sel: Tree, ctx: Tree) = {
+    var state: scala.Symbol = 'find_fold
+    var res: Option[Tree]   = Option.empty[Tree]
+
+    val traverser = new Traverser {
+      override def traverse(tree: Tree): Unit = state match {
+        case 'find_fold => tree match {
+          // xs.fold(empty, sng, union)
+          case tree @ q"${fold @ Select(xs, _)}[$_]($empty, $sng, $union)"
+            if fold.symbol == api.fold =>
+              state = 'find_homomorphisms
+              res = Some(tree)
+              traverse(xs)
+          case _ =>
+            super.traverse(tree)
+        }
+        case 'find_homomorphisms => tree match {
+          // xs.withFilter(f)
+          case q"${withFilter @ Select(xs, _)}((${arg: ValDef}) => $body)"
+            if withFilter.symbol == api.withFilter =>
+              traverse(xs)
+          // xs.map(f)
+          case tree @ q"${map @ Select(xs, _)}[$_]((${arg: ValDef}) => $body)"
+            if map.symbol == api.map =>
+              traverse(xs)
+          case _ =>
+            state = 'find_identifier
+            traverse(tree)
+        }
+        case 'find_identifier => tree match {
+          // xs.withFilter(f)
+          case tree @ q"${id: Ident}.values"
+            if tree == sel =>
+              state = 'success
+              super.traverse(tree)
+          case _ =>
+            state = 'find_fold
+            res = Option.empty[Tree]
+            traverse(tree)
+        }
+        case _ =>
+          super.traverse(tree)
       }
     }
+
+    traverser.traverse(ctx)
+    res
+  }
+
+  /** Check if the type matches the type pattern `Group[K, DataBag[A]]`. */
+  private def hasProperGroupType(tpe: Type) = {
+    tpe.typeSymbol == api.groupSymbol && tpe.typeArgs(1).typeSymbol == api.bagSymbol
+  }
+
+  /** Fuse a Group combinator with a list of Folds and return the resulting FoldGroup combinator. */
+  private def foldGroup(group: combinator.Group, folds: List[combinator.Fold]) = folds match {
+    case fold :: Nil => combinator.FoldGroup(group.key, fold.empty, fold.sng, fold.union, group.xs)
+    case _ =>
+      val combinator.Group(key, xs) = group
+      // Derive the unique product 'empty' function
+      val empty = q"(..${for (f <- folds) yield f.empty})".typeChecked
+
+      // Derive the unique product 'sng' function
+      val x   = freshName("x")
+      val y   = freshName("y")
+      val sng = q"($x: ${xs.elementType}) => (..${
+        for (f <- folds) yield {
+          val sng = f.sng.as[Function]
+          sng.body.rename(sng.vparams.head.name, x)
+        }
+      })".typeChecked
+
+      // Derive the unique product 'union' function
+      val union = q"($x: ${empty.tpe}, $y: ${empty.tpe}) => (..${
+        for ((f, i) <- folds.zipWithIndex) yield {
+          val tpe   = empty.tpe typeArgs i
+          val union = f.union.as[Function]
+          union.body substitute Map(
+            union.vparams.head.name ->
+              q"$x.${TermName(s"_${i + 1}")}".withType(tpe),
+
+            union.vparams(1).name ->
+              q"$y.${TermName(s"_${i + 1}")}".withType(tpe))
+        }
+      })".typeChecked
+
+      combinator.FoldGroup(key, empty, sng, union, xs)
   }
 
   /**
@@ -550,72 +632,6 @@ private[emma] trait ComprehensionAnalysis
 
     def alwaysTrue: Boolean = predicates combinations 2 exists {
       case ListBuffer(p, q) => p.neg != q.neg && p.tree.equalsStructure(q.tree)
-    }
-  }
-
-  private def hasGroupType(vd: ValDef) = vd.tpt.tpe match {
-    case TypeRef(_, sym, _) => sym == api.groupSymbol
-    case _ => false
-  }
-
-  private def generatorFor(name: TermSymbol, expressions: Seq[Expression]) =
-    expressions collectFirst {
-      case gen @ Generator(lhs, group: combinator.Group)
-        if lhs == name => (gen, group)
-    }
-
-  private def foldOverSelect(sel: Select, expr: Expression) = expr match {
-    case fold @ combinator.Fold(_, _, _, ScalaExpr(_, tree), _)
-      if endsWith(tree, sel) => Some(fold)
-    
-    case _ => None
-  }
-
-  private def endsWith(tree: Tree, expr: Tree): Boolean = tree match {
-    case Block(_, last) => endsWith(last, expr)
-    case _ => tree == expr
-  }
-
-  private def foldGroup(group: combinator.Group, folds: List[combinator.Fold]) = folds match {
-    case fold :: Nil => combinator.FoldGroup(group.key, fold.empty, fold.sng, fold.union, group.xs)
-    case _ =>
-      val combinator.Group(key, xs) = group
-      // Derive the unique product 'empty' function
-      val empty = q"(..${for (f <- folds) yield f.empty})".typeChecked
-
-      // Derive the unique product 'sng' function
-      val x   = freshName("x")
-      val y   = freshName("y")
-      val sng = q"($x: ${xs.elementType}) => (..${
-        for (f <- folds) yield {
-          val sng = f.sng.as[Function]
-          sng.body.rename(sng.vparams.head.name, x)
-        }
-      })".typeChecked
-
-      // Derive the unique product 'union' function
-      val union = q"($x: ${empty.tpe}, $y: ${empty.tpe}) => (..${
-        for ((f, i) <- folds.zipWithIndex) yield {
-          val tpe   = empty.tpe typeArgs i
-          val union = f.union.as[Function]
-          union.body substitute Map(
-            union.vparams.head.name ->
-              q"$x.${TermName(s"_${i + 1}")}".withType(tpe),
-
-            union.vparams(1).name ->
-              q"$y.${TermName(s"_${i + 1}")}".withType(tpe))
-        }
-      })".typeChecked
-
-      combinator.FoldGroup(key, empty, sng, union, xs)
-  }
-
-  private class FoldTermReplacer(count: Map[Tree, Int], prefix: Tree) extends Transformer {
-    override def transform(tree: Tree) = {
-      if (count contains tree)
-        if (count.size == 1) prefix
-        else q"$prefix.${TermName(s"_${count(tree) + 1}")}"
-      else super.transform(tree)
     }
   }
 }
