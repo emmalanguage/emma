@@ -446,6 +446,17 @@ trait ReflectUtil {
       substitute(dict.toSeq: _*)
 
     /**
+     * Replace occurrences of the `find` [[Tree]] with the replacement [[Tree]] `repl`.
+     *
+     * @param find The [[Tree]] to look for.
+     * @param repl The [[Tree]] that should replace `find`.
+     * @return A substituted version of the enclosing [[Tree]].
+     */
+    def substitute(find: Tree, repl: Tree): Tree = transform {
+      case x if x == find => repl
+    }
+
+    /**
      * Inline a value definitions in this [[Tree]]. It's assumed that it's part of the [[Tree]].
      *
      * @param valDef the [[ValDef]] to inline

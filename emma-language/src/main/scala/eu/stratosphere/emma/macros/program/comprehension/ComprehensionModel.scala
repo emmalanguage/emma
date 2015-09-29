@@ -61,6 +61,14 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       }.flatten
     }
 
+    /** Substitute `find` with `repl` in all enclosing trees. */
+    def substitute(find: Tree, repl: Tree): Unit = {
+      val transformer = new ExpressionTransformer {
+        override def xform(tree: Tree) = tree.substitute(find, repl)
+      }
+      expr = transformer.transform(expr)
+    }
+
     override def toString =
       prettyPrint(expr)
   }
@@ -156,7 +164,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
     def descend[U](f: Expression => U) = expr foreach f
   }
 
-  case class Generator(lhs: TermSymbol, var rhs: Expression) extends Qualifier {
+  case class Generator(var lhs: TermSymbol, var rhs: Expression) extends Qualifier {
     def tpe = rhs.elementType
     def descend[U](f: Expression => U) = rhs foreach f
   }
