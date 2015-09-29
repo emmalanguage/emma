@@ -116,10 +116,9 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     }
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(_, ScalaExpr(vars, tree), child) = rm
-      val args = vars.reverse
-      val body = tree.freeEnv(vars: _*)
-      val f    = q"(..$args) => $body".typeChecked
+      val RuleMatch(root, expr @ ScalaExpr(vars, tree), child) = rm
+      val args = expr.usedVars(rm.root).toList.sortBy { _.name.toString }
+      val f    = mk anonFun (for (a <- args) yield a.name -> a.info, tree)
       combinator.Map(f, child.rhs)
     }
   }
@@ -151,10 +150,9 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     }
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(_, ScalaExpr(vars, tree), child) = rm
-      val args = vars.reverse
-      val body = tree.freeEnv(vars: _*)
-      val f    = q"(..$args) => $body".typeChecked
+      val RuleMatch(root, expr @ ScalaExpr(vars, tree), child) = rm
+      val args = expr.usedVars(rm.root).toList.sortBy { _.name.toString }
+      val f    = mk anonFun (for (a <- args) yield a.name -> a.info, tree)
       combinator.FlatMap(f, child.rhs)
     }
   }
@@ -177,6 +175,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
   object MatchEquiJoin extends Rule {
 
     case class RuleMatch(
+      root:   Expression,
       parent: Comprehension,
       xs:     Generator,
       ys:     Generator,
@@ -190,8 +189,8 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
           filter @ Filter(p: ScalaExpr) <- qualifiers
           pairs = qualifiers takeWhile { _ != filter } sliding 2
           (xs: Generator) :: (ys: Generator) :: Nil <- pairs
-          (kx, ky) <- parseJoinPredicate(xs, ys, p)
-        } f(RuleMatch(parent, xs, ys, filter, kx, ky))
+          (kx, ky) <- parseJoinPredicate(root, xs, ys, p)
+        } f(RuleMatch(root, parent, xs, ys, filter, kx, ky))
 
         case _ =>
       }
@@ -200,7 +199,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     def guard(rm: RuleMatch) = true
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(parent, xs, ys, filter, kx, ky) = rm
+      val RuleMatch(root, parent, xs, ys, filter, kx, ky) = rm
       val (prefix, suffix) = parent.qualifiers span { _ != xs }
       // construct combinator node with input and predicate sides aligned
       val join = combinator.EquiJoin(kx, ky, xs.rhs, ys.rhs)
@@ -210,56 +209,60 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       val vd  = mk.valDef(freshName("x"), tpt)
       val sym = mk.freeTerm(vd.name.toString, vd.trueType)
       val qs  = suffix drop 2 filter { _ != filter }
-      parent.qualifiers = prefix ::: Generator(sym, join) :: qs
 
       // substitute [v._1/x] in affected expressions
       for {
         expr @ ScalaExpr(vars, _) <- parent
-        if vars exists { _.name == xs.lhs.name }
+        if expr.usedVars(root) contains { xs.lhs }
         tree = q"${mk ref sym}._1" withType vd.trueType.typeArgs(0)
       } expr.substitute(xs.lhs.name, ScalaExpr(vd :: Nil, tree))
 
       // substitute [v._2/y] in affected expressions
       for {
         expr @ ScalaExpr(vars, _) <- parent
-        if vars exists { _.name == ys.lhs.name }
+        if expr.usedVars(root) contains { ys.lhs }
         tree = q"${mk ref sym}._2" withType vd.trueType.typeArgs(1)
       } expr.substitute(ys.lhs.name, ScalaExpr(vd :: Nil, tree))
+
+      // modify parent qualifier list
+      parent.qualifiers = prefix ::: Generator(sym, join) :: qs
 
       // return the modified parent
       parent
     }
 
-    private def parseJoinPredicate(xs: Generator, ys: Generator, p: ScalaExpr):
+    private def parseJoinPredicate(root: Expression, xs: Generator, ys: Generator, p: ScalaExpr):
       Option[(Function, Function)] = p.tree match {
         case q"${lhs: Tree} == ${rhs: Tree}" =>
+          val defVars = p.definedVars(root)
+
           val lhsVars = { // Find expr.vars used in the `lhs`
-            val names = lhs.collect { case Ident(n: TermName) => n }.toSet
-            p.vars filter { v => names(v.name) }
+            val useVars = lhs.collect { case id @ Ident(n: TermName) => id.term }.toSet
+            defVars intersect useVars
           }
 
           val rhsVars = { // Find expr.vars used in the `rhs`
-            val names = rhs.collect { case Ident(n: TermName) => n }.toSet
-            p.vars filter { v => names(v.name) }
+            val useVars = rhs.collect { case id @ Ident(n: TermName) => id.term }.toSet
+            defVars intersect useVars
           }
 
           if (lhsVars.size != 1 || rhsVars.size != 1) {
             None // Both `lhs` and `rhs` must refer to exactly one variable
-          } else if (lhsVars.exists { _.name == xs.lhs.name } &&
-                     rhsVars.exists { _.name == ys.lhs.name }) {
+          } else if ((lhsVars contains xs.lhs) &&
+                     (rhsVars contains ys.lhs)) {
             // Filter expression has the type `f(xs.lhs) == h(ys.lhs)`
-            val vx = lhsVars.find { _.name == xs.lhs.name }.get
-            val vy = rhsVars.find { _.name == ys.lhs.name }.get
-            val kx = q"($vx) => ${lhs.freeEnv(p.vars: _*)}".typeChecked.as[Function]
-            val ky = q"($vy) => ${rhs.freeEnv(p.vars: _*)}".typeChecked.as[Function]
+            val vx = xs.lhs.name -> xs.lhs.info
+            val vy = ys.lhs.name -> ys.lhs.info
+            val kx = mk anonFun (List(vx), lhs)
+            val ky = mk anonFun (List(vy), rhs)
             Some(kx, ky)
-          } else if (lhsVars.exists { _.name == ys.lhs.name } &&
-                     rhsVars.exists { _.name == xs.lhs.name }) {
+          } else if ((lhsVars contains ys.lhs) &&
+                     (rhsVars contains xs.lhs)) {
             // Filter expression has the type `f(ys.lhs) == h(xs.lhs)`
-            val vx = rhsVars.find { _.name == xs.lhs.name }.get
-            val vy = lhsVars.find { _.name == ys.lhs.name }.get
-            val kx = q"($vx) => ${rhs.freeEnv(p.vars: _*)}".typeChecked.as[Function]
-            val ky = q"($vy) => ${lhs.freeEnv(p.vars: _*)}".typeChecked.as[Function]
+            val vx = xs.lhs.name -> xs.lhs.info
+            val vy = ys.lhs.name -> ys.lhs.info
+            val kx = mk anonFun (List(vx), rhs)
+            val ky = mk anonFun (List(vy), lhs)
             Some(kx, ky)
           } else None  // Something else
 
@@ -329,3 +332,4 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     }
   }
 }
+
