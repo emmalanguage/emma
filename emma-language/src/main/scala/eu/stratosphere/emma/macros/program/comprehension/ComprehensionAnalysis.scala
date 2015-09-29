@@ -86,7 +86,7 @@ private[emma] trait ComprehensionAnalysis
     val comprehendedTerms = mutable.Seq((for (term <- terms) yield {
       val name          = freshName("comprehension")
       val definition    = compTermDef(term)
-      val comprehension = ExpressionRoot(comprehend(Nil)(term) match {
+      val comprehension = ExpressionRoot(comprehend(term) match {
         case root: combinator.Write => root
         case root: combinator.Fold  => root
         case root: Expression =>
@@ -171,11 +171,10 @@ private[emma] trait ComprehensionAnalysis
   /**
    * Recursive comprehend method.
    *
-   * @param vars The variable environment for the currently lifted tree
    * @param tree The tree to be lifted
    * @return A lifted, MC syntax version of the given tree
    */
-  private def comprehend(vars: List[ValDef])(tree: Tree, input: Boolean = true): Expression =
+  private def comprehend(tree: Tree, input: Boolean = true): Expression =
     (tree match { // Ignore a top-level Typed node (side-effect of the Algebra inlining macros)
       case q"${inner: Tree}: $_" => inner
       case _ => tree
@@ -188,23 +187,23 @@ private[emma] trait ComprehensionAnalysis
       // xs.map(f)
       case q"${map @ Select(xs, _)}[$_]((${arg: ValDef}) => $body)"
         if map.symbol == api.map =>
-          val bind = Generator(arg.term, comprehend(vars)(xs))
-          val head = comprehend(arg.reset :: vars)(body, input = false)
+          val bind = Generator(arg.term, comprehend(xs))
+          val head = comprehend(body, input = false)
           Comprehension(head, bind :: Nil)
 
       // xs.flatMap(f)
       case q"${flatMap @ Select(xs, _)}[$_]((${arg: ValDef}) => $body)"
         if flatMap.symbol == api.flatMap =>
-          val bind = Generator(arg.term, comprehend(vars)(xs))
-          val head = comprehend(arg.reset :: vars)(body, input = false)
+          val bind = Generator(arg.term, comprehend(xs))
+          val head = comprehend(body, input = false)
           MonadJoin(Comprehension(head, bind :: Nil))
 
       // xs.withFilter(f)
       case q"${withFilter @ Select(xs, _)}((${arg: ValDef}) => $body)"
         if withFilter.symbol == api.withFilter =>
-          val bind   = Generator(arg.term, comprehend(vars)(xs))
-          val filter = Filter(comprehend(arg.reset :: vars)(body))
-          val head   = comprehend(arg.reset :: vars)(mk ref arg.term, input = false)
+          val bind   = Generator(arg.term, comprehend(xs))
+          val filter = Filter(comprehend(body))
+          val head   = comprehend(mk ref arg.term, input = false)
           Comprehension(head, bind :: filter :: Nil)
 
       // -----------------------------------------------------
@@ -214,22 +213,22 @@ private[emma] trait ComprehensionAnalysis
       // xs.groupBy(key)
       case q"${groupBy @ Select(xs, _)}[$_]($key)"
         if groupBy.symbol == api.groupBy =>
-          combinator.Group(key, comprehend(Nil)(xs))
+          combinator.Group(key, comprehend(xs))
 
       // xs.minus(ys)
       case q"${minus @ Select(xs, _)}[$_]($ys)"
         if minus.symbol == api.minus =>
-          combinator.Diff(comprehend(Nil)(xs), comprehend(Nil)(ys))
+          combinator.Diff(comprehend(xs), comprehend(ys))
 
       // xs.plus(ys)
       case q"${plus @ Select(xs, _)}[$_]($ys)"
         if plus.symbol == api.plus =>
-          combinator.Union(comprehend(Nil)(xs), comprehend(Nil)(ys))
+          combinator.Union(comprehend(xs), comprehend(ys))
 
       // xs.distinct()
       case q"${distinct @ Select(xs, _)}()"
         if distinct.symbol == api.distinct =>
-          combinator.Distinct(comprehend(Nil)(xs))
+          combinator.Distinct(comprehend(xs))
 
       // -----------------------------------------------------
       // Aggregates
@@ -238,7 +237,7 @@ private[emma] trait ComprehensionAnalysis
       // xs.fold(empty, sng, union)
       case tree @ q"${fold @ Select(xs, _)}[$_]($empty, $sng, $union)"
         if fold.symbol == api.fold =>
-          combinator.Fold(empty, sng, union, comprehend(Nil)(xs), tree)
+          combinator.Fold(empty, sng, union, comprehend(xs), tree)
 
       // ----------------------------------------------------------------------
       // Environment & Host Language Connectors
@@ -247,7 +246,7 @@ private[emma] trait ComprehensionAnalysis
       // write[T](loc, fmt)(xs)
       case q"${write: Tree}[$_]($loc, $fmt)($xs)"
         if write.symbol == api.write =>
-          combinator.Write(loc, fmt, comprehend(vars)(xs))
+          combinator.Write(loc, fmt, comprehend(xs))
 
       // read[T](loc, fmt)
       case q"${read: Tree}[$_]($loc, $fmt)"
@@ -335,7 +334,7 @@ private[emma] trait ComprehensionAnalysis
             ((grpVals, foldOpt), idx) <- groupValuesUsages.zipWithIndex
             (foldTree)                <- foldOpt
           } yield {
-            val foldComp = ExpressionRoot(comprehend(Nil)(foldTree)) ->> normalize
+            val foldComp = ExpressionRoot(comprehend(foldTree)) ->> normalize
             (idx, grpVals, foldTree, foldComp)
           }
 
