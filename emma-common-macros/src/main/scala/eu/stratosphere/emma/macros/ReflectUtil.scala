@@ -466,18 +466,6 @@ trait ReflectUtil {
       case vd: ValDef if vd.symbol == valDef.symbol => q"()".withType[Unit]
       case id: Ident  if id.symbol == valDef.symbol => valDef.rhs
     }
-
-    /**
-     * Create a function that replaces all occurrences of identifiers from the given environment with
-     * fresh identifiers. This can be used to "free" identifiers from their original [[Symbol]]s.
-     *
-     * @param vars An environment consisting of a list of [[ValDef]]s
-     * @return A function that can "free" the environment of a [[Tree]]
-     */
-    def freeEnv(vars: ValDef*): Tree = {
-      val varSet = vars.map { _.name }.toSet
-      transform { case Ident(name: TermName) if varSet(name) => Ident(name) }
-    }
   }
 
   /** Syntax sugar for [[ValDef]]s. */
