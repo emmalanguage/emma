@@ -354,20 +354,20 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       case Filter(xs)                     => Filter(xform(xs))
       case Generator(lhs, rhs)            => Generator(lhs, xform(rhs))
       // Environment & Host Language Connectors
-      case expr: ScalaExpr                => expr
+      case ScalaExpr(vars, tree)          => ScalaExpr(vars, xform(tree))
       // Combinators
       case read: c.Read                   => read
-      case c.Write(loc, fmt, xs)          => c.Write(loc, fmt, xform(xs))
+      case c.Write(loc, fmt, xs)          => c.Write(xform(loc), xform(fmt), xform(xs))
       case src: c.TempSource              => src
       case c.TempSink(id, xs)             => c.TempSink(id, xform(xs))
-      case c.Map(f, xs)                   => c.Map(f, xform(xs))
-      case c.FlatMap(f, xs)               => c.FlatMap(f, xform(xs))
-      case c.Filter(p, xs)                => c.Filter(p, xform(xs))
-      case c.EquiJoin(kx, ky, xs, ys)     => c.EquiJoin(kx, ky, xform(xs), xform(ys))
+      case c.Map(f, xs)                   => c.Map(xform(f), xform(xs))
+      case c.FlatMap(f, xs)               => c.FlatMap(xform(f), xform(xs))
+      case c.Filter(p, xs)                => c.Filter(xform(p), xform(xs))
+      case c.EquiJoin(kx, ky, xs, ys)     => c.EquiJoin(xform(kx), xform(ky), xform(xs), xform(ys))
       case c.Cross(xs, ys)                => c.Cross(xform(xs), xform(ys))
-      case c.Group(k, xs)                 => c.Group(k, xform(xs))
-      case c.Fold(em, sg, un, xs, or)     => c.Fold(em, sg, un, xform(xs), or)
-      case c.FoldGroup(k, em, sg, un, xs) => c.FoldGroup(k, em, sg, un, xform(xs))
+      case c.Group(k, xs)                 => c.Group(xform(k), xform(xs))
+      case c.Fold(em, sg, un, xs, or)     => c.Fold(xform(em), xform(sg), xform(un), xform(xs), xform(or))
+      case c.FoldGroup(k, em, sg, un, xs) => c.FoldGroup(xform(k), xform(em), xform(sg), xform(un), xform(xs))
       case c.Distinct(xs)                 => c.Distinct(xform(xs))
       case c.Union(xs, ys)                => c.Union(xform(xs), xform(ys))
       case c.Diff(xs, ys)                 => c.Diff(xform(xs), xform(ys))
@@ -381,6 +381,10 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
     protected def xform(q: Qualifier): Qualifier =
       transform(q).as[Qualifier]
+
+    protected def xform(t: Tree): Tree = {
+      t
+    }
   }
 
   trait ExpressionTraverser {
