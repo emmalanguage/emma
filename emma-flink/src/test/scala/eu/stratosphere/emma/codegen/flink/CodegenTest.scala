@@ -28,7 +28,7 @@ class CodegenTest extends BaseCodegenTest("flink") {
     compareBags(in, out)
   }
 
-  @Test def testStatefulUpdateWithMany() = {
+  @Test def testStatefulUpdate() = {
 
     // This only works with Flink at the moment, and only locally
 
@@ -39,24 +39,31 @@ class CodegenTest extends BaseCodegenTest("flink") {
       val b1 = DataBag(in)
       val s = stateful[State, Long](b1)
 
-      val us1 = DataBag(Seq(Update(3, 5)))
-      val o1 = s.updateWithMany(us1)(_.identity, (s, us) => {
+      val o1 = s.updateWithZero(s => {
+        s.value += 1
+
+        DataBag()
+      })
+
+      val us1 = DataBag(Seq(Update(6, 5), Update(6, 7)))
+      val o2 = s.updateWithOne(us1)(_.identity, (s, u) => {
+        s.value += u.inc
+        DataBag(Seq(42))
+      })
+
+      val us2 = DataBag(Seq(Update(3, 5), Update(3, 4)))
+      val o3 = s.updateWithMany(us2)(_.identity, (s, us) => {
         for(
           u <- us
         ) yield {
           s.value += u.inc
-          s.value * u.inc
         }
       })
 
-      val us2 = DataBag(Seq(Update(3, 1), Update(6, 2)))
-      val o2 = s.updateWithMany(us2)(_.identity, (s, us) => {
-        for(
-          u <- us
-        ) yield {
-          s.value += u.inc
-          s.value * u.inc
-        }
+      val us3 = DataBag(Seq(Update(3, 1), Update(6, 2), Update(6, 3)))
+      val o4 = s.updateWithMany(us3)(_.identity, (s, us) => {
+        us.map{_.inc}.sum()
+        DataBag(Seq(42))
       })
 
       val b2 = s.bag()

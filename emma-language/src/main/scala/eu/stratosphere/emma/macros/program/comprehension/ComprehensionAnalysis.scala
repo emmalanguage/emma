@@ -32,11 +32,13 @@ private[emma] trait ComprehensionAnalysis
     val plus             = bagSymbol.info.decl(TermName("plus"))
     val distinct         = bagSymbol.info.decl(TermName("distinct"))
     val fetchToStateless = statefulSymbol.info.decl(TermName("bag"))
+    val updateWithZero    = statefulSymbol.info.decl(TermName("updateWithZero"))
+    val updateWithOne    = statefulSymbol.info.decl(TermName("updateWithOne"))
     val updateWithMany   = statefulSymbol.info.decl(TermName("updateWithMany"))
 
     val methods = Set(
       read, write,
-      stateful, fetchToStateless, updateWithMany,
+      stateful, fetchToStateless, updateWithZero, updateWithOne, updateWithMany,
       fold,
       map, flatMap, withFilter,
       groupBy,
@@ -273,10 +275,21 @@ private[emma] trait ComprehensionAnalysis
         if fetchToStateless.symbol == api.fetchToStateless =>
           combinator.StatefulFetch(ident)
 
-      // stateful.UpdateWithMany(updates)(keySel, udf)
+      // stateful.updateWithZero(udf)
+      case q"${updateWithZero @ Select(ident @ Ident(_), _)}[$_]($udf)"
+        if updateWithZero.symbol == api.updateWithZero =>
+          combinator.UpdateWithZero(ident, udf)
+
+      // stateful.updateWithOne(updates)(keySel, udf)
+      case q"${updateWithOne @ Select(ident @ Ident(_), _)}[$_, $_]($updates)($keySel, $udf)"
+        if updateWithOne.symbol == api.updateWithOne =>
+          combinator.UpdateWithOne(ident, comprehend(updates), keySel, udf)
+
+      // stateful.updateWithMany(updates)(keySel, udf)
       case q"${updateWithMany @ Select(ident @ Ident(_), _)}[$_, $_]($updates)($keySel, $udf)"
         if updateWithMany.symbol == api.updateWithMany =>
           combinator.UpdateWithMany(ident, comprehend(updates), keySel, udf)
+
 
       // Interpret as boxed Scala expression (default)
       // Trees created by the caller with q"..." have to be explicitly type-checked

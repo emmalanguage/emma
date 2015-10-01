@@ -68,6 +68,8 @@ private[emma] trait ComprehensionCompiler
         case _: combinator.Write          => TermName("executeWrite")
         case _: combinator.Fold           => TermName("executeFold")
         case _: combinator.StatefulCreate => TermName("executeStatefulCreate")
+        case _: combinator.UpdateWithZero => TermName("updateWithZero")
+        case _: combinator.UpdateWithOne  => TermName("updateWithOne")
         case _: combinator.UpdateWithMany => TermName("updateWithMany")
         case _                            => TermName("executeTempSink")
       }
@@ -188,8 +190,27 @@ private[emma] trait ComprehensionCompiler
         val statefulNameStr = stateful.name.toString
         q"ir.StatefulFetch($statefulNameStr, $stateful)"
 
+      case combinator.UpdateWithZero(stateful, udf) =>
+        val stateTpe = stateful.trueType.typeArgs.head
+        val keyTpe   = stateful.trueType.typeArgs(1)
+        val outTpe   = expr.elementType
+        val statefulNameStr = stateful.name.toString
+        val udfStr          = serialize(udf)
+        q"ir.UpdateWithZero[$stateTpe, $keyTpe, $outTpe]($statefulNameStr, $stateful, $udfStr)"
+
+      case combinator.UpdateWithOne(stateful, upds, keySel, udf) =>
+        val stateTpe = stateful.trueType.typeArgs.head
+        val keyTpe   = stateful.trueType.typeArgs(1)
+        val updTpe   = upds.elementType
+        val outTpe   = expr.elementType
+        val statefulNameStr = stateful.name.toString
+        val usStr           = serialize(upds)
+        val keySelStr       = serialize(keySel)
+        val udfStr          = serialize(udf)
+        q"ir.UpdateWithOne[$stateTpe, $keyTpe, $updTpe, $outTpe]($statefulNameStr, $stateful, $usStr, $keySelStr, $udfStr)"
+
       case combinator.UpdateWithMany(stateful, upds, keySel, udf) =>
-        val stateTpe = stateful.trueType.typeArgs(0)
+        val stateTpe = stateful.trueType.typeArgs.head
         val keyTpe   = stateful.trueType.typeArgs(1)
         val updTpe   = upds.elementType
         val outTpe   = expr.elementType

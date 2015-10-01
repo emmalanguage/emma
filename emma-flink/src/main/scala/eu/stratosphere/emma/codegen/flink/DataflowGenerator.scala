@@ -165,6 +165,8 @@ class DataflowGenerator(
     case op: ir.Group[_, _]                => opCode(op)
     case op: ir.StatefulCreate[_, _]       => opCode(op)
     case op: ir.StatefulFetch[_, _]        => opCode(op)
+    case op: ir.UpdateWithZero[_, _, _]    => opCode(op)
+    case op: ir.UpdateWithOne[_, _, _, _]  => opCode(op)
     case op: ir.UpdateWithMany[_, _, _, _] => opCode(op)
     case _ => throw new RuntimeException(
       s"Unsupported ir node of type '${combinator.getClass}'")
@@ -457,11 +459,24 @@ class DataflowGenerator(
   private def opCode[S, K](op: ir.StatefulFetch[S, K])
       (implicit closure: DataFlowClosure): Tree = {
     closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
-    q"${TermName(op.name)}.asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[${typeOf(op.tag).dealias}, ${typeOf(op.tagK).dealias}]].fetchToStateLess()"
+    q"""${TermName(op.name)}
+        .asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[${typeOf(op.tag).dealias}, ${typeOf(op.tagK).dealias}]]
+        .fetchToStateLess()"""
   }
 
-  // (updates: DataSet[U], updateKeySelector: U => K, udf: (S, DataBag[U]) => DataBag[R]): DataSet[R] = {
-  private def opCode[S, K, U, R](op: ir.UpdateWithMany[S, K, U, R])
+  private def opCode[S, K, U, O](op: ir.UpdateWithZero[S, K, O])
+      (implicit closure: DataFlowClosure): Tree = {
+    closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
+    val updFn  = parseCheck(op.udf)
+    val updUdf = ir.UDF(updFn, updFn.tpe, tb)
+    val updUdfOutTpe = typeOf(op.tag).dealias
+    closure.capture(updUdf)
+    q"""${TermName(op.name)}
+        .asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[${typeOf(op.tagS).dealias}, ${typeOf(op.tagK).dealias}]]
+        .updateWithZero[$updUdfOutTpe](${updUdf.func})"""
+  }
+
+  private def opCode[S, K, U, O](op: ir.UpdateWithOne[S, K, U, O])
       (implicit closure: DataFlowClosure): Tree = {
     closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
     val us = generateOpCode(op.updates)
@@ -469,11 +484,30 @@ class DataflowGenerator(
     val keyUdf    = ir.UDF(keyFn, keyFn.tpe, tb)
     val updateFn  = parseCheck(op.udf)
     val updateUdf = ir.UDF(updateFn, updateFn.tpe, tb)
+    val updTpe = typeOf(op.tagU).dealias
+    val updUdfOutTpe = typeOf(op.tag).dealias
     closure.capture(keyUdf)
     closure.capture(updateUdf)
-    q"""${TermName(op.name)}.asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[${typeOf(op.tagS).dealias}, ${typeOf(op.tagK).dealias}]]
-       .updateWithMany($us, ${keyUdf.func}, ${updateUdf.func})
-     """
+    q"""${TermName(op.name)}.
+        asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[${typeOf(op.tagS).dealias}, ${typeOf(op.tagK).dealias}]]
+        .updateWithOne[$updTpe, $updUdfOutTpe]($us, ${keyUdf.func}, ${updateUdf.func})"""
+  }
+
+  private def opCode[S, K, U, O](op: ir.UpdateWithMany[S, K, U, O])
+      (implicit closure: DataFlowClosure): Tree = {
+    closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
+    val us = generateOpCode(op.updates)
+    val keyFn     = parseCheck(op.updateKeySel)
+    val keyUdf    = ir.UDF(keyFn, keyFn.tpe, tb)
+    val updateFn  = parseCheck(op.udf)
+    val updateUdf = ir.UDF(updateFn, updateFn.tpe, tb)
+    val updTpe = typeOf(op.tagU).dealias
+    val updUdfOutTpe = typeOf(op.tag).dealias
+    closure.capture(keyUdf)
+    closure.capture(updateUdf)
+    q"""${TermName(op.name)}
+        .asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[${typeOf(op.tagS).dealias}, ${typeOf(op.tagK).dealias}]]
+        .updateWithMany[$updTpe, $updUdfOutTpe]($us, ${keyUdf.func}, ${updateUdf.func})"""
   }
 
   // --------------------------------------------------------------------------

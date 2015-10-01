@@ -56,6 +56,20 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
     dataflowCompiler.execute[AbstractStatefulBackend[S, K]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
 
+  override def executeUpdateWithZero[S: TypeTag, K: TypeTag, O: TypeTag]
+      (root: UpdateWithZero[S, K, O], name: String, closure: Any*): DataBag[O] = {
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    val expr = dataflowCompiler.execute[DataSet[O]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+    DataBag(root.name, expr, expr.collect())
+  }
+
+  override def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+      (root: UpdateWithOne[S, K, U, O], name: String, closure: Any*): DataBag[O] = {
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    val expr = dataflowCompiler.execute[DataSet[O]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+    DataBag(root.name, expr, expr.collect())
+  }
+
   override def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
       (root: UpdateWithMany[S, K, U, O], name: String, closure: Any*): DataBag[O] = {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)

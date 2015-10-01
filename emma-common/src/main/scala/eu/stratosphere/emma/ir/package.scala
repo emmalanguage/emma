@@ -114,11 +114,29 @@ package object ir {
     val tagAbstractStatefulBackend: TypeTag[AbstractStatefulBackend[S, K]] = typeTag[AbstractStatefulBackend[S, K]]
   }
 
+  final case class UpdateWithZero[S: TypeTag, K: TypeTag, O: TypeTag]
+      (name: String, stateful: AbstractStatefulBackend[S, K], udf: String) extends Combinator[O] {
+    override val tag: TypeTag[_ <: O] = typeTag[O]
+    val tagS: TypeTag[_ <: S] = typeTag[S]
+    val tagK: TypeTag[_ <: K] = typeTag[K]
+    val tagAbstractStatefulBackend: TypeTag[AbstractStatefulBackend[S, K]] = typeTag[AbstractStatefulBackend[S, K]]
+  }
+
+  final case class UpdateWithOne[S: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+      (name: String, stateful: AbstractStatefulBackend[S, K], updates: Combinator[_ <: U], updateKeySel: String, udf: String) extends Combinator[O] {
+    override val tag: TypeTag[_ <: O] = typeTag[O]
+    val tagS: TypeTag[_ <: S] = typeTag[S]
+    val tagK: TypeTag[_ <: K] = typeTag[K]
+    val tagU: TypeTag[_ <: U] = typeTag[U]
+    val tagAbstractStatefulBackend: TypeTag[AbstractStatefulBackend[S, K]] = typeTag[AbstractStatefulBackend[S, K]]
+  }
+
   final case class UpdateWithMany[S: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
       (name: String, stateful: AbstractStatefulBackend[S, K], updates: Combinator[_ <: U], updateKeySel: String, udf: String) extends Combinator[O] {
     override val tag: TypeTag[_ <: O] = typeTag[O]
     val tagS: TypeTag[_ <: S] = typeTag[S]
     val tagK: TypeTag[_ <: K] = typeTag[K]
+    val tagU: TypeTag[_ <: U] = typeTag[U]
     val tagAbstractStatefulBackend: TypeTag[AbstractStatefulBackend[S, K]] = typeTag[AbstractStatefulBackend[S, K]]
   }
 
@@ -148,6 +166,8 @@ package object ir {
       case Scatter(_)                     =>
       case StatefulCreate(xs)             => traverse(xs)
       case StatefulFetch(_, _)            =>
+      case UpdateWithZero(_, _, _)        =>
+      case UpdateWithOne(_, _, us, _, _)  => traverse(us)
       case UpdateWithMany(_, _, us, _, _) => traverse(us)
     }
   }

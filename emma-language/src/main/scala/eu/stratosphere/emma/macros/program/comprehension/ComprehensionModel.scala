@@ -40,6 +40,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         case c.TempSource(id) if id.hasTerm => Set(id.term)
         case c.StatefulCreate(_, _, _)      => Set.empty[TermSymbol]
         case c.StatefulFetch(id)            => Set(id.term)
+        case c.UpdateWithZero(id, f)        => Set(id.term) union f.freeTerms
+        case c.UpdateWithOne(id, _, ku, f)  => Set(id.term) union ku.freeTerms union f.freeTerms
         case c.UpdateWithMany(id, _, ku, f) => Set(id.term) union ku.freeTerms union f.freeTerms
       }.flatten.toList.distinct sortBy { _.fullName }
     }
@@ -63,6 +65,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         case c.TempSource(id) if id.hasTerm => Seq(id)
         case c.StatefulCreate(_, _, _)      => Seq()
         case c.StatefulFetch(id)            => Seq(id)
+        case c.UpdateWithZero(id, f)        => Seq(id, f)
+        case c.UpdateWithOne(id, _, ku, f)  => Seq(id, ku, f)
         case c.UpdateWithMany(id, _, ku, f) => Seq(id, ku, f)
       }.flatten
     }
@@ -125,6 +129,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         case combinator.FoldGroup(key, empty, sng, union, xs) => Set(key, empty, sng, union)
         case combinator.StatefulCreate(_, _, _)               => Set.empty[Tree]
         case combinator.StatefulFetch(_)                      => Set.empty[Tree]
+        case combinator.UpdateWithZero(_, udf)                => Set(udf)
+        case combinator.UpdateWithOne(_, _, uKeySel, udf)     => Set(uKeySel, udf)
         case combinator.UpdateWithMany(_, _, uKeySel, udf)    => Set(uKeySel, udf)
       }).flatten.flatMap(_.freeTerms).toSet
       // Result is the intersection of both
@@ -339,9 +345,25 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
     case class StatefulFetch(stateful: Ident) extends Combinator {
 
-      def tpe = stateful.trueType.typeArgs(0)
+      def tpe = DATA_BAG(stateful.trueType.typeArgs.head)
 
       def descend[U](f: Expression => U) = {}
+    }
+
+    case class UpdateWithZero(stateful: Ident, udf: Tree) extends Combinator {
+
+      def tpe = udf.trueType.typeArgs.last
+
+      def descend[U](f: Expression => U) = {}
+    }
+
+    case class UpdateWithOne(stateful: Ident, updates: Expression, updateKeySel: Tree, udf: Tree) extends Combinator {
+
+      def tpe = udf.trueType.typeArgs.last
+
+      def descend[U](f: Expression => U) = {
+        updates foreach f
+      }
     }
 
     case class UpdateWithMany(stateful: Ident, updates: Expression, updateKeySel: Tree, udf: Tree) extends Combinator {
@@ -434,6 +456,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       case c.StatefulCreate(xs, stTpe, keyTpe) => c.StatefulCreate(xform(xs), stTpe, keyTpe)
       case c.StatefulFetch(stateful)           => c.StatefulFetch(stateful)
       case c.UpdateWithMany(s, us, kSel, f)    => c.UpdateWithMany(s, xform(us), kSel, f)
+      case c.UpdateWithOne(s, us, kSel, f)     => c.UpdateWithOne(s, xform(us), kSel, f)
+      case c.UpdateWithZero(s, f)              => c.UpdateWithZero(s, f)
     }
 
     protected def xform(e: Expression): Expression =
@@ -480,6 +504,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       case combinator.Diff(xs, ys)                => traverse(xs); traverse(ys)
       case combinator.StatefulCreate(xs, _, _)    => traverse(xs)
       case combinator.StatefulFetch(_)            =>
+      case combinator.UpdateWithZero(_, _)        =>
+      case combinator.UpdateWithOne(_, us, _, _)  => traverse(us)
       case combinator.UpdateWithMany(_, us, _, _) => traverse(us)
     }
   }
@@ -677,6 +703,20 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
       case c.StatefulFetch(stateful) => s"""
         |statefulFetch (${pp(stateful)})
+      """.stripMargin.trim
+
+      case c.UpdateWithZero(stateful, udf) => s"""
+        |UpdateWithZero (
+        |       ${pp(stateful, offset + " " * 8)},
+        |       ${pp(udf,      offset + " " * 8)} )
+      """.stripMargin.trim
+
+      case c.UpdateWithOne(stateful, us, uKeySel, udf) => s"""
+        |UpdateWithOne (
+        |       ${pp(stateful, offset + " " * 8)},
+        |       ${pp(us,       offset + " " * 8)},
+        |       ${pp(uKeySel,  offset + " " * 8)},
+        |       ${pp(udf,      offset + " " * 8)} )
       """.stripMargin.trim
 
       case c.UpdateWithMany(stateful, us, uKeySel, udf) => s"""

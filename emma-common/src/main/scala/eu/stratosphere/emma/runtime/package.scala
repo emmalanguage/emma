@@ -52,6 +52,12 @@ package object runtime {
     def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag]
       (root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K]
 
+    def executeUpdateWithZero[S: TypeTag, K: TypeTag, O: TypeTag]
+      (root: UpdateWithZero[S, K, O], name: String, closure: Any*): DataBag[O]
+
+    def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+      (root: UpdateWithOne[S, K, U, O], name: String, closure: Any*): DataBag[O]
+
     def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
       (root: UpdateWithMany[S, K, U, O], name: String, closure: Any*): DataBag[O]
 
@@ -85,6 +91,12 @@ package object runtime {
 
     override def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag]
       (root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K] = ???
+
+    override def executeUpdateWithZero[S: TypeTag, K: TypeTag, O: TypeTag]
+      (root: UpdateWithZero[S, K, O], name: String, closure: Any*): DataBag[O] = ???
+
+    override def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+      (root: UpdateWithOne[S, K, U, O], name: String, closure: Any*): DataBag[O] = ???
 
     override def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
       (root: UpdateWithMany[S, K, U, O], name: String, closure: Any*): DataBag[O] = ???

@@ -14,28 +14,28 @@ object Stateful {
    * Allows pointwise updates with zero or one additional arguments.
    *
    * @param state A mutable Map used for indexed state maintenance in local execution.
-   * @tparam A The element of the stored state.
+   * @tparam S The element of the stored state.
    * @tparam K The key type.
    */
-  sealed class Bag[A <: Identity[K], K] private(val state: mutable.Map[K, A]) {
+  sealed class Bag[S <: Identity[K], K] private(val state: mutable.Map[K, S]) {
 
     /**
      * Private constructor that transforms a DataBag into a stateful Bag.
      *
      * @param bag A DataBag containing elements with identity to be indexed and managed by this stateful Bag.
      */
-    private[api] def this(bag: DataBag[A]) =
-      this(bag.fold(mutable.Map.empty[K, A])(s => mutable.Map(s.identity -> s), _ ++ _))
+    private[api] def this(bag: DataBag[S]) =
+      this(bag.fold(mutable.Map.empty[K, S])(s => mutable.Map(s.identity -> s), _ ++ _))
 
     /**
      * Computes and flattens a delta without additional inputs. The UDF `f` is allowed to modify the state element `s`,
      * however with the restriction that the modification should not affect it's identity.
      *
      * @param f the update function to be applied for each point in the distributed state.
-     * @tparam C The type of the output elements.
+     * @tparam O The type of the output elements.
      * @return The flattened result of all update invocations.
      */
-    def updateWithZero[C](f: A => DataBag[C]): DataBag[C] = for {
+    def updateWithZero[O](f: S => DataBag[O]): DataBag[O] = for {
       state  <- bag()
       result <- f(state)
     } yield result
@@ -48,12 +48,12 @@ object Stateful {
      * @param updates A collection of inputs to be joined with.
      * @param k A key extractor function for matching `k(u) == s.identity`.
      * @param f A UDF to be applied per pair `f(s, u)` as described above.
-     * @tparam B The type of the `updates` elements.
-     * @tparam C The type of the output elements.
+     * @tparam U The type of the `updates` elements.
+     * @tparam O The type of the output elements.
      * @return The flattened result of all update invocations.
      */
-    def updateWithOne[B, C](updates: DataBag[B])
-      (k: B => K, f: (A, B) => DataBag[C]): DataBag[C] = for {
+    def updateWithOne[U, O](updates: DataBag[U])
+      (k: U => K, f: (S, U) => DataBag[O]): DataBag[O] = for {
         update <- updates
         state  <- DataBag(state.get(k(update)).toSeq)
         result <- f(state, update)
@@ -86,7 +86,7 @@ object Stateful {
      * @return The flattened collection
      */
     def updateWithMany[U, O](updates: DataBag[U])
-      (k: U => K, f: (A, DataBag[U]) => DataBag[O]): DataBag[O] = for {
+      (k: U => K, f: (S, DataBag[U]) => DataBag[O]): DataBag[O] = for {
         state  <- bag()
         result <- f(state, updates withFilter { k(_) == state.identity })
       } yield result
@@ -96,6 +96,6 @@ object Stateful {
      *
      * @return A Databag containing the set of elements contained in this stateful Bag.
      */
-    def bag(): DataBag[A] = DataBag((for (x <- state) yield x._2).toSeq)
+    def bag(): DataBag[S] = DataBag((for (x <- state) yield x._2).toSeq)
   }
 }
