@@ -32,10 +32,11 @@ private[emma] trait ComprehensionAnalysis
     val plus             = bagSymbol.info.decl(TermName("plus"))
     val distinct         = bagSymbol.info.decl(TermName("distinct"))
     val fetchToStateless = statefulSymbol.info.decl(TermName("bag"))
+    val updateWithMany   = statefulSymbol.info.decl(TermName("updateWithMany"))
 
     val methods = Set(
       read, write,
-      stateful, fetchToStateless,
+      stateful, fetchToStateless, updateWithMany,
       fold,
       map, flatMap, withFilter,
       groupBy,
@@ -272,6 +273,10 @@ private[emma] trait ComprehensionAnalysis
         if fetchToStateless.symbol == api.fetchToStateless =>
           combinator.StatefulFetch(ident)
 
+      // stateful.UpdateWithMany(updates)(keySel, udf)
+      case q"${updateWithMany @ Select(ident @ Ident(_), _)}[$_, $_]($updates)($keySel, $udf)"
+        if updateWithMany.symbol == api.updateWithMany =>
+          combinator.UpdateWithMany(ident, comprehend(updates), keySel, udf)
 
       // Interpret as boxed Scala expression (default)
       // Trees created by the caller with q"..." have to be explicitly type-checked

@@ -107,11 +107,19 @@ package object ir {
     val tagK: TypeTag[_ <: K] = typeTag[K]
   }
 
-  //todo: add variance (+A, +K)
-  final case class StatefulFetch[A: TypeTag, K: TypeTag](name: String, stateful: AbstractStatefulBackend[A, K]) extends Combinator[A] {
-    override val tag: TypeTag[_ <: A] = typeTag[A]
+  //todo: add variance (+S, +K)
+  final case class StatefulFetch[S: TypeTag, K: TypeTag](name: String, stateful: AbstractStatefulBackend[S, K]) extends Combinator[S] {
+    override val tag: TypeTag[_ <: S] = typeTag[S]
     val tagK: TypeTag[_ <: K] = typeTag[K]
-    val tagAbstractStatefulBackend: TypeTag[AbstractStatefulBackend[A, K]] = typeTag[AbstractStatefulBackend[A, K]]
+    val tagAbstractStatefulBackend: TypeTag[AbstractStatefulBackend[S, K]] = typeTag[AbstractStatefulBackend[S, K]]
+  }
+
+  final case class UpdateWithMany[S: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+      (name: String, stateful: AbstractStatefulBackend[S, K], updates: Combinator[_ <: U], updateKeySel: String, udf: String) extends Combinator[O] {
+    override val tag: TypeTag[_ <: O] = typeTag[O]
+    val tagS: TypeTag[_ <: S] = typeTag[S]
+    val tagK: TypeTag[_ <: K] = typeTag[K]
+    val tagAbstractStatefulBackend: TypeTag[AbstractStatefulBackend[S, K]] = typeTag[AbstractStatefulBackend[S, K]]
   }
 
   // --------------------------------------------------------------------------
@@ -122,24 +130,25 @@ package object ir {
 
     def traverse(e: Combinator[_]): Unit = e match {
       // Combinators
-      case Read(_, _) =>
-      case Write(_, _, xs) => traverse(xs)
-      case TempSource(id) =>
-      case TempSink(_, xs) => traverse(xs)
-      case Map(_, xs) => traverse(xs)
-      case FlatMap(_, xs) => traverse(xs)
-      case Filter(_, xs) => traverse(xs)
-      case EquiJoin(_, _, _, xs, ys) => traverse(xs); traverse(ys)
-      case Cross(_, xs, ys) => traverse(xs); traverse(ys)
-      case Group(_, xs) => traverse(xs)
-      case Fold(_, _, _, xs) => traverse(xs)
-      case FoldGroup(_, _, _, _, xs) => traverse(xs)
-      case Distinct(xs) => traverse(xs)
-      case Union(xs, ys) => traverse(xs); traverse(ys)
-      case Diff(xs, ys) => traverse(xs); traverse(ys)
-      case Scatter(_) =>
-      case StatefulCreate(xs) => traverse(xs)
-      case StatefulFetch(name, stateful) =>
+      case Read(_, _)                     =>
+      case Write(_, _, xs)                => traverse(xs)
+      case TempSource(id)                 =>
+      case TempSink(_, xs)                => traverse(xs)
+      case Map(_, xs)                     => traverse(xs)
+      case FlatMap(_, xs)                 => traverse(xs)
+      case Filter(_, xs)                  => traverse(xs)
+      case EquiJoin(_, _, _, xs, ys)      => traverse(xs); traverse(ys)
+      case Cross(_, xs, ys)               => traverse(xs); traverse(ys)
+      case Group(_, xs)                   => traverse(xs)
+      case Fold(_, _, _, xs)              => traverse(xs)
+      case FoldGroup(_, _, _, _, xs)      => traverse(xs)
+      case Distinct(xs)                   => traverse(xs)
+      case Union(xs, ys)                  => traverse(xs); traverse(ys)
+      case Diff(xs, ys)                   => traverse(xs); traverse(ys)
+      case Scatter(_)                     =>
+      case StatefulCreate(xs)             => traverse(xs)
+      case StatefulFetch(_, _)            =>
+      case UpdateWithMany(_, _, us, _, _) => traverse(us)
     }
   }
 

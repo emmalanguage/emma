@@ -68,6 +68,7 @@ private[emma] trait ComprehensionCompiler
         case _: combinator.Write          => TermName("executeWrite")
         case _: combinator.Fold           => TermName("executeFold")
         case _: combinator.StatefulCreate => TermName("executeStatefulCreate")
+        case _: combinator.UpdateWithMany => TermName("updateWithMany")
         case _                            => TermName("executeTempSink")
       }
 
@@ -180,10 +181,23 @@ private[emma] trait ComprehensionCompiler
           q"ir.Scatter(${transform(values)})"
 
       case combinator.StatefulCreate(xs, stateType, keyType) =>
-        q"ir.StatefulCreate[$stateType, $keyType](${serialize(xs)})"
+        val xsStr = serialize(xs)
+        q"ir.StatefulCreate[$stateType, $keyType]($xsStr)"
 
       case combinator.StatefulFetch(stateful) =>
-        q"ir.StatefulFetch(${stateful.name.toString}, $stateful)"
+        val statefulNameStr = stateful.name.toString
+        q"ir.StatefulFetch($statefulNameStr, $stateful)"
+
+      case combinator.UpdateWithMany(stateful, upds, keySel, udf) =>
+        val stateTpe = stateful.trueType.typeArgs(0)
+        val keyTpe   = stateful.trueType.typeArgs(1)
+        val updTpe   = upds.elementType
+        val outTpe   = expr.elementType
+        val statefulNameStr = stateful.name.toString
+        val usStr           = serialize(upds)
+        val keySelStr       = serialize(keySel)
+        val udfStr          = serialize(udf)
+        q"ir.UpdateWithMany[$stateTpe, $keyTpe, $updTpe, $outTpe]($statefulNameStr, $stateful, $usStr, $keySelStr, $udfStr)"
 
       case e => EmptyTree
       //throw new RuntimeException(

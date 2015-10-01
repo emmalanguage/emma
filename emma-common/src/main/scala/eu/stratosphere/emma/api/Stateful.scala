@@ -81,12 +81,12 @@ object Stateful {
      * @param updates A collection of inputs to be matched per `x`.
      * @param k A key extractor function for matching `k(u) == s.identity`.
      * @param f A UDF to be applied per pair `f(x, G p_x ys)` as described above.
-     * @tparam B The type of the `ys` elements.
-     * @tparam C The type of the output elements.
+     * @tparam U The type of the `ys` elements. (the updates)
+     * @tparam O The type of the output elements.
      * @return The flattened collection
      */
-    def updateWithMany[B, C](updates: DataBag[B])
-      (k: B => K, f: (A, DataBag[B]) => DataBag[C]): DataBag[C] = for {
+    def updateWithMany[U, O](updates: DataBag[U])
+      (k: U => K, f: (A, DataBag[U]) => DataBag[O]): DataBag[O] = for {
         state  <- bag()
         result <- f(state, updates withFilter { k(_) == state.identity })
       } yield result

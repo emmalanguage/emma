@@ -47,8 +47,12 @@ abstract class Spark(val host: String, val port: Int) extends Engine {
   }
 
   override def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag](root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K] = {
-    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    dataflowCompiler.execute[AbstractStatefulBackend[A, K]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
+    ???
+  }
+
+  override def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+    (root: UpdateWithMany[S, K, U, O], name: String, closure: Any*): DataBag[O] = {
+    ???
   }
 
   override def scatter[A: TypeTag](values: Seq[A]): DataBag[A] = {

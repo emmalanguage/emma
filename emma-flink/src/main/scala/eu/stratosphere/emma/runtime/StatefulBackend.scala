@@ -32,11 +32,11 @@ class StatefulBackend[S <: Identity[K] : ClassTag : TypeInformation, K: ClassTag
   xs.write(new TypeSerializerOutputFormat[S](), currentFileName(), FileSystem.WriteMode.NO_OVERWRITE)
 
 
-  def updateWith[U: ClassTag : TypeInformation, R: ClassTag : TypeInformation]
-        (udf: (S, DataBag[U]) => DataBag[R], updates: DataSet[U], updateKeySelector: U => K): DataSet[R] = {
+  def updateWithMany[U: ClassTag : TypeInformation, O: ClassTag : TypeInformation]
+        (updates: DataSet[U], updateKeySelector: U => K, udf: (S, DataBag[U]) => DataBag[O]): DataSet[O] = {
 
     val javaUdfResults = readStateFromFile().coGroup(updates).where(s => s.identity).equalTo(updateKeySelector).apply(
-      (stateIt: Iterator[S], updIt: Iterator[U], out: Collector[Either[S, R]]) => {
+      (stateIt: Iterator[S], updIt: Iterator[U], out: Collector[Either[S, O]]) => {
         if (stateIt.hasNext) {
           val state = stateIt.next()
           val upds = DataBag(updIt.toSeq)
@@ -58,7 +58,7 @@ class StatefulBackend[S <: Identity[K] : ClassTag : TypeInformation, K: ClassTag
     // We also can't just overwrite the old file here, because the write might be occuring in parallel with the read
     // (at least as far as the Flink runtime is concerned, I mean the read probably keeps the file open while the topology is up)
 
-    javaUdfResults.flatMap ((x, out: Collector[R]) => x match {
+    javaUdfResults.flatMap ((x, out: Collector[O]) => x match {
       case Left(_) =>
       case Right(r) => out.collect(r)
     })

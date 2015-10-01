@@ -148,23 +148,24 @@ class DataflowGenerator(
 
   private def generateOpCode(combinator: ir.Combinator[_])
       (implicit closure: DataFlowClosure): Tree = combinator match {
-    case op: ir.Read[_]              => opCode(op)
-    case op: ir.Write[_]             => opCode(op)
-    case op: ir.TempSource[_]        => opCode(op)
-    case op: ir.TempSink[_]          => opCode(op)
-    case op: ir.Scatter[_]           => opCode(op)
-    case op: ir.Map[_, _]            => opCode(op)
-    case op: ir.FlatMap[_, _]        => opCode(op)
-    case op: ir.Filter[_]            => opCode(op)
-    case op: ir.EquiJoin[_, _, _]    => opCode(op)
-    case op: ir.Cross[_, _, _]       => opCode(op)
-    case op: ir.Fold[_, _]           => opCode(op)
-    case op: ir.FoldGroup[_, _]      => opCode(op)
-    case op: ir.Distinct[_]          => opCode(op)
-    case op: ir.Union[_]             => opCode(op)
-    case op: ir.Group[_, _]          => opCode(op)
-    case op: ir.StatefulCreate[_, _] => opCode(op)
-    case op: ir.StatefulFetch[_, _]  => opCode(op)
+    case op: ir.Read[_]                    => opCode(op)
+    case op: ir.Write[_]                   => opCode(op)
+    case op: ir.TempSource[_]              => opCode(op)
+    case op: ir.TempSink[_]                => opCode(op)
+    case op: ir.Scatter[_]                 => opCode(op)
+    case op: ir.Map[_, _]                  => opCode(op)
+    case op: ir.FlatMap[_, _]              => opCode(op)
+    case op: ir.Filter[_]                  => opCode(op)
+    case op: ir.EquiJoin[_, _, _]          => opCode(op)
+    case op: ir.Cross[_, _, _]             => opCode(op)
+    case op: ir.Fold[_, _]                 => opCode(op)
+    case op: ir.FoldGroup[_, _]            => opCode(op)
+    case op: ir.Distinct[_]                => opCode(op)
+    case op: ir.Union[_]                   => opCode(op)
+    case op: ir.Group[_, _]                => opCode(op)
+    case op: ir.StatefulCreate[_, _]       => opCode(op)
+    case op: ir.StatefulFetch[_, _]        => opCode(op)
+    case op: ir.UpdateWithMany[_, _, _, _] => opCode(op)
     case _ => throw new RuntimeException(
       s"Unsupported ir node of type '${combinator.getClass}'")
   }
@@ -453,10 +454,26 @@ class DataflowGenerator(
       new StatefulBackend[$stateType,$keyType]($env,$xs)"""
   }
 
-  private def opCode[A, K](op: ir.StatefulFetch[A, K])
-       (implicit closure: DataFlowClosure): Tree = {
+  private def opCode[S, K](op: ir.StatefulFetch[S, K])
+      (implicit closure: DataFlowClosure): Tree = {
     closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
     q"${TermName(op.name)}.asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[${typeOf(op.tag).dealias}, ${typeOf(op.tagK).dealias}]].fetchToStateLess()"
+  }
+
+  // (updates: DataSet[U], updateKeySelector: U => K, udf: (S, DataBag[U]) => DataBag[R]): DataSet[R] = {
+  private def opCode[S, K, U, R](op: ir.UpdateWithMany[S, K, U, R])
+      (implicit closure: DataFlowClosure): Tree = {
+    closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
+    val us = generateOpCode(op.updates)
+    val keyFn     = parseCheck(op.updateKeySel)
+    val keyUdf    = ir.UDF(keyFn, keyFn.tpe, tb)
+    val updateFn  = parseCheck(op.udf)
+    val updateUdf = ir.UDF(updateFn, updateFn.tpe, tb)
+    closure.capture(keyUdf)
+    closure.capture(updateUdf)
+    q"""${TermName(op.name)}.asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[${typeOf(op.tagS).dealias}, ${typeOf(op.tagK).dealias}]]
+       .updateWithMany($us, ${keyUdf.func}, ${updateUdf.func})
+     """
   }
 
   // --------------------------------------------------------------------------

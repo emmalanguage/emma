@@ -50,9 +50,17 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
     dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
 
-  override def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag](root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K] = {
+  override def executeStatefulCreate[S <: Identity[K]: TypeTag, K: TypeTag]
+      (root: StatefulCreate[S, K], name: String, closure: Any*): AbstractStatefulBackend[S, K] = {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    dataflowCompiler.execute[AbstractStatefulBackend[A, K]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+    dataflowCompiler.execute[AbstractStatefulBackend[S, K]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+  }
+
+  override def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+      (root: UpdateWithMany[S, K, U, O], name: String, closure: Any*): DataBag[O] = {
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    val expr = dataflowCompiler.execute[DataSet[O]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+    DataBag(root.name, expr, expr.collect())
   }
 
   override def scatter[A: TypeTag](values: Seq[A]): DataBag[A] = {
