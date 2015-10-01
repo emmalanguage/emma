@@ -175,10 +175,7 @@ private[emma] trait ComprehensionAnalysis
    * @return A lifted, MC syntax version of the given tree
    */
   private def comprehend(tree: Tree, input: Boolean = true): Expression =
-    (tree match { // Ignore a top-level Typed node (side-effect of the Algebra inlining macros)
-      case q"${inner: Tree}: $_" => inner
-      case _ => tree
-    }) match { // translate based on matched expression type
+    tree.unAscribed match { // translate based on matched expression type
 
       // -----------------------------------------------------
       // Monad Ops

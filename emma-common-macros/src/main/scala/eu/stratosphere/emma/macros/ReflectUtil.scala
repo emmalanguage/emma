@@ -1,5 +1,6 @@
 package eu.stratosphere.emma.macros
 
+import scala.annotation.tailrec
 import scala.language.implicitConversions
 import scala.reflect.api.Universe
 
@@ -291,6 +292,17 @@ trait ReflectUtil {
         if (pf isDefinedAt tree) pf(tree)
         else super.transform(tree)
     } transform self
+
+    /**
+     * Recursively remove all layers of type ascriptions from this [[Tree]].
+     * E.g. `q"((42: Int): Int)".unAscribed = q"42"`
+     *
+     * @return An equivalent [[Tree]] without type ascriptions.
+     */
+    @tailrec final def unAscribed: Tree = self match {
+      case q"${tree: Tree}: $_" => tree.unAscribed
+      case _ => self
+    }
 
     /**
      * Bind a name to a value in this [[Tree]].
