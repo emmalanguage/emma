@@ -3,7 +3,7 @@ package eu.stratosphere.emma.codegen.flink
 import java.net.URI
 import java.util.UUID
 
-import eu.stratosphere.emma.api.{TextInputFormat, CSVInputFormat, CSVOutputFormat}
+import eu.stratosphere.emma.api.{ParallelizedDataBag, TextInputFormat, CSVInputFormat, CSVOutputFormat}
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir
 import eu.stratosphere.emma.macros.RuntimeUtil
@@ -232,17 +232,17 @@ class DataflowGenerator(
     // infer types and generate type information
     val tpe   = typeOf(op.tag).dealias
     // add a dedicated closure variable to pass the input param
-    val param = TermName(op.ref.name)
+    val param = TermName(op.ref.asInstanceOf[ParallelizedDataBag[B, DataSet[B]]].name)
     val inf   = freshName("inFmt$flink$")
     closure.closureParams +=
-      param -> tq"_root_.eu.stratosphere.emma.runtime.Flink.DataBagRef[$tpe]"
+      param -> tq"_root_.eu.stratosphere.emma.api.DataBag[$tpe]"
     // assemble dataFlow fragment
     q"""{
       val $inf =
         new org.apache.flink.api.java.io.TypeSerializerInputFormat[$tpe](
           _root_.org.apache.flink.api.scala.createTypeInformation[$tpe])
 
-      $inf.setFilePath(${s"$tmpResultsPrefix/${op.ref.name}"})
+      $inf.setFilePath(${s"$tmpResultsPrefix/${op.ref.asInstanceOf[ParallelizedDataBag[B, DataSet[B]]].name}"})
       $env.createInput($inf)
     }"""
   }

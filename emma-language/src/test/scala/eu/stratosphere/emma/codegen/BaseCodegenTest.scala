@@ -166,7 +166,8 @@ abstract class BaseCodegenTest(rtName: String) {
     val offset = 15.0
 
     val alg = emma.parallelize {
-      for (x <- DataBag(inp)) yield if (x < 5) offset else offset + x / denominator
+      val whitelist = DataBag(Seq(1, 2, 3, 4, 5))
+      for (x <- DataBag(inp)) yield if (whitelist.exists(_ == x)) offset else offset + x / denominator
     }
 
     // compute the algorithm using the original code and the runtime under test

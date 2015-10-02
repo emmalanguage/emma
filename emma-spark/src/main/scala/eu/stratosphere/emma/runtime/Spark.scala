@@ -3,8 +3,7 @@ package eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.codegen.spark.DataflowGenerator
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
-import eu.stratosphere.emma.ir.{TempSink, Fold, ValueRef, Write, localInputs}
-import eu.stratosphere.emma.runtime.Spark.DataBagRef
+import eu.stratosphere.emma.ir.{TempSink, Fold, Write, localInputs}
 import eu.stratosphere.emma.util.Counter
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
@@ -35,10 +34,10 @@ abstract class Spark(val host: String, val port: Int) extends Engine {
     dataflowCompiler.execute[A](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
   }
 
-  override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]] = {
+  override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     val rdd = dataflowCompiler.execute[RDD[A]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
-    DataBagRef[A](root.name, rdd)
+    DataBag(root.name, rdd, rdd.collect())
   }
 
   override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
@@ -46,12 +45,12 @@ abstract class Spark(val host: String, val port: Int) extends Engine {
     dataflowCompiler.execute[RDD[A]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
   }
 
-  override def scatter[A: TypeTag](values: Seq[A]): ValueRef[DataBag[A]] = {
-    DataBagRef(nextTmpName, sc.parallelize(values)(classTagOf[A]), Some(DataBag(values)))
+  override def scatter[A: TypeTag](values: Seq[A]): DataBag[A] = {
+    DataBag(nextTmpName, sc.parallelize(values)(classTagOf[A]), values)
   }
 
-  override def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A] = {
-    ref.value
+  override def gather[A: TypeTag](ref: DataBag[A]): DataBag[A] = {
+    ref
   }
 
   override protected def doCloseSession() = {
@@ -86,14 +85,4 @@ case class SparkRemote(override val host: String, override val port: Int) extend
     .setMaster(s"$host:$port")
 
   override val sc = new SparkContext(conf)
-}
-
-object Spark {
-
-  case class DataBagRef[A: TypeTag](name: String, rdd: RDD[A], var v: Option[DataBag[A]] = Option.empty[DataBag[A]]) extends ValueRef[DataBag[A]] {
-    def value: DataBag[A] = v.getOrElse({
-      v = Some(DataBag(rdd.collect().toSeq))
-      v.get
-    })
-  }
 }

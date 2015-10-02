@@ -2,13 +2,14 @@ package eu.stratosphere.emma.codegen.spark
 
 import java.util.UUID
 
-import eu.stratosphere.emma.api.{CSVOutputFormat, CSVInputFormat, TextInputFormat}
+import eu.stratosphere.emma.api.{ParallelizedDataBag, CSVOutputFormat, CSVInputFormat, TextInputFormat}
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir
 import eu.stratosphere.emma.macros.RuntimeUtil
 import eu.stratosphere.emma.runtime.logger
 import eu.stratosphere.emma.util.Counter
 import org.apache.spark.SparkContext
+import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable
 import scala.reflect.runtime.universe._
@@ -160,11 +161,11 @@ class DataflowGenerator(
       (implicit closure: DataFlowClosure): Tree = {
     val tpe   = typeOf(op.tag).dealias
     // add a dedicated closure variable to pass the input param
-    val param = TermName(op.ref.name)
+    val param = TermName(op.ref.asInstanceOf[ParallelizedDataBag[B, RDD[B]]].name)
     closure.closureParams +=
-      param -> tq"_root_.eu.stratosphere.emma.runtime.Spark.DataBagRef[$tpe]"
+      param -> tq"_root_.eu.stratosphere.emma.api.DataBag[$tpe]"
 
-    q"$param.rdd"
+    q"$param.asInstanceOf[_root_.eu.stratosphere.emma.api.ParallelizedDataBag[$tpe, _root_.org.apache.spark.rdd.RDD[$tpe]]].repr"
   }
 
   private def opCode[A](op: ir.TempSink[A])

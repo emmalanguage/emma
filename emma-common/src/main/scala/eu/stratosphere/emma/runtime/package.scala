@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.typesafe.scalalogging.slf4j.Logger
 import eu.stratosphere.emma.api.DataBag
-import eu.stratosphere.emma.ir.{Fold, TempSink, ValueRef, Write}
+import eu.stratosphere.emma.ir.{Fold, TempSink, Write}
 import org.slf4j.LoggerFactory
 
 import scala.reflect.runtime.universe._
@@ -44,13 +44,13 @@ package object runtime {
 
     def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A
 
-    def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]]
+    def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A]
 
     def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit
 
-    def scatter[A: TypeTag](values: Seq[A]): ValueRef[DataBag[A]]
+    def scatter[A: TypeTag](values: Seq[A]): DataBag[A]
 
-    def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A]
+    def gather[A: TypeTag](ref: DataBag[A]): DataBag[A]
 
     final def closeSession() = if (!closed) {
       doCloseSession()
@@ -72,13 +72,13 @@ package object runtime {
 
     override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = ???
 
-    override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]] = ???
+    override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = ???
 
     override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = ???
 
-    override def scatter[A: TypeTag](values: Seq[A]): ValueRef[DataBag[A]] = ???
+    override def scatter[A: TypeTag](values: Seq[A]): DataBag[A] = ???
 
-    override def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A] = ???
+    override def gather[A: TypeTag](ref: DataBag[A]): DataBag[A] = ???
   }
 
   def default(): Engine = {

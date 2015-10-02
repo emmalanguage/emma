@@ -16,21 +16,6 @@ package object ir {
   import scala.reflect.runtime.{universe => ru}
   import scala.tools.reflect.ToolBox
 
-  // ---------------------------------------------------
-  // Thunks.
-  // ---------------------------------------------------
-
-  trait ValueRef[A] {
-
-    val name: String
-
-    def uuid: UUID = UUID.nameUUIDFromBytes(name.getBytes)
-
-    def value: A
-  }
-
-  implicit def ValueRefToValue[A](ref: ValueRef[A]): A = ref.value
-
   // --------------------------------------------------------------------------
   // Combinators.
   // --------------------------------------------------------------------------
@@ -59,7 +44,7 @@ package object ir {
     override val tag: TypeTag[Unit] = typeTag[Unit]
   }
 
-  final case class TempSource[+A: TypeTag](ref: ValueRef[_ <: DataBag[A]]) extends Combinator[A] {
+  final case class TempSource[+A: TypeTag](ref: DataBag[A]) extends Combinator[A] {
     override val tag: TypeTag[_ <: A] = typeTag[A]
   }
 
