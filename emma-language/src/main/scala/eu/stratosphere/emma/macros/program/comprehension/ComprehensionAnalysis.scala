@@ -86,7 +86,7 @@ private[emma] trait ComprehensionAnalysis
     val comprehendedTerms = mutable.Seq((for (term <- terms) yield {
       val name          = freshName("comprehension")
       val definition    = compTermDef(term)
-      val comprehension = ExpressionRoot(comprehend(term) match {
+      val comprehension = ExpressionRoot(comprehend(term, topLevel = true) match {
         case root: combinator.Write => root
         case root: combinator.Fold  => root
         case root: Expression =>
@@ -174,7 +174,8 @@ private[emma] trait ComprehensionAnalysis
    * @param tree The tree to be lifted
    * @return A lifted, MC syntax version of the given tree
    */
-  private def comprehend(tree: Tree, input: Boolean = true): Expression =
+  // FIXME: Replace flag parameters with appropriate use of partial functions
+  private def comprehend(tree: Tree, input: Boolean = true, topLevel: Boolean = false): Expression =
     tree.unAscribed match { // translate based on matched expression type
 
       // -----------------------------------------------------
@@ -233,7 +234,7 @@ private[emma] trait ComprehensionAnalysis
 
       // xs.fold(empty, sng, union)
       case tree @ q"${fold @ Select(xs, _)}[$_]($empty, $sng, $union)"
-        if fold.symbol == api.fold =>
+        if topLevel && fold.symbol == api.fold =>
           combinator.Fold(empty, sng, union, comprehend(xs), tree)
 
       // ----------------------------------------------------------------------
@@ -331,7 +332,7 @@ private[emma] trait ComprehensionAnalysis
             ((grpVals, foldOpt), idx) <- groupValuesUsages.zipWithIndex
             (foldTree)                <- foldOpt
           } yield {
-            val foldComp = ExpressionRoot(comprehend(foldTree)) ->> normalize
+            val foldComp = ExpressionRoot(comprehend(foldTree, topLevel = true)) ->> normalize
             (idx, grpVals, foldTree, foldComp)
           }
 
