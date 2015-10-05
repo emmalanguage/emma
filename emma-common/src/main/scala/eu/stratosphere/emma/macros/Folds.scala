@@ -3,7 +3,7 @@ package eu.stratosphere.emma.macros
 import scala.language.experimental.macros
 
 /**
- * Predefined aggregate functions on top of the `fold(zero, sng, plus)` primitive, which
+ * Predefined aggregate functions on top of the `fold(zero)(sng, plus)` primitive, which
  * collections that implement the trait need to provide.
  * @tparam E the type of elements to fold over
  */
@@ -24,38 +24,24 @@ trait Folds[+E] extends Any {
     macro FoldMacros.nonEmpty
 
   /**
-   * Alias for `fold(z, s, p)`. The same as applying a map (transformation) first, and then
-   * reducing (folding) the result.
-   * @see [[Folds#fold]]
-   * @param z `zero`: bottom (of the recursion) element
-   * @param s `sng`:  mapping (transforming) function
-   * @param p `plus`: reducing (folding) function, should be associative
-   * @tparam R result type of the map phase, fed into reduce
-   * @return the result of reducing all elements into one
-   */
-  def fold3[R](z: R)(s: E => R, p: (R, R) => R): R =
-    macro FoldMacros.fold3[E, R]
-
-  /**
-   * Shortcut for `fold(z, identity, f)`.
-   * @see [Folds#fold]
+   * Shortcut for `fold(z)(identity, f)`.
    * @param z `zero`: bottom (of the recursion) element
    * @param p `plus`: reducing (folding) function, should be associative
    * @tparam R return type (super class of the element type)
    * @return the result of combining all elements into one
    */
-  def fold2[R >: E](z: R)(p: (R, R) => R): R =
-    macro FoldMacros.fold2[R]
+  def reduce[R >: E](z: R)(p: (R, R) => R): R =
+    macro FoldMacros.reduce[R]
 
   /**
-   * Shortcut for `fold(None, Some, f)`, which is the same as reducing the collection to a single
-   * element by applying a binary operator.
-   * @see [Folds#fold]
+   * Shortcut for `fold(None)(Some, Option.lift2(f))`, which is the same as reducing the collection
+   * to a single element by applying a binary operator.
    * @param p `plus`: reducing (folding) function, should be associative
+   * @tparam R return type (super class of the element type)
    * @return the result of reducing all elements into one
    */
-  def fold1(p: (E, E) => E): Option[E] =
-    macro FoldMacros.fold1[E]
+  def reduceOption[R >: E](p: (R, R) => R): Option[R] =
+    macro FoldMacros.reduceOption[R]
 
   /**
    * Same as `min` with a custom comparator function.
@@ -195,8 +181,8 @@ trait Folds[+E] extends Any {
    * @param o the implicit [[Ordering]] of elements
    * @return an ordered (ascending) [[List]] of the bottom `n` elements
    */
-  def bottom(n: Int)(implicit o: Ordering[E]): List[E] =
-    macro FoldMacros.bottom[E]
+  def bottom[R >: E](n: Int)(implicit o: Ordering[R]): List[R] =
+    macro FoldMacros.bottom[R]
 
   /**
    * Find the top `n` elements in the collection with respect to the natural ordering of the
@@ -205,8 +191,8 @@ trait Folds[+E] extends Any {
    * @param o the implicit [[Ordering]] of elements
    * @return an ordered (descending) [[List]] of the bottom `n` elements
    */
-  def top(n: Int)(implicit o: Ordering[E]): List[E] =
-    macro FoldMacros.top[E]
+  def top[R >: E](n: Int)(implicit o: Ordering[R]): List[R] =
+    macro FoldMacros.top[R]
 
   /**
    * Find the some element in the collection that satisfies a given predicate.

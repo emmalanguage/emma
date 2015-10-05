@@ -718,7 +718,7 @@ abstract class BaseCodegenTest(rtName: String) {
   @Test def testFold() = {
     val alg = emma.parallelize {
       val range = DataBag(0 until 100)
-      range.fold[Int](0, identity, _ + _)
+      range.fold(0)(identity, _ + _)
     }
 
     // compute the algorithm using the original code and the runtime under test

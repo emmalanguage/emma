@@ -21,15 +21,16 @@ trait ReflectUtil {
 
   // Predefined types
 
-  lazy val UNIT    = typeOf[Unit]
-  lazy val BOOL    = typeOf[Boolean]
-  lazy val CHAR    = typeOf[Char]
-  lazy val BYTE    = typeOf[Byte]
-  lazy val SHORT   = typeOf[Short]
-  lazy val INT     = typeOf[Int]
-  lazy val LONG    = typeOf[Long]
-  lazy val FLOAT   = typeOf[Float]
-  lazy val DOUBLE  = typeOf[Double]
+  def UNIT   = definitions.UnitTpe
+  def BOOL   = definitions.BooleanTpe
+  def CHAR   = definitions.CharTpe
+  def BYTE   = definitions.ByteTpe
+  def SHORT  = definitions.ShortTpe
+  def INT    = definitions.IntTpe
+  def LONG   = definitions.LongTpe
+  def FLOAT  = definitions.FloatTpe
+  def DOUBLE = definitions.DoubleTpe
+
   lazy val STRING  = typeOf[String]
   lazy val BIG_INT = typeOf[BigInt]
   lazy val BIG_DEC = typeOf[BigDecimal]
@@ -172,8 +173,8 @@ trait ReflectUtil {
       val params = for ((name, tpe) <- args)
         yield valDef(name, tpe, sym, Flag.SYNTHETIC | Flag.PARAM, pos)
 
-      val substitudedBody = body.substitute((for (p <- params) yield p.name -> ref(p.term)): _*)
-      Function(params, substitudedBody).withSym(sym).as[Function]
+      val substituted = body.substitute((for (p <- params) yield p.name -> ref(p.term)): _*)
+      Function(params, substituted).withSym(sym).as[Function]
     }
 
     def select(sym: Symbol, apply: Boolean): Tree = {

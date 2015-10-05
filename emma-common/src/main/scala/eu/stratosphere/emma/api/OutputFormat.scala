@@ -17,7 +17,7 @@ class CSVOutputFormat[T: CSVConverters](val separator: Char) extends OutputForma
   override def write(in: DataBag[T], os: OutputStream): Unit = {
     val writer = new CSVWriter(new OutputStreamWriter(os), separator, CSVWriter.NO_QUOTE_CHARACTER)
 
-    in.fold[Unit](Unit, x => writer.writeNext(convert.toCSV(x, separator)), (_, _) => Unit)
+    in.fold()(x => writer.writeNext(convert.toCSV(x, separator)), (_, _) => ())
 
     writer.close()
   }

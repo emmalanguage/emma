@@ -107,8 +107,8 @@ class KMeans(k: Int, epsilon: Double, inputUrl: String, outputUrl: String, rt: E
       do {
         // update means
         val newMeans = for (cluster <- solution.groupBy(_.clusterID)) yield {
-          val sum = (for (p <- cluster.values) yield p.point.pos).fold[Vector](Vector.zeros(3), identity, (x, y) => x + y)
-          val cnt = (for (p <- cluster.values) yield p.point.pos).fold[Int](0, _ => 1, (x, y) => x + y)
+          val sum = (for (p <- cluster.values) yield p.point.pos).reduce(Vector.zeros(3)) { _ + _ }
+          val cnt = (for (p <- cluster.values) yield p.point.pos).count()
           Point(cluster.key, sum / cnt)
         }
 

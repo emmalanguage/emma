@@ -18,10 +18,10 @@ class FoldSpec extends FunSuite with Matchers with PropertyChecks {
   implicit override val generatorDrivenConfig =
     PropertyCheckConfig(workers = 2)
 
-  test("fold1 (sum)") {
+  test("reduceOption (sum)") {
     forAll { xs: Seq[Int] =>
       val result = emma.parallelize {
-        DataBag(xs) fold1 { _ + _ }
+        DataBag(xs) reduceOption { _ + _ }
       } run runtime
 
       if (xs.isEmpty) result should be ('empty)
@@ -29,20 +29,20 @@ class FoldSpec extends FunSuite with Matchers with PropertyChecks {
     }
   }
 
-  test("fold2 (sum)") {
+  test("reduce (sum)") {
     forAll { xs: Seq[Int] =>
       val result = emma.parallelize {
-        DataBag(xs).fold2(0) { _ + _ }
+        DataBag(xs).reduce(0) { _ + _ }
       } run runtime
 
       result should be (xs.sum)
     }
   }
 
-  test("fold3 (sum length)") {
+  test("fold (sum length)") {
     forAll { xs: Seq[String] =>
       val result = emma.parallelize {
-        DataBag(xs).fold3(0)(_.length, _ + _)
+        DataBag(xs).fold(0)(_.length, _ + _)
       } run runtime
 
       result should be (xs.map { _.length }.sum)

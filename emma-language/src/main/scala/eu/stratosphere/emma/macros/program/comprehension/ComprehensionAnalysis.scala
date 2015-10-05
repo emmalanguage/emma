@@ -233,7 +233,7 @@ private[emma] trait ComprehensionAnalysis
       // -----------------------------------------------------
 
       // xs.fold(empty, sng, union)
-      case tree @ q"${fold @ Select(xs, _)}[$_]($empty, $sng, $union)"
+      case tree @ q"${fold @ Select(xs, _)}[$_]($empty)($sng, $union)"
         if topLevel && fold.symbol == api.fold =>
           combinator.Fold(empty, sng, union, comprehend(xs), tree)
 
@@ -383,8 +383,8 @@ private[emma] trait ComprehensionAnalysis
     val traverser = new Traverser {
       override def traverse(tree: Tree): Unit = state match {
         case 'find_fold => tree match {
-          // xs.fold(empty, sng, union)
-          case tree @ q"${fold @ Select(xs, _)}[$_]($empty, $sng, $union)"
+          // xs.fold(empty)(sng, union)
+          case tree @ q"${fold @ Select(xs, _)}[$_](...$_)"
             if fold.symbol == api.fold =>
               state = 'find_homomorphisms
               res = Some(tree)
@@ -394,11 +394,11 @@ private[emma] trait ComprehensionAnalysis
         }
         case 'find_homomorphisms => tree match {
           // xs.withFilter(f)
-          case q"${withFilter @ Select(xs, _)}((${arg: ValDef}) => $body)"
+          case q"${withFilter @ Select(xs, _)}($_)"
             if withFilter.symbol == api.withFilter =>
               traverse(xs)
           // xs.map(f)
-          case tree @ q"${map @ Select(xs, _)}[$_]((${arg: ValDef}) => $body)"
+          case tree @ q"${map @ Select(xs, _)}[$_]($_)"
             if map.symbol == api.map =>
               traverse(xs)
           case _ =>
@@ -407,7 +407,7 @@ private[emma] trait ComprehensionAnalysis
         }
         case 'find_identifier => tree match {
           // xs.withFilter(f)
-          case tree @ q"${id: Ident}.values"
+          case tree @ q"${_: Ident}.values"
             if tree == sel =>
               state = 'success
               super.traverse(tree)
@@ -426,9 +426,8 @@ private[emma] trait ComprehensionAnalysis
   }
 
   /** Check if the type matches the type pattern `Group[K, DataBag[A]]`. */
-  private def hasProperGroupType(tpe: Type) = {
+  private def hasProperGroupType(tpe: Type) =
     tpe.typeSymbol == api.groupSymbol && tpe.typeArgs(1).typeSymbol == api.bagSymbol
-  }
 
   /** Fuse a Group combinator with a list of Folds and return the resulting FoldGroup combinator. */
   private def foldGroup(group: combinator.Group, folds: List[combinator.Fold]) = folds match {
