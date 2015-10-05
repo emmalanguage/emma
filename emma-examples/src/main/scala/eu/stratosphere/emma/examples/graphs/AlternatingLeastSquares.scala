@@ -77,8 +77,8 @@ class AlternatingLeastSquares(
           if rating.item == item.id
         } yield item.features -> rating.value
         // calculate new feature vector
-        val Vu = prefs.fold[DenseVector[Double]](V0, Vr,  _ + _)
-        val Au = prefs.fold[DenseMatrix[Double]](M0, VVt, _ + _)
+        val Vu = prefs.fold(V0)(Vr,  _ + _)
+        val Au = prefs.fold(M0)(VVt, _ + _)
         val Eu = eye * (lambda * user.degree)
         user.copy(features = inv(Au + Eu) * Vu)
       } // update state of users
@@ -91,8 +91,8 @@ class AlternatingLeastSquares(
           if rating.user == user.id
         } yield user.features -> rating.value
         // calculate new feature vector
-        val Vi = prefs.fold[DenseVector[Double]](V0, Vr,  _ + _)
-        val Ai = prefs.fold[DenseMatrix[Double]](M0, VVt, _ + _)
+        val Vi = prefs.fold(V0)(Vr,  _ + _)
+        val Ai = prefs.fold(M0)(VVt, _ + _)
         val Ei = eye * (lambda * item.degree)
         item.copy(features = inv(Ai + Ei) * Vi)
       } // update state of items

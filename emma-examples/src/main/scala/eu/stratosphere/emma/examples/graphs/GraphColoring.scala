@@ -50,8 +50,8 @@ class GraphColoring(input: String, output: String, rt: Engine)
                 if e.src == u.id
               } yield u.col
               // calculate the range of unavailable colors
-              val (from, to) = colors.fold[List[(Cid, Cid)]](
-                Nil, col => col -> col :: Nil, merge(_, _)).head
+              val (from, to) = colors.fold(List.empty[(Cid, Cid)])(
+                col => (col, col) :: Nil, merge(_, _)).head
               // update with the minimal free color
               val col = if (from > minCol) minCol else next(to)
               v.col   = col

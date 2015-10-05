@@ -77,8 +77,8 @@ class AlternatingLeastSquares2(
       users = for { // update state of users
         g <- messages groupBy { m => m.dst -> m.degree }
       } yield { // calculate new feature vector
-        val Vu = g.values.fold[Vec](V0, m => m.F * m.rating, _ + _)
-        val Au = g.values.fold[Mat](M0, m => m.F outer m.F,  _ + _)
+        val Vu = g.values.fold(V0)(m => m.F * m.rating, _ + _)
+        val Au = g.values.fold(M0)(m => m.F outer m.F,  _ + _)
         val Eu = E * (_lambda * g.key._2)
         Vertex(g.key._1, g.key._2, (Au + Eu) invMul Vu)
       }
@@ -94,8 +94,8 @@ class AlternatingLeastSquares2(
       items = for { // update state of users
         g <- messages groupBy { m => m.dst -> m.degree }
       } yield { // calculate new feature vector
-        val Vi = g.values.fold[Vec](V0, m => m.F * m.rating, _ + _)
-        val Ai = g.values.fold[Mat](M0, m => m.F outer m.F,  _ + _)
+        val Vi = g.values.fold(V0)(m => m.F * m.rating, _ + _)
+        val Ai = g.values.fold(M0)(m => m.F outer m.F,  _ + _)
         val Ei = E * (_lambda * g.key._2)
         Vertex(g.key._1, g.key._2, (Ai + Ei) invMul Vi)
       }

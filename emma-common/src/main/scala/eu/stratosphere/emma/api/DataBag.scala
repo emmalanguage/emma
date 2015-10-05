@@ -28,7 +28,7 @@ sealed abstract class DataBag[+A] extends Serializable {
    * this match {
    *   case Empty => nil
    *   case Sng(value) => sng(value)
-   *   case Union(left, right) => plus(left.fold(nil, sng, plus), right.fold(nil, sng, plus))
+   *   case Union(left, right) => plus(left.fold(nil)(sng, plus), right.fold(nil)(sng, plus))
    * }
    * }}}
    *
@@ -38,7 +38,7 @@ sealed abstract class DataBag[+A] extends Serializable {
    * @tparam B The result type of the recursive computation
    * @return
    */
-  def fold[B](z: B, s: A => B, p: (B, B) => B): B = vals.foldLeft(z)((acc, x) => p(s(x), acc))
+  def fold[B](z: B)(s: A => B, p: (B, B) => B): B = vals.foldLeft(z)((acc, x) => p(s(x), acc))
 
   // -----------------------------------------------------
   // Monad Ops

@@ -25,7 +25,7 @@ object Stateful {
      * @param bag A DataBag containing elements with identity to be indexed and managed by this stateful Bag.
      */
     private[api] def this(bag: DataBag[A]) =
-      this(bag.fold[mutable.Map[K, A]](mutable.Map.empty[K, A], s => mutable.Map((s.identity, s)), (x, y) => x ++ y))
+      this(bag.fold(mutable.Map.empty[K, A])(s => mutable.Map(s.identity -> s), _ ++ _))
 
     /**
      * Computes and flattens a delta without additional inputs. The UDF `f` is allowed to modify the state element `s`,

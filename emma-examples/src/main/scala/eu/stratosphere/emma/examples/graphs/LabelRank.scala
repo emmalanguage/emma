@@ -89,8 +89,8 @@ class LabelRank(
       } yield pl.copy(prob = p)
 
       val maxLabels = for (gm <- infLabels.groupBy(_.vertex))
-        yield gm.key -> gm.values.fold[Map[Lid, Double]](
-          Map.empty[Lid, Double], l => Map(l.label -> l.prob), mergeMax(_, _)).keySet
+        yield gm.key -> gm.values.fold(Map.empty[Lid, Double])(
+          l => Map(l.label -> l.prob), mergeMax(_, _)).keySet
 
       val condUpdates = for {
         e  <- edges
