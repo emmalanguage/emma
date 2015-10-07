@@ -1,5 +1,6 @@
 package eu.stratosphere.emma.examples.datamining.clustering
 
+import java.lang.{Double => JDouble}
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.api.model._
 import eu.stratosphere.emma.examples.Algorithm
@@ -7,19 +8,15 @@ import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 import org.apache.spark.util.Vector
 
-import scala.util.Random
-
 object KMeans {
-
-  // constnats
-  val SEED = 5431423142056L
 
   object Command {
     // argument names
-    val KEY_K = "K"
-    val KEY_EPSILON = "epsilon"
-    val KEY_INPUT = "input-file"
-    val KEY_OUTPUT = "output-file"
+    val k = "K"
+    val epsilon = "epsilon"
+    val iterations = "iterations"
+    val input = "input-file"
+    val output = "output-file"
   }
 
   class Command extends Algorithm.Command[KMeans] {
@@ -34,105 +31,133 @@ object KMeans {
       super.setup(parser)
 
       // add arguments
-      parser.addArgument(Command.KEY_K)
+      parser.addArgument(Command.k)
         .`type`[Integer](classOf[Integer])
-        .dest(Command.KEY_K)
+        .dest(Command.k)
         .metavar("K")
         .help("number of clusters")
-      parser.addArgument(Command.KEY_EPSILON)
-        .`type`[Integer](classOf[Integer])
-        .dest(Command.KEY_EPSILON)
+
+      parser.addArgument(Command.epsilon)
+        .`type`[JDouble](classOf[JDouble])
+        .dest(Command.epsilon)
         .metavar("EPSILON")
         .help("termination threshold")
-      // add arguments
-      parser.addArgument(Command.KEY_INPUT)
+
+      parser.addArgument(Command.iterations)
+        .`type`[Integer](classOf[Integer])
+        .dest(Command.iterations)
+        .metavar("ITERATIONS")
+        .help("number of repeated iterations")
+
+      parser.addArgument(Command.input)
         .`type`[String](classOf[String])
-        .dest(Command.KEY_INPUT)
+        .dest(Command.input)
         .metavar("INPUT")
         .help("input file")
-      parser.addArgument(Command.KEY_OUTPUT)
+
+      parser.addArgument(Command.output)
         .`type`[String](classOf[String])
-        .dest(Command.KEY_OUTPUT)
+        .dest(Command.output)
         .metavar("OUTPUT")
-        .help("output file ")
+        .help("output file")
     }
   }
 
-  // --------------------------------------------------------------------------------------------
-  // ----------------------------------- tpch -------------------------------------------------
-  // --------------------------------------------------------------------------------------------
-
   object Schema {
-
     type PID = Long
 
     case class Point(@id id: PID, pos: Vector) extends Identity[PID] {
       def identity = id
     }
 
-    case class Solution(point: Point, clusterID: PID) {}
-
+    case class Solution(point: Point, cluster: PID)
   }
-
 }
 
-class KMeans(k: Int, epsilon: Double, inputUrl: String, outputUrl: String, rt: Engine) extends Algorithm(rt) {
+class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: String, rt: Engine)
+    extends Algorithm(rt) {
+
+  import eu.stratosphere.emma.examples.datamining.clustering.KMeans.Schema._
 
   def this(ns: Namespace, rt: Engine) = this(
-    ns.get[Int](KMeans.Command.KEY_K),
-    ns.get[Double](KMeans.Command.KEY_EPSILON),
-    ns.get[String](KMeans.Command.KEY_INPUT),
-    ns.get[String](KMeans.Command.KEY_OUTPUT),
+    ns.get[Int](KMeans.Command.k),
+    ns.get[Double](KMeans.Command.epsilon),
+    ns.get[Int](KMeans.Command.iterations),
+    ns.get[String](KMeans.Command.input),
+    ns.get[String](KMeans.Command.output),
     rt)
 
-  def run() = {
+  val algorithm = emma.parallelize {
+    // read input
+    val points = for (line <- read(input, new TextInputFormat[String]('\n'))) yield {
+      val record = line.split("\t")
+      Point(record.head.toInt, Vector(record.tail.map { _.toDouble }))
+    }
 
-    import eu.stratosphere.emma.examples.datamining.clustering.KMeans.Schema._
+    val dimensions = points.find { _ => true }.get.pos.length
+    var bestSolution = DataBag(Seq.empty[Solution])
+    var minSqrDist = 0.0
 
-    val algorithm = /*emma.parallelize*/ {
-      // read input
-      val points = read(inputUrl, new CSVInputFormat[Point])
-
+    for (i <- 1 to iterations) {
       // initialize random cluster means
-      val random = new Random(KMeans.SEED)
-      var centroids = DataBag(for (i <- 1 to k) yield Point(i, Vector(random.nextDouble(), random.nextDouble(), random.nextDouble())))
       var change = 0.0
+      var centroids = DataBag(for (i <- 1 to k)
+        yield Point(i, Vector.random(dimensions)))
 
       // initialize solution
       var solution = for (p <- points) yield {
-        val closestCentroid = centroids.minBy((m1, m2) => (p.pos squaredDist m1.pos) < (p.pos squaredDist m2.pos)).get
+        val closestCentroid = centroids.minBy { (m1, m2) =>
+          (p.pos squaredDist m1.pos) < (p.pos squaredDist m2.pos)
+        }.get
+
         Solution(p, closestCentroid.id)
       }
 
       do {
         // update means
-        val newMeans = for (cluster <- solution.groupBy(_.clusterID)) yield {
-          val sum = (for (p <- cluster.values) yield p.point.pos).reduce(Vector.zeros(3)) { _ + _ }
-          val cnt = (for (p <- cluster.values) yield p.point.pos).count()
+        val newMeans = for (cluster <- solution.groupBy { _.cluster }) yield {
+          val sum = cluster.values.map { _.point.pos }.reduce(Vector.zeros(dimensions)) { _ + _ }
+          val cnt = cluster.values.map { _.point.pos }.count()
           Point(cluster.key, sum / cnt)
         }
 
         // compute change between the old and the new means
-        change = {
-          val distances = for (mean <- centroids; newMean <- newMeans; if mean.id == newMean.id) yield mean.pos squaredDist newMean.pos
-          distances.sum()
-        }
+        change = (for {
+          mean <- centroids
+          newMean <- newMeans
+          if mean.id == newMean.id
+        } yield mean.pos squaredDist newMean.pos).sum()
 
         // update solution: re-assign clusters
         solution = for (s <- solution) yield {
-          val closestMean = centroids.minBy((m1, m2) => (s.point.pos squaredDist m1.pos) < (s.point.pos squaredDist m2.pos)).get
-          s.copy(clusterID = closestMean.id)
+          val closestMean = centroids.minBy { (m1, m2) =>
+            (s.point.pos squaredDist m1.pos) < (s.point.pos squaredDist m2.pos)
+          }.get
+
+          s.copy(cluster = closestMean.id)
         }
 
         // use new means for the next iteration
         centroids = newMeans
-      } while (change < epsilon)
+      } while (change > epsilon)
 
-      // write result
-      write(outputUrl, new CSVOutputFormat[(PID, PID)])(for (s <- solution) yield (s.point.id, s.clusterID))
+      val sumSqrDist = (for {
+        s <- solution
+        c <- centroids
+        if s.cluster == c.id
+      } yield s.point.pos squaredDist c.pos).sum()
+
+      if (i <= 1 || sumSqrDist < minSqrDist) {
+        minSqrDist = sumSqrDist
+        bestSolution = solution
+      }
     }
 
-    //algorithm.run(rt)
+    // write result
+    val result = for (s <- bestSolution) yield (s.point.id, s.cluster)
+    write(output, new CSVOutputFormat[(PID, PID)])(result)
+    result
   }
-}
 
+  def run() = algorithm.run(rt)
+}
