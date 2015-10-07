@@ -3,24 +3,23 @@ package eu.stratosphere.emma.examples.tpch
 import java.io.File
 
 import eu.stratosphere.emma.runtime
-import eu.stratosphere.emma.runtime.Engine
 import eu.stratosphere.emma.testutil._
 import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
-import org.junit.{Before, Test}
+import org.scalatest._
+import org.scalatest.junit.JUnitRunner
 
 @Category(Array(classOf[ExampleTest]))
-class TPCHTest {
-
-  var rt: Engine = _
+@RunWith(classOf[JUnitRunner])
+class TPCHTest extends FunSuite with Matchers with BeforeAndAfterAll {
 
   var inBase = tempPath("/tpch/sf0.001")
   var outBase = tempPath("/tpch/sf0.001/output")
 
-  @Before def setup() {
-    // create a new runtime session
-    rt = runtime.default()
-
+  override def beforeAll() = {
+    // make sure that the base paths exist
+    new File(inBase).mkdirs()
+    new File(outBase).mkdirs()
     // materialize the TPCH schema
     materializeResource("/tpch/sf0.001/customer.tbl")
     materializeResource("/tpch/sf0.001/lineitem.tbl")
@@ -30,13 +29,14 @@ class TPCHTest {
     materializeResource("/tpch/sf0.001/partsupp.tbl")
     materializeResource("/tpch/sf0.001/region.tbl")
     materializeResource("/tpch/sf0.001/supplier.tbl")
-
-    // make sure that the base paths exist
-    new File(outBase).mkdirs()
-    new File(outBase).mkdirs()
   }
 
-  @Test def testQuery01(): Unit = {
+  override def afterAll() = {
+    deleteRecursive(new File(outBase))
+    deleteRecursive(new File(inBase))
+  }
+
+  test("Query01") (withRuntime() { rt =>
 
     // execute with native and with tested environment
     new Query01(inBase, outputPath("q1.tbl.native"), 30, runtime.Native(), true).run()
@@ -48,9 +48,9 @@ class TPCHTest {
 
     // assert that the result contains the expected values
     compareBags(exp, res)
-  }
+  })
 
-  @Test def testQuery03(): Unit = {
+  test("Query03") (withRuntime() { rt =>
 
     // execute with native and with tested environment
     new Query03(inBase, outputPath("q3.tbl.native"), "AUTOMOBILE", "1996-06-30", runtime.Native(), true).run()
@@ -62,9 +62,9 @@ class TPCHTest {
 
     // assert that the result contains the expected values
     compareBags(exp, res)
-  }
+  })
 
-  @Test def testQuery05(): Unit = {
+  test("Query05") (withRuntime() { rt =>
 
     // execute with native and with tested environment
     new Query05(inBase, outputPath("q5.tbl.native"), "AMERICA", "1994-01-01", runtime.Native(), true).run()
@@ -76,7 +76,7 @@ class TPCHTest {
 
     // assert that the result contains the expected values
     compareBags(exp, res)
-  }
+  })
 
   def outputPath(suffix: String) = s"$outBase/$suffix"
 }

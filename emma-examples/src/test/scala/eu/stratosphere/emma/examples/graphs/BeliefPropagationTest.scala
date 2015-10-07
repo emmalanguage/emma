@@ -1,6 +1,5 @@
 package eu.stratosphere.emma.examples.graphs
 
-import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
 
 import java.io.File
@@ -15,19 +14,24 @@ import scala.io.Source
 
 @Category(Array(classOf[ExampleTest]))
 @RunWith(classOf[JUnitRunner])
-class BeliefPropagationTest extends FunSuite with Matchers {
+class BeliefPropagationTest extends FlatSpec with Matchers with BeforeAndAfter {
   // default parameters
   val dir        = "/graphs/belief-prop"
   val path       = tempPath(dir)
   val epsilon    = 1e-9
   val iterations = 100
-  val rt         = runtime.default()
-  // initialize resources
-  new File(path).mkdirs()
-  materializeResource(s"$dir/variables")
-  materializeResource(s"$dir/potential")
 
-  test("Belief Propagation calculates unknown marginal probabilities") {
+  before {
+    new File(path).mkdirs()
+    materializeResource(s"$dir/variables")
+    materializeResource(s"$dir/potential")
+  }
+
+  after {
+    deleteRecursive(new File(path))
+  }
+
+  "Belief Propagation" should "calculate unknown marginal probabilities" in withRuntime() { rt =>
     new BeliefPropagation(
       path, s"$path/marginals", epsilon, iterations, rt).run()
 

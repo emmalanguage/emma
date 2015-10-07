@@ -17,20 +17,22 @@ abstract class BaseCodegenTest(rtName: String) {
   var rt: runtime.Engine = _
   var native: runtime.Native = _
 
-  var inBase = tempPath("test/input")
-  var outBase = tempPath("test/output")
+  val inBase = tempPath("test/input")
+  val outBase = tempPath("test/output")
 
   @Before def setup(): Unit = {
-    rt = runtimeUnderTest
-    native = runtime.Native()
     // make sure that the base paths exist
     new File(inBase).mkdirs()
     new File(outBase).mkdirs()
+    rt = runtimeUnderTest
+    native = runtime.Native()
   }
 
   @After def teardown(): Unit = {
-    rt.closeSession()
     native.closeSession()
+    rt.closeSession()
+    deleteRecursive(new File(outBase))
+    deleteRecursive(new File(inBase))
   }
 
   protected def runtimeUnderTest: runtime.Engine

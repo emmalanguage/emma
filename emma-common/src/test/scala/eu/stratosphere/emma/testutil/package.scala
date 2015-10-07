@@ -69,4 +69,7 @@ package object testutil {
     }
     ret && path.delete()
   }
+
+  def withRuntime[T](rt: => runtime.Engine = runtime.default())
+    (f: runtime.Engine => T): T = try f(rt) finally rt.closeSession()
 }

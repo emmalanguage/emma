@@ -6,7 +6,6 @@ import breeze.linalg._
 import breeze.stats.distributions._
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
-import org.apache.commons.io.FileUtils
 import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.scalacheck.Gen._
@@ -20,7 +19,8 @@ import scala.io.Source
 // FIXME: Doesn't run on Flink/Spark back-ends
 @Category(Array(classOf[ExampleTest]))
 @RunWith(classOf[JUnitRunner])
-class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matchers {
+class AlternatingLeastSquaresTest extends FunSuite
+    with PropertyChecks with Matchers with BeforeAndAfter {
 
   import AlternatingLeastSquares.Schema._
   import AlternatingLeastSquaresTest._
@@ -30,12 +30,16 @@ class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matc
   val features   = 8
   val lambda     = 0.065
   val iterations = 10
-  val rt         = runtime.Native() //runtime.default()
 
-  // initialize resources
-  new File(path).mkdirs()
-  materializeResource(s"/graphs/als/r.base")
-  materializeResource(s"/graphs/als/r.test")
+  before {
+    new File(path).mkdirs()
+    materializeResource(s"/graphs/als/r.base")
+    materializeResource(s"/graphs/als/r.test")
+  }
+
+  after {
+    deleteRecursive(new File(path))
+  }
 
   test("M[i][j] * (M^t)[j][i] = sum[j](M[i][*] * M[i][*]^t)") {
     forAll { M: DenseMatrix[Int] =>
@@ -70,7 +74,7 @@ class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matc
       path:       String,
       features:   Int,
       lambda:     Double,
-      iterations: Int) = {
+      iterations: Int) = withRuntime(runtime.Native()) { rt =>
     val base = s"$path/r.base"
     val test = s"$path/r.test"
     val out  = s"$path/output"
@@ -79,7 +83,6 @@ class AlternatingLeastSquaresTest extends FunSuite with PropertyChecks with Matc
 
     val result   = alg.run(rt).fetch().iterator
     val expected = readRatings(test)
-    FileUtils.deleteQuietly(new File(s"$path/output"))
     rmse(expected, result)
   }
 

@@ -1,12 +1,9 @@
 package eu.stratosphere.emma.examples.graphs
 
-import java.io.File
-
 import breeze.linalg._
 import breeze.stats.distributions._
-import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
-import org.apache.commons.io.FileUtils
+import java.io.File
 import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.scalacheck.Gen._
@@ -14,12 +11,12 @@ import org.scalacheck.{Arbitrary => Arb}
 import org.scalatest._
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.PropertyChecks
-
 import scala.io.Source
 
 @Category(Array(classOf[ExampleTest]))
 @RunWith(classOf[JUnitRunner])
-class AlternatingLeastSquares2Test extends FunSuite with PropertyChecks with Matchers {
+class AlternatingLeastSquares2Test extends FunSuite
+    with PropertyChecks with Matchers with BeforeAndAfter {
 
   import AlternatingLeastSquares2.Schema._
   import AlternatingLeastSquares2Test._
@@ -29,12 +26,16 @@ class AlternatingLeastSquares2Test extends FunSuite with PropertyChecks with Mat
   val features   = 8
   val lambda     = 0.065
   val iterations = 10
-  val rt         = runtime.default()
 
-  // initialize resources
-  new File(path).mkdirs()
-  materializeResource(s"/graphs/als/r.base")
-  materializeResource(s"/graphs/als/r.test")
+  before {
+    new File(path).mkdirs()
+    materializeResource(s"/graphs/als/r.base")
+    materializeResource(s"/graphs/als/r.test")
+  }
+
+  after {
+    deleteRecursive(new File(path))
+  }
 
   test("M[i][j] * (M^t)[j][i] = sum[j](M[i][*] * M[i][*]^t)") {
     forAll { M: DenseMatrix[Int] =>
@@ -69,7 +70,7 @@ class AlternatingLeastSquares2Test extends FunSuite with PropertyChecks with Mat
       path:       String,
       features:   Int,
       lambda:     Double,
-      iterations: Int) = {
+      iterations: Int) = withRuntime() { rt =>
     val base = s"$path/r.base"
     val test = s"$path/r.test"
     val out  = s"$path/output"
@@ -78,7 +79,6 @@ class AlternatingLeastSquares2Test extends FunSuite with PropertyChecks with Mat
 
     val result   = alg.run(rt).fetch().iterator
     val expected = readRatings(test)
-    FileUtils.deleteQuietly(new File(s"$path/output"))
     rmse(expected, result)
   }
 

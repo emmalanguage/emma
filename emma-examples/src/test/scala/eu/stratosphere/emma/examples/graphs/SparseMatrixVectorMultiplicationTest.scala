@@ -2,10 +2,8 @@ package eu.stratosphere.emma.examples.graphs
 
 import java.io.{PrintWriter, File}
 
-import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
 
-import org.apache.commons.io.FileUtils
 import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.scalacheck.Arbitrary
@@ -18,39 +16,43 @@ import org.scalatest.prop.Checkers.check
 
 @Category(Array(classOf[ExampleTest]))
 @RunWith(classOf[JUnitRunner])
-class SparseMatrixVectorMultiplicationTest extends FunSuite with Matchers {
+class SparseMatrixVectorMultiplicationTest extends FunSuite with Matchers with BeforeAndAfter {
   import SparseMatrixVectorMultiplicationTest._
   // default parameters
   val dir  = "/graphs/spmv"
   val path = tempPath(dir)
-  val rt   = runtime.default()
   val eps  = 1e-9
-  // initialize resources
-  new File(path).mkdirs()
+
+  before {
+    new File(path).mkdirs()
+  }
+
+  after {
+    deleteRecursive(new File(path))
+  }
 
   test("Sparse matrix-vector multiplication") {
-    check(
+    withRuntime() { rt => check(
       forAllNoShrink(mvGen) { case (mat, vec) =>
         writeMatVec(mat, vec)
         1 to 3 forall { exp =>
           val result = new SparseMatrixVectorMultiplication(
-              path, s"$path/result", exp, rt).algorithm.run(rt).fetch()
+            path, s"$path/result", exp, rt).algorithm.run(rt).fetch()
 
           val vecMap = result.map {
             vv => vv.index -> vv.value
           }.toMap withDefaultValue 0.0
 
           val actual = (0l to vecMap.keySet.max map vecMap).toVector
-          val expect = mat ** (vec, exp)
-          FileUtils.deleteQuietly(new File(s"$path/result"))
+          val expect = mat **(vec, exp)
           println(s"actual: $actual")
           println(s"expect: $expect")
           actual zip expect forall {
             case (x, y) => (x / y - 1).abs < eps
           }
         }
-      }, Test.Parameters.default withMinSuccessfulTests 5
-    )
+      }, Test.Parameters.default withMinSuccessfulTests 5)
+    }
   }
 
   def writeMatVec(mat: Mat, vec: Vec) = {

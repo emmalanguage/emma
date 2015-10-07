@@ -2,7 +2,6 @@ package eu.stratosphere.emma.examples.graphs
 
 import java.io.File
 
-import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
 import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
@@ -14,16 +13,21 @@ import scala.io.Source
 
 @Category(Array(classOf[ExampleTest]))
 @RunWith(classOf[JUnitRunner])
-class GraphColoringTest extends FunSuite with PropertyChecks with Matchers {
+class GraphColoringTest extends FlatSpec with PropertyChecks with Matchers with BeforeAndAfter {
   // default parameters
   val dir   = "/graphs/graph-col"
   val path  = tempPath(dir)
-  val rt    = runtime.default()
-  // initialize resources
-  new File(path).mkdirs()
-  materializeResource(s"$dir/edges.tsv")
 
-  test("Merging of 2 lists of ranges should maintain order and compression") {
+  before {
+    new File(path).mkdirs()
+    materializeResource(s"$dir/edges.tsv")
+  }
+
+  after {
+    deleteRecursive(new File(path))
+  }
+
+  "Merging 2 lists of ranges" should "maintain order and compression" in {
     import Ordering.Implicits._
     import GraphColoring.Schema._
 
@@ -37,7 +41,7 @@ class GraphColoringTest extends FunSuite with PropertyChecks with Matchers {
     }
   }
 
-  test("After graph coloring any two neighbors should have different colors") {
+  "After graph coloring any two neighbors" should "have different colors" in withRuntime() { rt =>
     new GraphColoring(s"$path/edges.tsv", s"$path/vertex-colors.tsv", rt).run()
 
     val edges = for {
