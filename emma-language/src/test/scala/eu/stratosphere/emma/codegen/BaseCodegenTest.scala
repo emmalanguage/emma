@@ -533,7 +533,10 @@ abstract class BaseCodegenTest(rtName: String) {
   @Test def testGroupWithComplexKey() = {
     val alg = emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-      for (g <- imdbTop100.groupBy(x => (x.year / 10, x.rating.toInt))) yield (g.key._1, g.key._2, g.values.count())
+      for (g <- imdbTop100.groupBy(x => (x.year / 10, x.rating.toInt))) yield {
+        val (year, rating) = g.key
+        (year, rating, g.values.count())
+      }
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -781,6 +784,42 @@ abstract class BaseCodegenTest(rtName: String) {
 
     // assert that the result contains the expected values
     compareBags(act, exp)
+  }
+
+  @Test def testClassNameNormalization() = {
+    // without emma.substituteClassNames ImdbYear can not be found
+    val alg = emma.parallelize {
+      val entries = read(materializeResource(s"/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+      val years = for (e <- entries) yield ImdbYear(e.year)
+      years.forall { case iy @ ImdbYear(y) => iy == new ImdbYear(y) }
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+    assert(act, "IMDBYear(y) == new IMDBYear(y)")
+    assert(exp, "IMDBYear(y) == new IMDBYear(y)")
+  }
+
+  @Test def testEnclosingParametersNormalization() = {
+    // a class that wraps an Emma program and a parameter used within the 'parallelize' call
+    case class MoviesWithinPeriodQuery(minYear: Int, period: Int, rt: runtime.Engine) {
+      def run() = {
+        val alg = emma.parallelize {
+          for {
+            e <- read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+            if e.year >= minYear && e.year < minYear + period
+          } yield e
+        }
+
+        alg.run(rt)
+      }
+    }
+
+    // run the algorithm
+    val exp = MoviesWithinPeriodQuery(1990, 10, runtime.Native()).run().fetch()
+    val act = MoviesWithinPeriodQuery(1990, 10, rt).run().fetch()
+    compareBags(exp, act)
   }
 }
 
