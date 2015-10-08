@@ -17,7 +17,11 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
    */
   def normalize(tree: Tree): Tree = q"""{
     import _root_.scala.reflect._
-    ${tree ->> EnclosingParamNormalizer ->> unTypeCheck ->> ControlFlowTestNormalizer}
+    ${tree ->>
+      normalizeEnclosingParams ->>
+      normalizeClassNames ->>
+      unTypeCheck ->>
+      normalizeControlFlow}
   }""".typeChecked.as[Block].expr
 
   // --------------------------------------------------------------------------
@@ -33,7 +37,7 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
    * - un-nesting of complex [[Tree]]s outside do-while loop tests
    * - un-nesting of complex [[Tree]]s outside if-then-else conditionals
    */
-  object ControlFlowTestNormalizer extends Transformer with (Tree => Tree) {
+  object normalizeControlFlow extends Transformer with (Tree => Tree) {
     val testCounter = new Counter()
 
     override def transform(tree: Tree) = tree match {
@@ -108,7 +112,7 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
    * - Assigns the accessed parameters to local values of the form `__this${name}` at the beginning
    *   of the code.
    */
-  object EnclosingParamNormalizer extends (Tree => Tree) {
+  object normalizeEnclosingParams extends (Tree => Tree) {
 
     def apply(root: Tree) = findOwnerClass(enclosingOwner) match {
       case Some(clazz) =>
@@ -139,34 +143,9 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
   // --------------------------------------------------------------------------
 
   /** Substitutes the names of local classes to fully qualified names. */
-  object ClassNameNormalizer extends Transformer with (Tree => Tree) {
-
-    override def transform(tree: Tree): Tree = tree match {
-      // Search for a class call without 'new'
-      case q"${id: Ident}.$name[..$types](..${args: List[Tree]})"
-        if !isParam(id.symbol) =>
-          val selChain = mk.select(id.symbol, apply = true)
-          q"$selChain.$name[..$types](..${args map transform})"
-
-      // Search for a class call with 'new'
-      case q"new ${id: Ident}[..$types](..${args: List[Tree]})"
-        if id.hasOwner && !id.owner.isTerm =>
-          val selChain = mk.select(id.symbol, apply = false)
-          q"new $selChain[..$types](..${args map transform})"
-
-      case _ => super.transform(tree)
-    }
-
-    def apply(root: Tree) = transform(root)
-
-    /**
-     * Check if whether a [[Symbol]] is a parameter, function, `val` or a `var`.
-     *
-     * @param sym The [[Symbol]] to check
-     * @return `true` if the [[Symbol]] is any of the above
-     */
-    def isParam(sym: Symbol): Boolean =
-      (sym.isTerm && (sym.asTerm.isVal || sym.asTerm.isVar)) ||
-        (sym.owner.isMethod && sym.isParameter)
+  def normalizeClassNames(tree: Tree): Tree = tree transform {
+    case id: Ident if id.hasSymbol && id.symbol.isModule => mk.select(id.symbol)
+    case q"new ${id: Ident}[..$types](..${args: List[Tree]})" if id.hasSymbol =>
+      q"new ${mk.typeSelect(id.symbol)}[..$types](..${args map normalizeClassNames})"
   }
 }

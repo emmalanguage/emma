@@ -177,14 +177,15 @@ trait ReflectUtil {
       Function(params, substituted).withSym(sym).as[Function]
     }
 
-    def select(sym: Symbol, apply: Boolean): Tree = {
-      if (sym.owner != rootMirror.RootClass) {
-        val name = if (!apply && !sym.isPackage)
-          sym.name.toTypeName else sym.name.toTermName
+    def select(sym: Symbol): Tree =
+      if (Set(null, NoSymbol, rootMirror.RootClass)(sym.owner))
+        ref(rootMirror.staticPackage(sym.fullName))
+      else q"${select(sym.owner)}.${sym.name.toTermName}" withSym sym
 
-        Select(select(sym.owner, apply), name) withSym sym
-      } else ref(rootMirror staticPackage sym.fullName)
-    }
+    def typeSelect(sym: Symbol): Tree =
+      if (Set(null, NoSymbol, rootMirror.RootClass)(sym.owner))
+        ref(rootMirror.staticPackage(sym.fullName))
+      else tq"${select(sym.owner)}.${sym.name.toTypeName}" withSym sym
   }
 
   /** Syntactic sugar for [[Tree]]s. */
