@@ -67,5 +67,13 @@ trait BlackBoxUtil extends BlackBox with ReflectUtil {
         case x if pf isDefinedAt x => pf(x)
         case (tree, xform) => xform default tree
       }
+
+    override def transform(pf: Tree ~> Tree) = super.transform(pf orElse {
+      // NOTE:
+      // - `TypeTree.original` is not transformed by default
+      // - `setOriginal` is only available at compile-time
+      case tt: TypeTree if tt.original != null =>
+        setOriginal(tt, tt.original transform pf)
+    })
   }
 }
