@@ -1,87 +1,91 @@
 package eu.stratosphere.emma.macros.program.comprehension.rewrite
 
-import eu.stratosphere.emma.macros.program.ContextHolder
 import eu.stratosphere.emma.macros.program.comprehension.ComprehensionModel
 import eu.stratosphere.emma.rewrite.RewriteEngine
 
-import scala.reflect.macros.blackbox
-
-trait ComprehensionRewriteEngine[C <: blackbox.Context]
-  extends ContextHolder[C]
-  with ComprehensionModel[C]
-  with RewriteEngine {
+trait ComprehensionRewriteEngine extends ComprehensionModel with RewriteEngine {
 
   /**
-   * Constructs a rule application function that breaks after one successful application.
+   * Construct a rule application function that breaks after one successful application.
    *
-   * @param rules A sequence of rules to be applied.
+   * @param rules A sequence of rules to be applied
+   * @return A one-off rule application function
    */
-  protected def applyAny(rules: Rule*) = new (ExpressionRoot => Boolean) with ExpressionTransformer {
-    var changed = false
+  protected def applyAny(rules: Rule*): ExpressionRoot => Boolean =
+    new ExpressionTransformer with (ExpressionRoot => Boolean) {
+      
+      var changed: Boolean     = false
+      var root: ExpressionRoot = null
+  
+      override def transform(expr: Expression) = {
+        if (!changed) applyFirst(rules: _*)(expr, root.expr) match {
+          case Some(x) => changed = true; x
+          case None    => super.transform(expr)
+        } else expr
+      }
+  
+      /**
+       * Exhaustively apply the given set of `rules` to a tree and all its subtrees.
+       *
+       * @param root The root of the expression tree to be transformed
+       * @return A [[Boolean]] indicating whether some rule was applied at all
+       */
+      def apply(root: ExpressionRoot) = {
+        this.changed   = false
+        this.root      = root
 
-    override def transform(e: Expression): Expression = {
-      if (!changed) applyFirst(rules: _*)(e) match {
-        case Some(x) => changed = true; x
-        case _ => super.transform(e)
-      } else {
-        e;
+        root.expr = transform(root.expr)
+        changed
       }
     }
 
-    /**
-     * Exhaustively applies the given set of `rules` to a tree and all its subtrees.
-     *
-     * @param root The root of the expression tree to be transformed.
-     * @return A boolean indicating whether some rule was applied at all.
-     */
-    override def apply(root: ExpressionRoot) = {
-      changed = false
-      root.expr = transform(root.expr)
-      changed
-    }
-  }
-
   /**
-   * Constructs an exhaustive application function for a given set of transformation rules.
+   * Construct an exhaustive application function for a given set of transformation rules.
    *
-   * @param rules A sequence of rules to be applied.
+   * @param rules A sequence of rules to be applied
+   * @return An exhaustive rule application function
    */
-  protected def applyExhaustively(rules: Rule*) = new (ExpressionRoot => Boolean) with ExpressionTransformer {
-    var changed = false
+  protected def applyExhaustively(rules: Rule*): ExpressionRoot => Boolean =
+    new ExpressionTransformer with (ExpressionRoot => Boolean) {
 
-    override def transform(e: Expression): Expression = applyFirst(rules: _*)(e) match {
-      case Some(x) => changed = true; x
-      case _ => super.transform(e)
+      var changed: Boolean     = false
+      var root: ExpressionRoot = null
+  
+      override def transform(expr: Expression) =
+        applyFirst(rules: _*)(expr, root.expr) match {
+          case Some(x) => changed = true; x
+          case None    => super.transform(expr)
+        }
+  
+      /**
+       * Exhaustively apply the given set of `rules` to a tree and all its subtrees.
+       *
+       * @param root The root of the expression tree to be transformed
+       * @return A [[Boolean]] indicating whether some rule was applied at all
+       */
+      def apply(root: ExpressionRoot) = {
+        var i = -1
+        this.root = root
+
+        do {
+          i += 1
+          changed   = false
+          root.expr = transform(root.expr)
+        } while (changed)
+  
+        i > 0
+      }
     }
-
-    /**
-     * Exhaustively applies the given set of `rules` to a tree and all its subtrees.
-     *
-     * @param root The root of the expression tree to be transformed.
-     * @return A boolean indicating whether some rule was applied at all.
-     */
-    override def apply(root: ExpressionRoot) = {
-      var i = -1
-
-      do {
-        i = i + 1
-        changed = false
-        root.expr = transform(root.expr)
-        changed
-      } while (changed)
-
-      i > 0
-    }
-  }
 
   /**
    * Construct a break-on-success application function for a given sequence of transformation rules.
    *
-   * @param rules A sequence of rules to be applied.
+   * @param rules A sequence of rules to be applied
+   * @return A one-off rule application function
    */
-  protected def applyFirst(rules: Rule*) = (e: Expression) => rules.foldLeft(Option.empty[Expression])((x: Option[Expression], r: Rule) => x match {
-    case Some(_) => x
-    case _ => r.apply(e)
-  })
-
+  protected def applyFirst(rules: Rule*): (Expression, Expression) => Option[Expression] =
+    (expr, root) => rules.foldLeft(Option.empty[Expression]) {
+      case (Some(x), _) => Some(x)
+      case (None, rule) => rule apply (expr, root)
+    }
 }

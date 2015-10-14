@@ -1,245 +1,140 @@
 package eu.stratosphere.emma.macros.program.controlflow
 
-
 import eu.stratosphere.emma.util.Counter
-
-import scala.reflect.macros._
 import scalax.collection.GraphPredef._
 import scalax.collection.edge.LkDiEdge
 import scalax.collection.mutable.Graph
 
-private[emma] trait ControlFlowAnalysis[C <: blackbox.Context] extends ControlFlowModel[C] {
-  this: ControlFlowModel[C] =>
-
-  import c.universe._
+private[emma] trait ControlFlowAnalysis extends ControlFlowModel with ControlFlowNormalization {
+  import universe._
 
   def createControlFlowGraph(tree: Tree): CFGraph = {
 
-    // loop ID counter
+    // Loop ID counter
     val loopCounter = new Counter()
 
-    // vertex ID counter and an implicit next nodeID provider
+    // Vertex ID counter and an implicit next nodeID provider
     val vertexCounter = new Counter()
     implicit def nextVertexID = vertexCounter.advance.get
 
-    // initialize graph
-    val vCurr = new CFBlock()
-    val graph = Graph[CFBlock, LkDiEdge](vCurr)
+    // Initialize graph
+    val curV  = new CFBlock()
+    val graph = Graph[CFBlock, LkDiEdge](curV)
 
-    // recursive helper function
-    def _createCFG(currTree: Tree, currBlock: CFBlock): CFBlock = currTree match {
+    // Recursive helper function
+    def createCFG(curTree: Tree, curBlock: CFBlock): CFBlock = curTree match {
       // { `stats`; `expr` }
       case Block(stats, expr) =>
-        var _currBlock = currBlock
-        for (s <- stats) {
-          _currBlock = _createCFG(s, _currBlock)
-        }
-        _createCFG(expr, _currBlock)
+        var block = curBlock
+        for (stmt <- stats) block = createCFG(stmt, block)
+        createCFG(expr, block)
 
-      // val `name`: `tpt` = `rhs`
-      case ValDef(mods, name, tpt, rhs) =>
-        // ensure that the `rhs` tree is a "simple" term (no blocks or conditionals)
-        if (rhs match {
-          case Block(_, _) => true
-          case If(_, _, _) => true
-          case _ => false
-        }) c.error(c.enclosingPosition, "Emma does not support assignments with conditionals on the rhs at the moment!")
+      case ValDef(_, _, _,  _ @ (_: Block | _: If))
+        |  Assign(_: Ident, _ @ (_: Block | _: If))
+        => c.abort(curTree.pos,
+            "Emma does not support assignments with conditionals on the rhs at the moment")
 
-        // add assignment to the current block
-        currBlock.stats += currTree
-        currBlock
+      case _: ValDef | Assign(_: Ident, _) =>
+        // Add assignment to the current block
+        curBlock.stats += curTree
+        curBlock
 
-      // `name` = `rhs`
-      case Assign(Ident(name: TermName), rhs) =>
-        // ensure that the `rhs` tree is a "simple" term (no blocks or conditionals)
-        if (rhs match {
-          case Block(_, _) => true
-          case If(_, _, _) => true
-          case _ => false
-        }) c.error(c.enclosingPosition, "Emma does not support assignments with conditionals on the rhs at the moment!")
+      case q"do $body while (${cond: Ident})" =>
+        // Create body block
+        val startBlock = new CFBlock()
+        val endBlock   = createCFG(body, startBlock)
 
-        // add assignment to the current block
-        currBlock.stats += currTree
-        currBlock
-
-      // do  { `body` } while (`cond`)
-      case LabelDef(_, _, Block(b, If(cond, _, _))) =>
-        // ensure that the `cond` tree is a simple identifier
-        if (cond match {
-          case Ident(_: TermName) => false
-          case _ => true
-        }) c.error(c.enclosingPosition, "Invalid do-while test expression!") // should not happen after normalization
-
-        // create body block
-        val body = if (b.size > 1) Block(b.slice(0, b.size - 1).toList, b.last) else b.head
-        val bodyStartBlock = new CFBlock()
-        val bodyEndBlock = _createCFG(body, bodyStartBlock)
-
-        // create condition block with the `cond` term
+        // Create condition block with the `cond` term
         val condBlock = new CFBlock()
         condBlock.stats += cond
 
-        // create next block
+        // Create next block
         val nextBlock = new CFBlock()
 
-        // fix block type
-        val loopID = loopCounter.advance.get
-        bodyStartBlock.kind = DoWhileBegin(loopID)
-        bodyEndBlock.kind = DoWhileEnd(loopID)
+        // Fix block type
+        val loopID      = loopCounter.advance.get
+        startBlock.kind = DoWhileBegin(loopID)
+        endBlock.kind   = DoWhileEnd(loopID)
 
-        graph += LkDiEdge(currBlock, bodyStartBlock)(true)
-        graph += LkDiEdge(bodyEndBlock, condBlock)(true)
-        graph += LkDiEdge(condBlock, bodyStartBlock)(true)
+        graph += LkDiEdge(curBlock,  startBlock)(true)
+        graph += LkDiEdge(endBlock,  condBlock)(true)
+        graph += LkDiEdge(condBlock, startBlock)(true)
         graph += LkDiEdge(condBlock, nextBlock)(false)
 
         nextBlock
 
-      // while (`cond`) { `body` }
-      case LabelDef(_, _, If(cond, Block(b, _), _)) =>
-        // ensure that the `cond` tree is a simple identifier
-        if (cond match {
-          case Ident(_: TermName) => false
-          case _ => true
-        }) c.error(c.enclosingPosition, "Invalid while test expression!") // should not happen after normalization
-
-        // create condition block with the `cond` term
+      case q"while (${cond: Ident}) $body" =>
+        // Create condition block with the `cond` term
         val condBlock = new CFBlock()
         condBlock.stats += cond
 
-        // create body block
-        val body = if (b.size > 1) Block(b.slice(0, b.size - 1).toList, b.last) else b.head
-        val bodyStartBlock = new CFBlock()
-        val bodyEndBlock = _createCFG(body, bodyStartBlock)
+        // Create body block
+        val startBlock = new CFBlock()
+        val endBlock   = createCFG(body, startBlock)
 
-        // create next block
+        // Create next block
         val nextBlock = new CFBlock()
 
-        // fix block type
+        // Fix block type
         val loopID = loopCounter.advance.get
 
-        // fix block kinds
+        // Fix block kinds
         condBlock.kind = WhileBegin(loopID)
-        bodyEndBlock.kind = WhileEnd(loopID)
+        endBlock.kind  = WhileEnd(loopID)
 
-        graph += LkDiEdge(currBlock, condBlock)(true)
-        graph += LkDiEdge(condBlock, bodyStartBlock)(true)
+        graph += LkDiEdge(curBlock,  condBlock)(true)
+        graph += LkDiEdge(condBlock, startBlock)(true)
         graph += LkDiEdge(condBlock, nextBlock)(false)
-        graph += LkDiEdge(bodyEndBlock, condBlock)(true)
+        graph += LkDiEdge(endBlock,  condBlock)(true)
 
         nextBlock
 
-      // if (`cond`) `thenp` else `elsep`
-      case If(cond, thenp, elsep) =>
-        // ensure that the `cond` tree is a simple identifier
-        if (cond match {
-          case Ident(_: TermName) => true
-          case _ => false
-        }) c.error(c.enclosingPosition, "Invalid if-then-else test expression!") // should not happen after normalization
-
-        // create condition block with the `cond` term
+      case q"if (${cond: Ident}) $thn else $els" =>
+        // Create condition block with the `cond` term
         val condBlock = new CFBlock()
         condBlock.stats += cond
 
-        // create thenp block
-        val thenpStartBlock = new CFBlock()
-        val thenpEndBlock = _createCFG(thenp, thenpStartBlock)
+        // Create thn block
+        val thnStartBlock = new CFBlock()
+        val thnEndBlock   = createCFG(thn, thnStartBlock)
 
-        // create elsep block
-        val elsepStartBlock = new CFBlock()
-        val elsepEndBlock = _createCFG(elsep, elsepStartBlock)
+        // Create els block
+        val elsStartBlock = new CFBlock()
+        val elsEndBlock   = createCFG(els, elsStartBlock)
 
-        // create new current block
-        val currNewBlock = new CFBlock()
+        // Create new current block
+        val curNewBlock = new CFBlock()
 
-        // fix block kind
+        // Fix block kind
         condBlock.kind = Cond
 
-        graph += LkDiEdge(condBlock, condBlock)(true)
-        graph += LkDiEdge(condBlock, thenpStartBlock)(true)
-        graph += LkDiEdge(condBlock, elsepStartBlock)(false)
-        graph += LkDiEdge(thenpEndBlock, currNewBlock)(true)
-        graph += LkDiEdge(elsepEndBlock, currNewBlock)(true)
+        graph += LkDiEdge(condBlock,   condBlock)(true)
+        graph += LkDiEdge(condBlock,   thnStartBlock)(true)
+        graph += LkDiEdge(condBlock,   elsStartBlock)(false)
+        graph += LkDiEdge(thnEndBlock, curNewBlock)(true)
+        graph += LkDiEdge(elsEndBlock, curNewBlock)(true)
 
-        currNewBlock
+        curNewBlock
 
-      // default: a term expression
+      // Default: a term expression
       case _ =>
-        currBlock.stats += currTree
-        currBlock
+        curBlock.stats += curTree
+        curBlock
     }
 
-    // call recursive helper
-    _createCFG(tree, vCurr)
+    // Call recursive helper
+    createCFG(tree, curV)
 
-    // remove empty blocks from the end of the graph (might result from tailing if (c) e1 else e2 return statements)
-    var emptyBlocks = graph.nodes filter { x => x.diSuccessors.isEmpty && x.stats.isEmpty}
+    // Remove empty blocks from the end of the graph
+    // (might result from tailing if (c) e1 else e2 return statements)
+    var emptyBlocks = graph.nodes filter { n => n.diSuccessors.isEmpty && n.stats.isEmpty }
     while (emptyBlocks.nonEmpty) {
-      for (block <- emptyBlocks) graph -= block // remove empty block with no successors from the graph
-      emptyBlocks = graph.nodes filter { x => x.diSuccessors.isEmpty && x.stats.isEmpty}
+      // Remove empty block with no successors from the graph
+      for (block <- emptyBlocks) graph -= block
+      emptyBlocks = graph.nodes filter { n => n.diSuccessors.isEmpty && n.stats.isEmpty }
     }
 
-    // return the graph
+    // Return the graph
     graph
   }
-
-  /**
-   * Normalizes an expression tree.
-   *
-   * This process includes:
-   *
-   * - unnesting of compex trees ouside while loop tests.
-   * - unnesting of compex trees ouside do-while loop tests.
-   * - unnesting of compex trees ouside if-then-else conditions.
-   */
-  object normalize extends Transformer with (Tree => Tree) {
-
-    val testCounter = new Counter()
-
-    override def transform(tree: Tree): Tree = tree match {
-      // while (`cond`) { `body` }
-      case LabelDef(_, _, If(cond, Block(body, _), _)) =>
-        cond match {
-          case Ident(_: TermName) =>
-            // if condition is a simple identifier, no normalization needed
-            super.transform(tree)
-          case _ =>
-            // introduce condition variable
-            val condVar = TermName(f"testA${testCounter.advance.get}%03d")
-            // move the complex test outside the condition
-            q"{ var $condVar = $cond; while ($condVar) { $body; $condVar = $cond } }"
-        }
-
-      // do { `body` } while (`cond`)
-      case LabelDef(_, _, Block(body, If(cond, _, _))) =>
-        cond match {
-          case Ident(_: TermName) =>
-            // if condition is a simple identifier, no normalization needed
-            super.transform(tree)
-          case _ =>
-            // introduce condition variable
-            val condVar = TermName(f"testB${testCounter.advance.get}%03d")
-            // move the complex test outside the condition
-            q"{ var $condVar = null.asInstanceOf[Boolean]; do { $body; $condVar = $cond } while ($condVar) }"
-        }
-
-      // if (`cond`) `thenp` else `elsep`
-      case If(cond, thenp, elsep) =>
-        cond match {
-          case Ident(_: TermName) =>
-            // if condition is a simple identifier, no normalization needed
-            super.transform(tree)
-          case _ =>
-            // introduce condition value
-            val condVal = TermName(f"testC${testCounter.advance.get}%03d")
-            // move the complex test outside the condition
-            q"val $condVal = $cond; ${If(Ident(condVal), thenp, elsep)}"
-        }
-
-      case _ =>
-        super.transform(tree)
-    }
-
-    def apply(tree: Tree): Tree = c.typecheck(transform(c.untypecheck(tree)))
-  }
-
 }

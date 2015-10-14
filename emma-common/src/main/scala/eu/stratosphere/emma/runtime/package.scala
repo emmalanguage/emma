@@ -4,7 +4,7 @@ import java.util.UUID
 
 import com.typesafe.scalalogging.slf4j.Logger
 import eu.stratosphere.emma.api.DataBag
-import eu.stratosphere.emma.ir.{Fold, TempSink, ValueRef, Write}
+import eu.stratosphere.emma.ir.{Fold, TempSink, Write}
 import org.slf4j.LoggerFactory
 
 import scala.reflect.runtime.universe._
@@ -44,13 +44,13 @@ package object runtime {
 
     def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A
 
-    def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]]
+    def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A]
 
     def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit
 
-    def scatter[A: TypeTag](values: Seq[A]): ValueRef[DataBag[A]]
+    def scatter[A: TypeTag](values: Seq[A]): DataBag[A]
 
-    def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A]
+    def gather[A: TypeTag](ref: DataBag[A]): DataBag[A]
 
     final def closeSession() = if (!closed) {
       doCloseSession()
@@ -72,13 +72,35 @@ package object runtime {
 
     override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = ???
 
-    override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]] = ???
+    override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = ???
 
     override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = ???
 
-    override def scatter[A: TypeTag](values: Seq[A]): ValueRef[DataBag[A]] = ???
+    override def scatter[A: TypeTag](values: Seq[A]): DataBag[A] = ???
 
-    override def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A] = ???
+    override def gather[A: TypeTag](ref: DataBag[A]): DataBag[A] = ???
+  }
+
+  def default(): Engine = {
+    val backend = System.getProperty("emma.execution.backend", "")
+    val execmod = System.getProperty("emma.execution.mode", "")
+
+    require(backend.isEmpty || ("native" :: "flink" :: "spark" :: Nil contains backend),
+      "Unsupported execution backend (native|flink|spark).")
+    require((backend.isEmpty || backend == "native") || ("local" :: "remote" :: Nil contains execmod),
+      "Unsupported execution mode (local|remote).")
+
+    backend match {
+      case "flink" => execmod match {
+        case "local" /* */ => factory("flink-local", "localhost", 6123)
+        case "remote" /**/ => factory("flink-remote", "localhost", 6123)
+      }
+      case "spark" => execmod match {
+        case "local" /* */ => factory("spark-local", s"local[${Runtime.getRuntime.availableProcessors()}]", 7077)
+        case "remote" /**/ => factory("spark-remote", "localhost", 7077)
+      }
+      case _ => Native() // run native version of the code
+    }
   }
 
   def factory(name: String, host: String, port: Int) = {

@@ -60,4 +60,26 @@ package object testutil {
     assert((exp diff act) == Seq.empty[String], s"Unexpected elements in result: $exp")
     assert((act diff exp) == Seq.empty[String], s"Unseen elements in result: $act")
   }
+
+  def deleteRecursive(path: java.io.File): Boolean = {
+    val ret = if (path.isDirectory) {
+      path.listFiles().toSeq.foldLeft(true)((r, f) => deleteRecursive(f))
+    } else { /* regular file */
+      true
+    }
+    ret && path.delete()
+  }
+
+  /**
+   * Lazy initialization & execution wrapper for a piece of code that depends on a runtime object.
+   *
+   * @param rt A call-by-name parameter for the runtime to use.
+   * @param f  A lambda that depends on the initialized runtime and retuns a value of type T.
+   * @tparam T The type of the returned value.
+   * @return The result of `f` applied to the initialized `rt`.
+   */
+  def withRuntime[T](rt: => runtime.Engine = runtime.default())(f: runtime.Engine => T): T = {
+    lazy val runtime = rt
+    try f(runtime) finally runtime.closeSession()
+  }
 }

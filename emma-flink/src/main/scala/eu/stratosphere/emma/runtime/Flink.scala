@@ -1,12 +1,14 @@
 package eu.stratosphere.emma.runtime
 
-import eu.stratosphere.emma.api.DataBag
+import java.io.File
+import java.net.URL
+
+import eu.stratosphere.emma.api.{ParallelizedDataBag, DataBag}
 import eu.stratosphere.emma.codegen.flink.DataflowGenerator
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
-import eu.stratosphere.emma.ir.{Fold, TempSink, ValueRef, Write, localInputs}
-import eu.stratosphere.emma.runtime.Flink.DataBagRef
+import eu.stratosphere.emma.ir.{Fold, TempSink, Write, localInputs}
 import eu.stratosphere.emma.util.Counter
-import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
+import org.apache.flink.api.scala.ExecutionEnvironment
 
 import scala.reflect.runtime.universe._
 
@@ -35,10 +37,10 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
     dataflowCompiler.execute[A](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
 
-  override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): ValueRef[DataBag[A]] = {
+  override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     val expr = dataflowCompiler.execute[DataSet[A]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
-    DataBagRef[A](root.name, expr)
+    DataBag(root.name, expr, expr.collect())
   }
 
   override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
@@ -46,20 +48,20 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
     dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
 
-  override def scatter[A: TypeTag](values: Seq[A]): ValueRef[DataBag[A]] = {
+  override def scatter[A: TypeTag](values: Seq[A]): DataBag[A] = {
     // create fresh value reference
     val refName = nextTmpName
     // generate and execute a 'scatter' dataflow
     val dataflowSymbol = dataflowGenerator.generateScatterDef(refName)
     val expr = dataflowCompiler.execute[DataSet[A]](dataflowSymbol, Array[Any](env, values))
     // return the value reference
-    DataBagRef(refName, expr, Some(DataBag(values)))
+    DataBag(refName, expr, expr.collect())
   }
 
-  override def gather[A: TypeTag](ref: ValueRef[DataBag[A]]): DataBag[A] = {
+  override def gather[A: TypeTag](ref: DataBag[A]): DataBag[A] = {
     // generate and execute a 'scatter' dataflow
-    val dataflowSymbol = dataflowGenerator.generateGatherDef(ref.name)
-    dataflowCompiler.execute[DataBag[A]](dataflowSymbol, Array[Any](env, ref.asInstanceOf[DataBagRef[A]].expr))
+    val dataflowSymbol = dataflowGenerator.generateGatherDef(ref.asInstanceOf[ParallelizedDataBag[A, DataSet[A]]].name)
+    dataflowCompiler.execute[DataBag[A]](dataflowSymbol, Array[Any](env, ref.asInstanceOf[ParallelizedDataBag[A, DataSet[A]]].repr))
   }
 
   private def nextTmpName = f"emma$$temp${tmpCounter.advance.get}%05d"
@@ -77,23 +79,19 @@ case class FlinkRemote(override val host: String, override val port: Int) extend
   logger.info(s"Initializing remote execution environment for Flink at $host:$port")
 
   override val env = {
-    val path = new java.io.File(this.getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
-    if (path.exists() && path.isFile) {
-      logger.info(s"Passing jar location '${path.toString}' to remote environment")
-      ExecutionEnvironment.createRemoteEnvironment(host, port, path.toString)
-    } else {
-      ExecutionEnvironment.getExecutionEnvironment
+    val jars = {
+      val jar = new java.io.File(this.getClass.getProtectionDomain.getCodeSource.getLocation.toURI)
+      if (jar.exists() && jar.isFile) {
+        Array[String](jar.toString)
+      } else {
+        Array.empty[String]
+      }
     }
+    val path = Array[URL](new File(dataflowCompiler.codeGenDir).toURI.toURL)
+
+    logger.info(s" - jars: [ ${jars.mkString(", ")} ]")
+    logger.info(s" - path: [ ${path.mkString(", ")} ]")
+
+    ExecutionEnvironment.createRemoteEnvironment(host, port, jars, path)
   }
-}
-
-object Flink {
-
-  case class DataBagRef[A: TypeTag](name: String, expr: DataSet[A], var v: Option[DataBag[A]] = Option.empty[DataBag[A]]) extends ValueRef[DataBag[A]] {
-    def value: DataBag[A] = v.getOrElse({
-      v = Some(DataBag[A](expr.collect))
-      v.get
-    })
-  }
-
 }

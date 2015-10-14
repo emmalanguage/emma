@@ -1,16 +1,7 @@
 package eu.stratosphere.emma.macros.program.comprehension.rewrite
 
-import eu.stratosphere.emma.macros.program.ContextHolder
-import eu.stratosphere.emma.macros.program.util.ProgramUtils
-
-import scala.reflect.macros.blackbox
-
-trait ComprehensionNormalization[C <: blackbox.Context]
-  extends ContextHolder[C]
-  with ComprehensionRewriteEngine[C]
-  with ProgramUtils[C] {
-
-  import c.universe._
+trait ComprehensionNormalization extends ComprehensionRewriteEngine {
+  import universe._
 
   def normalize(root: ExpressionRoot) = {
     applyExhaustively(UnnestHead, UnnestGenerator, SimplifyTupleProjection)(root)
@@ -19,7 +10,7 @@ trait ComprehensionNormalization[C <: blackbox.Context]
   }
 
   /**
-   * Unnests a comprehended head in its parent.
+   * Un-nests a comprehended head in its parent.
    *
    * ==Rule Description==
    *
@@ -31,37 +22,35 @@ trait ComprehensionNormalization[C <: blackbox.Context]
    */
   object UnnestGenerator extends Rule {
 
-    case class RuleMatch(parent: Comprehension, generator: Generator, child: Comprehension)
+    case class RuleMatch(parent: Comprehension, gen: Generator, child: Comprehension)
 
-    override protected def bind(r: Expression) = r match {
-      case parent@Comprehension(_, qualifiers) =>
-        qualifiers.find({
-          case Generator(_, Comprehension(ScalaExpr(_, _), _)) => true
-          case _ => false
-        }) match {
-          case Some(generator@Generator(_, child@Comprehension(ScalaExpr(_, _), _))) => Some(RuleMatch(parent, generator, child))
-          case _ => Option.empty[RuleMatch]
-        }
-      case _ =>
-        Option.empty[RuleMatch]
+    def bind(expr: Expression, root: Expression) = expr match {
+      case parent @ Comprehension(_, qualifiers) => qualifiers collectFirst {
+        case gen @ Generator(_, child @ Comprehension(_: ScalaExpr, _)) =>
+          RuleMatch(parent, gen, child)
+      }
+      
+      case _ => None
     }
 
-    override protected def guard(m: RuleMatch) = true
+    def guard(rm: RuleMatch) = true
 
-    override protected def fire(m: RuleMatch) = {
-      val name = m.generator.lhs
-      val term = m.child.head.asInstanceOf[ScalaExpr]
-      val rest = m.parent.sequence()
-        .span(_ != m.generator)._2.tail // trim prefix
-        .span(x => !x.isInstanceOf[Generator] || x.asInstanceOf[Generator].lhs.toString != m.generator.toString)._1 // trim suffix
+    def fire(rm: RuleMatch) = {
+      val RuleMatch(parent, gen, child) = rm
+      val rest = parent
+        .dropWhile { _ != gen }.tail // trim prefix
+        .takeWhile { expr => !expr.isInstanceOf[Generator] ||
+          expr.as[Generator].lhs.fullName != gen.toString
+        } // trim suffix
 
-      val (xs, ys) = m.parent.qualifiers.span(_ != m.generator)
-      m.parent.qualifiers = xs ++ m.child.qualifiers ++ ys.tail
+      val (xs, ys) = parent.qualifiers span { _ != gen }
+      parent.qualifiers = xs ::: child.qualifiers ::: ys.tail
 
-      for (e <- rest; if e.isInstanceOf[ScalaExpr]) substitute(e.asInstanceOf[ScalaExpr], name, term)
+      for (expr <- rest if expr.isInstanceOf[ScalaExpr])
+        expr.as[ScalaExpr].substitute(gen.lhs.name, child.hd.as[ScalaExpr])
 
       // new parent
-      m.parent
+      rm.parent
     }
   }
 
@@ -80,94 +69,48 @@ trait ComprehensionNormalization[C <: blackbox.Context]
 
     case class RuleMatch(parent: Comprehension, child: Comprehension)
 
-    override protected def bind(r: Expression) = r match {
-      case MonadJoin(parent@Comprehension(child@Comprehension(_, _), _)) =>
+    def bind(expr: Expression, root: Expression) = expr match {
+      case MonadJoin(parent @ Comprehension(child: Comprehension, _)) =>
         Some(RuleMatch(parent, child))
-      case _ =>
-        Option.empty[RuleMatch]
+      
+      case _ => None
     }
 
-    override protected def guard(m: RuleMatch) = true //FIXME
+    def guard(rm: RuleMatch) = true //FIXME
 
-    override protected def fire(m: RuleMatch) = {
-      m.parent.qualifiers = m.parent.qualifiers ++ m.child.qualifiers
-      m.parent.head = m.child.head
-
-      // return new root
-      m.parent
+    def fire(rm: RuleMatch) = {
+      val RuleMatch(parent, child) = rm
+      parent.qualifiers ++= child.qualifiers
+      parent.hd = child.hd
+      parent // return new root
     }
   }
 
   object SimplifyTupleProjection extends Rule {
 
-    val projectionPattern = "_(\\d{1,2})".r
+    val offset = "_([1-9]+)".r
 
     case class RuleMatch(expr: ScalaExpr)
 
-    override protected def bind(r: Expression) = r match {
-      case expr@ScalaExpr(_, _) =>
-        Some(RuleMatch(expr))
-      case _ =>
-        Option.empty[RuleMatch]
+    def bind(expr: Expression, root: Expression) = expr match {
+      case expr: ScalaExpr => Some(RuleMatch(expr))
+      case _ => None
     }
 
-    override protected def guard(m: RuleMatch) = containsPattern(m.expr.tree)
-
-    override protected def fire(m: RuleMatch) = {
-      m.expr.tree = simplify(m.expr.tree)
-
-      // return new root
-      m.expr
+    def guard(rm: RuleMatch) = rm.expr.tree exists {
+      case q"(..${List(_, _, _*)}).${TermName(offset(_))}" => true
+      case _ => false
     }
 
-    object containsPattern extends Traverser with (Tree => Boolean) {
-
-      var result = false
-
-      override def traverse(tree: Tree): Unit = tree match {
-        case Select(Apply(TypeApply(Select(tuple@Select(Ident(TermName("scala")), _), TermName("apply")), types), args), TermName(_)) =>
-          val isTupleConstructor = tuple.name.toString.startsWith("Tuple") && tuple.symbol.isModule && tuple.symbol.companion.asClass.baseClasses.contains(symbolOf[Product])
-          val isProjectionMethod = tree.symbol.isMethod && projectionPattern.findFirstIn(tree.symbol.name.toString).isDefined
-          if (isTupleConstructor && isProjectionMethod) {
-            result = true
-          } else {
-            super.traverse(tree)
-          }
-        case _ =>
-          super.traverse(tree)
+    def fire(rm: RuleMatch) = {
+      val expr  = rm.expr
+      expr.tree = expr.tree transform {
+        case q"(..${args: List[Tree]}).${TermName(offset(i))}"
+          if args.size > 1 => args(i.toInt - 1)
       }
 
-      override def apply(tree: Tree): Boolean = {
-        containsPattern.result = false
-        containsPattern.traverse(tree)
-        containsPattern.result
-      }
+      expr
     }
-
-    object simplify extends Transformer with (Tree => Tree) {
-
-      var result = false
-
-      override def transform(tree: Tree): Tree = tree match {
-        case Select(Apply(TypeApply(Select(tuple@Select(Ident(TermName("scala")), _), TermName("apply")), types), args), TermName(_)) =>
-          val isTupleConstructor = tuple.name.toString.startsWith("Tuple") && tuple.symbol.isModule && tuple.symbol.companion.asClass.baseClasses.contains(symbolOf[Product])
-          val projectionMatch = projectionPattern.findFirstMatchIn(tree.symbol.name.toString)
-          if (isTupleConstructor && tree.symbol.isMethod && projectionMatch.isDefined) {
-            val offset = projectionMatch.get.group(1).toInt
-            if (args.size >= offset && types.size >= offset)
-              q"${args(offset - 1)}"
-            else
-              super.transform(tree)
-          } else {
-            super.transform(tree)
-          }
-        case _ =>
-          super.transform(tree)
-      }
-
-      override def apply(tree: Tree): Tree = transform(tree)
-    }
-
   }
 
   /**
@@ -182,28 +125,28 @@ trait ComprehensionNormalization[C <: blackbox.Context]
    * {{{ fold( empty, sng[e[x\z]\x], union[e[x\z]\x, e[y\z]\y], e' ]] ) }}}
    */
   object FoldFusion extends Rule {
+    val c = combinator
 
-    case class RuleMatch(fold: combinator.Fold, map: Comprehension, child: Generator)
+    case class RuleMatch(fold: c.Fold, map: Comprehension, child: Generator)
 
-    override protected def bind(r: Expression) = r match {
-      case fold@combinator.Fold(_, _, _, map@Comprehension(ScalaExpr(_, _), List(child@Generator(_, _))), _) =>
+    def bind(expr: Expression, root: Expression) = expr match {
+      case fold @ c.Fold(_, _, _, map @ Comprehension(_: ScalaExpr, List(child: Generator)), _) =>
         Some(RuleMatch(fold, map, child))
-      case _ =>
-        Option.empty[RuleMatch]
+      
+      case _ => None
     }
 
-    override protected def guard(m: RuleMatch) = true //FIXME
+    def guard(rm: RuleMatch) = true // FIXME
 
-    override protected def fire(m: RuleMatch) = {
-      val head = substitute(m.map.head.asInstanceOf[ScalaExpr].tree, m.child.lhs, q"x")
-      val sng = c.typecheck(q"(x: ${m.child.tpe}) => ${substitute(m.fold.sng.asInstanceOf[Function].body, TermName("x"), head)}")
-
-      m.fold.sng = sng
-      m.fold.xs = m.child.rhs
-
-      // return new root
-      m.fold
+    def fire(rm: RuleMatch) = {
+      val RuleMatch(fold, map, child) = rm
+      val x    = freshName("x")
+      val head = map.hd.as[ScalaExpr].tree.rename(child.lhs.name, x)
+      val sng  = fold.sng.as[Function]
+      val body = sng.body.substitute(sng.vparams.head.name, head)
+      fold.sng = q"($x: ${child.tpe}) => $body".typeChecked
+      fold.xs  = child.rhs
+      fold // return new root
     }
   }
-
 }

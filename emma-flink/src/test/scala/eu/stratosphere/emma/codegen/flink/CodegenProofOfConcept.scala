@@ -67,11 +67,11 @@ object CodegenProofOfConcept {
     val dfTree =
       q"""
         object DataflowWrapper {
-          import org.apache.flink.api.common.functions.FlatMapFunction
-          import org.apache.flink.api.java.ExecutionEnvironment
-          import org.apache.flink.api.java.DataSet
-          import org.apache.flink.util.Collector
-          import org.apache.flink.core.fs.FileSystem.WriteMode
+          import _root_.org.apache.flink.api.common.functions.FlatMapFunction
+          import _root_.org.apache.flink.api.java.ExecutionEnvironment
+          import _root_.org.apache.flink.api.java.DataSet
+          import _root_.org.apache.flink.util.Collector
+          import _root_.org.apache.flink.core.fs.FileSystem.WriteMode
 
           class Tokenizer(val separator: String) extends RichFlatMapFunction[String, org.apache.flink.api.java.tuple.Tuple2[String, Int]] {
             @Override

@@ -1,9 +1,13 @@
 package eu.stratosphere.emma.api
 
+import scala.language.experimental.macros
+
 /**
  * An abstraction for homogeneous collections.
  */
-sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collection[A] {
+sealed abstract class DataBag[+A] extends Serializable {
+
+  private[emma] def vals: Seq[A]
 
   // -----------------------------------------------------
   // Structural recursion
@@ -24,7 +28,7 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
    * this match {
    *   case Empty => nil
    *   case Sng(value) => sng(value)
-   *   case Union(left, right) => plus(left.fold(nil, sng, plus), right.fold(nil, sng, plus))
+   *   case Union(left, right) => plus(left.fold(nil)(sng, plus), right.fold(nil)(sng, plus))
    * }
    * }}}
    *
@@ -34,7 +38,7 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
    * @tparam B The result type of the recursive computation
    * @return
    */
-  def fold[B](z: B, s: A => B, p: (B, B) => B): B = impl.foldLeft(z)((acc, x) => p(s(x), acc))
+  def fold[B](z: B)(s: A => B, p: (B, B) => B): B = vals.foldLeft(z)((acc, x) => p(s(x), acc))
 
   // -----------------------------------------------------
   // Monad Ops
@@ -47,7 +51,7 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
    * @tparam B Type of the output DataBag.
    * @return A DataBag containing the elements `f(x)` produced for each element x of the input.
    */
-  def map[B](f: (A) => B): DataBag[B] = DataBag(impl.map(f))
+  def map[B](f: (A) => B): DataBag[B] = DataBag(vals.map(f))
 
   /**
    * Monad flatMap.
@@ -56,7 +60,7 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
    * @tparam B Type of the output DataBag.
    * @return A DataBag containing the union (flattening) of the DataBags `f(x)` produced for each element of the input.
    */
-  def flatMap[B](f: (A) => DataBag[B]): DataBag[B] = DataBag(impl.flatMap(x => f(x).impl))
+  def flatMap[B](f: (A) => DataBag[B]): DataBag[B] = DataBag(vals.flatMap(x => f(x).vals))
 
   /**
    * Monad filter.
@@ -64,7 +68,7 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
    * @param p Predicate to be applied on the collection. Only qualifying elements are passed down the chain.
    * @return
    */
-  def withFilter(p: (A) => Boolean): DataBag[A] = DataBag(impl.filter(p))
+  def withFilter(p: (A) => Boolean): DataBag[A] = DataBag(vals.filter(p))
 
   // -----------------------------------------------------
   // Grouping and Set operations
@@ -90,7 +94,7 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
    * @tparam B The type of the operator.
    * @return The set-theoretic difference (with duplicates) between this DataBag and the given subtrahend.
    */
-  def minus[B >: A](subtrahend: DataBag[B]): DataBag[B] = DataBag(this.impl diff subtrahend.impl)
+  def minus[B >: A](subtrahend: DataBag[B]): DataBag[B] = DataBag(this.vals diff subtrahend.vals)
 
   /**
    * Plus operator (union). Respects duplicates, e.g.:
@@ -103,7 +107,7 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
    * @tparam B The type of the operator.
    * @return The set-theoretic union (with duplicates) between this DataBag and the given subtrahend.
    */
-  def plus[B >: A](addend: DataBag[B]): DataBag[B] = DataBag(this.impl ++ addend.impl)
+  def plus[B >: A](addend: DataBag[B]): DataBag[B] = DataBag(this.vals ++ addend.vals)
 
   /**
    * Removes duplicate entries from the bag, e.g.
@@ -114,39 +118,7 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
    *
    * @return A version of this DataBag without duplicate entries.
    */
-  def distinct(): DataBag[A] = DataBag(impl.distinct)
-
-  // -----------------------------------------------------
-  // Aggregates
-  // -----------------------------------------------------
-
-  def minBy[B >: A](p: (A, A) => Boolean): Option[A] = fold[Option[A]](Option.empty[A], x => Some[A](x), (x, y) => {
-    if (x.isEmpty && y.isDefined) y
-    else if (x.isDefined && y.isEmpty) x
-    else for (u <- x; v <- y) yield if (p(u, v)) u else v
-  })
-
-  def maxBy[B >: A](p: (A, A) => Boolean): Option[A] = fold[Option[A]](Option.empty[A], x => Some[A](x), (x, y) => {
-    if (x.isEmpty && y.isDefined) y
-    else if (x.isDefined && y.isEmpty) x
-    else for (u <- x; v <- y) yield if (p(u, v)) v else u
-  })
-
-  def min[B >: A]()(implicit n: Numeric[B], l: Limits[B]): B = fold[B](l.max, identity, n.min)
-
-  def max[B >: A]()(implicit n: Numeric[B], l: Limits[B]): B = fold[B](l.min, identity, n.max)
-
-  def sum[B >: A]()(implicit n: Numeric[B]): B = fold[B](n.zero, identity, n.plus)
-
-  def product[B >: A]()(implicit n: Numeric[B]): B = fold[B](n.one, identity, n.times)
-
-  def count(): Long = fold[Long](0, x => 1, (x, y) => x + y)
-
-  def exists(f: A => Boolean): Boolean = fold[Boolean](false, x => f(x), (x, y) => x || y)
-
-  def forall(f: A => Boolean): Boolean = fold[Boolean](true, x => f(x), (x, y) => x && y)
-
-  def empty(): Boolean = impl.isEmpty
+  def distinct(): DataBag[A] = DataBag(vals.distinct)
 
   // -----------------------------------------------------
   // Conversion Methods
@@ -157,7 +129,23 @@ sealed class DataBag[+A] private(private[api] val impl: Seq[A]) extends Collecti
    *
    * @return A filtered version of the DataBag.
    */
-  def fetch(): Seq[A] = impl
+  def fetch(): Seq[A] = vals
+}
+
+/**
+ * A DataBag backed by a parallel representation that can be evaluated in order to materialize the underlying values.
+ *
+ * @param name The name identifying the backing parallel representation.
+ * @param repr The parallel representation for this bag.
+ * @param eval The method that evaluates the parallel representation and fetches the values as a Seq[A].
+ * @tparam A The element type of this bag.
+ * @tparam R The type of the parallel representation.
+ */
+sealed class ParallelizedDataBag[A, R] private[api](
+  @transient val name: String,
+  @transient val repr: R,
+                 eval: => Seq[A]) extends DataBag[A] {
+  override private[emma] lazy val vals = eval
 }
 
 object DataBag {
@@ -165,17 +153,25 @@ object DataBag {
   /**
    * Empty constructor.
    *
-   * @tparam A The element type for the DataBag.
-   * @return An empty DataBag for elements of type A.
+   * @tparam A The element type for the DataBag2.
+   * @return An empty DataBag2 for elements of type A.
    */
-  def apply[A](): DataBag[A] = new DataBag[A](List())
+  def apply[A](): DataBag[A] = new DataBag[A] {
+    override private[emma] lazy val vals = List.empty[A]
+  }
 
   /**
    * Sequence constructor.
    *
    * @param values The values contained in the bag.
-   * @tparam A The element type for the DataBag.
-   * @return A DataBag containing the elements of the `values` sequence.
+   * @tparam A The element type for the DataBag2.
+   * @return A DataBag2 containing the elements of the `values` sequence.
    */
-  def apply[A](values: Seq[A]): DataBag[A] = new DataBag[A](values)
+  def apply[A](values: Seq[A]): DataBag[A] = new DataBag[A] {
+    override private[emma] lazy val vals = values
+  }
+
+  private[emma] def apply[A, R](name: String, repr: R, eval: => Seq[A]): ParallelizedDataBag[A, R] = {
+    new ParallelizedDataBag(name, repr, eval)
+  }
 }

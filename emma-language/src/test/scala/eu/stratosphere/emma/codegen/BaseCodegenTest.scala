@@ -4,31 +4,35 @@ import java.io.File
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.codegen.testschema._
+import eu.stratosphere.emma.codegen.predicates._
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
 import org.junit.{Test, After, Before}
 
 import scala.reflect.runtime.universe._
+import scala.util.Random
 
 abstract class BaseCodegenTest(rtName: String) {
 
   var rt: runtime.Engine = _
   var native: runtime.Native = _
 
-  var inBase = tempPath("test/input")
-  var outBase = tempPath("test/output")
+  val inBase = tempPath("test/input")
+  val outBase = tempPath("test/output")
 
   @Before def setup(): Unit = {
-    rt = runtimeUnderTest
-    native = runtime.Native()
     // make sure that the base paths exist
     new File(inBase).mkdirs()
     new File(outBase).mkdirs()
+    rt = runtimeUnderTest
+    native = runtime.Native()
   }
 
   @After def teardown(): Unit = {
-    rt.closeSession()
     native.closeSession()
+    rt.closeSession()
+    deleteRecursive(new File(outBase))
+    deleteRecursive(new File(inBase))
   }
 
   protected def runtimeUnderTest: runtime.Engine
@@ -75,7 +79,7 @@ abstract class BaseCodegenTest(rtName: String) {
       EdgeWithLabel(3L, 6L, "C")))
   }
 
-  private def testCSVReadWrite[A: TypeTag : CSVConvertors](inp: Seq[A]): Unit = {
+  private def testCSVReadWrite[A: TypeTag : CSVConverters](inp: Seq[A]): Unit = {
     // construct a parameterized algorithm family
     val alg = (suffix: String) => emma.parallelize {
       val outputPath = s"$outBase/csv.$suffix"
@@ -164,7 +168,8 @@ abstract class BaseCodegenTest(rtName: String) {
     val offset = 15.0
 
     val alg = emma.parallelize {
-      for (x <- DataBag(inp)) yield if (x < 5) offset else offset + x / denominator
+      val whitelist = DataBag(Seq(1, 2, 3, 4, 5))
+      for (x <- DataBag(inp)) yield if (whitelist.exists(_ == x)) offset else offset + x / denominator
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -528,7 +533,10 @@ abstract class BaseCodegenTest(rtName: String) {
   @Test def testGroupWithComplexKey() = {
     val alg = emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-      for (g <- imdbTop100.groupBy(x => (x.year / 10, x.rating.toInt))) yield (g.key._1, g.key._2, g.values.count())
+      for (g <- imdbTop100.groupBy(x => (x.year / 10, x.rating.toInt))) yield {
+        val (year, rating) = g.key
+        (year, rating, g.values.count())
+      }
     }
 
     // compute the algorithm using the original code and the runtime under test
@@ -537,6 +545,30 @@ abstract class BaseCodegenTest(rtName: String) {
 
     // assert that the result contains the expected values
     compareBags(act, exp)
+  }
+
+  @Test def testMultipleGroupByUsingTheSameNames() = {
+    val alg = emma.parallelize {
+      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+
+      val r1 = for {
+        g <- imdbTop100.groupBy(x => x.year / 10)
+      } yield (g.key, g.values.count(), g.values.map(_.rating).min())
+
+      val r2 = for {
+        g <- imdbTop100.groupBy(x => x.year / 10)
+      } yield (g.key, g.values.count(), g.values.map(_.rating).max())
+
+      (r1, r2)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    compareBags(act._1.fetch(), exp._1.fetch())
+    compareBags(act._2.fetch(), exp._2.fetch())
   }
 
   // --------------------------------------------------------------------------
@@ -571,4 +603,224 @@ abstract class BaseCodegenTest(rtName: String) {
     // assert that the result contains the expected values
     assert(exp == act, s"Unexpected result: $act != $exp")
   }
+
+  @Test def testPatternMatching() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0.until(100).zipWithIndex)
+      val squares = for (xy <- range) yield xy match {
+        case (x, y) => x + y
+      }
+      squares.sum()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testPartialFunction() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0.until(100).zipWithIndex)
+      val squares = range map { case (x, y) => x + y }
+      squares.sum()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testDestructuring() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0.until(100).zipWithIndex)
+      val squares = for ((x, y) <- range) yield x + y
+      squares.sum()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testIntermediateValueDefinition() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0.until(100).zipWithIndex)
+      val squares = for (xy <- range; sqr = xy._1 * xy._2) yield sqr
+      squares.sum()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testGroupMaterialization() = {
+    val alg = emma.parallelize {
+      val bag = DataBag(new Random().shuffle(0.until(100).toList))
+      val top = for (g <- bag groupBy { _ % 8 })
+        yield g.values.fetch().sorted.take(4).sum
+
+      top.max()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testGroupMaterializationWithClosure() = {
+    val alg = emma.parallelize {
+      val semiFinal = 8
+      val bag = DataBag(new Random().shuffle(0.until(100).toList))
+      val top = for (g <- bag groupBy { _ % semiFinal })
+        yield g.values.fetch().sorted.take(semiFinal / 2).sum
+
+      top.max()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testRootPackageCapture() = {
+    val alg = emma.parallelize {
+      val eu    = "eu"
+      val com   = "com"
+      val java  = "java"
+      val org   = "org"
+      val scala = "scala"
+      val range = DataBag(0 until 100)
+      range.sum()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testFold() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0 until 100)
+      range.fold(0)(identity, _ + _)
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result:  $act != $exp")
+  }
+
+  @Test def testFilterNormalizationWithSimplePredicates() = {
+
+    val alg = emma.parallelize {
+      val f = for (x <- DataBag(1 to 1000)
+                if !(x > 5 || (x < 2 && x == 0)) || (x > 5 || !(x < 2)))
+              yield x
+      f.fetch()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  @Test def testFilterNormalizationWithSimplePredicatesMultipleInputs() = {
+
+    val alg = emma.parallelize {
+      val X = DataBag(1 to 1000)
+      val Y = DataBag(100 to 2000)
+
+      val f = for (x <- X; y <- Y if x < y || x + y < 100 && x % 2 == 0 || y / 2 == 0) yield y + x
+      f.fetch()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  @Test def testFilterNormalizationWithUDFPredicates() = {
+
+    val alg = emma.parallelize {
+      val f = for (x <- DataBag(1 to 1000)
+                   if !(A(x) || (B(x) && C(x))) || (A(x) || !B(x)))
+      yield x
+      f.fetch()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
+  @Test def testClassNameNormalization() = {
+    // without emma.substituteClassNames ImdbYear can not be found
+    val alg = emma.parallelize {
+      val entries = read(materializeResource(s"/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+      val years = for (e <- entries) yield ImdbYear(e.year)
+      years.forall { case iy @ ImdbYear(y) => iy == new ImdbYear(y) }
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+    assert(act, "IMDBYear(y) == new IMDBYear(y)")
+    assert(exp, "IMDBYear(y) == new IMDBYear(y)")
+  }
+
+  @Test def testEnclosingParametersNormalization() = {
+    // a class that wraps an Emma program and a parameter used within the 'parallelize' call
+    case class MoviesWithinPeriodQuery(minYear: Int, period: Int, rt: runtime.Engine) {
+      def run() = {
+        val alg = emma.parallelize {
+          for {
+            e <- read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+            if e.year >= minYear && e.year < minYear + period
+          } yield e
+        }
+
+        alg.run(rt)
+      }
+    }
+
+    // run the algorithm
+    val exp = MoviesWithinPeriodQuery(1990, 10, runtime.Native()).run().fetch()
+    val act = MoviesWithinPeriodQuery(1990, 10, rt).run().fetch()
+    compareBags(exp, act)
+  }
 }
+
+case class ImdbYear(year: Int) {}

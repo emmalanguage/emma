@@ -4,7 +4,7 @@ import java.io.{File, FileInputStream, FileOutputStream}
 import java.net.URI
 
 import eu.stratosphere.emma.api.model.Identity
-import eu.stratosphere.emma.macros.ConvertorsMacros
+import eu.stratosphere.emma.macros.{Folds, ConvertersMacros}
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
@@ -60,6 +60,15 @@ package object api {
       if (uri.getScheme == "hdfs") {
         hdfs.create(new Path(uri), true)
       } else {
+        def deleteRecursive(path: File): Boolean = {
+          val ret = if (path.isDirectory) {
+            path.listFiles().toSeq.foldLeft(true)((r, f) => deleteRecursive(f))
+          } else { /* regular file */
+            true
+          }
+          ret && path.delete()
+        }
+        deleteRecursive(new File(path)) // make sure that file does not exist FIXME: add flag
         new FileOutputStream(new File(path))
       }
     }
@@ -131,8 +140,18 @@ package object api {
   }
 
   // -----------------------------------------------------
-  // convertors
+  // Converters
   // -----------------------------------------------------
 
-  implicit def materializeCSVConvertors[T]: CSVConvertors[T] = macro ConvertorsMacros.materializeCSVConvertorsImpl[T]
+  /**
+   * Extend the [[DataBag]] type with methods from [[Folds]] via the "pimp my library" pattern.
+   * This is a value class, which means that in most cases, the allocation of an instance can be
+   * avoided when using the defined methods.
+   * @param self the actual [[DataBag]] instance
+   * @tparam E the type of elements to fold over
+   */
+  implicit class DataBagWithFolds[+E](val self: DataBag[E]) extends AnyVal with Folds[E]
+
+  implicit def materializeCSVConverters[T]: CSVConverters[T] =
+    macro ConvertersMacros.materializeCSVConverters[T]
 }
