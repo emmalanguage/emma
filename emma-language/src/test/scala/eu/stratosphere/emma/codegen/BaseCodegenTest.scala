@@ -37,6 +37,16 @@ abstract class BaseCodegenTest(rtName: String) {
 
   protected def runtimeUnderTest: runtime.Engine
 
+  // note: works only for Algorithms returning a DataBag
+  def compareWithNative[A](alg: Algorithm[DataBag[A]]) = {
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt).fetch()
+    val exp = alg.run(native).fetch()
+
+    // assert that the result contains the expected values
+    compareBags(act, exp)
+  }
+
   // --------------------------------------------------------------------------
   // Scatter / Gather
   // --------------------------------------------------------------------------
@@ -109,16 +119,9 @@ abstract class BaseCodegenTest(rtName: String) {
 
     val len = 10
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       DataBag(inp).withFilter(_.length > len)
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testFilterTupleType(): Unit = {
@@ -126,16 +129,9 @@ abstract class BaseCodegenTest(rtName: String) {
 
     val len = 10
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       DataBag(inp).withFilter(_._1.length > len)
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testFilterCaseClassType(): Unit = {
@@ -144,16 +140,9 @@ abstract class BaseCodegenTest(rtName: String) {
     val len = 10
     val year = 1980
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       DataBag(inp).withFilter(_.year > year).withFilter(_.title.length > len)
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   // --------------------------------------------------------------------------
@@ -167,17 +156,10 @@ abstract class BaseCodegenTest(rtName: String) {
     val denominator = 4.0
     val offset = 15.0
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       val whitelist = DataBag(Seq(1, 2, 3, 4, 5))
       for (x <- DataBag(inp)) yield if (whitelist.exists(_ == x)) offset else offset + x / denominator
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testMapTupleType(): Unit = {
@@ -189,16 +171,9 @@ abstract class BaseCodegenTest(rtName: String) {
     val a = 1
     val b = 10
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       for (e <- DataBag(inp)) yield if (e._1 < e._2) (e._1 * a, e._2 * b, a * b) else (e._2 * a, e._1 * b, a * b)
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testMapCaseClassType(): Unit = {
@@ -209,17 +184,10 @@ abstract class BaseCodegenTest(rtName: String) {
 
     val y = "Y"
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       // FIXME: for some reason, does not work on companion apply constructor 'EdgeWithLabel(e.src, e.dst, y)'
       for (e <- DataBag(inp)) yield if (e.label == "B") new EdgeWithLabel(e.src, e.dst, y) else e.copy(label = y)
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   // --------------------------------------------------------------------------
@@ -232,16 +200,9 @@ abstract class BaseCodegenTest(rtName: String) {
     val max = 3
     val min = 9
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       DataBag(inp).flatMap(x => DataBag(x.split("\\W+").filter(w => w.length > min && w.length < max)))
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testFlatMapWithFilter(): Unit = {
@@ -251,16 +212,9 @@ abstract class BaseCodegenTest(rtName: String) {
     val min = 9
     val len = 10
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       DataBag(inp).flatMap(x => DataBag(x.split("\\W+").filter(w => w.length > min && w.length < max))).withFilter(_.length > len)
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   // --------------------------------------------------------------------------
@@ -273,16 +227,9 @@ abstract class BaseCodegenTest(rtName: String) {
       lines.flatMap(_.split("\\W+")).toStream
     }
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       DataBag(inp).distinct()
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testDistinctTupleType(): Unit = {
@@ -291,16 +238,9 @@ abstract class BaseCodegenTest(rtName: String) {
       lines.flatMap(_.split("\\W+")).zipWithIndex.toStream
     }
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       DataBag(inp).distinct()
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testUnionSimpleType(): Unit = {
@@ -312,16 +252,9 @@ abstract class BaseCodegenTest(rtName: String) {
     val lft = inp.filter(_.length % 2 == 0) // even-length words
     val rgt = inp.filter(_.length % 2 == 1) // odd-length words
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       DataBag(lft) plus DataBag(rgt)
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   // --------------------------------------------------------------------------
@@ -334,16 +267,9 @@ abstract class BaseCodegenTest(rtName: String) {
     val a = 1
     val b = 2
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       for (x <- DataBag(1 to N); y <- DataBag(1 to Math.sqrt(N).toInt)) yield (a * x, b * y, a * b)
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testTwoWayJoinSimpleType(): Unit = {
@@ -352,19 +278,12 @@ abstract class BaseCodegenTest(rtName: String) {
     val a = 1
     val b = 2
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       val A = DataBag(1 to N)
       val B = DataBag(1 to N)
 
       for (x <- A; y <- B; if x * a == y * b) yield (a * x, b * y, a * b)
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testTwoWayJoinTupleType(): Unit = {
@@ -414,18 +333,11 @@ abstract class BaseCodegenTest(rtName: String) {
   @Test def testMultiWayJoinSimpleType(): Unit = {
     val N = 10000
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       for (x <- DataBag(1 to Math.sqrt(N).toInt);
            y <- DataBag(1 to Math.sqrt(N).toInt);
            z <- DataBag(1 to N); if x * x + y * y == z * z) yield (x, y, z)
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testMultiWayJoinComplexTypeLocalInput(): Unit = {
@@ -434,7 +346,7 @@ abstract class BaseCodegenTest(rtName: String) {
     val berlinWinnersLocal = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner]).fetch()
 
     // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       val imdbTop100 = DataBag(imdbTop100Local)
       val cannesWinners = DataBag(cannesWinnersLocal)
       val berlinWinners = DataBag(berlinWinnersLocal)
@@ -444,19 +356,12 @@ abstract class BaseCodegenTest(rtName: String) {
 
       val result = cannesTop100 plus berlinTop100
       result
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testMultiWayJoinComplexType(): Unit = {
     // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
       val cannesWinners = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner])
       val berlinWinners = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
@@ -466,14 +371,7 @@ abstract class BaseCodegenTest(rtName: String) {
 
       val result = cannesTop100 plus berlinTop100
       result
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   // --------------------------------------------------------------------------
@@ -483,34 +381,20 @@ abstract class BaseCodegenTest(rtName: String) {
   @Test def testGroupSimpleType() = {
     val N = 200
 
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       for (x <- DataBag(1 to N map (x => (0, x))).groupBy(_._1)) yield x.values.map(_._2).sum()
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testBasicGroup() = {
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
       for (g <- imdbTop100.groupBy(_.year)) yield g.values.count()
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch()
-    val exp = alg.run(native).fetch()
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testComplexGroup() = {
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
       for (g <- imdbTop100.groupBy(_.year / 10)) yield {
         val total = g.values.count()
@@ -520,31 +404,17 @@ abstract class BaseCodegenTest(rtName: String) {
 
         (s"${g.key * 10} - ${g.key * 10 + 9}", total, avgRating, minRating, maxRating)
       }
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch().sortBy(_._1)
-    val exp = alg.run(native).fetch().sortBy(_._1)
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testGroupWithComplexKey() = {
-    val alg = emma.parallelize {
+    compareWithNative(emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
       for (g <- imdbTop100.groupBy(x => (x.year / 10, x.rating.toInt))) yield {
         val (year, rating) = g.key
         (year, rating, g.values.count())
       }
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt).fetch().sortBy(_._1)
-    val exp = alg.run(native).fetch().sortBy(_._1)
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
+    })
   }
 
   @Test def testMultipleGroupByUsingTheSameNames() = {
