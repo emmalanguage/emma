@@ -79,7 +79,7 @@ class TPCHTest extends FunSuite with Matchers with BeforeAndAfterAll {
     compareBags(exp, res)
   })
 
-  @Test def testQuery06(): Unit = {
+  test("Query06") (withRuntime() { rt =>
 
     // execute with native and with tested environment
     new Query06(inBase, outputPath("q6.tbl.native"), "1994-01-01", 0.06, 24, runtime.Native(), true).run()
@@ -91,9 +91,9 @@ class TPCHTest extends FunSuite with Matchers with BeforeAndAfterAll {
 
     // assert that the result contains the expected values
     compareBags(exp, res)
-  }
+  })
 
-  @Test def testQuery07(): Unit = {
+  test("Query07") (withRuntime() { rt =>
 
     // execute with native and with tested environment
     //TODO Nation1: "FRANCE" for validation against the qualification database (not enough results in sample data set)
@@ -106,9 +106,9 @@ class TPCHTest extends FunSuite with Matchers with BeforeAndAfterAll {
 
     // assert that the result contains the expected values
     compareBags(exp, res)
-  }
+  })
 
-  @Test def testQuery08(): Unit = {
+  test("Query08") (withRuntime() { rt =>
 
     // execute with native and with tested environment
     //TODO Nation: "BRAZIL" for validation against the qualification database (not enough results in sample data set)
@@ -121,9 +121,9 @@ class TPCHTest extends FunSuite with Matchers with BeforeAndAfterAll {
 
     // assert that the result contains the expected values
     compareBags(exp, res)
-  }
+  })
 
-  @Test def testQuery09(): Unit = {
+  test("Query09") (withRuntime() { rt =>
 
     // execute with native and with tested environment
     new Query09(inBase, outputPath("q9.tbl.native"), "green", runtime.Native(), true).run()
@@ -135,6 +135,7 @@ class TPCHTest extends FunSuite with Matchers with BeforeAndAfterAll {
 
     // assert that the result contains the expected values
     compareBags(exp, res)
-  }
+  })
+
   def outputPath(suffix: String) = s"$outBase/$suffix"
 }
