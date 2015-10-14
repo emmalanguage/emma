@@ -4,10 +4,9 @@ import java.io.File
 import java.net.URL
 
 import eu.stratosphere.emma.api.DataBag
-import eu.stratosphere.emma.codegen.flink.DataflowGenerator
+import eu.stratosphere.emma.codegen.flink.{TempResultsManager, DataflowGenerator}
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir.{Fold, TempSink, Write, localInputs}
-import eu.stratosphere.emma.util.Counter
 import org.apache.flink.api.scala.ExecutionEnvironment
 
 import scala.reflect.runtime.universe._
@@ -28,20 +27,26 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
 
   val dataflowGenerator = new DataflowGenerator(dataflowCompiler, envSessionID)
 
+  val resMgr = new TempResultsManager(dataflowCompiler.tb, envSessionID)
+
   override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    dataflowCompiler.execute[A](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+    val res = dataflowCompiler.execute[A](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
+    resMgr.gc()
+    res
   }
 
   override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    val expr = dataflowCompiler.execute[DataSet[A]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+    val expr = dataflowCompiler.execute[DataSet[A]](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
+    resMgr.gc()
     DataBag(root.name, expr, expr.collect())
   }
 
   override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+    dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
+    resMgr.gc()
   }
 }
 

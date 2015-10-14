@@ -1,6 +1,5 @@
 package eu.stratosphere.emma.codegen.flink
 
-import java.net.URI
 import java.util.UUID
 
 import eu.stratosphere.emma.api.{ParallelizedDataBag, TextInputFormat, CSVInputFormat, CSVOutputFormat}
@@ -8,7 +7,6 @@ import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir
 import eu.stratosphere.emma.macros.RuntimeUtil
 import eu.stratosphere.emma.runtime.logger
-import org.apache.commons.io.FilenameUtils
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
 
 import scala.collection.mutable
@@ -19,20 +17,14 @@ class DataflowGenerator(
       val sessionID: UUID = UUID.randomUUID)
     extends RuntimeUtil {
 
-  val tb   = compiler.tb
-  val env  = freshName("env$flink$")
-  val memo = mutable.Map.empty[String, ModuleSymbol]
+          val tb      = compiler.tb
+  private val memo    = mutable.Map.empty[String, ModuleSymbol]
 
-  private val tmpDir =
-    "java.io.tmpdir" ->>
-    System.getProperty ->>
-    FilenameUtils.separatorsToUnix
-
-  // get the path where the toolbox will place temp results
-  private val tmpResultsPrefix =
-    new URI(System.getProperty("emma.temp.dir", s"file:///$tmpDir/emma/temp")).toString
-
+  private val env     = freshName("env$flink$")
   private val ExecEnv = typeOf[ExecutionEnvironment]
+
+  private val resMgr  = freshName("resMgr$")
+  private val ResMgr  = typeOf[TempResultsManager]
 
   private val compile = (t: Tree) =>
     compiler.compile(t.asInstanceOf[ImplDef]).asModule
@@ -67,18 +59,20 @@ class DataflowGenerator(
 
       val runMethod = root match {
         case op: ir.Fold[_, _] =>
-          q"def run($env: $ExecEnv, ..$params, ..$localInputs) = $opCode"
+          q"""def run($env: $ExecEnv, $resMgr: $ResMgr, ..$params, ..$localInputs) = {
+            $opCode
+          }"""
 
         case op: ir.TempSink[_] =>
           val res = freshName("res$flink$")
-          q"""def run($env: $ExecEnv, ..$params, ..$localInputs) = {
+          q"""def run($env: $ExecEnv, $resMgr: $ResMgr, ..$params, ..$localInputs) = {
             val $res = $opCode
             $env.execute(${s"Emma[$sessionID][$dataFlowName]"})
             $res
           }"""
 
         case op: ir.Write[_] =>
-          q"""def run($env: $ExecEnv, ..$params, ..$localInputs) = {
+          q"""def run($env: $ExecEnv, $resMgr: $ResMgr, ..$params, ..$localInputs) = {
             $opCode
             $env.execute(${s"Emma[$sessionID][$dataFlowName]"})
             ()
@@ -210,7 +204,7 @@ class DataflowGenerator(
         new org.apache.flink.api.java.io.TypeSerializerInputFormat[$tpe](
           _root_.org.apache.flink.api.scala.createTypeInformation[$tpe])
 
-      $inf.setFilePath(${s"$tmpResultsPrefix/${op.ref.asInstanceOf[ParallelizedDataBag[B, DataSet[B]]].name}"})
+      $inf.setFilePath($resMgr.resolve(${op.ref.asInstanceOf[ParallelizedDataBag[B, DataSet[B]]].name}))
       $env.createInput($inf)
     }"""
   }
@@ -231,7 +225,7 @@ class DataflowGenerator(
       val $of = new _root_.org.apache.flink.api.java.io.TypeSerializerOutputFormat[$tpe]
       $of.setInputType($ti, $env.getConfig)
       $of.setSerializer($ti.createSerializer($env.getConfig))
-      $in.write($of, ${s"$tmpResultsPrefix/${op.name}"},
+      $in.write($of, $resMgr.assign(${op.name}),
         _root_.org.apache.flink.core.fs.FileSystem.WriteMode.OVERWRITE)
 
       $in
