@@ -65,11 +65,8 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
      */
     // TODO: add support for comprehension filter expressions
     def guard(rm: RuleMatch) = rm.filter.expr match {
-      case expr: ScalaExpr => expr.usedVars(rm.root).toSeq match {
-        case Seq(v) =>
-          v == rm.gen.lhs
-        case _ => false
-      }
+      case expr: ScalaExpr =>
+        expr.usedVars(rm.root) subsetOf Set(rm.gen.lhs)
         
       case _ => false
     }
@@ -78,8 +75,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     def fire(rm: RuleMatch) = rm.filter.expr match {
       case expr @ ScalaExpr(tree) =>
         val RuleMatch(root, parent, gen, filter) = rm
-        val arg  = expr.usedVars(rm.root).head
-        val p    = mk anonFun (List(arg.name -> arg.info), tree)
+        val p    = mk anonFun (List(rm.gen.lhs.name -> rm.gen.lhs.info), tree)
         gen.rhs           = combinator.Filter(p, gen.rhs)
         parent.qualifiers = parent.qualifiers diff List(filter)
         parent // return new parent
@@ -112,13 +108,12 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     }
 
     def guard(rm: RuleMatch) = {
-      rm.head.usedVars(rm.root).size == 1
+      rm.head.usedVars(rm.root) subsetOf Set(rm.child.lhs)
     }
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(root, expr @ ScalaExpr(tree), child) = rm
-      val args = expr.usedVars(rm.root).toList.sortBy { _.name.toString }
-      val f    = mk anonFun (for (a <- args) yield a.name -> a.info, tree)
+      val f = mk anonFun (List(child.lhs.name -> child.lhs.info), tree)
       combinator.Map(f, child.rhs)
     }
   }
@@ -146,13 +141,12 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     }
 
     def guard(rm: RuleMatch) = {
-      rm.head.usedVars(rm.root).size == 1
+      rm.head.usedVars(rm.root) subsetOf Set(rm.child.lhs)
     }
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(root, expr @ ScalaExpr(tree), child) = rm
-      val args = expr.usedVars(rm.root).toList.sortBy { _.name.toString }
-      val f    = mk anonFun (for (a <- args) yield a.name -> a.info, tree)
+      val f = mk anonFun (List(child.lhs.name -> child.lhs.info), tree)
       combinator.FlatMap(f, child.rhs)
     }
   }
