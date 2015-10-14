@@ -112,13 +112,12 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     }
 
     def guard(rm: RuleMatch) = {
-      rm.head.usedVars(rm.root).size == 1
+      rm.head.usedVars(rm.root).size <= 1
     }
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(root, expr @ ScalaExpr(tree), child) = rm
-      val args = expr.usedVars(rm.root).toList.sortBy { _.name.toString }
-      val f    = mk anonFun (for (a <- args) yield a.name -> a.info, tree)
+      val f = mk anonFun (List(child.lhs.name -> child.lhs.info), tree)
       combinator.Map(f, child.rhs)
     }
   }
@@ -146,13 +145,12 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     }
 
     def guard(rm: RuleMatch) = {
-      rm.head.usedVars(rm.root).size == 1
+      rm.head.usedVars(rm.root).size <= 1
     }
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(root, expr @ ScalaExpr(tree), child) = rm
-      val args = expr.usedVars(rm.root).toList.sortBy { _.name.toString }
-      val f    = mk anonFun (for (a <- args) yield a.name -> a.info, tree)
+      val f = mk anonFun (List(child.lhs.name -> child.lhs.info), tree)
       combinator.FlatMap(f, child.rhs)
     }
   }

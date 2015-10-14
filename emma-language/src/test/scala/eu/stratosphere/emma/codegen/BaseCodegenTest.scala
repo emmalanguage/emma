@@ -190,6 +190,16 @@ abstract class BaseCodegenTest(rtName: String) {
     })
   }
 
+  @Test def testMapAndFlatMapWithNoVarRhs(): Unit = {
+    compareWithNative(emma.parallelize {
+      // map
+      for (x <- DataBag(1 to 100)) yield 5
+
+      // flatMap
+      DataBag(1 to 100).flatMap(_ => DataBag(Seq(5,6,7)))
+    })
+  }
+
   // --------------------------------------------------------------------------
   // FlatMap
   // --------------------------------------------------------------------------
