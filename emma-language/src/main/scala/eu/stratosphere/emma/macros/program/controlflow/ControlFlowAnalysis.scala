@@ -29,11 +29,6 @@ private[emma] trait ControlFlowAnalysis extends ControlFlowModel with ControlFlo
         for (stmt <- stats) block = createCFG(stmt, block)
         createCFG(expr, block)
 
-      case ValDef(_, _, _,  _ @ (_: Block | _: If))
-        |  Assign(_: Ident, _ @ (_: Block | _: If))
-        => c.abort(curTree.pos,
-            "Emma does not support assignments with conditionals on the rhs at the moment")
-
       case _: ValDef | Assign(_: Ident, _) =>
         // Add assignment to the current block
         curBlock.stats += curTree
