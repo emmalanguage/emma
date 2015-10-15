@@ -697,6 +697,42 @@ abstract class BaseCodegenTest(rtName: String) {
       A plus B plus C plus D
     })
   }
+
+  @Test def testUpdatedTempSink(): Unit = {
+    // Sieve of Eratosthenes
+    compareWithNative(emma.parallelize {
+      val N = 20
+      val PAYLOAD = "#" * 1000
+
+      val positive = {
+        var primes = DataBag(3 to N map { x => (x, PAYLOAD) })
+
+        var p = 2
+
+        while (p <= Math.sqrt(N)) {
+          primes = for ((n, payload) <- primes if n > p && n % p != 0) yield (n, payload)
+          p = primes map { case (n, payload) => n } min()
+        }
+
+        primes map { case (n, payload) => n }
+      }
+
+      val negative = {
+        var primes = DataBag(-N to 3 map { x => (x, PAYLOAD) })
+
+        var p = -2
+
+        while (p >= -Math.sqrt(N)) {
+          primes = for ((n, payload) <- primes if n < p && n % p != 0) yield (n, payload)
+          p = primes map { case (n, payload) => n } max()
+        }
+
+        primes map { case (n, payload) => n }
+      }
+
+      positive plus negative
+    })
+  }
 }
 
 case class ImdbYear(year: Int) {}
