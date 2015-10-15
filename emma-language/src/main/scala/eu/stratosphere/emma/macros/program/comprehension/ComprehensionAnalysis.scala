@@ -357,6 +357,8 @@ private[emma] trait ComprehensionAnalysis
             }
             com.comprehension.substitute(foldTree, replTree)
           }
+
+          com.comprehension.substitute(gSym, gen.lhs)
         }
 
       // Ignore other expression types

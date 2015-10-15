@@ -69,6 +69,15 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       expr = transformer.transform(expr)
     }
 
+    def substitute(find: TermSymbol, repl: TermSymbol): Unit = {
+      val transformer = new ExpressionTransformer {
+        override def xform(tree: Tree) = tree transform {
+          case ident @ Ident(name: TermName) if ident.symbol == find => mk ref repl
+        }
+      }
+      expr = transformer.transform(expr)
+    }
+
     override def toString =
       prettyPrint(expr)
   }
