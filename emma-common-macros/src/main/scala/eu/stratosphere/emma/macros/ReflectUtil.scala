@@ -291,10 +291,21 @@ trait ReflectUtil {
      * @return A new [[Tree]] with some of the nodes transformed
      */
     def transform(pf: Tree ~> Tree): Tree = new Transformer {
-      override def transform(tree: Tree) =
+      override def transform(tree: Tree): Tree =
         if (pf isDefinedAt tree) pf(tree)
         else super.transform(tree)
     } transform self
+
+    /**
+     * Recursively apply a depth-first traversal to this [[Tree]].
+     *
+     * @param pf A [[PartialFunction]] to traverse some of the [[Tree]] nodes
+     */
+    def traverse(pf: Tree ~> Unit): Unit = new Traverser {
+      override def traverse(tree: Tree): Unit =
+        if (pf isDefinedAt tree) pf(tree)
+        else super.traverse(tree)
+    } traverse self
 
     /**
      * Recursively remove all layers of type ascriptions from this [[Tree]].

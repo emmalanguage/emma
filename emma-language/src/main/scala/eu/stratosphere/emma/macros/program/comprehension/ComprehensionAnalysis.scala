@@ -63,23 +63,12 @@ private[emma] trait ComprehensionAnalysis
 
     // Step #1: compute the set of maximal terms that can be translated to comprehension syntax
     val terms = (for (block <- cfBlockTraverser; stmt <- block.stats) yield {
-      // Find all value applications on methods from the comprehended API for this statement
-      implicit val compTerms: mutable.Set[Tree] =
-        mutable.Set(stmt collect { case app @ Apply(f, _) if api methods f.symbol => app }: _*)
-
-      // Reduce by removing nodes that will be comprehended with their parent
-      var obsolete = mutable.Set.empty[Tree]
-
-      do {
-        compTerms --= obsolete
-        obsolete = for {
-          term  <- compTerms
-          child <- compChild(term)
-        } yield child
-      } while (obsolete.nonEmpty)
-
-      // Return the reduced set of applies
-      compTerms
+      val builder = Set.newBuilder[Tree]
+      // Find all top-level applications on methods from the comprehended API for this statement
+      stmt traverse {
+        case app @ Apply(f, _) if api methods f.symbol => builder += app
+      }
+      builder.result()
     }).flatten.toSet
 
     // Step #2: create ComprehendedTerm entries for the identified terms
@@ -98,38 +87,6 @@ private[emma] trait ComprehensionAnalysis
 
     // Step #3: build the comprehension store
     new ComprehensionView(comprehendedTerms)
-  }
-
-  /**
-   * Check whether the parent expression in a selector chain is also comprehended.
-   *
-   * What happens here is that effectively we are looking for "inverse" links as compared to the
-   * traversal order in the "comprehend" method.
-   *
-   * @param term The expression to be checked
-   * @param compTerms The set of comprehended terms
-   * @return An option holding the comprehended parent term (if such exists)
-   */
-  // FIXME: Make this consistent with the `comprehend` method patterns
-  private def compChild(term: Tree)
-      (implicit compTerms: mutable.Set[Tree]): Option[Tree] = term match {
-    case q"${f: Tree}[$_](($_) => $body)"
-      if (f.symbol == api.map || f.symbol == api.flatMap) && compTerms(body) =>
-        Some(body)
-
-    case q"$_[..$_](..$_)($parent)"
-      if compTerms(parent) => Some(parent)
-
-    case q"$_[..$_]($parent)"
-      if compTerms(parent) => Some(parent)
-
-    case q"$parent.$_[..$_](...$_)"
-      if compTerms(parent) => Some(parent)
-
-    case q"${parent: Apply}(...$_)"
-      if compTerms(parent) => Some(parent)
-
-    case _ => None
   }
 
   /**
