@@ -190,37 +190,6 @@ abstract class BaseCodegenTest(rtName: String) {
     })
   }
 
-  @Test def testMapAndFlatMapAndFilterWithNoVarRhs(): Unit = {
-    compareWithNative(emma.parallelize {
-      // map
-      for (x <- DataBag(1 to 100)) yield 5
-
-      // flatMap
-      DataBag(1 to 100).flatMap(_ => DataBag(Seq(5,6,7)))
-
-      // filter
-      for {
-        x <- DataBag(1 to 100)
-        if 5 == 1
-      } yield 5
-
-      // filter
-      DataBag(1 to 100).withFilter(x=>true)
-    })
-  }
-
-  @Test def testMapWithLocalFunction(): Unit = {
-    compareWithNative(emma.parallelize {
-      def double(x: Int) = 2 * x
-      val b1 = for (x <- DataBag(1 to 100)) yield double(x)
-
-      def add(x: Int, y: Int) = x + y
-      val b2 = for (x <- DataBag(1 to 100)) yield add(x, 5)
-
-      b1 plus b2
-    })
-  }
-
   // --------------------------------------------------------------------------
   // FlatMap
   // --------------------------------------------------------------------------
@@ -334,10 +303,6 @@ abstract class BaseCodegenTest(rtName: String) {
     compareBags(act.fetch(), exp.fetch())
   }
 
-  // FIXME: fails with an error: cannot determine unique overloaded method alternative from
-  //   final private val title: java.lang.String
-  //   def title(): java.lang.String
-  // that matches value title:=> String
   @Test def testTwoWayJoinComplexType(): Unit = {
 
     // Q: how many cannes winners are there in the IMDB top 100?
@@ -406,10 +371,45 @@ abstract class BaseCodegenTest(rtName: String) {
   }
 
   // --------------------------------------------------------------------------
-  // FoldGroup (Aggregations)
+  // Group (wih materielization) and FoldGroup (Aggregations)
   // --------------------------------------------------------------------------
 
-  @Test def testGroupSimpleType() = {
+  @Test def testGroupMaterialization() = {
+    val alg = emma.parallelize {
+      val bag = DataBag(new Random().shuffle(0.until(100).toList))
+      val top = for (g <- bag groupBy { _ % 8 })
+        yield g.values.fetch().sorted.take(4).sum
+
+      top.max()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testGroupMaterializationWithClosure() = {
+    val alg = emma.parallelize {
+      val semiFinal = 8
+      val bag = DataBag(new Random().shuffle(0.until(100).toList))
+      val top = for (g <- bag groupBy { _ % semiFinal })
+        yield g.values.fetch().sorted.take(semiFinal / 2).sum
+
+      top.max()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testFoldGroupSimpleType() = {
     val N = 200
 
     compareWithNative(emma.parallelize {
@@ -417,14 +417,14 @@ abstract class BaseCodegenTest(rtName: String) {
     })
   }
 
-  @Test def testBasicGroup() = {
+  @Test def testFoldGroupComplexTypeSingleFold() = {
     compareWithNative(emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
       for (g <- imdbTop100.groupBy(_.year)) yield g.values.count()
     })
   }
 
-  @Test def testComplexGroup() = {
+  @Test def testFoldGroupComplexTypeMultipleFolds() = {
     compareWithNative(emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
       for (g <- imdbTop100.groupBy(_.year / 10)) yield {
@@ -438,7 +438,7 @@ abstract class BaseCodegenTest(rtName: String) {
     })
   }
 
-  @Test def testGroupWithComplexKey() = {
+  @Test def testFoldGroupWithComplexKey() = {
     compareWithNative(emma.parallelize {
       val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
       for (g <- imdbTop100.groupBy(x => (x.year / 10, x.rating.toInt))) yield {
@@ -505,122 +505,6 @@ abstract class BaseCodegenTest(rtName: String) {
     assert(exp == act, s"Unexpected result: $act != $exp")
   }
 
-  @Test def testPatternMatching() = {
-    val alg = emma.parallelize {
-      val range = DataBag(0.until(100).zipWithIndex)
-      val squares = for (xy <- range) yield xy match {
-        case (x, y) => x + y
-      }
-      squares.sum()
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt)
-    val exp = alg.run(native)
-
-    // assert that the result contains the expected values
-    assert(exp == act, s"Unexpected result: $act != $exp")
-  }
-
-  @Test def testPartialFunction() = {
-    val alg = emma.parallelize {
-      val range = DataBag(0.until(100).zipWithIndex)
-      val squares = range map { case (x, y) => x + y }
-      squares.sum()
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt)
-    val exp = alg.run(native)
-
-    // assert that the result contains the expected values
-    assert(exp == act, s"Unexpected result: $act != $exp")
-  }
-
-  @Test def testDestructuring() = {
-    val alg = emma.parallelize {
-      val range = DataBag(0.until(100).zipWithIndex)
-      val squares = for ((x, y) <- range) yield x + y
-      squares.sum()
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt)
-    val exp = alg.run(native)
-
-    // assert that the result contains the expected values
-    assert(exp == act, s"Unexpected result: $act != $exp")
-  }
-
-  @Test def testIntermediateValueDefinition() = {
-    val alg = emma.parallelize {
-      val range = DataBag(0.until(100).zipWithIndex)
-      val squares = for (xy <- range; sqr = xy._1 * xy._2) yield sqr
-      squares.sum()
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt)
-    val exp = alg.run(native)
-
-    // assert that the result contains the expected values
-    assert(exp == act, s"Unexpected result: $act != $exp")
-  }
-
-  @Test def testGroupMaterialization() = {
-    val alg = emma.parallelize {
-      val bag = DataBag(new Random().shuffle(0.until(100).toList))
-      val top = for (g <- bag groupBy { _ % 8 })
-        yield g.values.fetch().sorted.take(4).sum
-
-      top.max()
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt)
-    val exp = alg.run(native)
-
-    // assert that the result contains the expected values
-    assert(exp == act, s"Unexpected result: $act != $exp")
-  }
-
-  @Test def testGroupMaterializationWithClosure() = {
-    val alg = emma.parallelize {
-      val semiFinal = 8
-      val bag = DataBag(new Random().shuffle(0.until(100).toList))
-      val top = for (g <- bag groupBy { _ % semiFinal })
-        yield g.values.fetch().sorted.take(semiFinal / 2).sum
-
-      top.max()
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt)
-    val exp = alg.run(native)
-
-    // assert that the result contains the expected values
-    assert(exp == act, s"Unexpected result: $act != $exp")
-  }
-
-  @Test def testRootPackageCapture() = {
-    val alg = emma.parallelize {
-      val eu    = "eu"
-      val com   = "com"
-      val java  = "java"
-      val org   = "org"
-      val scala = "scala"
-      val range = DataBag(0 until 100)
-      range.sum()
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt)
-    val exp = alg.run(native)
-
-    // assert that the result contains the expected values
-    assert(exp == act, s"Unexpected result: $act != $exp")
-  }
-
   @Test def testFold() = {
     val alg = emma.parallelize {
       val range = DataBag(0 until 100)
@@ -634,6 +518,10 @@ abstract class BaseCodegenTest(rtName: String) {
     // assert that the result contains the expected values
     assert(exp == act, s"Unexpected result:  $act != $exp")
   }
+
+  // --------------------------------------------------------------------------
+  // Expression Normalization
+  // --------------------------------------------------------------------------
 
   @Test def testFilterNormalizationWithSimplePredicates() = {
 
@@ -721,6 +609,124 @@ abstract class BaseCodegenTest(rtName: String) {
     val exp = MoviesWithinPeriodQuery(1990, 10, runtime.Native()).run().fetch()
     val act = MoviesWithinPeriodQuery(1990, 10, rt).run().fetch()
     compareBags(exp, act)
+  }
+
+  @Test def testLocalFunctionNormalization(): Unit = {
+    compareWithNative(emma.parallelize {
+      def double(x: Int) = 2 * x
+      val b1 = for (x <- DataBag(1 to 100)) yield double(x)
+
+      def add(x: Int, y: Int) = x + y
+      val b2 = for (x <- DataBag(1 to 100)) yield add(x, 5)
+
+      b1 plus b2
+    })
+  }
+
+  // --------------------------------------------------------------------------
+  // Miscellaneous
+  // --------------------------------------------------------------------------
+
+  @Test def testPatternMatching() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0.until(100).zipWithIndex)
+      val squares = for (xy <- range) yield xy match {
+        case (x, y) => x + y
+      }
+      squares.sum()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testPartialFunction() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0.until(100).zipWithIndex)
+      val squares = range map { case (x, y) => x + y }
+      squares.sum()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testDestructuring() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0.until(100).zipWithIndex)
+      val squares = for ((x, y) <- range) yield x + y
+      squares.sum()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testIntermediateValueDefinition() = {
+    val alg = emma.parallelize {
+      val range = DataBag(0.until(100).zipWithIndex)
+      val squares = for (xy <- range; sqr = xy._1 * xy._2) yield sqr
+      squares.sum()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testRootPackageCapture() = {
+    val alg = emma.parallelize {
+      val eu    = "eu"
+      val com   = "com"
+      val java  = "java"
+      val org   = "org"
+      val scala = "scala"
+      val range = DataBag(0 until 100)
+      range.sum()
+    }
+
+    // compute the algorithm using the original code and the runtime under test
+    val act = alg.run(rt)
+    val exp = alg.run(native)
+
+    // assert that the result contains the expected values
+    assert(exp == act, s"Unexpected result: $act != $exp")
+  }
+
+  @Test def testConstantExpressions(): Unit = {
+    compareWithNative(emma.parallelize {
+      // map
+      val A = for (x <- DataBag(1 to 100)) yield 1
+
+      // flatMap
+      val B = DataBag(101 to 200).flatMap(_ => DataBag(Seq(2,3,4)))
+
+      // filter
+      val C = for {
+        x <- DataBag(201 to 300)
+        if 5 == 1
+      } yield 5
+
+      // filter
+      val D = DataBag(301 to 400).withFilter(x=>true)
+
+      A plus B plus C plus D
+    })
   }
 }
 
