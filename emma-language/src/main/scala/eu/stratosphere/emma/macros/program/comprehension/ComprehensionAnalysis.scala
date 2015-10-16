@@ -4,6 +4,7 @@ import eu.stratosphere.emma.macros.program.comprehension.rewrite.ComprehensionNo
 import eu.stratosphere.emma.macros.program.controlflow.ControlFlowModel
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.language.postfixOps
 
 private[emma] trait ComprehensionAnalysis
     extends ControlFlowModel
@@ -63,30 +64,49 @@ private[emma] trait ComprehensionAnalysis
 
     // Step #1: compute the set of maximal terms that can be translated to comprehension syntax
     val terms = (for (block <- cfBlockTraverser; stmt <- block.stats) yield {
-      val builder = Set.newBuilder[Tree]
+      val builder = Set.newBuilder[(TermName, Tree)]
       // Find all top-level applications on methods from the comprehended API for this statement
       stmt traverse {
-        case app @ Apply(f, _) if api methods f.symbol => builder += app
+        // within an enclosing immutable ValDef
+        case vd @ q"$_ val $_: $_ = ${app @ Apply(f, _)}"
+          if api methods f.symbol =>
+            val symb = vd.asInstanceOf[ValDef].term
+            builder += symb.name -> app
+        // within an enclosing mutable ValDef
+        case vd @ q"$_ var $_: $_ = ${app @ Apply(f, _)}"
+          if api methods f.symbol =>
+            val symb = vd.asInstanceOf[ValDef].term
+            builder += symb.name -> app
+        // within an enclosing Assign
+        case as @ q"${_: Ident} = ${app @ Apply(f, _)}"
+          if api methods f.symbol =>
+            val symb = as.asInstanceOf[Assign].lhs.term
+            builder += symb.name -> app
+        // anonymous term
+        case app @ Apply(f, _)
+          if api methods f.symbol =>
+            builder += freshName("anon") -> app
       }
       builder.result()
     }).flatten.toSet
 
     // Step #2: create ComprehendedTerm entries for the identified terms
-    val comprehendedTerms = mutable.Seq((for (term <- terms) yield {
-      val name          = freshName("comprehension")
+    val comprehendedTerms = (for {
+      (name, term) <- terms
+    } yield {
+      val compName      = freshName(s"$name$$comp")
       val definition    = compTermDef(term)
       val comprehension = ExpressionRoot(comprehend(term, topLevel = true) match {
         case root: combinator.Write => root
         case root: combinator.Fold  => root
-        case root: Expression =>
-          combinator.TempSink(compTermName(definition, name), root)
+        case root: Expression       => combinator.TempSink(name, root)
       }) ->> normalize
 
-      ComprehendedTerm(name, term, comprehension, definition)
-    }).toSeq: _*)
+      ComprehendedTerm(compName, term, comprehension, definition)
+    }).toSeq
 
     // Step #3: build the comprehension store
-    new ComprehensionView(comprehendedTerms)
+    new ComprehensionView(mutable.Seq(comprehendedTerms: _*))
   }
 
   /**
@@ -106,20 +126,6 @@ private[emma] trait ComprehensionAnalysis
 
     termDef
   }
-
-  /**
-   * Look up a definition term ([[ValDef]] or [[Assign]]) for a comprehended term.
-   *
-   * @param term The term to lookup
-   * @return The name of the term
-   */
-  private def compTermName(term: Option[Tree], default: TermName): TermName =
-    term getOrElse default match {
-      case q"$_ val $name: $_ = $_"  => name
-      case q"$_ var $name: $_ = $_"  => name
-      case q"${name: TermName} = $_" => name
-      case _ => default
-    }
 
   // --------------------------------------------------------------------------
   // Comprehension Constructor

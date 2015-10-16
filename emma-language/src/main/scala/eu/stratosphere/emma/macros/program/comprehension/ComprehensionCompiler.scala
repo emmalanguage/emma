@@ -47,9 +47,7 @@ private[emma] trait ComprehensionCompiler
       val closure = term.comprehension.freeTerms
 
       // Get the TermName associated with this comprehended term
-      val name = term.definition collect {
-        case vd: ValDef => vd.name.encodedName
-      } getOrElse term.id.encodedName
+      val name = term.id.encodedName
 
       val execute = root match {
         case _: combinator.Write => TermName("executeWrite")

@@ -3,7 +3,7 @@ package eu.stratosphere.emma.runtime
 import java.io.File
 import java.net.URL
 
-import eu.stratosphere.emma.api.{ParallelizedDataBag, DataBag}
+import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.codegen.flink.DataflowGenerator
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir.{Fold, TempSink, Write, localInputs}
