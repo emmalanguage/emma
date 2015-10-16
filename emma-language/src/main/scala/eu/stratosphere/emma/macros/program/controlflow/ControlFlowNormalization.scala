@@ -17,11 +17,12 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
    */
   def normalize(tree: Tree): Tree = q"""{
     import _root_.scala.reflect._
-    ${tree ->>
-      normalizeEnclosingParams ->>
-      normalizeClassNames ->>
-      unTypeCheck ->>
-      normalizeControlFlow}
+    ${ tree                     ->>
+       normalizeEnclosingParams ->>
+       normalizeClassNames      ->>
+       normalizeTypeAscriptions ->>
+       unTypeCheck              ->>
+       normalizeControlFlow }
   }""".typeChecked.as[Block].expr
 
   // --------------------------------------------------------------------------
@@ -147,5 +148,10 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
     case id: Ident if id.hasSymbol && id.symbol.isModule => mk.select(id.symbol)
     case q"new ${id: Ident}[..$types](..${args: List[Tree]})" if id.hasSymbol =>
       q"new ${mk.typeSelect(id.symbol)}[..$types](..${args map normalizeClassNames})"
+  }
+
+  /** Recursively removes all type ascriptions in the tree. */
+  def normalizeTypeAscriptions(tree: Tree): Tree = tree transform {
+    case t @ q"${tree: Tree}: $_" => tree.unAscribed
   }
 }
