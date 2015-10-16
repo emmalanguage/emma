@@ -29,6 +29,9 @@ class DataflowGenerator(
   private val compile = (t: Tree) =>
     compiler.compile(t.asInstanceOf[ImplDef]).asModule
 
+  // Type constructors
+  val DATA_SET = typeOf[DataSet[Nothing]].typeConstructor
+
   // --------------------------------------------------------------------------
   // Combinator Dataflows (traversal based)
   // --------------------------------------------------------------------------
@@ -197,13 +200,13 @@ class DataflowGenerator(
     val param = TermName(op.ref.asInstanceOf[ParallelizedDataBag[B, DataSet[B]]].name)
     val inpf  = freshName("inFmt$flink$")
     closure.closureParams +=
-      param -> tq"_root_.eu.stratosphere.emma.api.DataBag[$tpe]"
+      param -> tq"_root_.eu.stratosphere.emma.api.ParallelizedDataBag[$tpe, ${DATA_SET(tpe)}]"
     // assemble dataFlow fragment
     q"""{
       val $inpf = new _root_.org.apache.flink.api.java.io.TypeSerializerInputFormat[$tpe](
                     _root_.org.apache.flink.api.scala.createTypeInformation[$tpe])
 
-      $inpf.setFilePath($resMgr.resolve(${op.ref.asInstanceOf[ParallelizedDataBag[B, DataSet[B]]].name}))
+      $inpf.setFilePath($resMgr.resolve($param.name))
       $env.createInput($inpf)
     }"""
   }
