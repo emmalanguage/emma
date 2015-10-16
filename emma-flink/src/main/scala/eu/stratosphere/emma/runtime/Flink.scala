@@ -4,9 +4,11 @@ import java.io.File
 import java.net.URL
 
 import eu.stratosphere.emma.api.{ParallelizedDataBag, DataBag}
+import eu.stratosphere.emma.ir.{Fold, TempSink, Write, localInputs}
+import eu.stratosphere.emma.api.model.Identity
 import eu.stratosphere.emma.codegen.flink.DataflowGenerator
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
-import eu.stratosphere.emma.ir.{Fold, TempSink, Write, localInputs}
+import eu.stratosphere.emma.ir._
 import eu.stratosphere.emma.util.Counter
 import org.apache.flink.api.scala.ExecutionEnvironment
 
@@ -46,6 +48,33 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
   override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+  }
+
+  override def executeStatefulCreate[S <: Identity[K]: TypeTag, K: TypeTag]
+      (root: StatefulCreate[S, K], name: String, closure: Any*): AbstractStatefulBackend[S, K] = {
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    dataflowCompiler.execute[AbstractStatefulBackend[S, K]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+  }
+
+  override def executeUpdateWithZero[S: TypeTag, K: TypeTag, O: TypeTag]
+      (root: UpdateWithZero[S, K, O], name: String, closure: Any*): DataBag[O] = {
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    val expr = dataflowCompiler.execute[DataSet[O]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+    DataBag(root.name, expr, expr.collect())
+  }
+
+  override def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+      (root: UpdateWithOne[S, K, U, O], name: String, closure: Any*): DataBag[O] = {
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    val expr = dataflowCompiler.execute[DataSet[O]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+    DataBag(root.name, expr, expr.collect())
+  }
+
+  override def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+      (root: UpdateWithMany[S, K, U, O], name: String, closure: Any*): DataBag[O] = {
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    val expr = dataflowCompiler.execute[DataSet[O]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
+    DataBag(root.name, expr, expr.collect())
   }
 
   override def scatter[A: TypeTag](values: Seq[A]): DataBag[A] = {

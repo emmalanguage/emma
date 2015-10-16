@@ -153,8 +153,8 @@ object DataBag {
   /**
    * Empty constructor.
    *
-   * @tparam A The element type for the DataBag2.
-   * @return An empty DataBag2 for elements of type A.
+   * @tparam A The element type for the DataBag.
+   * @return An empty DataBag for elements of type A.
    */
   def apply[A](): DataBag[A] = new DataBag[A] {
     override private[emma] lazy val vals = List.empty[A]
@@ -164,8 +164,8 @@ object DataBag {
    * Sequence constructor.
    *
    * @param values The values contained in the bag.
-   * @tparam A The element type for the DataBag2.
-   * @return A DataBag2 containing the elements of the `values` sequence.
+   * @tparam A The element type for the DataBag.
+   * @return A DataBag containing the elements of the `values` sequence.
    */
   def apply[A](values: Seq[A]): DataBag[A] = new DataBag[A] {
     override private[emma] lazy val vals = values

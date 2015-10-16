@@ -4,8 +4,9 @@ import java.util.UUID
 
 import com.typesafe.scalalogging.slf4j.Logger
 import eu.stratosphere.emma.api.DataBag
-import eu.stratosphere.emma.ir.{Fold, TempSink, Write}
+import eu.stratosphere.emma.ir._
 import org.slf4j.LoggerFactory
+import eu.stratosphere.emma.api.model.Identity
 
 import scala.reflect.runtime.universe._
 
@@ -48,6 +49,18 @@ package object runtime {
 
     def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit
 
+    def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag]
+      (root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K]
+
+    def executeUpdateWithZero[S: TypeTag, K: TypeTag, O: TypeTag]
+      (root: UpdateWithZero[S, K, O], name: String, closure: Any*): DataBag[O]
+
+    def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+      (root: UpdateWithOne[S, K, U, O], name: String, closure: Any*): DataBag[O]
+
+    def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+      (root: UpdateWithMany[S, K, U, O], name: String, closure: Any*): DataBag[O]
+
     def scatter[A: TypeTag](values: Seq[A]): DataBag[A]
 
     def gather[A: TypeTag](ref: DataBag[A]): DataBag[A]
@@ -75,6 +88,18 @@ package object runtime {
     override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = ???
 
     override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = ???
+
+    override def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag]
+      (root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K] = ???
+
+    override def executeUpdateWithZero[S: TypeTag, K: TypeTag, O: TypeTag]
+      (root: UpdateWithZero[S, K, O], name: String, closure: Any*): DataBag[O] = ???
+
+    override def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+      (root: UpdateWithOne[S, K, U, O], name: String, closure: Any*): DataBag[O] = ???
+
+    override def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, U: TypeTag, O: TypeTag]
+      (root: UpdateWithMany[S, K, U, O], name: String, closure: Any*): DataBag[O] = ???
 
     override def scatter[A: TypeTag](values: Seq[A]): DataBag[A] = ???
 

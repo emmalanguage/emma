@@ -663,7 +663,7 @@ abstract class BaseCodegenTest(rtName: String) {
     val alg = emma.parallelize {
       val f = for (x <- DataBag(1 to 1000)
                    if !(A(x) || (B(x) && C(x))) || (A(x) || !B(x)))
-      yield x
+        yield x
       f.fetch()
     }
 

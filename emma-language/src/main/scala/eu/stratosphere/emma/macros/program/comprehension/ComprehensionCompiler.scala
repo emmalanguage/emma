@@ -65,16 +65,21 @@ private[emma] trait ComprehensionCompiler
       } getOrElse term.id.encodedName
 
       val execute = root match {
-        case _: combinator.Write => TermName("executeWrite")
-        case _: combinator.Fold  => TermName("executeFold")
-        case _                   => TermName("executeTempSink")
+        case _: combinator.Write          => TermName("executeWrite")
+        case _: combinator.Fold           => TermName("executeFold")
+        case _: combinator.StatefulCreate => TermName("executeStatefulCreate")
+        case _: combinator.UpdateWithZero => TermName("updateWithZero")
+        case _: combinator.UpdateWithOne  => TermName("updateWithOne")
+        case _: combinator.UpdateWithMany => TermName("updateWithMany")
+        case _                            => TermName("executeTempSink")
       }
 
       q"""{
         import _root_.scala.reflect.runtime.universe._
         import _root_.eu.stratosphere.emma.ir
         val __root = ${serialize(root)}
-        engine.$execute(__root, ${name.toString}, ..${for (s <- closure) yield q"${s.name}"})
+        val __result = engine.$execute(__root, ${name.toString}, ..${for (s <- closure) yield q"${s.name}"})
+        __result
       }"""
     }
 
@@ -176,6 +181,44 @@ private[emma] trait ComprehensionCompiler
       case ScalaExpr(Apply(fn, values :: Nil))
         if api.apply.alternatives contains fn.symbol =>
           q"ir.Scatter(${transform(values)})"
+
+      case combinator.StatefulCreate(xs, stateType, keyType) =>
+        val xsStr = serialize(xs)
+        q"ir.StatefulCreate[$stateType, $keyType]($xsStr)"
+
+      case combinator.StatefulFetch(stateful) =>
+        val statefulNameStr = stateful.name.toString
+        q"ir.StatefulFetch($statefulNameStr, $stateful)"
+
+      case combinator.UpdateWithZero(stateful, udf) =>
+        val stateTpe = stateful.trueType.typeArgs.head
+        val keyTpe   = stateful.trueType.typeArgs(1)
+        val outTpe   = expr.elementType
+        val statefulNameStr = stateful.name.toString
+        val udfStr          = serialize(udf)
+        q"ir.UpdateWithZero[$stateTpe, $keyTpe, $outTpe]($statefulNameStr, $stateful, $udfStr)"
+
+      case combinator.UpdateWithOne(stateful, upds, keySel, udf) =>
+        val stateTpe = stateful.trueType.typeArgs.head
+        val keyTpe   = stateful.trueType.typeArgs(1)
+        val updTpe   = upds.elementType
+        val outTpe   = expr.elementType
+        val statefulNameStr = stateful.name.toString
+        val usStr           = serialize(upds)
+        val keySelStr       = serialize(keySel)
+        val udfStr          = serialize(udf)
+        q"ir.UpdateWithOne[$stateTpe, $keyTpe, $updTpe, $outTpe]($statefulNameStr, $stateful, $usStr, $keySelStr, $udfStr)"
+
+      case combinator.UpdateWithMany(stateful, upds, keySel, udf) =>
+        val stateTpe = stateful.trueType.typeArgs.head
+        val keyTpe   = stateful.trueType.typeArgs(1)
+        val updTpe   = upds.elementType
+        val outTpe   = expr.elementType
+        val statefulNameStr = stateful.name.toString
+        val usStr           = serialize(upds)
+        val keySelStr       = serialize(keySel)
+        val udfStr          = serialize(udf)
+        q"ir.UpdateWithMany[$stateTpe, $keyTpe, $updTpe, $outTpe]($statefulNameStr, $stateful, $usStr, $keySelStr, $udfStr)"
 
       case e => EmptyTree
       //throw new RuntimeException(
