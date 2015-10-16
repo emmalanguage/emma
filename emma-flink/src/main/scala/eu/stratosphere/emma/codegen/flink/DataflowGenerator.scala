@@ -68,7 +68,7 @@ class DataflowGenerator(
           q"""def run($env: $ExecEnv, $resMgr: $ResMgr, ..$params, ..$localInputs) = {
             val $res = $opCode
             $env.execute(${s"Emma[$sessionID][$dataFlowName]"})
-            $res
+            $env.createInput($res)
           }"""
 
         case op: ir.Write[_] =>
@@ -195,17 +195,16 @@ class DataflowGenerator(
     val tpe   = typeOf(op.tag).dealias
     // add a dedicated closure variable to pass the input param
     val param = TermName(op.ref.asInstanceOf[ParallelizedDataBag[B, DataSet[B]]].name)
-    val inf   = freshName("inFmt$flink$")
+    val inpf  = freshName("inFmt$flink$")
     closure.closureParams +=
       param -> tq"_root_.eu.stratosphere.emma.api.DataBag[$tpe]"
     // assemble dataFlow fragment
     q"""{
-      val $inf =
-        new org.apache.flink.api.java.io.TypeSerializerInputFormat[$tpe](
-          _root_.org.apache.flink.api.scala.createTypeInformation[$tpe])
+      val $inpf = new _root_.org.apache.flink.api.java.io.TypeSerializerInputFormat[$tpe](
+                    _root_.org.apache.flink.api.scala.createTypeInformation[$tpe])
 
-      $inf.setFilePath($resMgr.resolve(${op.ref.asInstanceOf[ParallelizedDataBag[B, DataSet[B]]].name}))
-      $env.createInput($inf)
+      $inpf.setFilePath($resMgr.resolve(${op.ref.asInstanceOf[ParallelizedDataBag[B, DataSet[B]]].name}))
+      $env.createInput($inpf)
     }"""
   }
 
@@ -214,21 +213,28 @@ class DataflowGenerator(
     // infer types and generate type information
     val tpe = typeOf(op.tag).dealias
     // assemble input fragment
-    val xs  = generateOpCode(op.xs)
-    val in  = freshName("input$flink$")
-    val ti  = freshName("typeInfo$flink$")
-    val of  = freshName("outFmt$flink$")
+    val xs   = generateOpCode(op.xs)
+    val in   = freshName("input$flink$")
+    val ti   = freshName("typeInfo$flink$")
+    val outf = freshName("outFmt$flink$")
+    val inpf = freshName("inFmt$flink$")
     // assemble dataFlow fragment
     q"""{
-      val $in = $xs
-      val $ti = _root_.org.apache.flink.api.scala.createTypeInformation[$tpe]
-      val $of = new _root_.org.apache.flink.api.java.io.TypeSerializerOutputFormat[$tpe]
-      $of.setInputType($ti, $env.getConfig)
-      $of.setSerializer($ti.createSerializer($env.getConfig))
-      $in.write($of, $resMgr.assign(${op.name}),
+      val $in   = $xs
+      val $ti   = _root_.org.apache.flink.api.scala.createTypeInformation[$tpe]
+
+      val $outf = new _root_.org.apache.flink.api.java.io.TypeSerializerOutputFormat[$tpe]
+      $outf.setInputType($ti, $env.getConfig)
+      $outf.setSerializer($ti.createSerializer($env.getConfig))
+
+      $in.write($outf, $resMgr.assign(${op.name}),
         _root_.org.apache.flink.core.fs.FileSystem.WriteMode.OVERWRITE)
 
-      $in
+      val $inpf = new _root_.org.apache.flink.api.java.io.TypeSerializerInputFormat[$tpe](
+                    _root_.org.apache.flink.api.scala.createTypeInformation[$tpe])
+      $inpf.setFilePath($resMgr.resolve(${op.name}))
+
+      $inpf
     }"""
   }
 
