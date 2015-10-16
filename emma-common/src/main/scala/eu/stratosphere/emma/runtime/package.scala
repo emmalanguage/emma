@@ -48,10 +48,6 @@ package object runtime {
 
     def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit
 
-    def scatter[A: TypeTag](values: Seq[A]): DataBag[A]
-
-    def gather[A: TypeTag](ref: DataBag[A]): DataBag[A]
-
     final def closeSession() = if (!closed) {
       doCloseSession()
       closed = true
@@ -75,10 +71,6 @@ package object runtime {
     override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = ???
 
     override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = ???
-
-    override def scatter[A: TypeTag](values: Seq[A]): DataBag[A] = ???
-
-    override def gather[A: TypeTag](ref: DataBag[A]): DataBag[A] = ???
   }
 
   def default(): Engine = {

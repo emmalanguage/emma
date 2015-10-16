@@ -22,10 +22,6 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
 
   override lazy val defaultDOP = env.getParallelism
 
-  val tmpCounter = new Counter()
-
-  val plnCounter = new Counter()
-
   val env: ExecutionEnvironment
 
   val dataflowCompiler = new DataflowCompiler(mirror)
@@ -47,24 +43,6 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
-
-  override def scatter[A: TypeTag](values: Seq[A]): DataBag[A] = {
-    // create fresh value reference
-    val refName = nextTmpName
-    // generate and execute a 'scatter' dataflow
-    val dataflowSymbol = dataflowGenerator.generateScatterDef(refName)
-    val expr = dataflowCompiler.execute[DataSet[A]](dataflowSymbol, Array[Any](env, values))
-    // return the value reference
-    DataBag(refName, expr, expr.collect())
-  }
-
-  override def gather[A: TypeTag](ref: DataBag[A]): DataBag[A] = {
-    // generate and execute a 'scatter' dataflow
-    val dataflowSymbol = dataflowGenerator.generateGatherDef(ref.asInstanceOf[ParallelizedDataBag[A, DataSet[A]]].name)
-    dataflowCompiler.execute[DataBag[A]](dataflowSymbol, Array[Any](env, ref.asInstanceOf[ParallelizedDataBag[A, DataSet[A]]].repr))
-  }
-
-  private def nextTmpName = f"emma$$temp${tmpCounter.advance.get}%05d"
 }
 
 case class FlinkLocal(override val host: String, override val port: Int) extends Flink(host, port) {

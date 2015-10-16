@@ -25,21 +25,8 @@ private[emma] trait ComprehensionCompiler
 
     override def transform(tree: Tree): Tree = compView getByTerm tree match {
       case Some(term) => expandComprehension(tree, cfGraph, compView)(term)
-      case None       => tree match {
-        case Apply(fn, values :: Nil) if api.apply.alternatives contains fn.symbol =>
-          expandScatter(transform(values))
-
-        case _ => super.transform(tree)
-      }
+      case None       => super.transform(tree)
     }
-
-    /**
-     * Expand a local collection constructor as a scatter call to the underlying engine.
-     *
-     * @param values A `Seq[T]` typed term that provides the values for the local constructor call
-     * @return The [[Tree]] of a scatter call to the underlying engine
-     */
-    private def expandScatter(values: Tree) = q"engine.scatter($values)"
 
     /**
      * Expand a comprehended term in the compiled driver.

@@ -19,10 +19,6 @@ abstract class Spark(val host: String, val port: Int) extends Engine {
 
   override lazy val defaultDOP = sc.defaultParallelism
 
-  val tmpCounter = new Counter()
-
-  val plnCounter = new Counter()
-
   val sc: SparkContext
 
   val dataflowCompiler = new DataflowCompiler(mirror)
@@ -45,22 +41,10 @@ abstract class Spark(val host: String, val port: Int) extends Engine {
     dataflowCompiler.execute[RDD[A]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
   }
 
-  override def scatter[A: TypeTag](values: Seq[A]): DataBag[A] = {
-    DataBag(nextTmpName, sc.parallelize(values)(classTagOf[A]), values)
-  }
-
-  override def gather[A: TypeTag](ref: DataBag[A]): DataBag[A] = {
-    ref
-  }
-
   override protected def doCloseSession() = {
     super.doCloseSession()
     sc.stop()
   }
-
-  private def nextTmpName = f"emma$$temp${tmpCounter.advance.get}%05d"
-
-  private def classTagOf[A: TypeTag]: ClassTag[A] = ClassTag[A]( typeTag[A].mirror.runtimeClass( typeTag[A].tpe ) )
 }
 
 case class SparkLocal(override val host: String, override val port: Int) extends Spark(host, port) {

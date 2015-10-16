@@ -48,37 +48,6 @@ abstract class BaseCodegenTest(rtName: String) {
   }
 
   // --------------------------------------------------------------------------
-  // Scatter / Gather
-  // --------------------------------------------------------------------------
-
-  @Test def testScatterGatherSimpleType(): Unit = {
-    testScatterGather(Seq(2, 4, 6, 8, 10))
-  }
-
-  @Test def testScatterGatherComplexType(): Unit = {
-    testScatterGather(Seq(
-      EdgeWithLabel(1L, 4L, "A"),
-      EdgeWithLabel(2L, 5L, "B"),
-      EdgeWithLabel(3L, 6L, "C")))
-  }
-
-  private def testScatterGather[A: TypeTag](inp: Seq[A]): Unit = {
-    // scatter the input bag
-    val sct = rt.scatter(inp)
-
-    // assert that the scattered bag contains the input values
-    compareBags(inp, sct.fetch())
-
-    // repeat three times to test the memo underlying implementation
-    for (i <- 0 until 3) {
-      // gather back the scattered values
-      val res = rt.gather(sct)
-      // assert that the result contains the input values
-      compareBags(inp, res.fetch())
-    }
-  }
-
-  // --------------------------------------------------------------------------
   // CSV I/O
   // --------------------------------------------------------------------------
 

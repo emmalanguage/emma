@@ -38,38 +38,6 @@ class DataflowGenerator(
     compiler.compile(t.asInstanceOf[ImplDef]).asModule
 
   // --------------------------------------------------------------------------
-  // Scatter & Gather DataFlows (hardcoded)
-  // --------------------------------------------------------------------------
-
-  def generateScatterDef[A: TypeTag](id: String) = {
-    val dataFlowName = s"scatter$$$id"
-    memo.getOrElseUpdate(dataFlowName, {
-      logger info s"Generating scatter code for '$dataFlowName'"
-      val vals = freshName("vals$flink$")
-      // assemble dataFlow
-      q"""object ${TermName(dataFlowName)} {
-        import _root_.org.apache.flink.api.scala._
-        def run($env: $ExecEnv, $vals: ${typeOf[Seq[A]]}) =
-          $env.fromCollection($vals)
-      }""" ->> compile
-    })
-  }
-
-  def generateGatherDef[A: TypeTag](id: String) = {
-    val dataFlowName = s"gather$$$id"
-    memo.getOrElseUpdate(dataFlowName, {
-      logger info s"Generating gather code for '$dataFlowName'"
-      val expr = freshName("expr$flink$")
-      // assemble dataFlow
-      q"""object ${TermName(dataFlowName)} {
-        import _root_.org.apache.flink.api.scala._
-        def run($env: $ExecEnv, $expr: ${typeOf[DataSet[A]]}) =
-          _root_.eu.stratosphere.emma.api.DataBag($expr.collect())
-      }""" ->> compile
-    })
-  }
-
-  // --------------------------------------------------------------------------
   // Combinator Dataflows (traversal based)
   // --------------------------------------------------------------------------
 
