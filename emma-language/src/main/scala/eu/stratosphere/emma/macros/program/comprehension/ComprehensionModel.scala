@@ -38,6 +38,11 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         case c.Fold(em, sg, un, _, _)       => Set(em, sg, un)    flatMap { _.freeTerms }
         case c.FoldGroup(k, em, sg, un, _)  => Set(k, em, sg, un) flatMap { _.freeTerms }
         case c.TempSource(id) if id.hasTerm => Set(id.term)
+        case c.StatefulCreate(_, _, _)      => Set.empty[TermSymbol]
+        case c.StatefulFetch(id)            => Set(id.term)
+        case c.UpdateWithZero(id, f)        => Set(id.term) union f.freeTerms
+        case c.UpdateWithOne(id, _, ku, f)  => Set(id.term) union ku.freeTerms union f.freeTerms
+        case c.UpdateWithMany(id, _, ku, f) => Set(id.term) union ku.freeTerms union f.freeTerms
       }.flatten.toList.distinct sortBy { _.fullName }
     }
 
@@ -58,6 +63,11 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         case c.Fold(em, sg, un, _, _)       => Seq(em, sg, un)
         case c.FoldGroup(k, em, sg, un, _)  => Seq(k, em, sg, un)
         case c.TempSource(id) if id.hasTerm => Seq(id)
+        case c.StatefulCreate(_, _, _)      => Seq()
+        case c.StatefulFetch(id)            => Seq(id)
+        case c.UpdateWithZero(id, f)        => Seq(id, f)
+        case c.UpdateWithOne(id, _, ku, f)  => Seq(id, ku, f)
+        case c.UpdateWithMany(id, _, ku, f) => Seq(id, ku, f)
       }.flatten
     }
 
@@ -126,6 +136,11 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         case combinator.Group(key, xs)                        => Set(key)
         case combinator.Fold(empty, sng, union, xs, origin)   => Set(empty, sng, union)
         case combinator.FoldGroup(key, empty, sng, union, xs) => Set(key, empty, sng, union)
+        case combinator.StatefulCreate(_, _, _)               => Set.empty[Tree]
+        case combinator.StatefulFetch(_)                      => Set.empty[Tree]
+        case combinator.UpdateWithZero(_, udf)                => Set(udf)
+        case combinator.UpdateWithOne(_, _, uKeySel, udf)     => Set(uKeySel, udf)
+        case combinator.UpdateWithMany(_, _, uKeySel, udf)    => Set(uKeySel, udf)
       }).flatten.flatMap(_.freeTerms).toSet
       // Result is the intersection of both
       defined intersect used
@@ -328,6 +343,47 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       }
     }
 
+    case class StatefulCreate(var xs: Expression, stateTpe: Type, keyTpe: Type) extends Combinator {
+
+      def tpe = typeOf[Unit]
+
+      def descend[U](f: Expression => U) = {
+        xs foreach f
+      }
+    }
+
+    case class StatefulFetch(stateful: Ident) extends Combinator {
+
+      def tpe = DATA_BAG(stateful.trueType.typeArgs.head)
+
+      def descend[U](f: Expression => U) = {}
+    }
+
+    case class UpdateWithZero(stateful: Ident, udf: Tree) extends Combinator {
+
+      def tpe = udf.trueType.typeArgs.last
+
+      def descend[U](f: Expression => U) = {}
+    }
+
+    case class UpdateWithOne(stateful: Ident, updates: Expression, updateKeySel: Tree, udf: Tree) extends Combinator {
+
+      def tpe = udf.trueType.typeArgs.last
+
+      def descend[U](f: Expression => U) = {
+        updates foreach f
+      }
+    }
+
+    case class UpdateWithMany(stateful: Ident, updates: Expression, updateKeySel: Tree, udf: Tree) extends Combinator {
+
+      def tpe = udf.trueType.typeArgs.last
+
+      def descend[U](f: Expression => U) = {
+        updates foreach f
+      }
+    }
+
   }
 
   // --------------------------------------------------------------------------
@@ -382,30 +438,35 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
      */
     def transform(expr: Expression): Expression = expr match {
       // Monads
-      case MonadUnit(xs)                  => MonadUnit(xform(xs))
-      case MonadJoin(xs)                  => MonadJoin(xform(xs))
-      case Comprehension(h, qs)           => Comprehension(xform(h), qs map xform)
+      case MonadUnit(xs)                       => MonadUnit(xform(xs))
+      case MonadJoin(xs)                       => MonadJoin(xform(xs))
+      case Comprehension(h, qs)                => Comprehension(xform(h), qs map xform)
       // Qualifiers
-      case Filter(xs)                     => Filter(xform(xs))
-      case Generator(lhs, rhs)            => Generator(lhs, xform(rhs))
+      case Filter(xs)                          => Filter(xform(xs))
+      case Generator(lhs, rhs)                 => Generator(lhs, xform(rhs))
       // Environment & Host Language Connectors
-      case ScalaExpr(tree)                => ScalaExpr(xform(tree))
+      case ScalaExpr(tree)                     => ScalaExpr(xform(tree))
       // Combinators
-      case read: c.Read                   => read
-      case c.Write(loc, fmt, xs)          => c.Write(xform(loc), xform(fmt), xform(xs))
-      case src: c.TempSource              => src
-      case c.TempSink(id, xs)             => c.TempSink(id, xform(xs))
-      case c.Map(f, xs)                   => c.Map(xform(f), xform(xs))
-      case c.FlatMap(f, xs)               => c.FlatMap(xform(f), xform(xs))
-      case c.Filter(p, xs)                => c.Filter(xform(p), xform(xs))
-      case c.EquiJoin(kx, ky, xs, ys)     => c.EquiJoin(xform(kx), xform(ky), xform(xs), xform(ys))
-      case c.Cross(xs, ys)                => c.Cross(xform(xs), xform(ys))
-      case c.Group(k, xs)                 => c.Group(xform(k), xform(xs))
-      case c.Fold(em, sg, un, xs, or)     => c.Fold(xform(em), xform(sg), xform(un), xform(xs), xform(or))
-      case c.FoldGroup(k, em, sg, un, xs) => c.FoldGroup(xform(k), xform(em), xform(sg), xform(un), xform(xs))
-      case c.Distinct(xs)                 => c.Distinct(xform(xs))
-      case c.Union(xs, ys)                => c.Union(xform(xs), xform(ys))
-      case c.Diff(xs, ys)                 => c.Diff(xform(xs), xform(ys))
+      case read: c.Read                        => read
+      case c.Write(loc, fmt, xs)               => c.Write(xform(loc), xform(fmt), xform(xs))
+      case src: c.TempSource                   => src
+      case c.TempSink(id, xs)                  => c.TempSink(id, xform(xs))
+      case c.Map(f, xs)                        => c.Map(xform(f), xform(xs))
+      case c.FlatMap(f, xs)                    => c.FlatMap(xform(f), xform(xs))
+      case c.Filter(p, xs)                     => c.Filter(xform(p), xform(xs))
+      case c.EquiJoin(kx, ky, xs, ys)          => c.EquiJoin(xform(kx), xform(ky), xform(xs), xform(ys))
+      case c.Cross(xs, ys)                     => c.Cross(xform(xs), xform(ys))
+      case c.Group(k, xs)                      => c.Group(xform(k), xform(xs))
+      case c.Fold(em, sg, un, xs, or)          => c.Fold(xform(em), xform(sg), xform(un), xform(xs), xform(or))
+      case c.FoldGroup(k, em, sg, un, xs)      => c.FoldGroup(xform(k), xform(em), xform(sg), xform(un), xform(xs))
+      case c.Distinct(xs)                      => c.Distinct(xform(xs))
+      case c.Union(xs, ys)                     => c.Union(xform(xs), xform(ys))
+      case c.Diff(xs, ys)                      => c.Diff(xform(xs), xform(ys))
+      case c.StatefulCreate(xs, stTpe, keyTpe) => c.StatefulCreate(xform(xs), stTpe, keyTpe)
+      case c.StatefulFetch(stateful)           => c.StatefulFetch(stateful)
+      case c.UpdateWithMany(s, us, kSel, f)    => c.UpdateWithMany(s, xform(us), kSel, f)
+      case c.UpdateWithOne(s, us, kSel, f)     => c.UpdateWithOne(s, xform(us), kSel, f)
+      case c.UpdateWithZero(s, f)              => c.UpdateWithZero(s, f)
     }
 
     protected def xform(e: Expression): Expression =
@@ -426,30 +487,35 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
     def traverse(e: Expression): Unit = e match {
       // Monads
-      case MonadUnit(expr)                      => traverse(expr)
-      case MonadJoin(expr)                      => traverse(expr)
-      case Comprehension(head, qualifiers)      => qualifiers foreach traverse; traverse(head)
+      case MonadUnit(expr)                        => traverse(expr)
+      case MonadJoin(expr)                        => traverse(expr)
+      case Comprehension(head, qualifiers)        => qualifiers foreach traverse; traverse(head)
       // Qualifiers
       case Filter(expr) => traverse(expr)
-      case Generator(_, rhs)                    => traverse(rhs)
+      case Generator(_, rhs)                      => traverse(rhs)
       // Environment & Host Language Connectors
-      case ScalaExpr(_)                         =>
+      case ScalaExpr(_)                           =>
       // Combinators
-      case combinator.Read(_, _)                =>
-      case combinator.Write(_, _, xs)           => traverse(xs)
-      case combinator.TempSource(_)             =>
-      case combinator.TempSink(_, xs)           => traverse(xs)
-      case combinator.Map(_, xs)                => traverse(xs)
-      case combinator.FlatMap(_, xs)            => traverse(xs)
-      case combinator.Filter(_, xs)             => traverse(xs)
-      case combinator.EquiJoin(_, _, xs, ys)    => traverse(xs); traverse(ys)
-      case combinator.Cross(xs, ys)             => traverse(xs); traverse(ys)
-      case combinator.Group(_, xs)              => traverse(xs)
-      case combinator.Fold(_, _, _, xs, _)      => traverse(xs)
-      case combinator.FoldGroup(_, _, _, _, xs) => traverse(xs)
-      case combinator.Distinct(xs)              => traverse(xs)
-      case combinator.Union(xs, ys)             => traverse(xs); traverse(ys)
-      case combinator.Diff(xs, ys)              => traverse(xs); traverse(ys)
+      case combinator.Read(_, _)                  =>
+      case combinator.Write(_, _, xs)             => traverse(xs)
+      case combinator.TempSource(_)               =>
+      case combinator.TempSink(_, xs)             => traverse(xs)
+      case combinator.Map(_, xs)                  => traverse(xs)
+      case combinator.FlatMap(_, xs)              => traverse(xs)
+      case combinator.Filter(_, xs)               => traverse(xs)
+      case combinator.EquiJoin(_, _, xs, ys)      => traverse(xs); traverse(ys)
+      case combinator.Cross(xs, ys)               => traverse(xs); traverse(ys)
+      case combinator.Group(_, xs)                => traverse(xs)
+      case combinator.Fold(_, _, _, xs, _)        => traverse(xs)
+      case combinator.FoldGroup(_, _, _, _, xs)   => traverse(xs)
+      case combinator.Distinct(xs)                => traverse(xs)
+      case combinator.Union(xs, ys)               => traverse(xs); traverse(ys)
+      case combinator.Diff(xs, ys)                => traverse(xs); traverse(ys)
+      case combinator.StatefulCreate(xs, _, _)    => traverse(xs)
+      case combinator.StatefulFetch(_)            =>
+      case combinator.UpdateWithZero(_, _)        =>
+      case combinator.UpdateWithOne(_, us, _, _)  => traverse(us)
+      case combinator.UpdateWithMany(_, us, _, _) => traverse(us)
     }
   }
 
@@ -637,6 +703,37 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         |diff (
         |       ${offset + pp(xs, offset + " " * 8)} ,
         |       ${offset + pp(ys, offset + " " * 8)} )
+      """.stripMargin.trim
+
+      case c.StatefulCreate(xs, stateTpe, keyTpe) => s"""
+        |statefulCreate[$stateTpe, $keyTpe] (
+        |       ${pp(xs, offset + " " * 8)} )
+      """.stripMargin.trim
+
+      case c.StatefulFetch(stateful) => s"""
+        |statefulFetch (${pp(stateful)})
+      """.stripMargin.trim
+
+      case c.UpdateWithZero(stateful, udf) => s"""
+        |UpdateWithZero (
+        |       ${pp(stateful, offset + " " * 8)},
+        |       ${pp(udf,      offset + " " * 8)} )
+      """.stripMargin.trim
+
+      case c.UpdateWithOne(stateful, us, uKeySel, udf) => s"""
+        |UpdateWithOne (
+        |       ${pp(stateful, offset + " " * 8)},
+        |       ${pp(us,       offset + " " * 8)},
+        |       ${pp(uKeySel,  offset + " " * 8)},
+        |       ${pp(udf,      offset + " " * 8)} )
+      """.stripMargin.trim
+
+      case c.UpdateWithMany(stateful, us, uKeySel, udf) => s"""
+        |UpdateWithMany (
+        |       ${pp(stateful, offset + " " * 8)},
+        |       ${pp(us,       offset + " " * 8)},
+        |       ${pp(uKeySel,  offset + " " * 8)},
+        |       ${pp(udf,      offset + " " * 8)} )
       """.stripMargin.trim
 
       // Lists

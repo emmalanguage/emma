@@ -15,26 +15,31 @@ private[emma] trait ComprehensionAnalysis
 
   /** A set of API method symbols to be comprehended. */
   protected object api {
-    val moduleSymbol = rootMirror.staticModule("eu.stratosphere.emma.api.package")
-    val bagSymbol    = rootMirror.staticClass("eu.stratosphere.emma.api.DataBag")
-    val groupSymbol  = rootMirror.staticClass("eu.stratosphere.emma.api.Group")
+    val moduleSymbol     = rootMirror.staticModule("eu.stratosphere.emma.api.package")
+    val bagSymbol        = rootMirror.staticClass("eu.stratosphere.emma.api.DataBag")
+    val groupSymbol      = rootMirror.staticClass("eu.stratosphere.emma.api.Group")
+    val statefulSymbol   = rootMirror.staticClass("eu.stratosphere.emma.api.Stateful.Bag")
 
-    val apply        = bagSymbol.companion.info.decl(TermName("apply"))
-    val read         = moduleSymbol.info.decl(TermName("read"))
-    val write        = moduleSymbol.info.decl(TermName("write"))
-    val stateful     = moduleSymbol.info.decl(TermName("stateful"))
-    val fold         = bagSymbol.info.decl(TermName("fold"))
-    val map          = bagSymbol.info.decl(TermName("map"))
-    val flatMap      = bagSymbol.info.decl(TermName("flatMap"))
-    val withFilter   = bagSymbol.info.decl(TermName("withFilter"))
-    val groupBy      = bagSymbol.info.decl(TermName("groupBy"))
-    val minus        = bagSymbol.info.decl(TermName("minus"))
-    val plus         = bagSymbol.info.decl(TermName("plus"))
-    val distinct     = bagSymbol.info.decl(TermName("distinct"))
+    val apply            = bagSymbol.companion.info.decl(TermName("apply"))
+    val read             = moduleSymbol.info.decl(TermName("read"))
+    val write            = moduleSymbol.info.decl(TermName("write"))
+    val stateful         = moduleSymbol.info.decl(TermName("stateful"))
+    val fold             = bagSymbol.info.decl(TermName("fold"))
+    val map              = bagSymbol.info.decl(TermName("map"))
+    val flatMap          = bagSymbol.info.decl(TermName("flatMap"))
+    val withFilter       = bagSymbol.info.decl(TermName("withFilter"))
+    val groupBy          = bagSymbol.info.decl(TermName("groupBy"))
+    val minus            = bagSymbol.info.decl(TermName("minus"))
+    val plus             = bagSymbol.info.decl(TermName("plus"))
+    val distinct         = bagSymbol.info.decl(TermName("distinct"))
+    val fetchToStateless = statefulSymbol.info.decl(TermName("bag"))
+    val updateWithZero   = statefulSymbol.info.decl(TermName("updateWithZero"))
+    val updateWithOne    = statefulSymbol.info.decl(TermName("updateWithOne"))
+    val updateWithMany   = statefulSymbol.info.decl(TermName("updateWithMany"))
 
     val methods = Set(
       read, write,
-      stateful,
+      stateful, fetchToStateless, updateWithZero, updateWithOne, updateWithMany,
       fold,
       map, flatMap, withFilter,
       groupBy,
@@ -97,9 +102,10 @@ private[emma] trait ComprehensionAnalysis
       val compName      = freshName(s"$name$$comp")
       val definition    = compTermDef(term)
       val comprehension = ExpressionRoot(comprehend(term, topLevel = true) match {
-        case root: combinator.Write => root
-        case root: combinator.Fold  => root
-        case root: Expression       => combinator.TempSink(name, root)
+        case root: combinator.Write          => root
+        case root: combinator.Fold           => root
+        case root: combinator.StatefulCreate => root
+        case root: Expression                => combinator.TempSink(name, root)
       }) ->> normalize
 
       ComprehendedTerm(compName, term, comprehension, definition)
@@ -218,6 +224,36 @@ private[emma] trait ComprehensionAnalysis
       case id: Ident if input =>
         combinator.TempSource(id)
 
+      // -----------------------------------------------------
+      // Stateful data bags
+      // -----------------------------------------------------
+
+      // stateful[S,K](xs)
+      case q"${stateful: Tree}[${stateType: TypeTree}, ${keyType: TypeTree}]($xs)"
+        if stateful.symbol == api.stateful =>
+          combinator.StatefulCreate(comprehend(xs), stateType.tpe, keyType.tpe)
+
+      // stateful.bag()
+      case q"${fetchToStateless @ Select(ident @ Ident(_), _)}()"
+        if fetchToStateless.symbol == api.fetchToStateless =>
+          combinator.StatefulFetch(ident)
+
+      // stateful.updateWithZero(udf)
+      case q"${updateWithZero @ Select(ident @ Ident(_), _)}[$_]($udf)"
+        if updateWithZero.symbol == api.updateWithZero =>
+          combinator.UpdateWithZero(ident, udf)
+
+      // stateful.updateWithOne(updates)(keySel, udf)
+      case q"${updateWithOne @ Select(ident @ Ident(_), _)}[$_, $_]($updates)($keySel, $udf)"
+        if updateWithOne.symbol == api.updateWithOne =>
+          combinator.UpdateWithOne(ident, comprehend(updates), keySel, udf)
+
+      // stateful.updateWithMany(updates)(keySel, udf)
+      case q"${updateWithMany @ Select(ident @ Ident(_), _)}[$_, $_]($updates)($keySel, $udf)"
+        if updateWithMany.symbol == api.updateWithMany =>
+          combinator.UpdateWithMany(ident, comprehend(updates), keySel, udf)
+
+
       // Interpret as boxed Scala expression (default)
       // Trees created by the caller with q"..." have to be explicitly type-checked
       case expr => ScalaExpr(expr)
@@ -244,7 +280,9 @@ private[emma] trait ComprehensionAnalysis
     var definitions = (for (cv <- compView.terms; d <- cv.definition)
       yield cv.definition collect {
         // Make sure that the associated definition is a non-mutable ValDef
-        case vd @ q"$_ val $_: $_ = $_" =>
+        case vd @ q"$_ val $_: ${defType: TypeTree} = $_"
+          // Don't inline Stateful terms
+          if defType.tpe.erasure.typeSymbol.asClass != api.statefulSymbol =>
           // Get the identifiers referencing this ValDef symbol
           val ids = tree collect { case id: Ident if id.symbol == d.symbol => id }
           // If the symbol is referenced only once, inline the ValDef rhs in place of the ident
