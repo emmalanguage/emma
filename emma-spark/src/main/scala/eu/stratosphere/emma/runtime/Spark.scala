@@ -1,9 +1,10 @@
 package eu.stratosphere.emma.runtime
 
 import eu.stratosphere.emma.api.DataBag
+import eu.stratosphere.emma.api.model.Identity
 import eu.stratosphere.emma.codegen.spark.DataflowGenerator
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
-import eu.stratosphere.emma.ir.{TempSink, Fold, Write, localInputs}
+import eu.stratosphere.emma.ir._
 import eu.stratosphere.emma.util.Counter
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkConf, SparkContext}
@@ -39,6 +40,25 @@ abstract class Spark(val host: String, val port: Int) extends Engine {
   override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[RDD[A]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
+  }
+
+  override def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag](root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K] = {
+    ??? // Not supported yet
+  }
+
+  override def executeUpdateWithZero[S: TypeTag, K: TypeTag, B: TypeTag]
+    (root: UpdateWithZero[S, K, B], name: String, closure: Any*): DataBag[B] = {
+    ??? // Not supported yet
+  }
+
+  override def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
+    (root: UpdateWithOne[S, K, A, B], name: String, closure: Any*): DataBag[B] = {
+    ??? // Not supported yet
+  }
+
+  override def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
+    (root: UpdateWithMany[S, K, A, B], name: String, closure: Any*): DataBag[B] = {
+    ??? // Not supported yet
   }
 
   override protected def doCloseSession() = {

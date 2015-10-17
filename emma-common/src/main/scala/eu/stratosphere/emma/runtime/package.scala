@@ -4,8 +4,9 @@ import java.util.UUID
 
 import com.typesafe.scalalogging.slf4j.Logger
 import eu.stratosphere.emma.api.DataBag
-import eu.stratosphere.emma.ir.{Fold, TempSink, Write}
+import eu.stratosphere.emma.ir._
 import org.slf4j.LoggerFactory
+import eu.stratosphere.emma.api.model.Identity
 
 import scala.reflect.runtime.universe._
 
@@ -46,6 +47,18 @@ package object runtime {
 
     def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit
 
+    def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag]
+      (root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K]
+
+    def executeUpdateWithZero[S: TypeTag, K: TypeTag, B: TypeTag]
+      (root: UpdateWithZero[S, K, B], name: String, closure: Any*): DataBag[B]
+
+    def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
+      (root: UpdateWithOne[S, K, A, B], name: String, closure: Any*): DataBag[B]
+
+    def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
+      (root: UpdateWithMany[S, K, A, B], name: String, closure: Any*): DataBag[B]
+
     final def closeSession() = if (!closed) {
       doCloseSession()
       closed = true
@@ -69,6 +82,18 @@ package object runtime {
     override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = ???
 
     override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = ???
+
+    override def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag]
+      (root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K] = ???
+
+    override def executeUpdateWithZero[S: TypeTag, K: TypeTag, B: TypeTag]
+      (root: UpdateWithZero[S, K, B], name: String, closure: Any*): DataBag[B] = ???
+
+    override def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
+      (root: UpdateWithOne[S, K, A, B], name: String, closure: Any*): DataBag[B] = ???
+
+    override def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
+      (root: UpdateWithMany[S, K, A, B], name: String, closure: Any*): DataBag[B] = ???
   }
 
   def default(): Engine = {

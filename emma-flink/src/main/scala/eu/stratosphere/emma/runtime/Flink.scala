@@ -3,10 +3,11 @@ package eu.stratosphere.emma.runtime
 import java.io.File
 import java.net.URL
 
-import eu.stratosphere.emma.api.DataBag
+import eu.stratosphere.emma.api.{ParallelizedDataBag, DataBag}
+import eu.stratosphere.emma.api.model.Identity
 import eu.stratosphere.emma.codegen.flink.{TempResultsManager, DataflowGenerator}
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
-import eu.stratosphere.emma.ir.{Fold, TempSink, Write, localInputs}
+import eu.stratosphere.emma.ir._
 import org.apache.flink.api.scala.ExecutionEnvironment
 
 import scala.reflect.runtime.universe._
@@ -47,6 +48,38 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
     resMgr.gc()
+  }
+
+  override def executeStatefulCreate[S <: Identity[K]: TypeTag, K: TypeTag]
+      (root: StatefulCreate[S, K], name: String, closure: Any*): AbstractStatefulBackend[S, K] = {
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    val res = dataflowCompiler.execute[AbstractStatefulBackend[S, K]](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
+    resMgr.gc()
+    res
+  }
+
+  override def executeUpdateWithZero[S: TypeTag, K: TypeTag, B: TypeTag]
+      (root: UpdateWithZero[S, K, B], name: String, closure: Any*): DataBag[B] = {
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    val expr = dataflowCompiler.execute[DataSet[B]](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
+    resMgr.gc()
+    DataBag(root.name, expr, expr.collect())
+  }
+
+  override def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
+      (root: UpdateWithOne[S, K, A, B], name: String, closure: Any*): DataBag[B] = {
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    val expr = dataflowCompiler.execute[DataSet[B]](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
+    resMgr.gc()
+    DataBag(root.name, expr, expr.collect())
+  }
+
+  override def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
+      (root: UpdateWithMany[S, K, A, B], name: String, closure: Any*): DataBag[B] = {
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    val expr = dataflowCompiler.execute[DataSet[B]](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
+    resMgr.gc()
+    DataBag(root.name, expr, expr.collect())
   }
 }
 
