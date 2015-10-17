@@ -131,6 +131,7 @@ class BeliefPropagation(
           Belief(v, s, prob)
         }
 
+        val messagesPrev = messages.bag()
         messages.updateWithMany(edges)(
           e => (e.var1, e.var2, e.state2), (m, es) => {
             m.prob = (for {
@@ -139,7 +140,7 @@ class BeliefPropagation(
               if v.identity == (e.var1, e.state1)
               p <- products
               if p.identity == (e.var1, e.state1)
-              m <- messages.bag()
+              m <- messagesPrev
               if m.identity == (e.var2, e.var1, e.state1)
             } yield {
               v.prior * e.prob * p.marginal / m.prob
