@@ -1,12 +1,15 @@
 package eu.stratosphere.emma.api
 
+import com.esotericsoftware.kryo.KryoException
+import com.twitter.chill.ScalaKryoInstantiator
 import eu.stratosphere.emma.api.model._
-import scala.collection.mutable
 
 /**
  * Abstractions for stateful collections.
  */
 object Stateful {
+
+  val kryo = (new ScalaKryoInstantiator).newKryo()
 
   /**
    * An abstraction for stateful collections.
@@ -17,15 +20,24 @@ object Stateful {
    * @tparam S The element of the stored state.
    * @tparam K The key type.
    */
-  sealed class Bag[S <: Identity[K], K] private(val state: mutable.Map[K, S]) {
+  sealed class Bag[S <: Identity[K], K] private(val state: Map[K, S]) {
 
     /**
      * Private constructor that transforms a DataBag into a stateful Bag.
      *
      * @param bag A DataBag containing elements with identity to be indexed and managed by this stateful Bag.
      */
-    private[api] def this(bag: DataBag[S]) =
-      this(bag.fold(mutable.Map.empty[K, S])(s => mutable.Map(s.identity -> s), _ ++ _))
+    private[api] def this(bag: DataBag[S]) = {
+      this ({
+        try bag.vals.map(s => {
+          s.identity -> kryo.copy(s)
+        }).toMap catch {
+          case e: KryoException =>
+            throw new Exception("""Kryo serializer could not copy state object. A likely cause is that the class of the
+                                |state object is an inner class. Try moving it to a companion object.
+                              """.stripMargin, e)
+        }})
+    }
 
     /**
      * Computes and flattens a delta without additional inputs. The UDF `f` is allowed to modify the state element `s`,
@@ -36,9 +48,10 @@ object Stateful {
      * @return The flattened result of all update invocations.
      */
     def updateWithZero[B](f: S => DataBag[B]): DataBag[B] = for {
-      state  <- bag()
-      result <- f(state)
-    } yield result
+      s <- DataBag(state.values.toList)
+      b <- f(s)
+    } yield b
+
 
     /**
      * Computes and flattens the `leftJoin` with `updates` which passes for each update element `u` it's
@@ -54,10 +67,10 @@ object Stateful {
      */
     def updateWithOne[A, B](updates: DataBag[A])
       (k: A => K, f: (S, A) => DataBag[B]): DataBag[B] = for {
-        update <- updates
-        state  <- DataBag(state.get(k(update)).toSeq)
-        result <- f(state, update)
-      } yield result
+        a <- updates
+        s <- DataBag(state.get(k(a)).toList)
+        b <- f(s, a)
+      } yield b
 
     /**
      * Computes and flattens the `nestJoin(p, f)` which nests the current state elements `s` against their
@@ -87,15 +100,16 @@ object Stateful {
      */
     def updateWithMany[A, B](updates: DataBag[A])
       (k: A => K, f: (S, DataBag[A]) => DataBag[B]): DataBag[B] = for {
-        state  <- bag()
-        result <- f(state, updates withFilter { k(_) == state.identity })
-      } yield result
+        s <- DataBag(state.values.toList)
+        b <- f(s, updates withFilter { k(_) == s.identity })
+      } yield b
+
 
     /**
      * Converts the stateful bag into an immutable Bag.
      *
      * @return A Databag containing the set of elements contained in this stateful Bag.
      */
-    def bag(): DataBag[S] = DataBag((for (x <- state) yield x._2).toSeq)
+    def bag(): DataBag[S] = DataBag((for (x <- state) yield kryo.copy(x._2)).toSeq)
   }
 }

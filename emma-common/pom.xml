@@ -76,6 +76,13 @@
             <groupId>org.scalatest</groupId>
             <artifactId>scalatest_${scala.tools.version}</artifactId>
         </dependency>
+
+        <!-- Serialization -->
+        <dependency>
+            <groupId>com.twitter</groupId>
+            <artifactId>chill_${scala.tools.version}</artifactId>
+            <version>0.5.2</version>
+        </dependency>
     </dependencies>
 
     <build>
