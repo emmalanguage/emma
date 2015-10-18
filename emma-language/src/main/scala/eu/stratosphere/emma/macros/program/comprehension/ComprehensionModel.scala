@@ -689,8 +689,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       """.stripMargin.trim
 
       case c.Distinct(xs) => s"""
-        |distinct (${pp(xs)})
-        |       ${offset + pp(xs, offset)})
+        |distinct (
+        |       ${offset + pp(xs, offset + " " * 8)})
       """.stripMargin.trim
 
       case c.Union(xs, ys) => s"""
