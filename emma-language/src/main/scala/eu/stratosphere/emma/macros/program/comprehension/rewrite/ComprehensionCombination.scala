@@ -1,29 +1,33 @@
 package eu.stratosphere.emma.macros.program.comprehension.rewrite
 
+import language.postfixOps
+
 trait ComprehensionCombination extends ComprehensionRewriteEngine {
   import universe._
 
   def combine(root: ExpressionRoot) = {
     // states for the state machine
     sealed trait RewriteState
-    object Start  extends RewriteState
-    object Filter extends RewriteState
-    object Join   extends RewriteState
-    object Cross  extends RewriteState
-    object Map    extends RewriteState
-    object End    extends RewriteState
+    object Start     extends RewriteState
+    object Filter    extends RewriteState
+    object FlatMap   extends RewriteState
+    object Join      extends RewriteState
+    object Cross     extends RewriteState
+    object Residuals extends RewriteState
+    object End       extends RewriteState
 
     // state machine for the rewrite process
     def process(state: RewriteState): ExpressionRoot = state match {
-      case Start  => process(Filter);
-      case Filter => applyExhaustively(MatchFilter)(root); process(Join)
-      case Join   => if (applyAny(MatchEquiJoin)(root)) process(Filter) else process(Cross)
-      case Cross  => if (applyAny(MatchCross)(root))    process(Filter) else process(Map)
-      case Map    => applyExhaustively(MatchMap, MatchFlatMap)(root); process(End)
-      case End    => root
+      case Start     => process(Filter)
+      case Filter    => applyExhaustively(MatchFilter)(root); process(FlatMap)
+      case FlatMap   => if (applyAny(MatchFlatMap)(root))  process(Filter) else process(Join)
+      case Join      => if (applyAny(MatchEquiJoin)(root)) process(Filter) else process(Cross)
+      case Cross     => if (applyAny(MatchCross)(root))    process(Filter) else process(Residuals)
+      case Residuals => applyExhaustively(MatchResidualComprehension)(root); process(End)
+      case End       => root
     }
 
-    // (1) run the state machine and (2) simplify UDF parameter names
+    // run the state machine
     process(Start)
   }
 
@@ -34,12 +38,13 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
   /**
    * Creates a filter combinator.
    *
-   * ==Rule Description==
-   *
-   * '''Matching Pattern''':
+   * ==Matching Pattern==
    * {{{ [[ e | qs, x ← xs, qs1, p x, qs2 ]] }}}
    *
-   * '''Rewrite''':
+   * ==Guard==
+   * The filter expression `p x` must refer to at most one generator variable and this variable should be `x`.
+   *
+   * ==Rewrite==
    * {{{ [[ e | qs, x ← filter p xs, qs1, qs2 ]] }}}
    */
   object MatchFilter extends Rule {
@@ -57,52 +62,38 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       }
     }
 
-    /**
-     * Checks:
-     *
-     * - Filter uses only 1 variable
-     * - Generator binds the variable of the filter
-     */
-    // TODO: add support for comprehension filter expressions
-    def guard(rm: RuleMatch) = rm.filter.expr match {
-      case expr: ScalaExpr =>
-        expr.usedVars(rm.root) subsetOf Set(rm.gen.lhs)
-        
-      case _ => false
+    def guard(rm: RuleMatch) = {
+      rm.filter.usedVars(rm.root) subsetOf Set(rm.gen.lhs)
     }
 
-    // TODO: add support for comprehension filter expressions
-    def fire(rm: RuleMatch) = rm.filter.expr match {
-      case expr @ ScalaExpr(tree) =>
-        val RuleMatch(root, parent, gen, filter) = rm
-        val p    = mk anonFun (List(rm.gen.lhs.name -> rm.gen.lhs.info), tree)
-        gen.rhs           = combinator.Filter(p, gen.rhs)
-        parent.qualifiers = parent.qualifiers diff List(filter)
-        parent // return new parent
-
-      case filter => c.abort(c.enclosingPosition,
-        s"Unexpected filter expression type: ${filter.getClass}")
+    def fire(rm: RuleMatch) = {
+      val RuleMatch(_, parent, gen, filter) = rm
+      val p   = mk anonFun (List(rm.gen.lhs.name -> rm.gen.lhs.info), unComprehend(filter.expr))
+      gen.rhs = combinator.Filter(p, gen.rhs)
+      parent.qualifiers = parent.qualifiers diff List(filter)
+      parent // return new parent
     }
   }
 
   /**
-   * Creates a map combinator. Assumes that aggregations are matched beforehand.
+   * Creates a map combinator.
    *
-   * ==Rule Description==
-   *
-   * '''Matching Pattern''':
+   * ==Matching Pattern==
    * {{{ [[ f x  | x ← xs ]] }}}
    *
-   * '''Rewrite''':
+   * ==Guard==
+   * The head expression `f x` must refer to at most one generator variable and this variable should be `x`.
+   *
+   * ==Rewrite==
    * {{{ map f xs }}}
    */
   object MatchMap extends Rule {
 
-    case class RuleMatch(root: Expression, head: ScalaExpr, child: Generator)
+    case class RuleMatch(root: Expression, head: ScalaExpr, child: Generator, comp: Comprehension)
 
     def bind(expr: Expression, root: Expression) = expr match {
-      case Comprehension(head: ScalaExpr, List(child: Generator)) =>
-        Some(RuleMatch(root, head, child))
+      case comp @ Comprehension(head: ScalaExpr, List(child: Generator)) =>
+        Some(RuleMatch(root, head, child, comp))
       
       case _ => None
     }
@@ -112,42 +103,58 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     }
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(root, expr @ ScalaExpr(tree), child) = rm
+      val RuleMatch(_, ScalaExpr(tree), child, comp) = rm
       val f = mk anonFun (List(child.lhs.name -> child.lhs.info), tree)
       combinator.Map(f, child.rhs)
     }
   }
 
   /**
-   * Creates a flatMap combinator. Assumes that aggregations are matched beforehand.
+   * Creates a flatMap combinator.
    *
-   * ==Rule Description==
+   * ===Matching Pattern===
+   * {{{ [[ e | x ← xs, qs, y ← f x, qs' ]] }}}
    *
-   * '''Matching Pattern''':
-   * {{{ join [[ f x  | x ← xs ]] }}}
+   * ==Guard==
+   * 1. The head expression `f x` refer to at most one generator variable and this variable should be `x`.
+   * 2. The remaining combinators as well as the head should refer to `x`.
    *
-   * '''Rewrite''':
-   * {{{ flatMap f xs }}}
+   * ==Rewrite==
+   * {{{ [[ e | qs, x ← xs, qs', y ← flatMap f xs, qs'' ]]  }}}
    */
   object MatchFlatMap extends Rule {
 
-    case class RuleMatch(root: Expression, head: ScalaExpr, child: Generator)
+    case class RuleMatch(root: Expression, parent: Comprehension, g1: Generator, g2: Generator)
 
-    def bind(expr: Expression, root: Expression) = expr match {
-      case MonadJoin(Comprehension(head: ScalaExpr, List(child: Generator))) =>
-        Some(RuleMatch(root, head, child))
-      
-      case _ => None
+    def bind(expr: Expression, root: Expression) = new Traversable[RuleMatch] {
+      def foreach[U](f: RuleMatch => U) = expr match {
+        case parent @ Comprehension(_, qualifiers) => for {
+          g1 <- qualifiers collect { case g @ Generator(_, _: Expression) => g }
+          g2 <- qualifiers collect { case g @ Generator(_, _: Expression) => g }
+          if g1 != g2
+        } f(RuleMatch(root, parent, g1, g2))
+
+        case _ =>
+      }
     }
 
-    def guard(rm: RuleMatch) = {
-      rm.head.usedVars(rm.root) subsetOf Set(rm.child.lhs)
+    def guard(rm: RuleMatch) = (rm.parent.qualifiers :+ rm.parent.hd) forall { expr =>
+      if (expr == rm.g2)
+        expr.usedVars(rm.parent) == Set(rm.g1.lhs)
+      else
+        ! ( expr.usedVars(rm.parent) contains rm.g1.lhs )
     }
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(root, expr @ ScalaExpr(tree), child) = rm
-      val f = mk anonFun (List(child.lhs.name -> child.lhs.info), tree)
-      combinator.FlatMap(f, child.rhs)
+      val RuleMatch(_, parent, g1, g2 @ Generator(_, rhs)) = rm
+      val f = mk anonFun (List(g1.lhs.name -> g1.lhs.info), unComprehend(rhs))
+      parent.qualifiers = for (q <- parent.qualifiers if q != g1) yield {
+        if (q == g2)
+          Generator(g2.lhs, combinator.FlatMap(f, g1.rhs))
+        else
+          q
+      }
+      parent
     }
   }
 
@@ -158,12 +165,13 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
   /**
    * Creates an equi-join combinator.
    *
-   * ==Rule Description==
-   *
-   * '''Matching Pattern''':
+   * ==Matching Pattern==
    * {{{ [[ e | qs, x ← xs, y ← ys, qs1, k₁ x == k₂ y, qs2 ]] }}}
    *
-   * '''Rewrite''':
+   * ==Guard==
+   * The generators should not be be correlated, i.e. `xs` and `ys` should not refer to `y` and `x` correspondingly.
+   *
+   * ==Rewrite==
    * {{{ [[ e[v.x/x][v.y/y] | qs, v ← ⋈ k₁ k₂ xs ys, qs1[v.x/x][v.y/y], qs2[v.x/x][v.y/y] ]] }}}
    */
   object MatchEquiJoin extends Rule {
@@ -190,7 +198,9 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       }
     }
 
-    def guard(rm: RuleMatch) = true
+    def guard(rm: RuleMatch) = {
+      !((rm.xs.usedVars(rm.root) contains rm.ys.lhs ) || (rm.ys.usedVars(rm.root) contains rm.xs.lhs))
+    }
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(root, parent, xs, ys, filter, kx, ky) = rm
@@ -271,12 +281,13 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
   /**
    * Creates a cross combinator.
    *
-   * ==Rule Description==
-   *
-   * '''Matching Pattern''':
+   * ==Matching Pattern==
    * {{{ [[ e | qs, x ← xs, y ← ys, qs1 ]] }}}
    *
-   * '''Rewrite''':
+   * ==Guard==
+   * The generators should not be be correlated, i.e. `xs` and `ys` should not refer to `y` and `x` correspondingly.
+   *
+   * ==Rewrite==
    * {{{ [[ e[v.x/x][v.y/y] | qs, v ← ⨯ xs ys, qs1[v.x/x][v.y/y] ]] }}}
    */
   object MatchCross extends Rule {
@@ -293,7 +304,9 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       }
     }
 
-    def guard(rm: RuleMatch) = true
+    def guard(rm: RuleMatch) = {
+      !((rm.xs.usedVars(rm.root) contains rm.ys.lhs ) || (rm.ys.usedVars(rm.root) contains rm.xs.lhs))
+    }
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(root, parent, xs, ys) = rm
@@ -325,6 +338,66 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
       // return the modified parent
       rm.parent
+    }
+  }
+
+  //---------------------------------------------------------------------------
+  // Residual comprehensions
+  //---------------------------------------------------------------------------
+
+  /**
+   * Matches a residual comprehension.
+   *
+   * ==Matching Pattern==
+   * {{{ [[ e | qs ]] }}}
+   *
+   * ==Guard==
+   * None.
+   *
+   * ==Rewrite==
+   * {{{ MC [[ e | qs ]] }}}
+   *
+   * where the top node is represented as an IR combinator node and the inner nodes are part of the UDF.
+   */
+  object MatchResidualComprehension extends Rule {
+
+    case class RuleMatch(root: Expression, parent: Comprehension)
+
+    def bind(expr: Expression, root: Expression) = new Traversable[RuleMatch] {
+      def foreach[U](f: RuleMatch => U) = expr match {
+        case comp @ Comprehension(_, _) =>
+          f(RuleMatch(root, comp))
+
+        case _ =>
+      }
+    }
+
+    def guard(rm: RuleMatch) = true
+
+    def fire(rm: RuleMatch) = {
+      val RuleMatch(root, comp) = rm
+
+      // the rhs of the first generator will be the input
+      val in = comp.qualifiers collectFirst { case Generator(_, rhs) => rhs }
+
+      val xx = prettyPrint(comp)
+
+      assert(in.isDefined, "Undefined input for residual comprehension")
+
+      unComprehend(comp) match {
+        // xs.map(f)
+        case q"${map @ Select(xs, _)}[$_]($f)"
+          if map.symbol == api.map =>
+            combinator.Map(f, in.get)
+        // xs.flatMap(f)
+        case q"${flatMap @ Select(xs, _)}[$_]($f)"
+          if flatMap.symbol == api.flatMap =>
+            combinator.FlatMap(f, in.get)
+        // xs.withFilter(f)
+        case q"${withFilter @ Select(xs, _)}($f)"
+          if withFilter.symbol == api.withFilter =>
+            combinator.Filter(f, in.get)
+      }
     }
   }
 }

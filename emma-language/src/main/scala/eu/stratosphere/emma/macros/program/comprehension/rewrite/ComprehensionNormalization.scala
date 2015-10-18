@@ -67,22 +67,27 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
    */
   object UnnestHead extends Rule {
 
-    case class RuleMatch(parent: Comprehension, child: Comprehension)
+    case class RuleMatch(parent: Comprehension, child: Expression)
 
     def bind(expr: Expression, root: Expression) = expr match {
-      case MonadJoin(parent @ Comprehension(child: Comprehension, _)) =>
+      case MonadJoin(parent @ Comprehension(child, _)) =>
         Some(RuleMatch(parent, child))
-      
       case _ => None
     }
 
     def guard(rm: RuleMatch) = true //FIXME
 
-    def fire(rm: RuleMatch) = {
-      val RuleMatch(parent, child) = rm
-      parent.qualifiers ++= child.qualifiers
-      parent.hd = child.hd
-      parent // return new root
+    def fire(rm: RuleMatch) = rm match {
+      case RuleMatch(parent, child: Comprehension) =>
+        parent.qualifiers ++= child.qualifiers
+        parent.hd = child.hd
+        parent // return new root
+      case RuleMatch(parent, child: Expression) =>
+        val vd  = mk.valDef(freshName("x"), child.tpe)
+        val sym = mk.freeTerm(vd.name.toString, vd.elementType)
+        parent.qualifiers ++= List(Generator(sym, child))
+        parent.hd = ScalaExpr(mk ref sym)
+        parent // return new root
     }
   }
 
