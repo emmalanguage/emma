@@ -201,4 +201,7 @@ trait Folds[+E] extends Any {
    */
   def find(p: E => Boolean): Option[E] =
     macro FoldMacros.find[E]
+
+  def random[R >: E](n: Int): List[R] =
+    macro FoldMacros.random[R]
 }
