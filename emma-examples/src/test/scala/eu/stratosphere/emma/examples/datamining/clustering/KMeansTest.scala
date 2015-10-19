@@ -1,7 +1,6 @@
 package eu.stratosphere.emma.examples.datamining.clustering
 
 import java.io.File
-import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
 import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
@@ -16,8 +15,7 @@ class KMeansTest extends FlatSpec with Matchers with BeforeAndAfter {
   val dir = "/clustering/kmeans"
   val path = tempPath(dir)
   val epsilon = 1e-3
-  val iterations = 50
-  // initialize resources
+  val iterations = 20
   val delimiter = "\t"
 
   before {
