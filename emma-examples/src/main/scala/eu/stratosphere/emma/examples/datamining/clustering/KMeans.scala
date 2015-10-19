@@ -70,7 +70,7 @@ object KMeans {
       def identity = id
     }
 
-    case class Solution(point: Point, cluster: PID)
+    case class Solution(point: Point, cluster: PID, sqrDiff: Double = 0)
   }
 }
 
@@ -91,7 +91,7 @@ class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: St
     // read input
     val points = for (line <- read(input, new TextInputFormat[String]('\n'))) yield {
       val record = line.split("\t")
-      Point(record.head.toInt, Vector(record.tail.map { _.toDouble }))
+      Point(record.head.toLong, Vector(record.tail.map { _.toDouble }))
     }
 
     val dimensions = points.find { _ => true }.get.pos.length
@@ -99,10 +99,9 @@ class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: St
     var minSqrDist = 0.0
 
     for (i <- 1 to iterations) {
-      // initialize random cluster means
+      // initialize forgy cluster means
       var change = 0.0
-      var centroids = DataBag(for (i <- 1 to k)
-        yield Point(i, Vector.random(dimensions)))
+      var centroids = DataBag(points.random(k))
 
       // initialize solution
       var solution = for (p <- points) yield {
@@ -110,7 +109,8 @@ class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: St
           (p.pos squaredDist m1.pos) < (p.pos squaredDist m2.pos)
         }.get
 
-        Solution(p, closestCentroid.id)
+        val sqrDiff = p.pos squaredDist closestCentroid.pos
+        Solution(p, closestCentroid.id, sqrDiff)
       }
 
       do {
@@ -134,19 +134,15 @@ class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: St
             (s.point.pos squaredDist m1.pos) < (s.point.pos squaredDist m2.pos)
           }.get
 
-          s.copy(cluster = closestMean.id)
+          val sqrDiff = s.point.pos squaredDist closestMean.pos
+          s.copy(cluster = closestMean.id, sqrDiff = sqrDiff)
         }
 
         // use new means for the next iteration
         centroids = newMeans
       } while (change > epsilon)
 
-      val sumSqrDist = (for {
-        s <- solution
-        c <- centroids
-        if s.cluster == c.id
-      } yield s.point.pos squaredDist c.pos).sum()
-
+      val sumSqrDist = solution.map { _.sqrDiff }.sum()
       if (i <= 1 || sumSqrDist < minSqrDist) {
         minSqrDist = sumSqrDist
         bestSolution = solution
