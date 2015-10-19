@@ -8,7 +8,7 @@ import scala.language.existentials
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
-class WorkflowMacros(val c: blackbox.Context) extends ControlFlow with Comprehension {
+class WorkflowMacros(val c: blackbox.Context) extends ControlFlow with Comprehension with SemanticChecks {
   import universe._
 
   val ENGINE = typeOf[Engine]
@@ -17,6 +17,8 @@ class WorkflowMacros(val c: blackbox.Context) extends ControlFlow with Comprehen
   /** Translate an Emma expression to an [[Algorithm]]. */
   // TODO: Add more comprehensive ScalaDoc
   def parallelize[T: c.WeakTypeTag](e: Expr[T]) = {
+
+    doSemanticChecks(e.tree)
 
     // Create a normalized version of the original tree
     val normalized = normalize(e.tree)
@@ -72,6 +74,8 @@ class WorkflowMacros(val c: blackbox.Context) extends ControlFlow with Comprehen
   /** Translate an Emma expression to an [[Algorithm]]. */
   // TODO: Add more comprehensive ScalaDoc
   def comprehend[T: c.WeakTypeTag](e: Expr[T]) = {
+
+    doSemanticChecks(e.tree)
 
     // Create a normalized version of the original tree
     val normalized = normalize(e.tree)

@@ -22,6 +22,8 @@ object Stateful {
    */
   sealed class Bag[S <: Identity[K], K] private(val state: Map[K, S]) {
 
+    var updateInProgress = false // This is for detecting when the user calls .bag() from the UDF of updateWith*
+
     /**
      * Private constructor that transforms a DataBag into a stateful Bag.
      *
@@ -39,6 +41,7 @@ object Stateful {
         }})
     }
 
+
     /**
      * Computes and flattens a delta without additional inputs. The UDF `f` is allowed to modify the state element `s`,
      * however with the restriction that the modification should not affect it's identity.
@@ -47,11 +50,12 @@ object Stateful {
      * @tparam B The type of the output elements.
      * @return The flattened result of all update invocations.
      */
-    def updateWithZero[B](f: S => DataBag[B]): DataBag[B] = for {
-      s <- DataBag(state.values.toList)
-      b <- f(s)
-    } yield b
-
+    def updateWithZero[B](f: S => DataBag[B]): DataBag[B] = checkNoBagAccess {
+      for {
+        s <- DataBag(state.values.toList)
+        b <- f(s)
+      } yield b
+    }
 
     /**
      * Computes and flattens the `leftJoin` with `updates` which passes for each update element `u` it's
@@ -66,11 +70,13 @@ object Stateful {
      * @return The flattened result of all update invocations.
      */
     def updateWithOne[A, B](updates: DataBag[A])
-      (k: A => K, f: (S, A) => DataBag[B]): DataBag[B] = for {
+      (k: A => K, f: (S, A) => DataBag[B]): DataBag[B] = checkNoBagAccess {
+      for {
         a <- updates
         s <- DataBag(state.get(k(a)).toList)
         b <- f(s, a)
       } yield b
+    }
 
     /**
      * Computes and flattens the `nestJoin(p, f)` which nests the current state elements `s` against their
@@ -99,10 +105,12 @@ object Stateful {
      * @return The flattened collection
      */
     def updateWithMany[A, B](updates: DataBag[A])
-      (k: A => K, f: (S, DataBag[A]) => DataBag[B]): DataBag[B] = for {
+      (k: A => K, f: (S, DataBag[A]) => DataBag[B]): DataBag[B] = checkNoBagAccess {
+      for {
         s <- DataBag(state.values.toList)
         b <- f(s, updates withFilter { k(_) == s.identity })
       } yield b
+    }
 
 
     /**
@@ -110,6 +118,20 @@ object Stateful {
      *
      * @return A Databag containing the set of elements contained in this stateful Bag.
      */
-    def bag(): DataBag[S] = DataBag((for (x <- state) yield kryo.copy(x._2)).toSeq)
+    def bag(): DataBag[S] = {
+      if (updateInProgress)
+        throw new StatefulAccessedFromUdfException()
+
+      DataBag((for (x <- state) yield kryo.copy(x._2)).toSeq)
+    }
+
+
+
+    private def checkNoBagAccess[T](body: => T): T = {
+      updateInProgress = true
+      val result = body
+      updateInProgress = false
+      result
+    }
   }
 }

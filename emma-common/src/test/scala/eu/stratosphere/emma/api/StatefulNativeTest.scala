@@ -9,6 +9,7 @@ import org.scalatest.junit.JUnitRunner
 class StatefulNativeTest extends FlatSpec with Matchers with BeforeAndAfter {
 
   "Stateful native" should "do deep copies" in  {
+    import eu.stratosphere.emma.api.StatefulNativeTest.Foo
 
     val b1 = DataBag(Seq(Foo(1, 1)))
 
@@ -28,7 +29,10 @@ class StatefulNativeTest extends FlatSpec with Matchers with BeforeAndAfter {
   }
 }
 
+object StatefulNativeTest {
 
-case class Foo(@id s: Int, var n: Int) extends Identity[Int] {
-  override def identity = n
+  case class Foo(@id s: Int, var n: Int) extends Identity[Int] {
+    override def identity = n
+  }
+
 }

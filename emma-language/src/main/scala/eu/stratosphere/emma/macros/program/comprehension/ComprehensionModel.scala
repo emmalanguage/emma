@@ -45,6 +45,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
     ) ++ apply.alternatives
 
     val monadic = Set(map, flatMap, withFilter)
+
+    val updateWith = Set(updateWithZero, updateWithOne, updateWithMany)
   }
 
   // Type constructors

@@ -154,4 +154,18 @@ package object api {
 
   implicit def materializeCSVConverters[T]: CSVConverters[T] =
     macro ConvertersMacros.materializeCSVConverters[T]
+
+  // -----------------------------------------------------
+  // exceptions
+  // -----------------------------------------------------
+
+  class InvalidProgramException(message: String = null, cause: Throwable = null) extends Exception(message, cause) {}
+
+  class StatefulAccessedFromUdfException()
+    extends InvalidProgramException("""
+      | Called .bag() from the UDF of an updateWith* on the same stateful that is
+      | "being updated. A possible fix is to save the result of the .bag() call to a DataBag before the
+      | "updateWith* call, and use that one in place of this .bag() call.""".stripMargin)
+  // Note: Don't catch this!
+  // This should terminate the program, because the stateful will be in an invalid state after throwing this.
 }
