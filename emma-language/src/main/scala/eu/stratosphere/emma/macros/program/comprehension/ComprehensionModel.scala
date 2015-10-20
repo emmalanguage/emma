@@ -753,4 +753,142 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
     pp(root)
   }
+
+  def unComprehend(expr: Expression): Tree = (expr match {
+
+    // -----------------------------------------------------
+    // Monad Ops
+    // -----------------------------------------------------
+
+    // for { x <- xs; y <- ys; if p; if q } yield f(x, y)
+    case Comprehension(head, qualifiers) =>
+      q"""for (..${qualifiers collect {
+        case Generator(x, xs) => fq"${x.name} <- ${unComprehend(xs)}"
+        case Filter(p) => fq"if ${unComprehend(p)}"
+      }}) yield ${unComprehend(head)}"""
+
+    // xs map f
+    case combinator.Map(f, xs) =>
+      q"${unComprehend(xs)}.map($f)"
+
+    // xs withFilter f
+    case combinator.Filter(p, xs) =>
+      q"${unComprehend(xs)}.withFilter($p)"
+
+    // xs.flatten
+    case MonadJoin(xs) =>
+      q"${unComprehend(xs)}.flatMap(_root_.scala.Predef.identity)"
+
+    // xs flatMap f
+    case combinator.FlatMap(f, xs) =>
+      q"${unComprehend(xs)}.flatMap($f)"
+
+    // -----------------------------------------------------
+    // Joins
+    // -----------------------------------------------------
+
+    // xs join ys where kx equalTo ky
+    case combinator.EquiJoin(kx, ky, xs, ys) =>
+      val x = freshName("x")
+      val y = freshName("y")
+      q"""for {
+        $x <- ${unComprehend(xs)}
+        $y <- ${unComprehend(ys)}
+        if $kx($x) == $ky($y)
+      } yield ($x, $y)"""
+
+    // xs cross ys
+    case combinator.Cross(xs, ys) =>
+      val x = freshName("x")
+      val y = freshName("y")
+      q"""for {
+        $x <- ${unComprehend(xs)}
+        $y <- ${unComprehend(ys)}
+      } yield ($x, $y)"""
+
+    // -----------------------------------------------------
+    // Grouping and Set operations
+    // -----------------------------------------------------
+
+    // xs groupBy key
+    case combinator.Group(key, xs) =>
+      q"${unComprehend(xs)}.groupBy($key)"
+
+    // xs minus ys
+    case combinator.Diff(xs, ys) =>
+      q"${unComprehend(xs)}.minus(${unComprehend(ys)})"
+
+    // xs plus ys
+    case combinator.Union(xs, ys) =>
+      q"${unComprehend(xs)}.plus(${unComprehend(ys)})"
+
+    // xs.distinct()
+    case combinator.Distinct(xs) =>
+      q"${unComprehend(xs)}.distinct()"
+
+    // -----------------------------------------------------
+    // Aggregates
+    // -----------------------------------------------------
+
+    // xs.fold(empty)(sng, union)
+    case combinator.Fold(empty, sng, union, xs, _) =>
+      q"${unComprehend(xs)}.fold($empty)($sng, $union)"
+
+    // xs groupBy key map { g => Group(g.key, g.values.fold(empty)(sng, union)) }
+    case combinator.FoldGroup(key, empty, sng, union, xs) =>
+      val g = freshName("g")
+      q"""${unComprehend(xs)}.groupBy($key).map({ case $g =>
+        _root_.eu.stratosphere.emma.api.Group($g.key, $g.values.fold($empty)($sng, $union))
+      })"""
+
+    // -----------------------------------------------------
+    // Stateful data bags
+    // -----------------------------------------------------
+
+    // stateful[S, K](xs)
+    case combinator.StatefulCreate(xs, stateTpe, keyTpe) =>
+      q"_root_.eu.stratosphere.emma.api.stateful[$stateTpe, $keyTpe](${unComprehend(xs)})"
+
+    // stateful.bag()
+    case combinator.StatefulFetch(stateful) =>
+      q"$stateful.bag()"
+
+    // stateful updateWithZero udf
+    case combinator.UpdateWithZero(stateful, udf) =>
+      q"$stateful.updateWithZero($udf)"
+
+    // stateful.updateWithOne(updates)(keySel, udf)
+    case combinator.UpdateWithOne(stateful, updates, key, udf) =>
+      q"$stateful.updateWithOne(${unComprehend(updates)})($key, $udf)"
+
+    // stateful.updateWithMany(updates)(keySel, udf)
+    case combinator.UpdateWithMany(stateful, updates, key, udf) =>
+      q"$stateful.updateWithMany(${unComprehend(updates)})($key, $udf)"
+
+    // ----------------------------------------------------------------------
+    // Environment & Host Language Connectors
+    // ----------------------------------------------------------------------
+
+    // write[T](loc, fmt)(xs)
+    case combinator.Write(loc, fmt, xs) =>
+      q"_root_.eu.stratosphere.emma.api.write($loc, $fmt)(${unComprehend(xs)})"
+
+    // read[T](loc, fmt)
+    case combinator.Read(loc, fmt) =>
+      q"_root_.eu.stratosphere.emma.api.read($loc, $fmt)"
+
+    // Temp sink identifier
+    case combinator.TempSink(id, xs) =>
+      q"val $id = ${unComprehend(xs)}"
+
+    // Temp result identifier
+    case combinator.TempSource(id) => id
+
+    // Scala expression
+    case ScalaExpr(tree) => tree
+
+    case _ =>
+      val combinator = expr.getClass.getSimpleName
+      throw new UnsupportedOperationException(s"Unsupported combinator: $combinator")
+  }).typeChecked
 }
