@@ -38,7 +38,7 @@
         <!-- Hadoop -->
         <hadoop.version>2.2.0</hadoop.version>
         <!-- Flink -->
-        <flink.version>0.9-SNAPSHOT</flink.version>
+        <flink.version>0.10.0</flink.version>
         <!-- Spark -->
         <spark.version>1.5.1</spark.version>
 
@@ -168,20 +168,20 @@
 
             <!-- Flink -->
             <dependency>
-                <groupId>eu.stratosphere</groupId>
-                <artifactId>flink-scala</artifactId>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-scala_${scala.tools.version}</artifactId>
                 <version>${flink.version}</version>
                 <scope>provided</scope>
             </dependency>
             <dependency>
-                <groupId>eu.stratosphere</groupId>
-                <artifactId>flink-java</artifactId>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-java_${scala.tools.version}</artifactId>
                 <version>${flink.version}</version>
                 <scope>provided</scope>
             </dependency>
             <dependency>
-                <groupId>eu.stratosphere</groupId>
-                <artifactId>flink-clients</artifactId>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-clients_${scala.tools.version}</artifactId>
                 <version>${flink.version}</version>
                 <scope>provided</scope>
             </dependency>

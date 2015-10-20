@@ -141,16 +141,16 @@
             <dependencies>
                 <!-- Flink -->
                 <dependency>
-                    <groupId>eu.stratosphere</groupId>
-                    <artifactId>flink-scala</artifactId>
+                    <groupId>org.apache.flink</groupId>
+                    <artifactId>flink-scala_${scala.tools.version}</artifactId>
                 </dependency>
                 <dependency>
-                    <groupId>eu.stratosphere</groupId>
-                    <artifactId>flink-java</artifactId>
+                    <groupId>org.apache.flink</groupId>
+                    <artifactId>flink-java_${scala.tools.version}</artifactId>
                 </dependency>
                 <dependency>
-                    <groupId>eu.stratosphere</groupId>
-                    <artifactId>flink-clients</artifactId>
+                    <groupId>org.apache.flink</groupId>
+                    <artifactId>flink-clients_${scala.tools.version}</artifactId>
                 </dependency>
             </dependencies>
         </profile>
@@ -239,9 +239,7 @@
                                 <excludes>
                                     <exclude>org.apache.hadoop:*</exclude>
                                     <exclude>org.apache.spark:*</exclude>
-                                    <exclude>eu.stratosphere:flink-scala</exclude>
-                                    <exclude>eu.stratosphere:flink-java</exclude>
-                                    <exclude>eu.stratosphere:flink-clients</exclude>
+                                    <exclude>org.apache.flink:*</exclude>
                                     <exclude>org.scala-lang:*</exclude>
                                     <exclude>com.google.guava:*</exclude>
                                     <exclude>org.slf4j:slf4j-log4j12</exclude>

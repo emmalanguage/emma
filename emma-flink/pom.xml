@@ -65,16 +65,16 @@
 
         <!-- Flink -->
         <dependency>
-            <groupId>eu.stratosphere</groupId>
-            <artifactId>flink-scala</artifactId>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-scala_${scala.tools.version}</artifactId>
         </dependency>
         <dependency>
-            <groupId>eu.stratosphere</groupId>
-            <artifactId>flink-java</artifactId>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-java_${scala.tools.version}</artifactId>
         </dependency>
         <dependency>
-            <groupId>eu.stratosphere</groupId>
-            <artifactId>flink-clients</artifactId>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-clients_${scala.tools.version}</artifactId>
         </dependency>
 
         <!-- Test -->
