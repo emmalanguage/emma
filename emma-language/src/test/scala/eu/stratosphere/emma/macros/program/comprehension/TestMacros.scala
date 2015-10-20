@@ -135,4 +135,62 @@ class TestMacros(val c: blackbox.Context) extends ControlFlow with Comprehension
 
     c.Expr[Unit](c.typecheck(code))
   }
+
+  /** Comprehend and unComprehend the algorithm to test the IR. */
+  def reComprehend[T: c.WeakTypeTag](e: Expr[T]) = {
+    // Create a normalized version of the original tree
+    val normalized = normalize(e.tree)
+
+    // ----------------------------------------------------------------------
+    // Code analysis
+    // ----------------------------------------------------------------------
+
+    // 1. Create control flow graph
+    implicit var cfGraph = createControlFlowGraph(normalized)
+    // 2. Identify and isolate maximal comprehensions
+    implicit var compView = createComprehensionView(cfGraph)
+
+    // ----------------------------------------------------------------------
+    // Code optimizations
+    // ----------------------------------------------------------------------
+
+    // 1. Inline comprehensions
+    val optimized = inlineComprehensions(normalized)
+    cfGraph = createControlFlowGraph(optimized)
+    compView = createComprehensionView(cfGraph)
+    // normalize filter predicates to CNF
+    // normalizePredicates(optimized)
+    // 2. Apply Fold-Group-Fusion where possible
+    foldGroupFusion(optimized)
+
+    // ----------------------------------------------------------------------
+    // Final object assembly
+    // ----------------------------------------------------------------------
+
+    val reComprehender = new ReComprehender(compView)
+
+    // construct algorithm object
+    q"""new _root_.eu.stratosphere.emma.api.Algorithm[${c.weakTypeOf[T]}] {
+        import _root_.scala.reflect._
+
+      def run(engine: _root_.eu.stratosphere.emma.runtime.Engine): ${c.weakTypeOf[T]} =
+        engine match {
+          case _: _root_.eu.stratosphere.emma.runtime.Native => runNative()
+          case _ => runParallel(engine)
+        }
+
+      private def runNative(): ${c.weakTypeOf[T]} =
+        { ${reComprehender.transform(optimized).unTypeChecked} }
+
+      private def runParallel(engine: _root_.eu.stratosphere.emma.runtime.Engine):
+        ${c.weakTypeOf[T]} = { ${compile(optimized, cfGraph, compView)} }
+    }""".typeChecked
+  }
+
+  class ReComprehender(compView: ComprehensionView) extends Transformer {
+    override def transform(tree: Tree): Tree = compView getByTerm tree match {
+      case Some(term) => unComprehend(term.comprehension.expr)
+      case None => super.transform(tree)
+    }
+  }
 }
