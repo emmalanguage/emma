@@ -37,20 +37,17 @@ private[emma] trait ComprehensionAnalysis
       // Find all top-level applications on methods from the comprehended API for this statement
       stmt traverse {
         // within an enclosing immutable ValDef
-        case vd @ q"$_ val $_: $_ = ${app @ Apply(f, _)}"
-          if api methods f.symbol =>
-            val symb = vd.asInstanceOf[ValDef].term
-            builder += symb.name -> app
+        case vd @ q"$_ val $_: $_ = ${ComprehendableTerm(app)}" =>
+          val symb = vd.asInstanceOf[ValDef].term
+          builder += symb.name -> app
         // within an enclosing mutable ValDef
-        case vd @ q"$_ var $_: $_ = ${app @ Apply(f, _)}"
-          if api methods f.symbol =>
-            val symb = vd.asInstanceOf[ValDef].term
-            builder += symb.name -> app
+        case vd @ q"$_ var $_: $_ = ${ComprehendableTerm(app)}" =>
+          val symb = vd.asInstanceOf[ValDef].term
+          builder += symb.name -> app
         // within an enclosing Assign
-        case as @ q"${_: Ident} = ${app @ Apply(f, _)}"
-          if api methods f.symbol =>
-            val symb = as.asInstanceOf[Assign].lhs.term
-            builder += symb.name -> app
+        case as @ q"${_: Ident} = ${ComprehendableTerm(app)}" =>
+          val symb = as.asInstanceOf[Assign].lhs.term
+          builder += symb.name -> app
         // anonymous term
         case app @ Apply(f, _)
           if api methods f.symbol =>
@@ -77,6 +74,21 @@ private[emma] trait ComprehensionAnalysis
 
     // Step #3: build the comprehension store
     new ComprehensionView(mutable.Seq(comprehendedTerms: _*))
+  }
+
+  object ComprehendableTerm {
+    def unapply(tree: Tree): Option[Tree] = {
+      tree match {
+        case q"${app @ Apply(f, _)}"
+          if api methods f.symbol =>
+            Some(app)
+        case q"${app @ Apply(f, _)}: $_"
+          if api methods f.symbol =>
+            Some(app)
+        case _ =>
+          None
+      }
+    }
   }
 
   /**
