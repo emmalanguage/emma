@@ -186,6 +186,37 @@ abstract class BaseCodegenTest(rtName: String) {
     })
   }
 
+  @Test def testFlatMapComprehensionUncorrelatedResult(): Unit = {
+    val inp = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
+
+    val max = 3
+    val min = 9
+    val len = 10
+
+    compareWithNative(emma.parallelize {
+      for {
+        l <- DataBag(inp)
+        w <- DataBag(l.split("\\W+").filter(w => w.length > min && w.length < max))
+        if w.length > len
+      } yield w
+    })
+  }
+
+  @Test def testFlatMapComprehensionCorrelatedResult(): Unit = {
+    val inp = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
+
+    val max = 3
+    val min = 9
+    val len = 10
+
+    compareWithNative(emma.parallelize {
+      for {
+        l <- DataBag(inp)
+        w <- DataBag(l.split("\\W+"))
+      } yield (l, w)
+    })
+  }
+
   // --------------------------------------------------------------------------
   // Distinct and Union
   // --------------------------------------------------------------------------

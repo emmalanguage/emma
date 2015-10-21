@@ -1,6 +1,5 @@
 package eu.stratosphere.emma.macros.program.comprehension
 
-import eu.stratosphere.emma.api
 import eu.stratosphere.emma.macros.BlackBoxUtil
 import scala.collection.mutable
 
@@ -8,9 +7,49 @@ import scala.collection.mutable
 private[emma] trait ComprehensionModel extends BlackBoxUtil {
   import universe._
 
+  // --------------------------------------------------------------------------
+  // Comprehension API
+  // --------------------------------------------------------------------------
+
+  /** A set of API method symbols to be comprehended. */
+  protected object api {
+    val moduleSymbol     = rootMirror.staticModule("eu.stratosphere.emma.api.package")
+    val bagSymbol        = rootMirror.staticClass("eu.stratosphere.emma.api.DataBag")
+    val groupSymbol      = rootMirror.staticClass("eu.stratosphere.emma.api.Group")
+    val statefulSymbol   = rootMirror.staticClass("eu.stratosphere.emma.api.Stateful.Bag")
+
+    val apply            = bagSymbol.companion.info.decl(TermName("apply"))
+    val read             = moduleSymbol.info.decl(TermName("read"))
+    val write            = moduleSymbol.info.decl(TermName("write"))
+    val stateful         = moduleSymbol.info.decl(TermName("stateful"))
+    val fold             = bagSymbol.info.decl(TermName("fold"))
+    val map              = bagSymbol.info.decl(TermName("map"))
+    val flatMap          = bagSymbol.info.decl(TermName("flatMap"))
+    val withFilter       = bagSymbol.info.decl(TermName("withFilter"))
+    val groupBy          = bagSymbol.info.decl(TermName("groupBy"))
+    val minus            = bagSymbol.info.decl(TermName("minus"))
+    val plus             = bagSymbol.info.decl(TermName("plus"))
+    val distinct         = bagSymbol.info.decl(TermName("distinct"))
+    val fetchToStateless = statefulSymbol.info.decl(TermName("bag"))
+    val updateWithZero   = statefulSymbol.info.decl(TermName("updateWithZero"))
+    val updateWithOne    = statefulSymbol.info.decl(TermName("updateWithOne"))
+    val updateWithMany   = statefulSymbol.info.decl(TermName("updateWithMany"))
+
+    val methods = Set(
+      read, write,
+      stateful, fetchToStateless, updateWithZero, updateWithOne, updateWithMany,
+      fold,
+      map, flatMap, withFilter,
+      groupBy,
+      minus, plus, distinct
+    ) ++ apply.alternatives
+
+    val monadic = Set(map, flatMap, withFilter)
+  }
+
   // Type constructors
-  val DATA_BAG = typeOf[api.DataBag[Nothing]].typeConstructor
-  val GROUP    = typeOf[api.Group[Nothing, Nothing]].typeConstructor
+  val DATA_BAG = typeOf[eu.stratosphere.emma.api.DataBag[Nothing]].typeConstructor
+  val GROUP    = typeOf[eu.stratosphere.emma.api.Group[Nothing, Nothing]].typeConstructor
 
   // --------------------------------------------------------------------------
   // Comprehension Model
@@ -689,8 +728,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       """.stripMargin.trim
 
       case c.Distinct(xs) => s"""
-        |distinct (${pp(xs)})
-        |       ${offset + pp(xs, offset)})
+        |distinct (
+        |       ${offset + pp(xs, offset + " " * 8)})
       """.stripMargin.trim
 
       case c.Union(xs, ys) => s"""
@@ -761,11 +800,18 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
     // -----------------------------------------------------
 
     // for { x <- xs; y <- ys; if p; if q } yield f(x, y)
-    case Comprehension(head, qualifiers) =>
-      q"""for (..${qualifiers collect {
-        case Generator(x, xs) => fq"${x.name} <- ${unComprehend(xs)}"
-        case Filter(p) => fq"if ${unComprehend(p)}"
-      }}) yield ${unComprehend(head)}"""
+    case Comprehension(head, Generator(lhs, rhs) :: FilterPrefix(fs, qs)) =>
+      // apply all filters to the uncomprehended 'rhs' first
+      val xs = fs.foldLeft(unComprehend(rhs))((res, fil) => {
+        q"$res.withFilter(${mk anonFun (List(lhs.name -> lhs.info), unComprehend(fil.expr))})"
+      })
+      // append a map or a flatMap to the result depending on the size of the residual qualifier sequence 'qs'
+      qs match {
+        case Nil =>
+          q"$xs.map(${mk anonFun (List(lhs.name -> lhs.info), unComprehend(head))})"
+        case _ =>
+          q"$xs.flatMap(${mk anonFun (List(lhs.name -> lhs.info), unComprehend(Comprehension(head, qs)))})"
+      }
 
     // xs map f
     case combinator.Map(f, xs) =>
@@ -891,4 +937,13 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       val combinator = expr.getClass.getSimpleName
       throw new UnsupportedOperationException(s"Unsupported combinator: $combinator")
   }).typeChecked
+
+  /** Helper pattern matcher. Matches a prefix of Filters in a Qualifier sequence. */
+  object FilterPrefix {
+    def unapply(qs: List[Qualifier]): Option[(List[Filter], List[Qualifier])] = {
+      val flts = qs takeWhile { _.isInstanceOf[Filter] } collect { case filter @ Filter(_) => filter }
+      val rest = qs dropWhile { _.isInstanceOf[Filter] }
+      Some(flts, rest)
+    }
+  }
 }
