@@ -13,42 +13,6 @@ private[emma] trait ComprehensionAnalysis
 
   import universe._
 
-  /** A set of API method symbols to be comprehended. */
-  protected object api {
-    val moduleSymbol     = rootMirror.staticModule("eu.stratosphere.emma.api.package")
-    val bagSymbol        = rootMirror.staticClass("eu.stratosphere.emma.api.DataBag")
-    val groupSymbol      = rootMirror.staticClass("eu.stratosphere.emma.api.Group")
-    val statefulSymbol   = rootMirror.staticClass("eu.stratosphere.emma.api.Stateful.Bag")
-
-    val apply            = bagSymbol.companion.info.decl(TermName("apply"))
-    val read             = moduleSymbol.info.decl(TermName("read"))
-    val write            = moduleSymbol.info.decl(TermName("write"))
-    val stateful         = moduleSymbol.info.decl(TermName("stateful"))
-    val fold             = bagSymbol.info.decl(TermName("fold"))
-    val map              = bagSymbol.info.decl(TermName("map"))
-    val flatMap          = bagSymbol.info.decl(TermName("flatMap"))
-    val withFilter       = bagSymbol.info.decl(TermName("withFilter"))
-    val groupBy          = bagSymbol.info.decl(TermName("groupBy"))
-    val minus            = bagSymbol.info.decl(TermName("minus"))
-    val plus             = bagSymbol.info.decl(TermName("plus"))
-    val distinct         = bagSymbol.info.decl(TermName("distinct"))
-    val fetchToStateless = statefulSymbol.info.decl(TermName("bag"))
-    val updateWithZero   = statefulSymbol.info.decl(TermName("updateWithZero"))
-    val updateWithOne    = statefulSymbol.info.decl(TermName("updateWithOne"))
-    val updateWithMany   = statefulSymbol.info.decl(TermName("updateWithMany"))
-
-    val methods = Set(
-      read, write,
-      stateful, fetchToStateless, updateWithZero, updateWithOne, updateWithMany,
-      fold,
-      map, flatMap, withFilter,
-      groupBy,
-      minus, plus, distinct
-    ) ++ apply.alternatives
-
-    val monadic = Set(map, flatMap, withFilter)
-  }
-
   // --------------------------------------------------------------------------
   // Comprehension Store Constructor
   // --------------------------------------------------------------------------
