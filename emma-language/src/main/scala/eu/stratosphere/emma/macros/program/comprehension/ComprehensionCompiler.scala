@@ -44,7 +44,7 @@ private[emma] trait ComprehensionCompiler
       val root = combine(term.comprehension).expr
 
       // Extract the comprehension closure
-      val closure = term.comprehension.freeTerms
+      val closure = term.comprehension.closure
 
       // Get the TermName associated with this comprehended term
       val name = term.id.encodedName
@@ -178,16 +178,16 @@ private[emma] trait ComprehensionCompiler
         q"ir.StatefulFetch($statefulNameStr, $stateful)"
 
       case combinator.UpdateWithZero(stateful, udf) =>
-        val stateTpe = stateful.trueType.typeArgs.head
-        val keyTpe   = stateful.trueType.typeArgs(1)
+        val stateTpe = stateful.preciseType.typeArgs.head
+        val keyTpe   = stateful.preciseType.typeArgs(1)
         val outTpe   = expr.elementType
         val statefulNameStr = stateful.name.toString
         val udfStr          = serialize(udf)
         q"ir.UpdateWithZero[$stateTpe, $keyTpe, $outTpe]($statefulNameStr, $stateful, $udfStr)"
 
       case combinator.UpdateWithOne(stateful, upds, keySel, udf) =>
-        val stateTpe = stateful.trueType.typeArgs.head
-        val keyTpe   = stateful.trueType.typeArgs(1)
+        val stateTpe = stateful.preciseType.typeArgs.head
+        val keyTpe   = stateful.preciseType.typeArgs(1)
         val updTpe   = upds.elementType
         val outTpe   = expr.elementType
         val statefulNameStr = stateful.name.toString
@@ -197,8 +197,8 @@ private[emma] trait ComprehensionCompiler
         q"ir.UpdateWithOne[$stateTpe, $keyTpe, $updTpe, $outTpe]($statefulNameStr, $stateful, $usStr, $keySelStr, $udfStr)"
 
       case combinator.UpdateWithMany(stateful, upds, keySel, udf) =>
-        val stateTpe = stateful.trueType.typeArgs.head
-        val keyTpe   = stateful.trueType.typeArgs(1)
+        val stateTpe = stateful.preciseType.typeArgs.head
+        val keyTpe   = stateful.preciseType.typeArgs(1)
         val updTpe   = upds.elementType
         val outTpe   = expr.elementType
         val statefulNameStr = stateful.name.toString
@@ -219,16 +219,16 @@ private[emma] trait ComprehensionCompiler
      * @return A [[String]] representation of the [[Tree]]
      */
     private def serialize(tree: Tree): String = {
-      val args = tree.freeTerms.toList
-        .sortBy { _.fullName }
-        .map { sym =>
-          sym.name ->
-            (sym.info match {
-              // The following line converts a method type to a function type (eg. from "(x: Int)Int" to "Int => Int").
-              // This is necessary, because this will go into a parameter list, where we can't have method types.
-              case _: MethodType => q"$sym _".trueType
-              case _             => sym.info
-            })
+      val args = tree.closure.toList
+        .sortBy { _.name.toString }
+        .map { term =>
+          term.withType(term.info match {
+            // The following line converts a method type to a function type (eg. from "(x: Int)Int"
+            // to "Int => Int"). This is necessary, because this will go into a parameter list,
+            // where we can't have method types.
+            case _: MethodType => q"$term _".preciseType
+            case _ => term.preciseType
+          }).asTerm
         }
 
       val fun = mk.anonFun(args, tree)
