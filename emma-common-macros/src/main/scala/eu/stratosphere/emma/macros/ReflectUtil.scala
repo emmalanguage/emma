@@ -47,7 +47,7 @@ trait ReflectUtil {
   lazy val J_BIG_INT = typeOf[java.math.BigInteger]
   lazy val J_BIG_DEC = typeOf[java.math.BigDecimal]
 
-  lazy val PAIR  = TUPLE(2)
+  lazy val PAIR = TUPLE(2)
   lazy val ARRAY = typeOf[Array[Nothing]].typeConstructor
 
   lazy val TUPLE = Map(1 to 22 map { n =>
@@ -78,19 +78,14 @@ trait ReflectUtil {
   def typeCheck(tree: Tree): Tree
 
   /** Create a new [[TermSymbol]]. */
-  def termSym(
-      owner: Symbol,
-      name:  TermName,
-      tpe:   Type,
-      flags: FlagSet  = Flag.SYNTHETIC,
-      pos:   Position = NoPosition): TermSymbol
+  def termSym(owner: Symbol, name: TermName, tpe: Type,
+      flags: FlagSet = Flag.SYNTHETIC,
+      pos: Position = NoPosition): TermSymbol
 
   /** Create a new [[TypeSymbol]]. */
-  def typeSym(
-     owner: Symbol,
-     name:  TypeName,
-     flags: FlagSet  = Flag.SYNTHETIC,
-     pos:   Position = NoPosition): TypeSymbol
+  def typeSym(owner: Symbol, name: TypeName,
+     flags: FlagSet = Flag.SYNTHETIC,
+     pos: Position = NoPosition): TypeSymbol
 
   /** Generate a new [[TermName]]. */
   def freshName(prefix: String): TermName =
@@ -119,62 +114,48 @@ trait ReflectUtil {
   /** [[Tree]] constructors. */
   object mk {
 
-    def ref(sym: TermSymbol): Ident =
-      mkIdent(sym).withType(sym.info).as[Ident]
+    def ref(term: TermSymbol): Ident =
+      Ident(term.name).withSym(term).as[Ident]
 
-    def bind(sym: TermSymbol, rhs: Tree = EmptyTree): Bind =
-      Bind(sym.name, rhs).withSym(sym).as[Bind]
+    def bind(term: TermSymbol,
+        rhs: Tree = Ident(termNames.WILDCARD)): Bind =
+      Bind(term.name, rhs).withSym(term).as[Bind]
 
-    def freeTerm(
-        name:   String,
-        tpe:    Type,
-        flags:  FlagSet = Flag.SYNTHETIC,
-        origin: String  = null): TermSymbol =
-      newFreeTerm(name, null, flags, origin).withInfo(tpe).asTerm
+    def freeTerm(name: String, tpe: Type,
+        flags: FlagSet = Flag.SYNTHETIC,
+        origin: String = null): TermSymbol =
+      newFreeTerm(name, null, flags, origin).withType(tpe.precise).asTerm
 
-    def freeType(
-        name:   String,
-        flags:  FlagSet = Flag.SYNTHETIC,
-        origin: String  = null): TypeSymbol =
+    def freeType(name: String,
+        flags: FlagSet = Flag.SYNTHETIC,
+        origin: String = null): TypeSymbol =
       newFreeType(name, flags, origin)
 
-    def valDef(sym: TermSymbol): ValDef =
-      valDef(sym, EmptyTree)
+    def valDef(term: TermSymbol): ValDef =
+      valDef(term, EmptyTree)
 
-    def valDef(sym: TermSymbol, rhs: Tree): ValDef =
-      internal.valDef(sym, rhs).withType(sym.info).as[ValDef]
+    def valDef(term: TermSymbol, rhs: Tree): ValDef =
+      internal.valDef(term, rhs)
 
-    def valDef(name: TermName, tpt: Tree): ValDef =
-      valDef(name, tpt, EmptyTree)
+    def valDef(name: TermName, tpe: Type,
+        owner: Symbol = NoSymbol,
+        flags: FlagSet = Flag.SYNTHETIC,
+        pos: Position = NoPosition,
+        rhs: Tree = EmptyTree): ValDef =
+      valDef(termSym(owner, name, tpe.precise, flags, pos).asTerm, rhs)
 
-    def valDef(name: TermName, tpt: Tree, rhs: Tree): ValDef =
-      valDef(name, tpt, Flag.SYNTHETIC, rhs)
+    def anonFun(args: List[TermSymbol], body: Tree,
+        owner: Symbol = NoSymbol,
+        flags: FlagSet = Flag.SYNTHETIC,
+        pos: Position = NoPosition): Function = {
+      val argTypes = args.map { _.preciseType }
+      val funType = FUN(args.size)(argTypes :+ body.preciseType: _*)
+      val funSym = termSym(owner, TermName("anonfun"), funType, flags, pos)
+      val params = for ((arg, tpe) <- args zip argTypes)
+        yield valDef(arg.name, tpe, funSym, Flag.SYNTHETIC | Flag.PARAM, pos)
 
-    def valDef(name: TermName, tpt: Tree, flags: FlagSet, rhs: Tree): ValDef =
-      ValDef(Modifiers(flags), name, tpt, rhs).withType(tpt.trueType).as[ValDef]
-
-    def valDef(
-        name:  TermName,
-        tpe:   Type,
-        owner: Symbol   = NoSymbol,
-        flags: FlagSet  = Flag.SYNTHETIC,
-        pos:   Position = NoPosition,
-        rhs:   Tree     = EmptyTree): ValDef =
-      valDef(termSym(owner, name, tpe, flags, pos).asTerm, rhs)
-
-    def anonFun(
-        args:  List[(TermName, Type)],
-        body:  Tree,
-        owner: Symbol   = NoSymbol,
-        flags: FlagSet  = Flag.SYNTHETIC,
-        pos:   Position = NoPosition): Function = {
-      val tpe    = FUN(args.size)(args.map { _._2 } :+ body.trueType: _*)
-      val sym    = termSym(owner, TermName("anonfun"), tpe, flags, pos)
-      val params = for ((name, tpe) <- args)
-        yield valDef(name, tpe, sym, Flag.SYNTHETIC | Flag.PARAM, pos)
-
-      val substituted = body.substitute((for (p <- params) yield p.name -> ref(p.term)): _*)
-      Function(params, substituted).withSym(sym).as[Function]
+      val tree = body.rename(args zip params.map { _.term }: _*)
+      Function(params, tree).withSym(funSym).as[Function]
     }
 
     def select(sym: Symbol): Tree =
@@ -192,22 +173,14 @@ trait ReflectUtil {
   class TreeOps(self: Tree) {
 
     /** @return `true` if this [[Tree]] is annotated with a [[Type]], `false` otherwise */
-    def hasType: Boolean = {
-      val tpe = self.tpe
-      tpe != null && tpe != NoType
-    }
+    def hasType: Boolean = self.tpe != null && self.tpe != NoType
 
     /** @return `true` if this [[Tree]] is annotated with a [[Symbol]], `false` otherwise */
-    def hasSymbol: Boolean = {
-      val sym = self.symbol
-      sym != null && sym != NoSymbol
-    }
+    def hasSymbol: Boolean = self.symbol != null && self.symbol != NoSymbol
 
     /** @return `true` if this [[Tree]] has an owner, `false` otherwise */
-    def hasOwner: Boolean = hasSymbol && {
-      val owner = self.symbol.owner
-      owner != null && owner != NoSymbol
-    }
+    def hasOwner: Boolean = hasSymbol &&
+      self.symbol.owner != null && self.symbol.owner != NoSymbol
 
     /** @return This [[Tree]]'s owner */
     def owner: Symbol = self.symbol.owner
@@ -219,14 +192,10 @@ trait ReflectUtil {
     def reTypeChecked: Tree = reTypeCheck(self)
 
     /** @return The most precise [[Type]] of this [[Tree]] */
-    def trueType: Type = {
-      if (hasType) self.tpe
-      else if (hasSymbol && self.symbol.hasInfo) self.symbol.info
-      else typeChecked.tpe
-    }.precise
-
-    /** @return The [[Type]] argument used to initialize the [[Type]] if this [[Tree]] */
-    def elementType: Type = trueType.typeArgs.head
+    def preciseType: Type =
+      if (hasType) self.tpe.precise
+      else if (hasSymbol && self.symbol.hasType) self.symbol.preciseType
+      else typeChecked.tpe.precise
 
     /** @return The [[TermSymbol]] of this [[Tree]] */
     def term: TermSymbol = self.symbol.asTerm
@@ -241,7 +210,7 @@ trait ReflectUtil {
      * @return This [[Tree]] with its [[Type]] set
      */
     def withType(tpe: Type): Tree =
-      setType(self, tpe)
+      setType(self, tpe.precise)
 
     /**
      * Annotate this [[Tree]] with a specified [[Type]].
@@ -255,34 +224,30 @@ trait ReflectUtil {
     /**
      * Annotate this [[Tree]] with a specified [[Symbol]].
      *
-     * @param sym The [[Symbol]] to use for this [[Tree]]
+     * @param symbol The [[Symbol]] to use for this [[Tree]]
      * @return This [[Tree]] with its [[Symbol]] set
      */
-    def withSym(sym: Symbol): Tree = {
-      val tree = setSymbol(self, sym)
-      if (sym.hasInfo) tree withType sym.info else tree
+    def withSym(symbol: Symbol): Tree = {
+      val tree = setSymbol(self, symbol)
+      if (symbol.hasType) tree withType symbol.preciseType else tree
     }
 
     /** Type-check this [[Tree]] if it doesn't have a [[Type]]. */
     lazy val typeChecked: Tree = if (hasType) self else typeCheck(self)
 
-    /** Collect the [[Symbol]]s of all bound variables in this [[Tree]]. */
+    /** The [[Symbol]]s of all bound variables in this [[Tree]]. */
     lazy val definitions: Set[TermSymbol] = typeChecked.collect {
-      case dd: DefDef if dd.hasTerm => dd.term
-      case vd: ValDef if vd.hasTerm => vd.term
-      case bd: Bind   if bd.hasTerm => bd.term
-    }.toSet
+      case defTree @ (_: DefDef | _: ValDef | _: Bind) => defTree
+    }.filter { _.hasTerm }.map { _.term }.toSet
 
-    /** Collect the [[Symbol]]s of all variables referenced in this [[Tree]]. */
+    /** The [[Symbol]]s of all variables referenced in this [[Tree]]. */
     lazy val references: Set[TermSymbol] = typeChecked.collect {
-      case id: Ident if id.hasTerm && (id.term.isVal || id.term.isVar || id.term.isMethod) => id.term
+      case id: Ident if id.hasTerm &&
+        (id.term.isVal || id.term.isVar || id.term.isMethod) => id.term
     }.toSet
 
-    /** Collect the [[Symbol]]s of all free variables in this [[Tree]]. */
-    lazy val freeTerms: Set[TermSymbol] = references diff definitions
-
-    /** Collect the [[TermName]]s of all free variables in this [[Tree]]. */
-    lazy val closure: Set[TermName] = freeTerms map { _.name }
+    /** The [[Symbol]]s of all free variables in this [[Tree]]. */
+    lazy val closure: Set[TermSymbol] = references diff definitions
 
     /**
      * Recursively apply a depth-first transformation to this [[Tree]].
@@ -292,9 +257,9 @@ trait ReflectUtil {
      */
     def transform(pf: Tree ~> Tree): Tree = new Transformer {
       override def transform(tree: Tree): Tree =
-        if (pf isDefinedAt tree) pf(tree)
+        if (pf.isDefinedAt(tree)) pf(tree)
         else super.transform(tree)
-    } transform self
+    }.transform(self)
 
     /**
      * Recursively apply a depth-first traversal to this [[Tree]].
@@ -303,9 +268,9 @@ trait ReflectUtil {
      */
     def traverse(pf: Tree ~> Unit): Unit = new Traverser {
       override def traverse(tree: Tree): Unit =
-        if (pf isDefinedAt tree) pf(tree)
+        if (pf.isDefinedAt(tree)) pf(tree)
         else super.traverse(tree)
-    } traverse self
+    }.traverse(self)
 
     /**
      * Recursively remove all layers of type ascriptions from this [[Tree]].
@@ -319,7 +284,7 @@ trait ReflectUtil {
     }
 
     /**
-     * Bind a name to a value in this [[Tree]].
+     * Bind a [[Name]] to a value in this [[Tree]].
      * 
      * @param name The [[TermName]] to bind
      * @param value The [[Tree]] to bind the name to
@@ -329,81 +294,77 @@ trait ReflectUtil {
       bind(name -> value)
 
     /**
-     * Bind a [[Map]] of name-value pairs in this [[Tree]].
-     *
-     * @param dict A dictionary of name-value pairs to bind
-     * @return This [[Tree]] with all names in `dict` bound to their respective values
-     */
-    def bind(dict: Map[TermName, Tree]): Tree =
-      bind(dict.toSeq: _*)
-
-    /**
      * Bind a sequence of name-value pairs in this [[Tree]].
      *
      * @param bindings A sequence of name-value pairs to bind
      * @return This [[Tree]] with all names in `kvs` bound to their respective values
      */
     def bind(bindings: (TermName, Tree)*): Tree =
-      q"{ ..${for ((k, v) <- bindings) yield q"val $k = $v"}; $self }"
-
-
-    /**
-     * Replace a sequence of identifiers in this [[Tree]] with fresh [[TermName]]s.
-     *
-     * @param names The sequence of identifiers to rename
-     * @return This [[Tree]] with the specified names replaced
-     */
-    def refresh(names: TermName*): Tree =
-      rename((for (n <- names) yield n -> freshName(n.toString)): _*)
+      if (bindings.isEmpty) self else
+        q"{ ..${for ((k, v) <- bindings) yield q"val $k = $v"}; $self }"
 
     /**
-     * Replace a specified identifier in this [[Tree]] with a new one.
+     * Bind a [[Symbol]] to a value in this [[Tree]].
      *
-     * @param key The [[TermName]] to replace
-     * @param alias A new [[TermName]] to use in place of the old one
-     * @return This [[Tree]] with the specified name replaced
+     * @param term The [[Symbol]] to bind
+     * @param value The [[Tree]] to bind the name to
+     * @return This [[Tree]] with `term` bound to `value`
      */
-    def rename(key: TermName, alias: TermName): Tree =
-      rename(key -> alias)
+    def bind(term: TermSymbol, value: Tree): Tree =
+      bind(Map(term -> value))
 
     /**
-     * Replace a sequence of identifiers in this [[Tree]] with their respective aliases.
+     * Bind a dictionary of [[Symbol]]-value pairs in this [[Tree]].
      *
-     * @param aliases The sequence of identifiers to rename
-     * @return This [[Tree]] with the specified names replaced
+     * @param dict A [[Map]] of [[Symbol]]-value pairs to bind
+     * @return This [[Tree]] with all [[Symbol]]s in `dict` bound to their respective values
      */
-    def rename(aliases: (TermName, TermName)*): Tree =
-      rename(aliases.toMap)
+    def bind(dict: Map[TermSymbol, Tree]): Tree =
+      if (dict.isEmpty) self else {
+        val bindings = dict filterKeys closure map { case (k, v) =>
+          val name = freshName(k.name.toString)
+          (k: Symbol, mk.valDef(name, k.preciseType, k.owner, pos = k.pos, rhs = v))
+        }
+
+        val body = self.rename(bindings mapValues { _.term })
+        q"{ ..${bindings.values}; $body }" withType preciseType
+      }
 
     /**
-     * Replace a [[Map]] of identifiers in this [[Tree]] with their respective aliases.
+     * Replace occurrences of the `find` [[Tree]] with the `replacement` [[Tree]].
      *
-     * @param dict A dictionary of aliases to be renames
-     * @return This [[Tree]] with the specified names replaced
+     * @param find The [[Tree]] to look for
+     * @param replacement The [[Tree]] that should replace `find`
+     * @return A substituted version of the enclosing [[Tree]]
      */
-    def rename(dict: Map[TermName, TermName]): Tree = transform {
+    def substitute(find: Tree, replacement: Tree): Tree =
+      transform { case `find` => replacement }
+
+    @deprecated("DANGER: Use `rename(aliases: (Symbol, TermSymbol)*)` instead.", "0.1.0")
+    def refresh_!(names: TermName*): Tree =
+      rename_!((for (n <- names) yield n -> freshName(n.toString)).toMap)
+
+    @deprecated("DANGER: Use `rename(dict: Map[Symbol, TermName])` instead.", "0.1.0")
+    def rename_!(dict: Map[TermName, TermName]): Tree = transform {
       // reference
       case Ident(name: TermName) if dict contains name =>
         Ident(dict(name))
 
       // case name => ...
       case Bind(name: TermName, body) if dict contains name =>
-        Bind(dict(name), body rename dict)
+        Bind(dict(name), body rename_! dict)
 
       // val name = ...
       case ValDef(mods, name, tpt, rhs) if dict contains name =>
-        ValDef(mods, dict(name), tpt, rhs rename dict)
+        ValDef(mods, dict(name), tpt, rhs rename_! dict)
     }
 
-    /**
-     * Replace all free occurrences of an identifier with a source code snippet in this [[Tree]].
-     *
-     * @param key The [[TermName]] to replace
-     * @param value The source code [[Tree]] to substitute
-     * @return This [[Tree]] with the substituted source code
-     */
-    def substitute(key: TermName, value: Tree): Tree = {
-      val closure = value.closure
+    @deprecated("""DANGER: Think carefully!
+    | Usually you can use a combination of `bind` and `rename` instead.
+    | Consider the following example: `(x + 5).substitute("x", 42) == { val x = 42; x + 5 }`
+    |""".stripMargin, "0.1.0")
+    def substitute_!(key: TermName, value: Tree): Tree = {
+      val closure = value.closure map { _.name }
       transform {
         // reference
         case Ident(`key`) => value
@@ -412,21 +373,21 @@ trait ReflectUtil {
         // case name => ...
         case bd @ Bind(`key`, _) => bd
         case bd @ Bind(name: TermName, _) if closure(name) =>
-          bd.refresh(name).substitute(key, value)
+          bd.refresh_!(name).substitute_!(key, value)
 
         // val name = ...
         case vd @ ValDef(_, `key`, _, _) => vd
         case vd @ ValDef(_, name, _, _) if closure(name) =>
-          vd.refresh(name).substitute(key, value)
+          vd.refresh_!(name).substitute_!(key, value)
 
         // (args: _*) => ...
         case fn @ Function(args, _) if args exists { _.name == key } => fn
         case fn @ Function(args, _) if args exists { arg => closure(arg.name) } =>
-          fn.refresh(args map { _.name } filter closure: _*).substitute(key, value)
+          fn.refresh_!(args map { _.name } filter closure: _*).substitute_!(key, value)
 
         // { ... lazy val name = ... }
         case bl: Block if bl.children exists {
-          case vd @ ValDef(_, `key`, _, _) => vd.isLazy
+          case vd @ ValDef(_, `key`, _, _) => vd.mods hasFlag Flag.LAZY
           case _ => false
         } => bl
 
@@ -434,9 +395,9 @@ trait ReflectUtil {
         case bl: Block if bl.children exists {
           case vd @ ValDef(_, name, _, _) => closure(name)
           case _ => false
-        } => bl.refresh(bl.children collect {
+        } => bl.refresh_!(bl.children collect {
           case vd @ ValDef(_, name, _, _) if closure(name) => name
-        }: _*).substitute(key, value)
+        }: _*).substitute_!(key, value)
 
         // { ... val name = ... }
         case bl: Block if bl.children exists {
@@ -446,41 +407,39 @@ trait ReflectUtil {
           case vd: ValDef => vd.name != key
           case _ => true
         } match { case (pre, post) =>
-          Block(pre.map { _.substitute(key, value) } ::: post.init, post.last)
+          Block(pre.map { _.substitute_!(key, value) } ::: post.init, post.last)
         }
       }
     }
 
     /**
-     * Replace all free occurrences of a sequence of identifiers with their respective source code
-     * snippets in this [[Tree]].
-     *
-     * @param kvs A sequence of [[TermName]]s and code snippets to substitute
-     * @return This [[Tree]] with the substituted code snippets
+     * Replace a dictionary of [[Symbol]]s with references to their aliases.
+     * 
+     * @param dict A [[Map]] of aliases to replace
+     * @return This [[Tree]] with the specified [[Symbol]]s replaced 
      */
-    def substitute(kvs: (TermName, Tree)*): Tree =
-      kvs.foldLeft(self) { case (tree, (key, value)) => tree.substitute(key, value) }
+    def rename(dict: Map[Symbol, TermSymbol]): Tree =
+      if (dict.isEmpty) self else
+        transform { case id: Ident if dict contains id.symbol => mk ref dict(id.symbol) }
 
     /**
-     * Replace all free occurrences of a [[Map]] of identifiers with their respective source code
-     * snippets in this [[Tree]].
+     * Replace a sequence of [[Symbol]]s with references to their aliases.
      *
-     * @param dict A dictionary of [[TermName]]s and code snippets to substitute
-     * @return This [[Tree]] with the substituted code snippets
+     * @param aliases A sequence of aliases to replace
+     * @return This [[Tree]] with the specified [[Symbol]]s replaced
      */
-    def substitute(dict: Map[TermName, Tree]): Tree =
-      substitute(dict.toSeq: _*)
+    def rename(aliases: (Symbol, TermSymbol)*): Tree =
+      rename(aliases.toMap)
 
     /**
-     * Replace occurrences of the `find` [[Tree]] with the replacement [[Tree]] `repl`.
+     * Replace a [[Symbol]]s with a reference to an alias.
      *
-     * @param find The [[Tree]] to look for.
-     * @param repl The [[Tree]] that should replace `find`.
-     * @return A substituted version of the enclosing [[Tree]].
+     * @param key The [[Symbol]] to rename
+     * @param alias An alternative [[Symbol]] to use
+     * @return This [[Tree]] with the specified [[Symbol]] replaced
      */
-    def substitute(find: Tree, repl: Tree): Tree = transform {
-      case x if x == find => repl
-    }
+    def rename(key: Symbol, alias: TermSymbol): Tree =
+      rename(key -> alias)
 
     /**
      * Inline a value definitions in this [[Tree]]. It's assumed that it's part of the [[Tree]].
@@ -490,21 +449,8 @@ trait ReflectUtil {
      */
     def inline(valDef: ValDef): Tree = transform {
       case vd: ValDef if vd.symbol == valDef.symbol => q"()".withType[Unit]
-      case id: Ident  if id.symbol == valDef.symbol => valDef.rhs
+      case id: Ident if id.symbol == valDef.symbol => valDef.rhs
     }
-  }
-
-  /** Syntax sugar for [[ValDef]]s. */
-  implicit class ValDefOps(self: ValDef) {
-
-    /** @return `true` if the value definition is lazy, `false` otherwise */
-    def isLazy: Boolean = self.mods hasFlag Flag.LAZY
-
-    /** @return `true` if the value definition is implicit, `false` otherwise */
-    def isImplicit: Boolean = self.mods hasFlag Flag.IMPLICIT
-
-    /** @return This [[ValDef]] without a [[Symbol]] and a `rhs` */
-    def reset: ValDef = mk.valDef(self.name, self.tpt, self.mods.flags, EmptyTree)
   }
 
   /** Syntax sugar for [[Type]]s. */
@@ -512,9 +458,6 @@ trait ReflectUtil {
 
     /** @return The de-aliased and widened version of this [[Type]] */
     def precise: Type = self.finalResultType.widen
-
-    /** @return The [[Type]] argument used to initialize this [[Type]] constructor */
-    def elementType: Type = precise.typeArgs.head
 
     /**
      * Apply this [[Type]] as a [[Type]] constructor.
@@ -530,18 +473,16 @@ trait ReflectUtil {
   implicit class SymbolOps(self: Symbol) {
 
     /** Check if this [[Symbol]] has an associated [[Type]]. */
-    def hasInfo: Boolean = {
-      val info = self.info
-      info != null && info != NoType
-    }
+    def hasType: Boolean = self.info != null && self.info != NoType
 
     /** Set the `info` of this [[Symbol]]. */
-    def withInfo(info: Type): Symbol =
-      setInfo(self, info)
+    def withType(tpe: Type): Symbol = setInfo(self, tpe.precise)
 
     /** Set the `info` of this [[Symbol]]. */
-    def withInfo[T: TypeTag]: Symbol =
-      withInfo(typeOf[T])
+    def withType[T: TypeTag]: Symbol = withType(typeOf[T])
+
+    /** @return The most precise [[Type]] of this [[Symbol]] */
+    def preciseType: Type = self.info.precise
   }
 
   /** Syntax sugar for function call chain emulation. */
@@ -562,7 +503,6 @@ trait ReflectUtil {
 
   /** Syntax sugar for class casting. */
   implicit class As[A](self: A) {
-
     /** Alias for `this.asInstanceOf[B]`. */
     def as[B]: B = self.asInstanceOf[B]
   }

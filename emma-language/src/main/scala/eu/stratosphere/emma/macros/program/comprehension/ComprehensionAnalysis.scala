@@ -359,7 +359,7 @@ private[emma] trait ComprehensionAnalysis
             com.comprehension.substitute(foldTree, replTree)
           }
 
-          com.comprehension.substitute(gSym, gen.lhs)
+          com.comprehension.rename(gSym, gen.lhs)
         }
 
       // Ignore other expression types
@@ -434,34 +434,25 @@ private[emma] trait ComprehensionAnalysis
 
   /** Fuse a Group combinator with a list of Folds and return the resulting FoldGroup combinator. */
   private def foldGroup(group: combinator.Group, folds: List[combinator.Fold]) = folds match {
-    case fold :: Nil => combinator.FoldGroup(group.key, fold.empty, fold.sng, fold.union, group.xs)
+    case fold :: Nil =>
+      combinator.FoldGroup(group.key, fold.empty, fold.sng, fold.union, group.xs)
+
     case _ =>
       val combinator.Group(key, xs) = group
       // Derive the unique product 'empty' function
-      val empty = q"(..${for (f <- folds) yield f.empty})".typeChecked
+      val empty = q"(..${folds.map(_.empty)})".typeChecked
 
       // Derive the unique product 'sng' function
-      val x   = freshName("x")
-      val y   = freshName("y")
+      val x = freshName("x")
+      val y = freshName("y")
       val sng = q"($x: ${xs.elementType}) => (..${
-        for (f <- folds) yield {
-          val sng = f.sng.as[Function]
-          sng.body.rename(sng.vparams.head.name, x)
-        }
+        for (f <- folds) yield q"${f.sng}($x)"
       })".typeChecked
 
       // Derive the unique product 'union' function
       val union = q"($x: ${empty.tpe}, $y: ${empty.tpe}) => (..${
-        for ((f, i) <- folds.zipWithIndex) yield {
-          val tpe   = empty.tpe typeArgs i
-          val union = f.union.as[Function]
-          union.body substitute Map(
-            union.vparams.head.name ->
-              q"$x.${TermName(s"_${i + 1}")}".withType(tpe),
-
-            union.vparams(1).name ->
-              q"$y.${TermName(s"_${i + 1}")}".withType(tpe))
-        }
+        for { (f, i) <- folds.zipWithIndex; field = TermName(s"_${i+1}") }
+          yield q"${f.union}($x.$field, $y.$field)"
       })".typeChecked
 
       combinator.FoldGroup(key, empty, sng, union, xs)

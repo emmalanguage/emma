@@ -27,23 +27,23 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
      *
      * @return The closure as a list lexicographically ordered by the [[Symbol]]s' [[TermName]]s
      */
-    def freeTerms: List[TermSymbol] = {
+    def closure: List[TermSymbol] = {
       val c = combinator
       expr.collect { // Combinators
-        case c.Map(f, _)                    => f.freeTerms
-        case c.FlatMap(f, _)                => f.freeTerms
-        case c.Filter(p, _)                 => p.freeTerms
-        case c.EquiJoin(kx, ky, _, _)       => kx.freeTerms union ky.freeTerms
-        case c.Group(k, _)                  => k.freeTerms
-        case c.Fold(em, sg, un, _, _)       => Set(em, sg, un)    flatMap { _.freeTerms }
-        case c.FoldGroup(k, em, sg, un, _)  => Set(k, em, sg, un) flatMap { _.freeTerms }
+        case c.Map(f, _)                    => f.closure
+        case c.FlatMap(f, _)                => f.closure
+        case c.Filter(p, _)                 => p.closure
+        case c.EquiJoin(kx, ky, _, _)       => kx.closure union ky.closure
+        case c.Group(k, _)                  => k.closure
+        case c.Fold(em, sg, un, _, _)       => Set(em, sg, un)    flatMap { _.closure }
+        case c.FoldGroup(k, em, sg, un, _)  => Set(k, em, sg, un) flatMap { _.closure }
         case c.TempSource(id) if id.hasTerm => Set(id.term)
         case c.StatefulCreate(_, _, _)      => Set.empty[TermSymbol]
         case c.StatefulFetch(id)            => Set(id.term)
-        case c.UpdateWithZero(id, f)        => Set(id.term) union f.freeTerms
-        case c.UpdateWithOne(id, _, ku, f)  => Set(id.term) union ku.freeTerms union f.freeTerms
-        case c.UpdateWithMany(id, _, ku, f) => Set(id.term) union ku.freeTerms union f.freeTerms
-      }.flatten.toList.distinct sortBy { _.fullName }
+        case c.UpdateWithZero(id, f)        => Set(id.term) union f.closure
+        case c.UpdateWithOne(id, _, ku, f)  => Set(id.term) union ku.closure union f.closure
+        case c.UpdateWithMany(id, _, ku, f) => Set(id.term) union ku.closure union f.closure
+      }.flatten.toList.distinct.sortBy { _.name.toString }
     }
 
     /**
@@ -71,21 +71,18 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
       }.flatten
     }
 
-    /** Substitute `find` with `repl` in all enclosing trees. */
-    def substitute(find: Tree, repl: Tree): Unit = {
-      val transformer = new ExpressionTransformer {
-        override def xform(tree: Tree) = tree.substitute(find, repl)
-      }
-      expr = transformer.transform(expr)
+    /** Substitute `find` with `replacement` in all enclosing trees. */
+    def substitute(find: Tree, replacement: Tree): Unit = {
+      expr = new ExpressionTransformer {
+        override def xform(tree: Tree) = tree.substitute(find, replacement)
+      }.transform(expr)
     }
 
-    def substitute(find: TermSymbol, repl: TermSymbol): Unit = {
-      val transformer = new ExpressionTransformer {
-        override def xform(tree: Tree) = tree transform {
-          case ident @ Ident(name: TermName) if ident.symbol == find => mk ref repl
-        }
-      }
-      expr = transformer.transform(expr)
+    /** Rename `key` to `alias` in all enclosing [[Tree]]s. */
+    def rename(key: Symbol, alias: TermSymbol): Unit = {
+      expr = new ExpressionTransformer {
+        override def xform(tree: Tree) = tree.rename(key, alias)
+      }.transform(expr)
     }
 
     override def toString =
@@ -98,7 +95,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
     def tpe: Type
 
     /** @return The element [[Type]] of this [[Expression]] */
-    def elementType: Type = tpe.elementType
+    def elementType: Type = tpe.precise.typeArgs.head
 
     /**
      * Recurse down the children of this [[Expression]] and apply a side-effecting function to each
@@ -141,7 +138,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         case combinator.UpdateWithZero(_, udf)                => Set(udf)
         case combinator.UpdateWithOne(_, _, uKeySel, udf)     => Set(uKeySel, udf)
         case combinator.UpdateWithMany(_, _, uKeySel, udf)    => Set(uKeySel, udf)
-      }).flatten.flatMap(_.freeTerms).toSet
+      }).flatten.flatMap(_.closure).toSet
       // Result is the intersection of both
       defined intersect used
     }
@@ -197,21 +194,9 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
   case class ScalaExpr(var tree: Tree) extends Expression {
 
-    def tpe = tree.trueType
+    def tpe = tree.preciseType
 
     def descend[U](f: Expression => U) = ()
-
-    /**
-     * Simultaneously substitutes all free occurrences of `key` with `value` in this expression
-     * and adapts its environment.
-     *
-     * @param key The old node to be substituted
-     * @param value The new node to be substituted in place of the old one
-     */
-    def substitute(key: TermName, value: ScalaExpr): Unit = {
-      // add all additional value.vars
-      tree = tree.substitute(key, value.tree)
-    }
   }
 
   // Combinators
@@ -221,7 +206,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
     sealed trait Combinator extends Expression
 
     case class Read(location: Tree, format: Tree) extends Combinator {
-      def tpe = DATA_BAG(format.elementType)
+      def tpe = DATA_BAG(format.preciseType.typeArgs.head)
       def descend[U](f: Expression => U) = ()
     }
 
@@ -231,7 +216,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
     }
 
     case class TempSource(id: Ident) extends Combinator {
-      val tpe = id.trueType
+      val tpe = id.preciseType
       def descend[U](f: Expression => U) = ()
     }
 
@@ -241,13 +226,13 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
     }
 
     case class Map(f: Tree, xs: Expression) extends Combinator {
-      def tpe = DATA_BAG(f.trueType.typeArgs.last)
+      def tpe = DATA_BAG(f.preciseType.typeArgs.last)
       def descend[U](f: Expression => U) = xs foreach f
     }
 
     case class FlatMap(f: Tree, xs: Expression) extends Combinator {
       // Since the return type of is DataBag[DataBag[T]], don't wrap!
-      def tpe = f.trueType.typeArgs.last
+      def tpe = f.preciseType.typeArgs.last
       def descend[U](f: Expression => U) = xs foreach f
     }
 
@@ -280,7 +265,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
     case class Group(var key: Tree, var xs: Expression) extends Combinator {
 
       def tpe = {
-        val K = key.trueType.typeArgs(1)
+        val K = key.preciseType.typeArgs(1)
         val V = DATA_BAG(xs.elementType)
         DATA_BAG(GROUP(K, V))
       }
@@ -296,7 +281,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         var xs:     Expression,
         var origin: Tree) extends Combinator {
 
-      def tpe = sng.trueType.typeArgs(1) // Function[A, B]#B
+      def tpe = sng.preciseType.typeArgs(1) // Function[A, B]#B
 
       def descend[U](f: Expression => U) = xs foreach f
     }
@@ -309,8 +294,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         var xs:    Expression) extends Combinator {
 
       def tpe = {
-        val K = key.trueType.typeArgs(1)
-        val V = sng.trueType.typeArgs(1)
+        val K = key.preciseType.typeArgs(1)
+        val V = sng.preciseType.typeArgs(1)
         DATA_BAG(GROUP(K, V))
       }
 
@@ -354,21 +339,21 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
     case class StatefulFetch(stateful: Ident) extends Combinator {
 
-      def tpe = DATA_BAG(stateful.trueType.typeArgs.head)
+      def tpe = DATA_BAG(stateful.preciseType.typeArgs.head)
 
       def descend[U](f: Expression => U) = {}
     }
 
     case class UpdateWithZero(stateful: Ident, udf: Tree) extends Combinator {
 
-      def tpe = udf.trueType.typeArgs.last
+      def tpe = udf.preciseType.typeArgs.last
 
       def descend[U](f: Expression => U) = {}
     }
 
     case class UpdateWithOne(stateful: Ident, updates: Expression, updateKeySel: Tree, udf: Tree) extends Combinator {
 
-      def tpe = udf.trueType.typeArgs.last
+      def tpe = udf.preciseType.typeArgs.last
 
       def descend[U](f: Expression => U) = {
         updates foreach f
@@ -377,7 +362,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
     case class UpdateWithMany(stateful: Ident, updates: Expression, updateKeySel: Tree, udf: Tree) extends Combinator {
 
-      def tpe = udf.trueType.typeArgs.last
+      def tpe = udf.preciseType.typeArgs.last
 
       def descend[U](f: Expression => U) = {
         updates foreach f
@@ -548,20 +533,6 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
   // --------------------------------------------------------------------------
 
   /**
-   * Type-check a [[Tree]] given a set of environment [[ValDef]]s as a closure. Performed only if
-   * the [[Tree]] hasn't already been type-checked.
-   *
-   * @param env A [[List]] of [[ValDef]]s that can be free in the [[Tree]]
-   * @param tree The [[Tree]] to be type-checked
-   * @return A type-checked version of the [[Tree]]
-   */
-  def typeCheckWith(env: List[ValDef], tree: Tree) =
-    if (tree.hasType) tree else {
-      val bindings = for (v <- env.reverse) yield v.name -> q"null.asInstanceOf[${v.tpt}]"
-      tree.bind(bindings: _*).typeChecked.as[Block].expr
-    }
-
-  /**
    * Pretty-print an IR tree. Currently tries to be smart about trimming some of the generated code,
    * e.g. sugar non-alphanumeric characters and shorten the names of predefined packages like
    * [[scala]], [[scala.Predef]] and [[eu.stratosphere.emma]]
@@ -623,7 +594,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
         s"${pp(expr)}"
 
       case Generator(lhs, rhs) =>
-        s"${lhs.name} ← ${pp(rhs, offset + " " * 3 + " " * lhs.fullName.length)}"
+        s"${lhs.name} ← ${pp(rhs, offset + " " * 3 + " " * lhs.name.toString.length)}"
 
       // Environment & Host Language Connectors
       case ScalaExpr(expr) =>

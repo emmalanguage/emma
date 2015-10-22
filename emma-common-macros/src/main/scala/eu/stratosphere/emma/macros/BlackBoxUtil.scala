@@ -9,15 +9,15 @@ trait BlackBoxUtil extends BlackBox with ReflectUtil {
   import universe._
   import c.internal._
 
-  def parse(str: String) =
-    c parse str
+  def parse(string: String) =
+    c.parse(string)
 
   def typeCheck(tree: Tree) =
     if (tree.isType) c.typecheck(tree, c.TYPEmode)
-    else c typecheck tree
+    else c.typecheck(tree)
 
   def termSym(owner: Symbol, name: TermName, tpe: Type, flags: FlagSet, pos: Position) =
-    newTermSymbol(owner, name, pos, flags).withInfo(tpe).asTerm
+    newTermSymbol(owner, name, pos, flags).withType(tpe.precise).asTerm
 
   def typeSym(owner: Symbol, name: TypeName, flags: FlagSet, pos: Position) =
     newTypeSymbol(owner, name, pos, flags)
@@ -48,7 +48,7 @@ trait BlackBoxUtil extends BlackBox with ReflectUtil {
      */
     def typingTransform(pf: (Tree, TypingTransformApi) ~> Tree): Tree =
       c.internal.typingTransform(typeChecked) {
-        case x if pf isDefinedAt x => pf(x)
+        case x if pf.isDefinedAt(x) => pf(x)
         case (tree, xform) => xform default tree
       }
 
@@ -64,7 +64,7 @@ trait BlackBoxUtil extends BlackBox with ReflectUtil {
      */
     def typingTransform(owner: Symbol)(pf: (Tree, TypingTransformApi) ~> Tree): Tree =
       c.internal.typingTransform(typeChecked, owner) {
-        case x if pf isDefinedAt x => pf(x)
+        case x if pf.isDefinedAt(x) => pf(x)
         case (tree, xform) => xform default tree
       }
 

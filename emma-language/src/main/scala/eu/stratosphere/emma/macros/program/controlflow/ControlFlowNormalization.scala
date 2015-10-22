@@ -85,7 +85,7 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
     override def transform(tree: Tree) = tree match {
       case sel @ Select(enclosing: This, name) if needsSubstitution(enclosing, sel) =>
         val alias = aliases.getOrElseUpdate(sel.symbol,
-          mk.valDef(TermName(s"__this$$$name"), sel.trueType, rhs = sel))
+          mk.valDef(TermName(s"__this$$$name"), sel.preciseType, rhs = sel))
 
         Ident(alias.name)
 

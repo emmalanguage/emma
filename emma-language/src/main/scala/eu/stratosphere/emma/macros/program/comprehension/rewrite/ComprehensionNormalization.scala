@@ -38,16 +38,18 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
     def fire(rm: RuleMatch) = {
       val RuleMatch(parent, gen, child) = rm
       val rest = parent
-        .dropWhile { _ != gen }.tail // trim prefix
-        .takeWhile { expr => !expr.isInstanceOf[Generator] ||
-          expr.as[Generator].lhs.fullName != gen.toString
+        .dropWhile { _ != gen }
+        .tail // trim prefix
+        .takeWhile {
+          case Generator(lhs, _) => lhs.name.toString != gen.toString
+          case _ => true
         } // trim suffix
 
       val (xs, ys) = parent.qualifiers span { _ != gen }
       parent.qualifiers = xs ::: child.qualifiers ::: ys.tail
 
-      for (expr <- rest if expr.isInstanceOf[ScalaExpr])
-        expr.as[ScalaExpr].substitute(gen.lhs.name, child.hd.as[ScalaExpr])
+      for (expr @ ScalaExpr(tree) <- rest)
+        expr.tree = tree.bind(gen.lhs, child.hd.as[ScalaExpr].tree)
 
       // new parent
       rm.parent
@@ -140,12 +142,9 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(fold, map, child) = rm
-      val x    = freshName("x")
-      val head = map.hd.as[ScalaExpr].tree.rename(child.lhs.name, x)
-      val sng  = fold.sng.as[Function]
-      val body = sng.body.substitute(sng.vparams.head.name, head)
-      fold.sng = q"($x: ${child.tpe}) => $body".typeChecked
-      fold.xs  = child.rhs
+      val head = map.hd.as[ScalaExpr].tree
+      fold.sng = mk.anonFun(child.lhs :: Nil, q"${fold.sng}($head)")
+      fold.xs = child.rhs
       fold // return new root
     }
   }

@@ -74,9 +74,9 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     // TODO: add support for comprehension filter expressions
     def fire(rm: RuleMatch) = rm.filter.expr match {
       case expr @ ScalaExpr(tree) =>
-        val RuleMatch(root, parent, gen, filter) = rm
-        val p    = mk anonFun (List(rm.gen.lhs.name -> rm.gen.lhs.info), tree)
-        gen.rhs           = combinator.Filter(p, gen.rhs)
+        val RuleMatch(_, parent, gen, filter) = rm
+        val p = mk.anonFun(gen.lhs :: Nil, tree)
+        gen.rhs = combinator.Filter(p, gen.rhs)
         parent.qualifiers = parent.qualifiers diff List(filter)
         parent // return new parent
 
@@ -112,8 +112,8 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     }
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(root, expr @ ScalaExpr(tree), child) = rm
-      val f = mk anonFun (List(child.lhs.name -> child.lhs.info), tree)
+      val RuleMatch(_, ScalaExpr(tree), child) = rm
+      val f = mk.anonFun(child.lhs :: Nil, tree)
       combinator.Map(f, child.rhs)
     }
   }
@@ -145,8 +145,8 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     }
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(root, expr @ ScalaExpr(tree), child) = rm
-      val f = mk anonFun (List(child.lhs.name -> child.lhs.info), tree)
+      val RuleMatch(_, ScalaExpr(tree), child) = rm
+      val f = mk.anonFun(child.lhs :: Nil, tree)
       combinator.FlatMap(f, child.rhs)
     }
   }
@@ -199,24 +199,23 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       val join = combinator.EquiJoin(kx, ky, xs.rhs, ys.rhs)
 
       // bind join result to a fresh variable
-      val tpt = tq"(${kx.vparams.head.tpt}, ${ky.vparams.head.tpt})"
-      val vd  = mk.valDef(freshName("x"), tpt)
-      val sym = mk.freeTerm(vd.name.toString, vd.trueType)
-      val qs  = suffix drop 2 filter { _ != filter }
+      val x = freshName("x").toString
+      val sym = mk.freeTerm(x, PAIR(xs.tpe, ys.tpe))
+      val qs = suffix drop 2 filter { _ != filter }
 
       // substitute [v._1/x] in affected expressions
       for {
-        expr @ ScalaExpr(_) <- parent
-        if expr.usedVars(root) contains { xs.lhs }
-        tree = q"${mk ref sym}._1" withType vd.trueType.typeArgs(0)
-      } expr.substitute(xs.lhs.name, ScalaExpr(tree))
+        expr @ ScalaExpr(tree) <- parent
+        if expr.usedVars(root)(xs.lhs)
+        body = q"${mk.ref(sym)}._1" withType xs.tpe
+      } expr.tree = tree.bind(xs.lhs, body)
 
       // substitute [v._2/y] in affected expressions
       for {
-        expr @ ScalaExpr(_) <- parent
-        if expr.usedVars(root) contains { ys.lhs }
-        tree = q"${mk ref sym}._2" withType vd.trueType.typeArgs(1)
-      } expr.substitute(ys.lhs.name, ScalaExpr(tree))
+        expr @ ScalaExpr(tree) <- parent
+        if expr.usedVars(root)(ys.lhs)
+        body = q"${mk.ref(sym)}._2" withType ys.tpe
+      } expr.tree = tree.bind(ys.lhs, body)
 
       // modify parent qualifier list
       parent.qualifiers = prefix ::: Generator(sym, join) :: qs
@@ -242,23 +241,17 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
           if (lhsVars.size != 1 || rhsVars.size != 1) {
             None // Both `lhs` and `rhs` must refer to exactly one variable
-          } else if ((lhsVars contains xs.lhs) &&
-                     (rhsVars contains ys.lhs)) {
+          } else if (lhsVars(xs.lhs) && rhsVars(ys.lhs)) {
             // Filter expression has the type `f(xs.lhs) == h(ys.lhs)`
-            val vx = xs.lhs.name -> xs.lhs.info
-            val vy = ys.lhs.name -> ys.lhs.info
-            val kx = mk anonFun (List(vx), lhs)
-            val ky = mk anonFun (List(vy), rhs)
+            val kx = mk.anonFun(xs.lhs :: Nil, lhs)
+            val ky = mk.anonFun(ys.lhs :: Nil, rhs)
             Some(kx, ky)
-          } else if ((lhsVars contains ys.lhs) &&
-                     (rhsVars contains xs.lhs)) {
+          } else if (lhsVars(ys.lhs) && rhsVars(xs.lhs)) {
             // Filter expression has the type `f(ys.lhs) == h(xs.lhs)`
-            val vx = xs.lhs.name -> xs.lhs.info
-            val vy = ys.lhs.name -> ys.lhs.info
-            val kx = mk anonFun (List(vx), rhs)
-            val ky = mk anonFun (List(vy), lhs)
+            val kx = mk.anonFun(xs.lhs :: Nil, rhs)
+            val ky = mk.anonFun(ys.lhs :: Nil, lhs)
             Some(kx, ky)
-          } else None  // Something else
+          } else None // Something else
 
         case _ => None // Something else
       }
@@ -303,28 +296,28 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       val cross = combinator.Cross(xs.rhs, ys.rhs)
 
       // bind join result to a fresh variable
-      val vd  = mk.valDef(freshName("x"), tq"(${rm.xs.tpe}, ${rm.ys.tpe})")
-      val sym = mk.freeTerm(vd.name.toString, vd.trueType)
+      val x = freshName("x").toString
+      val sym = mk.freeTerm(x, PAIR(xs.tpe, ys.tpe))
 
       // substitute [v._1/x] in affected expressions
       for {
-        expr @ ScalaExpr(_) <- parent
-        if expr.usedVars(root) contains { xs.lhs }
-        tree = q"${mk ref sym}._1" withType vd.trueType.typeArgs(0)
-      } expr.substitute(xs.lhs.name, ScalaExpr(tree))
+        expr @ ScalaExpr(tree) <- parent
+        if expr.usedVars(root)(xs.lhs)
+        body = q"${mk.ref(sym)}._1" withType xs.tpe
+      } expr.tree = tree.bind(xs.lhs, body)
 
       // substitute [v._2/y] in affected expressions
       for {
-        expr @ ScalaExpr(_) <- parent
-        if expr.usedVars(root) contains { ys.lhs }
-        tree = q"${mk ref sym}._2" withType vd.trueType.typeArgs(1)
-      } expr.substitute(ys.lhs.name, ScalaExpr(tree))
+        expr @ ScalaExpr(tree) <- parent
+        if expr.usedVars(root)(ys.lhs)
+        body = q"${mk.ref(sym)}._2" withType ys.tpe
+      } expr.tree = tree.bind(ys.lhs, body)
 
       // modify parent qualifier list
       parent.qualifiers = prefix ::: Generator(sym, cross) :: suffix.drop(2)
 
       // return the modified parent
-      rm.parent
+      parent
     }
   }
 }
