@@ -288,13 +288,11 @@ private[emma] trait ComprehensionAnalysis
   def foldGroupFusion(tree: Tree)
       (implicit cfGraph: CFGraph, compView: ComprehensionView): Unit = {
 
-    for {
+    val candidates = for {
       com <- compView.terms // For each comprehended term
-      gen <- com.comprehension.expr // For each of it's sub-expressions
-    } gen match {
-      // If this is a generator binding a proper group
-      case gen@Generator(gSym, group: combinator.Group) if hasProperGroupType(gen.tpe) =>
-
+      gen@Generator(gSym, group: combinator.Group) <- com.comprehension.expr // For each of it's sub-expressions
+      if hasProperGroupType(gen.tpe) // If this is a generator binding a proper group
+    } yield {
         // Check if all 'group.values' usages within the enclosing comprehensions are of type "fold"
         val groupValuesUsages = (for (ctx <- com.comprehension.trees) yield ctx.collect {
           case grpVals @ q"${id: Ident}.values" if id.symbol == gSym =>
@@ -305,42 +303,50 @@ private[emma] trait ComprehensionAnalysis
         val allGroupValuesUsedInFold = groupValuesUsages forall { case (_, enclosingFold) => enclosingFold.isDefined }
 
         if (groupValuesUsages.nonEmpty && allGroupValuesUsedInFold) {
-          val comprehendedGroupValuesUsages = for {
-            ((grpVals, foldOpt), idx) <- groupValuesUsages.zipWithIndex
-            (foldTree)                <- foldOpt
-          } yield {
-            val foldComp = ExpressionRoot(comprehend(foldTree, topLevel = true)) ->> normalize
-            (idx, grpVals, foldTree, foldComp)
-          }
+          Some(com, groupValuesUsages, gen)
+        } else
+          None
+      }
 
-          // Project out folds
-          val folds = for {
-            (_, _, _, foldComp) <- comprehendedGroupValuesUsages
-          } yield foldComp.expr.as[combinator.Fold]
 
-          // Fuse the group with the folds and replace the Group with a GroupFold in the enclosing generator
-          val fGrp = foldGroup(group, folds)
-          val gNew = mk.valDef(gSym.name, fGrp.elementType)
-          gen.rhs  = fGrp
-          gen.lhs  = gNew.term
+    // We only work with the first candidate, and then recursively call ourselves.
+    // This is because com.comprehension.expr is modified by the com.comprehension.substitute call, so we have to generate the candidates again.
+    candidates.collectFirst({ case Some((com, groupValuesUsages, gen@Generator(gSym, group: combinator.Group))) =>
 
-          // For each 'foldTree' -> 'idx' pair
-          for ((idx, _, foldTree, _) <- comprehendedGroupValuesUsages) {
-            // Replace 'foldTree' with '${valSel}._${idx}' in all trees that can be found under the enclosing 'com'
-            val replTree = if (comprehendedGroupValuesUsages.length > 1) {
-              q"${mk ref gen.lhs}.values.${TermName(s"_${idx + 1}")}".typeChecked
-            } else {
-              q"${mk ref gen.lhs}.values".typeChecked
-            }
-            com.comprehension.substitute(foldTree, replTree)
-          }
-
-          com.comprehension.substitute(gSym, gen.lhs)
+      val comprehendedGroupValuesUsages = for {
+        ((grpVals, foldOpt), idx) <- groupValuesUsages.zipWithIndex
+        (foldTree) <- foldOpt
+      } yield {
+          val foldComp = ExpressionRoot(comprehend(foldTree, topLevel = true)) ->> normalize
+          (idx, grpVals, foldTree, foldComp)
         }
 
-      // Ignore other expression types
-      case _ =>
-    }
+      // Project out folds
+      val folds = for {
+        (_, _, _, foldComp) <- comprehendedGroupValuesUsages
+      } yield foldComp.expr.as[combinator.Fold]
+
+      // Fuse the group with the folds and replace the Group with a GroupFold in the enclosing generator
+      val fGrp = foldGroup(group, folds)
+      val gNew = mk.valDef(gSym.name, fGrp.elementType)
+      gen.rhs = fGrp
+      gen.lhs = gNew.term
+
+      // For each 'foldTree' -> 'idx' pair
+      for ((idx, _, foldTree, _) <- comprehendedGroupValuesUsages) {
+        // Replace 'foldTree' with '${valSel}._${idx}' in all trees that can be found under the enclosing 'com'
+        val replTree = if (comprehendedGroupValuesUsages.length > 1) {
+          q"${mk ref gen.lhs}.values.${TermName(s"_${idx + 1}")}".typeChecked
+        } else {
+          q"${mk ref gen.lhs}.values".typeChecked
+        }
+        com.comprehension.substitute(foldTree, replTree)
+      }
+
+      com.comprehension.substitute(gSym, gen.lhs)
+
+      foldGroupFusion(tree)
+    })
   }
 
   /**
