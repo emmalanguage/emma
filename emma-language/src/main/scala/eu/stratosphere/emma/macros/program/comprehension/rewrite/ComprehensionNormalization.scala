@@ -83,7 +83,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
         parent.hd = child.hd
         parent // return new root
       case RuleMatch(parent, child: Expression) =>
-        val vd  = mk.valDef(freshName("x"), child.tpe)
+        val vd  = mk.valDef(freshName("head"), child.tpe)
         val sym = mk.freeTerm(vd.name.toString, vd.elementType)
         parent.qualifiers ++= List(Generator(sym, child))
         parent.hd = ScalaExpr(mk ref sym)
@@ -145,7 +145,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(fold, map, child) = rm
-      val x    = freshName("x")
+      val x    = freshName("agg")
       val head = map.hd.as[ScalaExpr].tree.rename(child.lhs.name, x)
       val sng  = fold.sng.as[Function]
       val body = sng.body.substitute(sng.vparams.head.name, head)
