@@ -212,7 +212,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
 
       // bind join result to a fresh variable
       val tpt = tq"(${kx.vparams.head.tpt}, ${ky.vparams.head.tpt})"
-      val vd  = mk.valDef(freshName("x"), tpt)
+      val vd  = mk.valDef(freshName("join"), tpt)
       val sym = mk.freeTerm(vd.name.toString, vd.trueType)
       val qs  = suffix drop 2 filter { _ != filter }
 
@@ -310,8 +310,8 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       // construct combinator node with input and predicate sides aligned
       val cross = combinator.Cross(xs.rhs, ys.rhs)
 
-      // bind join result to a fresh variable
-      val vd  = mk.valDef(freshName("x"), tq"(${rm.xs.tpe}, ${rm.ys.tpe})")
+      // bind cross result to a fresh variable
+      val vd  = mk.valDef(freshName("cross"), tq"(${rm.xs.tpe}, ${rm.ys.tpe})")
       val sym = mk.freeTerm(vd.name.toString, vd.trueType)
 
       // substitute [v._1/x] in affected expressions

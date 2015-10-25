@@ -837,8 +837,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
     // xs join ys where kx equalTo ky
     case combinator.EquiJoin(kx, ky, xs, ys) =>
-      val x = freshName("x")
-      val y = freshName("y")
+      val x = freshName("unComp$x")
+      val y = freshName("unComp$y")
       q"""for {
         $x <- ${unComprehend(xs)}
         $y <- ${unComprehend(ys)}
@@ -847,8 +847,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
     // xs cross ys
     case combinator.Cross(xs, ys) =>
-      val x = freshName("x")
-      val y = freshName("y")
+      val x = freshName("unComp$x")
+      val y = freshName("unComp$y")
       q"""for {
         $x <- ${unComprehend(xs)}
         $y <- ${unComprehend(ys)}
@@ -884,7 +884,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil {
 
     // xs groupBy key map { g => Group(g.key, g.values.fold(empty)(sng, union)) }
     case combinator.FoldGroup(key, empty, sng, union, xs) =>
-      val g = freshName("g")
+      val g = freshName("unComp$g")
       q"""${unComprehend(xs)}.groupBy($key).map({ case $g =>
         _root_.eu.stratosphere.emma.api.Group($g.key, $g.values.fold($empty)($sng, $union))
       })"""
