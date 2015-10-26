@@ -11,7 +11,7 @@ import org.apache.spark.{SparkConf, SparkContext}
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
-abstract class Spark(val host: String, val port: Int) extends Engine {
+abstract class Spark(val host: String, val port: Int, val planMode:Boolean = false) extends Engine {
 
   sys addShutdownHook {
     closeSession()
@@ -30,17 +30,32 @@ abstract class Spark(val host: String, val port: Int) extends Engine {
   val dataflowGenerator = new DataflowGenerator(dataflowCompiler, envSessionID)
 
   override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = {
+    if (planMode) {
+      addPlan(name, root)
+      return null.asInstanceOf[A]
+    }
+
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[A](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
   }
 
   override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = {
+    if (planMode) {
+      addPlan(name, root)
+      return null.asInstanceOf[DataBag[A]]
+    }
+
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     val rdd = dataflowCompiler.execute[RDD[A]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
     DataBag(root.name, rdd, rdd.collect())
   }
 
   override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
+    if (planMode) {
+      addPlan(name, root)
+      return null.asInstanceOf[Unit]
+    }
+
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[RDD[A]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
   }
@@ -63,7 +78,7 @@ abstract class Spark(val host: String, val port: Int) extends Engine {
   private def classTagOf[A: TypeTag]: ClassTag[A] = ClassTag[A]( typeTag[A].mirror.runtimeClass( typeTag[A].tpe ) )
 }
 
-case class SparkLocal(override val host: String, override val port: Int) extends Spark(host, port) {
+case class SparkLocal(override val host: String, override val port: Int, override val planMode:Boolean = false) extends Spark(host, port, planMode) {
 
   logger.info(s"Initializing local execution environment for Spark ")
 

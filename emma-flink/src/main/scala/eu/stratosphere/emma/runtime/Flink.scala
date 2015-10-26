@@ -6,13 +6,13 @@ import java.net.URL
 import eu.stratosphere.emma.api.{ParallelizedDataBag, DataBag}
 import eu.stratosphere.emma.codegen.flink.DataflowGenerator
 import eu.stratosphere.emma.codegen.utils.DataflowCompiler
-import eu.stratosphere.emma.ir.{Fold, TempSink, Write, localInputs}
+import eu.stratosphere.emma.ir._
 import eu.stratosphere.emma.util.Counter
 import org.apache.flink.api.scala.ExecutionEnvironment
 
 import scala.reflect.runtime.universe._
 
-abstract class Flink(val host: String, val port: Int) extends Engine {
+abstract class Flink(val host: String, val port: Int, val planMode:Boolean = false) extends Engine {
 
   import org.apache.flink.api.scala._
 
@@ -33,17 +33,32 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
   val dataflowGenerator = new DataflowGenerator(dataflowCompiler, envSessionID)
 
   override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = {
+    if (planMode) {
+      addPlan(name, root)
+      return null.asInstanceOf[A]
+    }
+
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[A](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
 
   override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = {
+    if (planMode) {
+      addPlan(name, root)
+      return null.asInstanceOf[DataBag[A]]
+    }
+
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     val expr = dataflowCompiler.execute[DataSet[A]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
     DataBag(root.name, expr, expr.collect())
   }
 
   override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
+    if (planMode) {
+      addPlan(name, root)
+      return null.asInstanceOf[Unit]
+    }
+
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
@@ -67,7 +82,7 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
   private def nextTmpName = f"emma$$temp${tmpCounter.advance.get}%05d"
 }
 
-case class FlinkLocal(override val host: String, override val port: Int) extends Flink(host, port) {
+case class FlinkLocal(override val host: String, override val port: Int, override val planMode: Boolean = false) extends Flink(host, port, planMode) {
 
   logger.info(s"Initializing local execution environment for Flink ")
 
