@@ -1,5 +1,6 @@
 package eu.stratosphere.emma.examples.prototype
 
+import eu.stratosphere.emma.api.{DataBag, emma}
 import eu.stratosphere.emma.examples.Algorithm
 import eu.stratosphere.emma.runtime
 

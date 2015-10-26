@@ -8,6 +8,7 @@ import scala.collection.mutable
 private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
   import universe._
   import c.internal._
+  import syntax._
 
   /**
    * Normalize the control flow of a [[Tree]].
@@ -37,58 +38,49 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
    * - un-nesting of complex [[Tree]]s outside do-while loop tests
    * - un-nesting of complex [[Tree]]s outside if-then-else conditionals
    */
-  object normalizeControlFlow extends Transformer with (Tree => Tree) {
+  object normalizeControlFlow extends (Tree => Tree) {
     val testCounter = new Counter()
 
-    override def transform(tree: Tree) = tree match {
-      // If condition is a simple identifier, no normalization needed
-      case q"while (${_: Ident}) $_"      => super.transform(tree)
-      case q"do $_ while (${_: Ident})"   => super.transform(tree)
-      case q"if (${_: Ident}) $_ else $_" => super.transform(tree)
+    def apply(tree: Tree) = transform(tree) {
+      case q"while (${cond: Tree}) $body"
+        if (cond match { case _: Ident => false; case _ => true }) =>
+          // Introduce condition variable
+          val condVar = $"testWhile"
+          // Move the complex test outside the condition
+          q"{ var $condVar = $cond; while ($condVar) { $body; $condVar = $cond } }"
 
-      case q"while ($cond) $body" =>
-        // Introduce condition variable
-        val condVar = freshName("testWhile")
-        // Move the complex test outside the condition
-        q"{ var $condVar = $cond; while ($condVar) { $body; $condVar = $cond } }"
+      case q"do $body while (${cond: Tree})"
+        if (cond match { case _: Ident => false; case _ => true }) =>
+          // Introduce condition variable
+          val condVar = $"testDoWhile"
+          // Move the complex test outside the condition
+          q"""{
+            var $condVar = null.asInstanceOf[Boolean]
+            do { $body; $condVar = $cond } while ($condVar)
+          }"""
 
-      case q"do $body while ($cond)" =>
-        // Introduce condition variable
-        val condVar = freshName("testDoWhile")
-        // Move the complex test outside the condition
-        q"""{
-          var $condVar = null.asInstanceOf[Boolean]
-          do { $body; $condVar = $cond } while ($condVar)
-        }"""
-
-      case q"if ($cond) $thn else $els" =>
-        // Introduce condition value
-        val condVal = freshName("testIf")
-        // Move the complex test outside the condition
-        q"val $condVal = $cond; if ($condVal) $thn else $els"
-
-      // Default case
-      case _ => super.transform(tree)
+      case q"if (${cond: Tree}) $thn else $els"
+        if (cond match { case _: Ident => false; case _ => true }) =>
+          // Introduce condition value
+          val condVal = $"testIf"
+          // Move the complex test outside the condition
+          q"val $condVal = $cond; if ($condVal) $thn else $els"
     }
-
-    def apply(tree: Tree) = transform(tree)
   }
 
   // --------------------------------------------------------------------------
   // Normalize enclosing object parameter access.
   // --------------------------------------------------------------------------
 
-  private class EnclosingParamNormalizer(val clazz: Symbol) extends Transformer {
+  private class EnclosingParamNormalizer(val clazz: Symbol) {
     val aliases = mutable.Map.empty[Symbol, ValDef]
 
-    override def transform(tree: Tree) = tree match {
-      case sel @ Select(enclosing: This, name) if needsSubstitution(enclosing, sel) =>
-        val alias = aliases.getOrElseUpdate(sel.symbol,
-          mk.valDef(TermName(s"__this$$$name"), sel.trueType, rhs = sel))
+    def normalize(tree: Tree): Tree = transform(tree) {
+      case select @ Select(enclosing: This, name) if needsSubstitution(enclosing, select) =>
+        val alias = aliases.getOrElseUpdate(select.symbol,
+          val_(s"__this$$$name", select.preciseType) := select)
 
-        Ident(alias.name)
-
-      case _ => super.transform(tree)
+        &(alias.term)
     }
 
     /**
@@ -117,11 +109,11 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
     def apply(root: Tree) = findOwnerClass(enclosingOwner) match {
       case Some(clazz) =>
         // Construct function
-        val normalize = new EnclosingParamNormalizer(clazz)
+        val epn = new EnclosingParamNormalizer(clazz)
         // Normalize tree and collect alias symbols
-        val normTree  = normalize transform root
+        val norm = epn.normalize(root)
         // Construct normalized code snippet
-        q"{ ..${normalize.aliases.values}; ..$normTree }"
+        q"{ ..${epn.aliases.values}; ..$norm }"
 
       case None => root
     }
@@ -143,7 +135,7 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
   // --------------------------------------------------------------------------
 
   /** Substitutes the names of local classes to fully qualified names. */
-  def normalizeClassNames(tree: Tree): Tree = tree transform {
+  def normalizeClassNames(tree: Tree): Tree = transform(tree) {
     case id: Ident if id.hasSymbol && id.symbol.isModule => mk.select(id.symbol)
     case q"new ${id: Ident}[..$types](..${args: List[Tree]})" if id.hasSymbol =>
       q"new ${mk.typeSelect(id.symbol)}[..$types](..${args map normalizeClassNames})"

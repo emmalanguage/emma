@@ -9,7 +9,7 @@ import scala.reflect.api.Universe
  * macros and runtime reflection APIs, e.g. non-idempotent type checking, lack of hygiene,
  * capture-avoiding substitution, fully-qualified names, fresh name generation, identifying
  * closures, etc.
- * 
+ *
  * This trait has to be instantiated with a [[Universe]] type and works for both runtime and
  * compile time reflection.
  */
@@ -18,6 +18,7 @@ trait ReflectUtil {
 
   import universe._
   import internal.reificationSupport._
+  import syntax._
 
   // Predefined types
 
@@ -47,7 +48,7 @@ trait ReflectUtil {
   lazy val J_BIG_INT = typeOf[java.math.BigInteger]
   lazy val J_BIG_DEC = typeOf[java.math.BigDecimal]
 
-  lazy val PAIR  = TUPLE(2)
+  lazy val PAIR = TUPLE(2)
   lazy val ARRAY = typeOf[Array[Nothing]].typeConstructor
 
   lazy val TUPLE = Map(1 to 22 map { n =>
@@ -58,49 +59,30 @@ trait ReflectUtil {
     n -> rootMirror.staticClass(s"scala.Function$n").toTypeConstructor
   }: _*)
 
-  /** Alias of [[PartialFunction]]. */
-  type ~>[A, B] = PartialFunction[A, B]
-
   /**
    * Parse a [[String]] of source code.
    *
-   * @param str The source code to parse
+   * @param string The source code to parse
    * @return A [[Tree]] representation of the source code
    */
-  def parse(str: String): Tree
+  def parse(string: String): Tree
 
   /**
    * Type-check a source code snippet.
-   *
    * @param tree The [[Tree]] to type-check
    * @return A [[Tree]] annotated with [[Type]]s and [[Symbol]]s
    */
   def typeCheck(tree: Tree): Tree
 
   /** Create a new [[TermSymbol]]. */
-  def termSym(
-      owner: Symbol,
-      name:  TermName,
-      tpe:   Type,
-      flags: FlagSet  = Flag.SYNTHETIC,
-      pos:   Position = NoPosition): TermSymbol
+  def termSym(owner: Symbol, name: TermName, tpe: Type,
+    flags: FlagSet = Flag.SYNTHETIC,
+    pos: Position = NoPosition): TermSymbol
 
   /** Create a new [[TypeSymbol]]. */
-  def typeSym(
-     owner: Symbol,
-     name:  TypeName,
-     flags: FlagSet  = Flag.SYNTHETIC,
-     pos:   Position = NoPosition): TypeSymbol
-
-  /** Generate a new [[TermName]]. */
-  def freshName(prefix: String): TermName =
-    if (prefix.nonEmpty && prefix.last == '$') freshTermName(prefix)
-    else freshTermName(s"$prefix$$")
-
-  /** Generate a new [[TypeName]]. */
-  def freshType(prefix: String): TypeName =
-    if (prefix.nonEmpty && prefix.last == '$') freshTypeName(prefix)
-    else freshTypeName(s"$prefix$$")
+  def typeSym(owner: Symbol, name: TypeName,
+    flags: FlagSet = Flag.SYNTHETIC,
+    pos: Position = NoPosition): TypeSymbol
 
   /** Remove all [[Type]] annotations from this [[Tree]]. */
   // FIXME: Replace with c.untypecheck once https://issues.scala-lang.org/browse/SI-5464 resolved
@@ -112,458 +94,366 @@ trait ReflectUtil {
   /** Alias for `typeCheck compose parse`. */
   val parseCheck = parse _ andThen typeCheck
 
-  /** Syntax sugar for [[Tree]]s. */
-  private implicit def fromTree(tree: Tree): TreeOps =
-    new TreeOps(tree)
+  /**
+   * Recursively apply a depth-first transformation to a [[Tree]].
+   * @param tree The [[Tree]] to transform
+   * @param pf A [[PartialFunction]] to transform some of the [[Tree]] nodes
+   * @return A new [[Tree]] with some of the nodes transformed
+   */
+  def transform(tree: Tree)(pf: Tree ~> Tree): Tree = new Transformer {
+    override def transform(tree: Tree): Tree =
+      if (pf.isDefinedAt(tree)) pf(tree)
+      else super.transform(tree)
+  }.transform(tree)
 
-  /** [[Tree]] constructors. */
+  /**
+   * Recursively apply a depth-first traversal to a [[Tree]].
+   * @param tree The [[Tree]] to traverse
+   * @param pf A [[PartialFunction]] to traverse some of the [[Tree]] nodes
+   */
+  def traverse(tree: Tree)(pf: Tree ~> Unit): Unit = new Traverser {
+    override def traverse(tree: Tree): Unit =
+      if (pf.isDefinedAt(tree)) pf(tree)
+      else super.traverse(tree)
+  }.traverse(tree)
+
+  /**
+   * Recursively remove all layers of type ascriptions from a [[Tree]].
+   * E.g. `q"((42: Int): Int)".unAscribed = q"42"`
+   * @param tree The [[Tree]] to remove ascriptions from
+   * @return An equivalent [[Tree]] without type ascriptions
+   */
+  @tailrec final def unAscribed(tree: Tree): Tree = tree match {
+    case q"${t: Tree}: $_" => unAscribed(t)
+    case _ => tree
+  }
+
+  /**
+   * Bind a sequence of name-value pairs in a [[Tree]].
+   * @param in The [[Tree]] to bind in
+   * @param bindings A sequence of name-value pairs to bind
+   * @return This [[Tree]] with all names in `kvs` bound to their respective values
+   */
+  def bind(in: Tree)(bindings: (TermName, Tree)*): Tree =
+    if (bindings.isEmpty) in else
+      q"{ ..${for ((k, v) <- bindings) yield q"val $k = $v"}; $in }"
+
+  /**
+   * Bind a dictionary of [[Symbol]]-value pairs in a [[Tree]].
+   * @param in The tree to substitute in
+   * @param dict A [[Map]] of [[Symbol]]-value pairs to bind
+   * @return This [[Tree]] with all [[Symbol]]s in `dict` bound to their respective values
+   */
+  def substitute(in: Tree)(dict: Map[Symbol, Tree]): Tree =
+    if (dict.isEmpty) in else {
+      val closure = dict.values
+        .flatMap { _.closure }
+        .filterNot(dict.keySet)
+        .map { _.name }.toSet
+
+      val capture = in.definitions filter { term => closure(term.name) }
+      refresh(in)(capture.toSeq: _*) ->> (transform(_) {
+        case id: Ident if dict contains id.symbol => dict(id.symbol)
+      })
+    }
+
+  /**
+   * Replace occurrences of the `find` [[Tree]] with the `replacement` [[Tree]].
+   * @param in The [[Tree]] to substitute in
+   * @param find The [[Tree]] to look for
+   * @param replacement The [[Tree]] that should replace `find`
+   * @return A substituted version of the enclosing [[Tree]]
+   */
+  def replace(in: Tree)(find: Tree, replacement: Tree): Tree =
+    transform(in) { case `find` => replacement }
+
+  /**
+   * Replace a sequence of [[Symbol]]s in a [[Tree]] with fresh ones.
+   * @param in The [[Tree]] to refresh
+   * @param symbols The sequence of [[Symbol]]s to rename
+   * @return This [[Tree]] with the specified [[Symbol]]s replaced
+   */
+  def refresh(in: Tree)(symbols: Symbol*): Tree =
+    rename(in, { for (sym <- symbols)
+      yield sym -> termSym(sym.owner, $"${sym.name}", sym.info, pos = sym.pos)
+    }: _*)
+
+  /**
+   * Replace a dictionary of [[Symbol]]s with references to their aliases.
+   * @param in The [[Tree]] to rename in
+   * @param dict A [[Map]] of aliases to replace
+   * @return This [[Tree]] with the specified [[Symbol]]s replaced 
+   */
+  def rename(in: Tree, dict: Map[Symbol, TermSymbol]): Tree =
+    if (dict.isEmpty) in else transform(in) {
+      case vd: ValDef if dict contains vd.symbol => val_(dict(vd.symbol)) := vd.rhs
+      case id: Ident  if dict contains id.symbol => &(dict(id.symbol))
+      case bd: Bind   if dict contains bd.symbol => dict(bd.symbol) @@ bd.body
+    }
+
+  /**
+   * Replace a sequence of [[Symbol]]s with references to their aliases.
+   * @param in The [[Tree]] to rename in
+   * @param aliases A sequence of aliases to replace
+   * @return This [[Tree]] with the specified [[Symbol]]s replaced
+   */
+  def rename(in: Tree, aliases: (Symbol, TermSymbol)*): Tree =
+    rename(in, aliases.toMap)
+
+  /**
+   * Replace a [[Symbol]]s with a reference to an alias.
+   * @param in The [[Tree]] to rename in
+   * @param key The [[Symbol]] to rename
+   * @param alias An alternative [[Symbol]] to use
+   * @return This [[Tree]] with the specified [[Symbol]] replaced
+   */
+  def rename(in: Tree, key: Symbol, alias: TermSymbol): Tree =
+    rename(in, key -> alias)
+
+  /**
+   * Inline a value definitions in a [[Tree]]. It's assumed that it's part of the [[Tree]].
+   * @param in The [[Tree]] to inline in
+   * @param valDef the [[ValDef]] to inline
+   * @return this [[Tree]] with the specified value definitions inlined
+   */
+  def inline(in: Tree, valDef: ValDef): Tree = transform(in) {
+    case vd: ValDef if vd.symbol == valDef.symbol => q"()"[Unit]
+    case id: Ident  if id.symbol == valDef.symbol => valDef.rhs
+  }
+
+  /** [[Tree]], [[Name]] and [[Symbol]] constructors. */
   object mk {
 
-    def ref(sym: TermSymbol): Ident =
-      mkIdent(sym).withType(sym.info).as[Ident]
+    /** Generate a new [[TermName]]. */
+    def freshName(prefix: String): TermName =
+      if (prefix.nonEmpty && prefix.last == '$') freshTermName(prefix)
+      else freshTermName(s"$prefix$$")
 
-    def bind(sym: TermSymbol, rhs: Tree = EmptyTree): Bind =
-      Bind(sym.name, rhs).withSym(sym).as[Bind]
+    /** Generate a new [[TypeName]]. */
+    def freshType(prefix: String): TypeName =
+      if (prefix.nonEmpty && prefix.last == '$') freshTypeName(prefix)
+      else freshTypeName(s"$prefix$$")
 
-    def freeTerm(
-        name:   String,
-        tpe:    Type,
-        flags:  FlagSet = Flag.SYNTHETIC,
-        origin: String  = null): TermSymbol =
-      newFreeTerm(name, null, flags, origin).withInfo(tpe).asTerm
+    def ref(term: TermSymbol): Ident =
+      Ident(term.name).withSym(term).as[Ident]
 
-    def freeType(
-        name:   String,
-        flags:  FlagSet = Flag.SYNTHETIC,
-        origin: String  = null): TypeSymbol =
+    def bind(term: TermSymbol,
+        pattern: Tree = Ident(termNames.WILDCARD)): Bind =
+      Bind(term.name, pattern).withSym(term).as[Bind]
+
+    def freeTerm(name: String, tpe: Type,
+        flags: FlagSet = Flag.SYNTHETIC,
+        origin: String = null): TermSymbol =
+      newFreeTerm(name, null, flags, origin).withType(tpe).asTerm
+
+    def freeType(name: String,
+        flags: FlagSet = Flag.SYNTHETIC,
+        origin: String = null): TypeSymbol =
       newFreeType(name, flags, origin)
 
-    def valDef(sym: TermSymbol): ValDef =
-      valDef(sym, EmptyTree)
+    def valDef(term: TermSymbol): ValDef =
+      valDef(term, EmptyTree)
 
-    def valDef(sym: TermSymbol, rhs: Tree): ValDef =
-      internal.valDef(sym, rhs).withType(sym.info).as[ValDef]
+    def valDef(term: TermSymbol, rhs: Tree): ValDef =
+      internal.valDef(term, rhs)
 
-    def valDef(name: TermName, tpt: Tree): ValDef =
-      valDef(name, tpt, EmptyTree)
+    def valDef(name: TermName, tpe: Type,
+        owner: Symbol = NoSymbol,
+        flags: FlagSet = Flag.SYNTHETIC,
+        pos: Position = NoPosition,
+        rhs: Tree = EmptyTree): ValDef =
+      valDef(termSym(owner, name, tpe.precise, flags, pos), rhs)
 
-    def valDef(name: TermName, tpt: Tree, rhs: Tree): ValDef =
-      valDef(name, tpt, Flag.SYNTHETIC, rhs)
+    def anonFun(args: List[TermSymbol], body: Tree,
+        owner: Symbol = NoSymbol,
+        flags: FlagSet = Flag.SYNTHETIC,
+        pos: Position = NoPosition): Function = {
+      val argTypes = args map { _.preciseType }
+      val funType = FUN(args.size)(argTypes :+ body.preciseType: _*)
+      val funSym = termSym(owner, TermName("anonfun"), funType, flags, pos)
+      val params = for { (arg, tpe) <- args zip argTypes }
+        yield valDef(arg.name, tpe, funSym, Flag.SYNTHETIC | Flag.PARAM, pos)
 
-    def valDef(name: TermName, tpt: Tree, flags: FlagSet, rhs: Tree): ValDef =
-      ValDef(Modifiers(flags), name, tpt, rhs).withType(tpt.trueType).as[ValDef]
-
-    def valDef(
-        name:  TermName,
-        tpe:   Type,
-        owner: Symbol   = NoSymbol,
-        flags: FlagSet  = Flag.SYNTHETIC,
-        pos:   Position = NoPosition,
-        rhs:   Tree     = EmptyTree): ValDef =
-      valDef(termSym(owner, name, tpe, flags, pos).asTerm, rhs)
-
-    def anonFun(
-        args:  List[(TermName, Type)],
-        body:  Tree,
-        owner: Symbol   = NoSymbol,
-        flags: FlagSet  = Flag.SYNTHETIC,
-        pos:   Position = NoPosition): Function = {
-      val tpe    = FUN(args.size)(args.map { _._2 } :+ body.trueType: _*)
-      val sym    = termSym(owner, TermName("anonfun"), tpe, flags, pos)
-      val params = for ((name, tpe) <- args)
-        yield valDef(name, tpe, sym, Flag.SYNTHETIC | Flag.PARAM, pos)
-
-      val substituted = body.substitute((for (p <- params) yield p.name -> ref(p.term)): _*)
-      Function(params, substituted).withSym(sym).as[Function]
+      val tree = rename(body, args zip params.map { _.term }: _*)
+      Function(params, tree).withSym(funSym).as[Function]
     }
 
-    def select(sym: Symbol): Tree =
-      if (Set(null, NoSymbol, rootMirror.RootClass)(sym.owner))
-        ref(rootMirror.staticPackage(sym.fullName))
-      else q"${select(sym.owner)}.${sym.name.toTermName}" withSym sym
+    def select(symbol: Symbol): Tree =
+      if (Set(null, NoSymbol, rootMirror.RootClass) contains symbol.owner)
+        &(rootMirror.staticPackage(symbol.fullName))
+      else q"${select(symbol.owner)}.${symbol.name.toTermName}"(symbol)
 
-    def typeSelect(sym: Symbol): Tree =
-      if (Set(null, NoSymbol, rootMirror.RootClass)(sym.owner))
-        ref(rootMirror.staticPackage(sym.fullName))
-      else tq"${select(sym.owner)}.${sym.name.toTypeName}" withSym sym
+    def typeSelect(symbol: Symbol): Tree =
+      if (Set(null, NoSymbol, rootMirror.RootClass) contains symbol.owner)
+        &(rootMirror.staticPackage(symbol.fullName))
+      else tq"${select(symbol.owner)}.${symbol.name.toTypeName}"(symbol)
   }
+  
+  object syntax {
+    
+    /** Alias of [[PartialFunction]]. */
+    type ~>[A, B] = PartialFunction[A, B]
+    def &(term: TermSymbol): Ident = mk.ref(term)
+    def $(prefixes: String*): Seq[TermName] = prefixes map mk.freshName
+    def val_(term: TermSymbol): ValDef = mk.valDef(term)
+    def val_(name: TermName, tpe: Type): ValDef = mk.valDef(name, tpe)
+    def val_(name: String, tpe: Type): ValDef = val_(TermName(name), tpe)
+    def λ(args: TermSymbol*)(body: Tree): Function = lambda(args: _*) { body }
+    def lambda(args: TermSymbol*)(body: Tree): Function = mk.anonFun(args.toList, body)
 
-  /** Syntactic sugar for [[Tree]]s. */
-  class TreeOps(self: Tree) {
-
-    /** @return `true` if this [[Tree]] is annotated with a [[Type]], `false` otherwise */
-    def hasType: Boolean = {
-      val tpe = self.tpe
-      tpe != null && tpe != NoType
+    case class let(bindings: (Symbol, Tree)*) {
+      def in(tree: Tree): Tree = substitute(tree) { bindings.toMap }
     }
 
-    /** @return `true` if this [[Tree]] is annotated with a [[Symbol]], `false` otherwise */
-    def hasSymbol: Boolean = {
-      val sym = self.symbol
-      sym != null && sym != NoSymbol
+    object $ {
+      def unapplySeq(terms: Seq[TermName]): Option[Seq[TermName]] = Some(terms)
     }
 
-    /** @return `true` if this [[Tree]] has an owner, `false` otherwise */
-    def hasOwner: Boolean = hasSymbol && {
-      val owner = self.symbol.owner
-      owner != null && owner != NoSymbol
+    implicit class FreshNameGen(self: StringContext) {
+      def $(args: Any*): TermName = mk.freshName(self.s(args: _*))
     }
 
-    /** @return This [[Tree]]'s owner */
-    def owner: Symbol = self.symbol.owner
-
-    /** @return An un-type-checked version of this [[Tree]] */
-    def unTypeChecked: Tree = unTypeCheck(self)
-
-    /** @return `unTypeChecked.typeChecked` */
-    def reTypeChecked: Tree = reTypeCheck(self)
-
-    /** @return The most precise [[Type]] of this [[Tree]] */
-    def trueType: Type = {
-      if (hasType) self.tpe
-      else if (hasSymbol && self.symbol.hasInfo) self.symbol.info
-      else typeChecked.tpe
-    }.precise
-
-    /** @return The [[Type]] argument used to initialize the [[Type]] if this [[Tree]] */
-    def elementType: Type = trueType.typeArgs.head
-
-    /** @return The [[TermSymbol]] of this [[Tree]] */
-    def term: TermSymbol = self.symbol.asTerm
-
-    /** @return `true` if this [[Tree]] has a [[Symbol]] and it's a [[TermSymbol]] */
-    def hasTerm: Boolean = hasSymbol && self.symbol.isTerm
-
-    /**
-     * Annotate this [[Tree]] with a specified [[Type]].
-     *
-     * @param tpe The [[Type]] to use for this [[Tree]]
-     * @return This [[Tree]] with its [[Type]] set
-     */
-    def withType(tpe: Type): Tree =
-      setType(self, tpe)
-
-    /**
-     * Annotate this [[Tree]] with a specified [[Type]].
-     *
-     * @tparam T The [[Type]] to use for this [[Tree]]
-     * @return This [[Tree]] with its [[Type]] set
-     */
-    def withType[T: TypeTag]: Tree =
-      withType(typeOf[T])
-
-    /**
-     * Annotate this [[Tree]] with a specified [[Symbol]].
-     *
-     * @param sym The [[Symbol]] to use for this [[Tree]]
-     * @return This [[Tree]] with its [[Symbol]] set
-     */
-    def withSym(sym: Symbol): Tree = {
-      val tree = setSymbol(self, sym)
-      if (sym.hasInfo) tree withType sym.info else tree
+    /** Syntax sugar for class casting. */
+    implicit class As[A](self: A) {
+      /** Alias for `this.asInstanceOf[B]`. */
+      def as[B]: B = self.asInstanceOf[B]
     }
 
-    /** Type-check this [[Tree]] if it doesn't have a [[Type]]. */
-    lazy val typeChecked: Tree = if (hasType) self else typeCheck(self)
+    /** Syntax sugar for function call chain emulation. */
+    implicit class Chain[A](self: A) {
 
-    /** Collect the [[Symbol]]s of all bound variables in this [[Tree]]. */
-    lazy val definitions: Set[TermSymbol] = typeChecked.collect {
-      case dd: DefDef if dd.hasTerm => dd.term
-      case vd: ValDef if vd.hasTerm => vd.term
-      case bd: Bind   if bd.hasTerm => bd.term
-    }.toSet
+      /**
+       * Emulation of a function call chain starting with `this`, similar to Clojure's thread macros
+       * (-> and/or ->>). E.g. `x ->> f ->> g == g(f(x)) == (g compose f)(x) == (f andThen g)(x)`.
+       * @param f Next function to thread in the call chain
+       * @tparam B Return type of the next function
+       */
+      def ->>[B](f: A => B): B = f(self)
 
-    /** Collect the [[Symbol]]s of all variables referenced in this [[Tree]]. */
-    lazy val references: Set[TermSymbol] = typeChecked.collect {
-      case id: Ident if id.hasTerm && (id.term.isVal || id.term.isVar || id.term.isMethod) => id.term
-    }.toSet
-
-    /** Collect the [[Symbol]]s of all free variables in this [[Tree]]. */
-    lazy val freeTerms: Set[TermSymbol] = references diff definitions
-
-    /** Collect the [[TermName]]s of all free variables in this [[Tree]]. */
-    lazy val closure: Set[TermName] = freeTerms map { _.name }
-
-    /**
-     * Recursively apply a depth-first transformation to this [[Tree]].
-     *
-     * @param pf A [[PartialFunction]] to transform some of the [[Tree]] nodes
-     * @return A new [[Tree]] with some of the nodes transformed
-     */
-    def transform(pf: Tree ~> Tree): Tree = new Transformer {
-      override def transform(tree: Tree): Tree =
-        if (pf isDefinedAt tree) pf(tree)
-        else super.transform(tree)
-    } transform self
-
-    /**
-     * Recursively apply a depth-first traversal to this [[Tree]].
-     *
-     * @param pf A [[PartialFunction]] to traverse some of the [[Tree]] nodes
-     */
-    def traverse(pf: Tree ~> Unit): Unit = new Traverser {
-      override def traverse(tree: Tree): Unit =
-        if (pf isDefinedAt tree) pf(tree)
-        else super.traverse(tree)
-    } traverse self
-
-    /**
-     * Recursively remove all layers of type ascriptions from this [[Tree]].
-     * E.g. `q"((42: Int): Int)".unAscribed = q"42"`
-     *
-     * @return An equivalent [[Tree]] without type ascriptions.
-     */
-    @tailrec final def unAscribed: Tree = self match {
-      case q"${tree: Tree}: $_" => tree.unAscribed
-      case _ => self
+      /** Alias for `this ->> f`. */
+      def chain[B](f: A => B): B = f(self)
     }
 
-    /**
-     * Bind a name to a value in this [[Tree]].
-     * 
-     * @param name The [[TermName]] to bind
-     * @param value The [[Tree]] to bind the name to
-     * @return This [[Tree]] with `name` bound to `value`
-     */
-    def bind(name: TermName, value: Tree): Tree =
-      bind(name -> value)
-
-    /**
-     * Bind a [[Map]] of name-value pairs in this [[Tree]].
-     *
-     * @param dict A dictionary of name-value pairs to bind
-     * @return This [[Tree]] with all names in `dict` bound to their respective values
-     */
-    def bind(dict: Map[TermName, Tree]): Tree =
-      bind(dict.toSeq: _*)
-
-    /**
-     * Bind a sequence of name-value pairs in this [[Tree]].
-     *
-     * @param bindings A sequence of name-value pairs to bind
-     * @return This [[Tree]] with all names in `kvs` bound to their respective values
-     */
-    def bind(bindings: (TermName, Tree)*): Tree =
-      q"{ ..${for ((k, v) <- bindings) yield q"val $k = $v"}; $self }"
-
-
-    /**
-     * Replace a sequence of identifiers in this [[Tree]] with fresh [[TermName]]s.
-     *
-     * @param names The sequence of identifiers to rename
-     * @return This [[Tree]] with the specified names replaced
-     */
-    def refresh(names: TermName*): Tree =
-      rename((for (n <- names) yield n -> freshName(n.toString)): _*)
-
-    /**
-     * Replace a specified identifier in this [[Tree]] with a new one.
-     *
-     * @param key The [[TermName]] to replace
-     * @param alias A new [[TermName]] to use in place of the old one
-     * @return This [[Tree]] with the specified name replaced
-     */
-    def rename(key: TermName, alias: TermName): Tree =
-      rename(key -> alias)
-
-    /**
-     * Replace a sequence of identifiers in this [[Tree]] with their respective aliases.
-     *
-     * @param aliases The sequence of identifiers to rename
-     * @return This [[Tree]] with the specified names replaced
-     */
-    def rename(aliases: (TermName, TermName)*): Tree =
-      rename(aliases.toMap)
-
-    /**
-     * Replace a [[Map]] of identifiers in this [[Tree]] with their respective aliases.
-     *
-     * @param dict A dictionary of aliases to be renames
-     * @return This [[Tree]] with the specified names replaced
-     */
-    def rename(dict: Map[TermName, TermName]): Tree = transform {
-      // reference
-      case Ident(name: TermName) if dict contains name =>
-        Ident(dict(name))
-
-      // case name => ...
-      case Bind(name: TermName, body) if dict contains name =>
-        Bind(dict(name), body rename dict)
-
-      // val name = ...
-      case ValDef(mods, name, tpt, rhs) if dict contains name =>
-        ValDef(mods, dict(name), tpt, rhs rename dict)
+    implicit class ValDefOps(self: ValDef) {
+      def :=(rhs: Tree): ValDef = mk.valDef(self.term, rhs)
     }
 
-    /**
-     * Replace all free occurrences of an identifier with a source code snippet in this [[Tree]].
-     *
-     * @param key The [[TermName]] to replace
-     * @param value The source code [[Tree]] to substitute
-     * @return This [[Tree]] with the substituted source code
-     */
-    def substitute(key: TermName, value: Tree): Tree = {
-      val closure = value.closure
-      transform {
-        // reference
-        case Ident(`key`) => value
-        case Typed(Ident(`key`), _) => value
+    implicit class TermSymbolOps(self: TermSymbol) {
+      def @@(pattern: Tree): Bind = mk.bind(self, pattern)
+    }
 
-        // case name => ...
-        case bd @ Bind(`key`, _) => bd
-        case bd @ Bind(name: TermName, _) if closure(name) =>
-          bd.refresh(name).substitute(key, value)
+    /** Syntax sugar for [[Type]]s. */
+    implicit class TypeOps(self: Type) {
 
-        // val name = ...
-        case vd @ ValDef(_, `key`, _, _) => vd
-        case vd @ ValDef(_, name, _, _) if closure(name) =>
-          vd.refresh(name).substitute(key, value)
+      def ::(tree: Tree): Tree = tree withType self
+      def ::(symbol: Symbol): Symbol = symbol withType self
 
-        // (args: _*) => ...
-        case fn @ Function(args, _) if args exists { _.name == key } => fn
-        case fn @ Function(args, _) if args exists { arg => closure(arg.name) } =>
-          fn.refresh(args map { _.name } filter closure: _*).substitute(key, value)
+      /** @return The de-aliased and widened version of this [[Type]] */
+      def precise: Type = self.finalResultType.widen
 
-        // { ... lazy val name = ... }
-        case bl: Block if bl.children exists {
-          case vd @ ValDef(_, `key`, _, _) => vd.isLazy
-          case _ => false
-        } => bl
+      /**
+       * Apply this [[Type]] as a [[Type]] constructor.
+       * @param args The [[Type]] arguments
+       * @return The specialized version of this [[Type]]
+       */
+      def apply(args: Type*): Type =
+        appliedType(self, args: _*)
+    }
 
-        // { ... }
-        case bl: Block if bl.children exists {
-          case vd @ ValDef(_, name, _, _) => closure(name)
-          case _ => false
-        } => bl.refresh(bl.children collect {
-          case vd @ ValDef(_, name, _, _) if closure(name) => name
-        }: _*).substitute(key, value)
+    /** Syntax sugar for [[Symbol]]s. */
+    implicit class SymbolOps(self: Symbol) {
 
-        // { ... val name = ... }
-        case bl: Block if bl.children exists {
-          case vd: ValDef => vd.name == key
-          case _ => false
-        } => bl.children span {
-          case vd: ValDef => vd.name != key
-          case _ => true
-        } match { case (pre, post) =>
-          Block(pre.map { _.substitute(key, value) } ::: post.init, post.last)
-        }
+      def apply(tpe: Type): Symbol = withType(tpe)
+      def apply[T: TypeTag]: Symbol = withType[T]
+
+      /** Check if this [[Symbol]] has an associated [[Type]]. */
+      def hasType: Boolean = self.info != null && self.info != NoType
+
+      /** Set the `info` of this [[Symbol]]. */
+      def withType(tpe: Type): Symbol = setInfo(self, tpe.precise)
+
+      /** Set the `info` of this [[Symbol]]. */
+      def withType[T: TypeTag]: Symbol = withType(typeOf[T])
+
+      /** @return The most precise [[Type]] of this [[Symbol]] */
+      def preciseType: Type = self.info.precise
+    }
+
+    /** Syntactic sugar for [[Tree]]s. */
+    implicit class TreeOps(self: Tree) {
+
+      def apply(tpe: Type): Tree = withType(tpe)
+      def apply[T: TypeTag]: Tree = withType[T]
+      def apply(symbol: Symbol): Tree = withSym(symbol)
+
+      def ^(symbol: Symbol): Tree = withSym(symbol)
+
+      /** @return `true` if this [[Tree]] is annotated with a [[Type]], `false` otherwise */
+      def hasType: Boolean = self.tpe != null && self.tpe != NoType
+
+      /** @return `true` if this [[Tree]] is annotated with a [[Symbol]], `false` otherwise */
+      def hasSymbol: Boolean = self.symbol != null && self.symbol != NoSymbol
+
+      /** @return An un-type-checked version of this [[Tree]] */
+      def unTypeChecked: Tree = unTypeCheck(self)
+
+      /** @return `unTypeChecked.typeChecked` */
+      def reTypeChecked: Tree = reTypeCheck(self)
+
+      /** @return The most precise [[Type]] of this [[Tree]] */
+      def preciseType: Type =
+        if (hasType) self.tpe.precise
+        else if (hasSymbol && self.symbol.hasType) self.symbol.preciseType
+        else typeChecked.tpe.precise
+
+      /** @return The [[TermSymbol]] of this [[Tree]] */
+      def term: TermSymbol = self.symbol.asTerm
+
+      /** @return `true` if this [[Tree]] has a [[Symbol]] and it's a [[TermSymbol]] */
+      def hasTerm: Boolean = hasSymbol && self.symbol.isTerm
+
+      /**
+       * Annotate this [[Tree]] with a specified [[Type]].
+       * @param tpe The [[Type]] to use for this [[Tree]]
+       * @return This [[Tree]] with its [[Type]] set
+       */
+      def withType(tpe: Type): Tree =
+        setType(self, tpe.precise)
+
+      /**
+       * Annotate this [[Tree]] with a specified [[Type]].
+       * @tparam T The [[Type]] to use for this [[Tree]]
+       * @return This [[Tree]] with its [[Type]] set
+       */
+      def withType[T: TypeTag]: Tree =
+        withType(typeOf[T])
+
+      /**
+       * Annotate this [[Tree]] with a specified [[Symbol]].
+       * @param symbol The [[Symbol]] to use for this [[Tree]]
+       * @return This [[Tree]] with its [[Symbol]] set
+       */
+      def withSym(symbol: Symbol): Tree = {
+        val tree = setSymbol(self, symbol)
+        if (symbol.hasType) tree withType symbol.preciseType else tree
       }
+
+      /** Type-check this [[Tree]] if it doesn't have a [[Type]]. */
+      def typeChecked: Tree = if (hasType) self else typeCheck(self)
+
+      /** The [[Symbol]]s of all bound variables in this [[Tree]]. */
+      def definitions: Set[TermSymbol] = typeChecked.collect {
+        case defTree @ (_: DefDef | _: ValDef | _: Bind) => defTree
+      }.filter { _.hasTerm }.map { _.term }.toSet
+
+      /** The [[Symbol]]s of all variables referenced in this [[Tree]]. */
+      def references: Set[TermSymbol] = typeChecked.collect {
+        case id: Ident if id.hasTerm &&
+          (id.term.isVal || id.term.isVar || id.term.isMethod) => id.term
+      }.toSet
+
+      /** The [[Symbol]]s of all free variables in this [[Tree]]. */
+      def closure: Set[TermSymbol] = references diff definitions
     }
-
-    /**
-     * Replace all free occurrences of a sequence of identifiers with their respective source code
-     * snippets in this [[Tree]].
-     *
-     * @param kvs A sequence of [[TermName]]s and code snippets to substitute
-     * @return This [[Tree]] with the substituted code snippets
-     */
-    def substitute(kvs: (TermName, Tree)*): Tree =
-      kvs.foldLeft(self) { case (tree, (key, value)) => tree.substitute(key, value) }
-
-    /**
-     * Replace all free occurrences of a [[Map]] of identifiers with their respective source code
-     * snippets in this [[Tree]].
-     *
-     * @param dict A dictionary of [[TermName]]s and code snippets to substitute
-     * @return This [[Tree]] with the substituted code snippets
-     */
-    def substitute(dict: Map[TermName, Tree]): Tree =
-      substitute(dict.toSeq: _*)
-
-    /**
-     * Replace occurrences of the `find` [[Tree]] with the replacement [[Tree]] `repl`.
-     *
-     * @param find The [[Tree]] to look for.
-     * @param repl The [[Tree]] that should replace `find`.
-     * @return A substituted version of the enclosing [[Tree]].
-     */
-    def substitute(find: Tree, repl: Tree): Tree = transform {
-      case x if x == find => repl
-    }
-
-    /**
-     * Inline a value definitions in this [[Tree]]. It's assumed that it's part of the [[Tree]].
-     *
-     * @param valDef the [[ValDef]] to inline
-     * @return this [[Tree]] with the specified value definitions inlined
-     */
-    def inline(valDef: ValDef): Tree = transform {
-      case vd: ValDef if vd.symbol == valDef.symbol => q"()".withType[Unit]
-      case id: Ident  if id.symbol == valDef.symbol => valDef.rhs
-    }
-  }
-
-  /** Syntax sugar for [[ValDef]]s. */
-  implicit class ValDefOps(self: ValDef) {
-
-    /** @return `true` if the value definition is lazy, `false` otherwise */
-    def isLazy: Boolean = self.mods hasFlag Flag.LAZY
-
-    /** @return `true` if the value definition is implicit, `false` otherwise */
-    def isImplicit: Boolean = self.mods hasFlag Flag.IMPLICIT
-
-    /** @return This [[ValDef]] without a [[Symbol]] and a `rhs` */
-    def reset: ValDef = mk.valDef(self.name, self.tpt, self.mods.flags, EmptyTree)
-  }
-
-  /** Syntax sugar for [[Type]]s. */
-  implicit class TypeOps(self: Type) {
-
-    /** @return The de-aliased and widened version of this [[Type]] */
-    def precise: Type = self.finalResultType.widen
-
-    /** @return The [[Type]] argument used to initialize this [[Type]] constructor */
-    def elementType: Type = precise.typeArgs.head
-
-    /**
-     * Apply this [[Type]] as a [[Type]] constructor.
-     *
-     * @param args The [[Type]] arguments
-     * @return The specialized version of this [[Type]]
-     */
-    def apply(args: Type*): Type =
-      appliedType(self, args: _*)
-  }
-
-  /** Syntax sugar for [[Symbol]]s. */
-  implicit class SymbolOps(self: Symbol) {
-
-    /** Check if this [[Symbol]] has an associated [[Type]]. */
-    def hasInfo: Boolean = {
-      val info = self.info
-      info != null && info != NoType
-    }
-
-    /** Set the `info` of this [[Symbol]]. */
-    def withInfo(info: Type): Symbol =
-      setInfo(self, info)
-
-    /** Set the `info` of this [[Symbol]]. */
-    def withInfo[T: TypeTag]: Symbol =
-      withInfo(typeOf[T])
-  }
-
-  /** Syntax sugar for function call chain emulation. */
-  implicit class Chain[A](self: A) {
-
-    /**
-     * Emulation of a function call chain starting with `this`, similar to Clojure's thread macros
-     * (-> and/or ->>). E.g. `x ->> f ->> g == g(f(x)) == (g compose f)(x) == (f andThen g)(x)`.
-     *
-     * @param f Next function to thread in the call chain
-     * @tparam B Return type of the next function
-     */
-    def ->>[B](f: A => B): B = f(self)
-
-    /** Alias for `this ->> f`. */
-    def chain[B](f: A => B): B = f(self)
-  }
-
-  /** Syntax sugar for class casting. */
-  implicit class As[A](self: A) {
-
-    /** Alias for `this.asInstanceOf[B]`. */
-    def as[B]: B = self.asInstanceOf[B]
   }
 }

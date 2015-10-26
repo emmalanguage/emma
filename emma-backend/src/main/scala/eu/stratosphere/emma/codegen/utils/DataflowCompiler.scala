@@ -82,18 +82,7 @@ class DataflowCompiler(val mirror: Mirror) {
 }
 
 object DataflowCompiler {
-
-  val CODEGEN_DIR_DEFAULT = Paths.get(System.getProperty("java.io.tmpdir"), "emma", "codegen").toAbsolutePath.toString
-  val CONSTRUCTOR = termNames.CONSTRUCTOR
   val RUN_METHOD = TermName("run")
-
-  object replaceIdents extends Transformer with (Tree => Tree) {
-    override def transform(tree: Tree): Tree = tree match {
-      case ident@Ident(TermName(x)) => Ident(TermName(x))
-      case x => super.transform(x)
-    }
-
-    override def apply(tree: Tree) = transform(tree)
-  }
-
+  val CODEGEN_DIR_DEFAULT =
+    Paths.get(System.getProperty("java.io.tmpdir"), "emma", "codegen").toAbsolutePath.toString
 }

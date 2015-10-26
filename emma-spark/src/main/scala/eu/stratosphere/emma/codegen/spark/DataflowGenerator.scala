@@ -14,20 +14,17 @@ import org.apache.spark.rdd.RDD
 import scala.collection.mutable
 import scala.reflect.runtime.universe._
 
-
-class DataflowGenerator(
-      val compiler:  DataflowCompiler,
-      val sessionID: UUID = UUID.randomUUID())
+class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UUID.randomUUID())
     extends RuntimeUtil {
 
-  val tb   = compiler.tb
-  val sc   = freshName("sc$spark$")
+  import syntax._
+  val tb = compiler.tb
+  val sc = $"sc$$spark"
   val memo = mutable.Map[String, ModuleSymbol]()
 
-  private val SparkCtx = typeOf[SparkContext]
-
-  private val compile  = (t: Tree) => t ->>
-    { _.asInstanceOf[ImplDef] } ->>
+  private val SPARK_CTX = typeOf[SparkContext]
+  private val compile = (tree: Tree) => tree ->>
+    { _.as[ImplDef] } ->>
     { compiler compile _ } ->>
     { _.asModule }
 
@@ -38,7 +35,7 @@ class DataflowGenerator(
   def generateDataflowDef(root: ir.Combinator[_], id: String) = {
     val dataFlowName = id
     memo.getOrElseUpdate(dataFlowName, {
-      logger info s"Generating dataflow code for '$dataFlowName'"
+      logger.info("Generating dataflow code for '{}'", dataFlowName)
       // initialize UDF store to be passed around implicitly during dataFlow
       // opCode assembly
       implicit val closure = new DataFlowClosure()
@@ -59,17 +56,17 @@ class DataflowGenerator(
 
       val runMethod = root match {
         case op: ir.Fold[_, _] =>
-          q"def run($sc: $SparkCtx, ..$params, ..$localInputs) = $opCode"
+          q"def run($sc: $SPARK_CTX, ..$params, ..$localInputs) = $opCode"
 
         case op: ir.Write[_] =>
-          q"def run($sc: $SparkCtx, ..$params, ..$localInputs) = $opCode"
+          q"def run($sc: $SPARK_CTX, ..$params, ..$localInputs) = $opCode"
 
         case op: ir.Combinator[_] =>
-          val res = freshName("result$spark$")
-          q"""def run($sc: $SparkCtx, ..$params, ..$localInputs) = {
-            val $res = $opCode.cache()
-            $res.foreach(_ => ())
-            $res
+          val result = $"result$$spark"
+          q"""def run($sc: $SPARK_CTX, ..$params, ..$localInputs) = {
+            val $result = $opCode.cache()
+            $result.foreach(_ => ())
+            $result
           }"""
       }
 
@@ -106,7 +103,7 @@ class DataflowGenerator(
   private def opCode[B](op: ir.Read[B])
       (implicit closure: DataFlowClosure): Tree = {
     // infer types and generate type information
-    val tpe  = typeOf(op.tag).dealias
+    val tpe = typeOf(op.tag).precise
     val path = op.location
 
     op.format match {
@@ -115,7 +112,7 @@ class DataflowGenerator(
           throw new RuntimeException(
             s"Cannot create Spark CsvInputFormat for non-product type ${typeOf(op.tag)}")
 
-        val line = freshName("line$spark$")
+        val line = $"line$$spark"
         val name = closure nextTermName "converter"
         closure.UDFs += q"""val $name =
           _root_.eu.stratosphere.emma.api.`package`.materializeCSVConverters[$tpe]"""
@@ -134,17 +131,17 @@ class DataflowGenerator(
 
   private def opCode[A](op: ir.Write[A])
       (implicit closure: DataFlowClosure): Tree = {
-    val tpe = typeOf(op.xs.tag).dealias
+    val tpe = typeOf(op.xs.tag).precise
     // assemble input fragment
-    val xs  = generateOpCode(op.xs)
+    val xs = generateOpCode(op.xs)
 
     val outFormatTree = op.format match {
       case fmt: CSVOutputFormat[_] =>
         val sep = fmt.separator.toString
-        val e   = freshName("e$spark$")
+        val el = $"el$$spark"
         if (tpe <:< weakTypeOf[Product])
-          q"""$xs.map({ case $e =>
-            0.until($e.productArity).map($e.productElement(_)).mkString($sep)
+          q"""$xs.map({ case $el =>
+            0.until($el.productArity).map($el.productElement(_)).mkString($sep)
           })"""
         else throw new RuntimeException(
           s"Cannot create Spark CsvOutputFormat for non-product type ${typeOf(op.tag)}")
@@ -159,13 +156,14 @@ class DataflowGenerator(
 
   private def opCode[B](op: ir.TempSource[B])
       (implicit closure: DataFlowClosure): Tree = {
-    val tpe   = typeOf(op.tag).dealias
+    val tpe = typeOf(op.tag).precise
     // add a dedicated closure variable to pass the input param
     val param = TermName(op.ref.asInstanceOf[ParallelizedDataBag[B, RDD[B]]].name)
     closure.closureParams +=
       param -> tq"_root_.eu.stratosphere.emma.api.DataBag[$tpe]"
 
-    q"$param.asInstanceOf[_root_.eu.stratosphere.emma.api.ParallelizedDataBag[$tpe, _root_.org.apache.spark.rdd.RDD[$tpe]]].repr"
+    q"""$param.asInstanceOf[_root_.eu.stratosphere.emma.api.ParallelizedDataBag[$tpe,
+      _root_.org.apache.spark.rdd.RDD[$tpe]]].repr"""
   }
 
   private def opCode[A](op: ir.TempSink[A])
@@ -174,20 +172,20 @@ class DataflowGenerator(
 
   private def opCode[B](op: ir.Scatter[B])
       (implicit closure: DataFlowClosure): Tree = {
-    val tpe = typeOf(op.tag).dealias
+    val tpe = typeOf(op.tag).precise
     // add a dedicated closure variable to pass the scattered term
-    val ip  = closure.nextTermName()
-    closure.localInputParams += ip -> tq"_root_.scala.Seq[$tpe]"
-    q"$sc.parallelize($ip)"
+    val input = closure.nextTermName()
+    closure.localInputParams += input -> tq"_root_.scala.Seq[$tpe]"
+    q"$sc.parallelize($input)"
   }
 
   private def opCode[OT, IT](op: ir.Map[OT, IT])
       (implicit closure: DataFlowClosure): Tree = {
     // assemble input fragment
-    val xs     = generateOpCode(op.xs)
+    val xs = generateOpCode(op.xs)
     // generate fn UDF
-    val mapFn  = parseCheck(op.f)
-    val mapUDF = ir.UDF(mapFn, mapFn.tpe, tb)
+    val mapFun = parseCheck(op.f)
+    val mapUDF = ir.UDF(mapFun, mapFun.preciseType, tb)
     closure.closureParams ++= mapUDF.closure map { p => p.name -> p.tpt }
     // assemble dataFlow fragment
     q"$xs.map((..${mapUDF.params}) => ${mapUDF.body})"
@@ -196,10 +194,10 @@ class DataflowGenerator(
   private def opCode[B, A](op: ir.FlatMap[B, A])
       (implicit closure: DataFlowClosure): Tree = {
     // assemble input fragment
-    val xs    = generateOpCode(op.xs)
+    val xs = generateOpCode(op.xs)
     // generate fn UDF
-    val fmFn  = parseCheck(op.f)
-    val fmUDF = ir.UDF(fmFn, fmFn.tpe, tb)
+    val fmFun = parseCheck(op.f)
+    val fmUDF = ir.UDF(fmFun, fmFun.preciseType, tb)
     closure.closureParams ++= fmUDF.closure map { p => p.name -> p.tpt }
     q"$xs.flatMap((..${fmUDF.params}) => ${fmUDF.body}.fetch())"
   }
@@ -208,10 +206,10 @@ class DataflowGenerator(
   private def opCode[A](op: ir.Filter[A])
       (implicit closure: DataFlowClosure): Tree = {
     // assemble input fragment
-    val xs   = generateOpCode(op.xs)
+    val xs = generateOpCode(op.xs)
     // generate fn UDF
-    val f    = parseCheck(op.p)
-    val fUDF = ir.UDF(f, f.tpe, tb)
+    val predicate = parseCheck(op.p)
+    val fUDF = ir.UDF(predicate, predicate.preciseType, tb)
     closure.closureParams ++= fUDF.closure map { p => p.name -> p.tpt }
     // assemble dataflow fragment
     q"$xs.filter((..${fUDF.params}) => ${fUDF.body})"
@@ -219,25 +217,24 @@ class DataflowGenerator(
 
   private def opCode[C, A, B](op: ir.EquiJoin[C, A, B])
       (implicit closure: DataFlowClosure): Tree = {
-    val kx    = parseCheck(op.keyx)
-    val kxUDF = ir.UDF(kx, kx.tpe.dealias, tb)
-    val ky    = parseCheck(op.keyy)
-    val kyUDF = ir.UDF(ky, ky.tpe.dealias, tb)
-    val f     = parseCheck(op.f)
-    val fUDF  = ir.UDF(f, f.tpe.dealias, tb)
+    val kx = parseCheck(op.keyx)
+    val kxUDF = ir.UDF(kx, kx.preciseType, tb)
+    val ky = parseCheck(op.keyy)
+    val kyUDF = ir.UDF(ky, ky.preciseType, tb)
+    val predicate = parseCheck(op.f)
+    val fUDF = ir.UDF(predicate, predicate.preciseType, tb)
     // assemble input fragments
-    val xs    = generateOpCode(op.xs)
-    val ys    = generateOpCode(op.ys)
-    val left  = freshName("xs$spark$")
-    val right = freshName("ys$spark$")
+    val xs = generateOpCode(op.xs)
+    val ys = generateOpCode(op.ys)
+    val $(left, right) = $("xs$spark", "ys$spark")
     // generate kx UDF
     closure.closureParams ++= kxUDF.closure map { p => p.name -> p.tpt }
     // generate ky UDF
     closure.closureParams ++= kyUDF.closure map { p => p.name -> p.tpt }
     // generate join UDF
-    closure.closureParams ++=  fUDF.closure map { p => p.name -> p.tpt }
+    closure.closureParams ++= fUDF.closure map { p => p.name -> p.tpt }
     // assemble dataflow fragment
-    q"""val $left  = $xs.map({ (..${kxUDF.params}) =>
+    q"""val $left = $xs.map({ (..${kxUDF.params}) =>
         (${kxUDF.body}, ${kxUDF.params.head.name})
       })
 
@@ -260,53 +257,51 @@ class DataflowGenerator(
   private def opCode[B, A](op: ir.Fold[B, A])
       (implicit closure: DataFlowClosure): Tree = {
     // assemble input fragment
-    val xs       = generateOpCode(op.xs)
+    val xs = generateOpCode(op.xs)
     // get fold components
-    val empty    = parseCheck(op.empty)
-    val emptyUDF = ir.UDF(empty, empty.tpe.dealias, tb)
-    val sng      = parseCheck(op.sng)
-    val sngUDF   = ir.UDF(sng, sng.tpe.dealias, tb)
-    val union    = parseCheck(op.union)
-    val unionUDF = ir.UDF(union, union.tpe.dealias, tb)
+    val empty = parseCheck(op.empty)
+    val emptyUDF = ir.UDF(empty, empty.preciseType, tb)
+    val sng = parseCheck(op.sng)
+    val sngUDF = ir.UDF(sng, sng.preciseType, tb)
+    val union = parseCheck(op.union)
+    val unionUDF = ir.UDF(union, union.preciseType, tb)
     // add closure parameters
     closure.closureParams ++= emptyUDF.closure map { p => p.name -> p.tpt }
-    closure.closureParams ++=   sngUDF.closure map { p => p.name -> p.tpt }
+    closure.closureParams ++= sngUDF.closure map { p => p.name -> p.tpt }
     closure.closureParams ++= unionUDF.closure map { p => p.name -> p.tpt }
     // assemble dataFlow fragment
     q"""$xs.map((..${sngUDF.params}) => ${sngUDF.body})
-        .reduce((..${unionUDF.params}) => ${unionUDF.body})"""
+      .reduce((..${unionUDF.params}) => ${unionUDF.body})"""
   }
 
   private def opCode[B, A](op: ir.FoldGroup[B, A])
       (implicit closure: DataFlowClosure): Tree = {
     // assemble input fragment
-    val xs       = generateOpCode(op.xs)
+    val xs = generateOpCode(op.xs)
     // get fold components
-    val key      = parseCheck(op.key)
-    val keyUDF   = ir.UDF(key, key.tpe.dealias, tb)
-    val empty    = parseCheck(op.empty)
-    val emptyUDF = ir.UDF(empty, empty.tpe.dealias, tb)
-    val sng      = parseCheck(op.sng)
-    val sngUDF   = ir.UDF(sng, sng.tpe.dealias, tb)
-    val union    = parseCheck(op.union)
-    val unionUDF = ir.UDF(union, union.tpe.dealias, tb)
+    val key = parseCheck(op.key)
+    val keyUDF = ir.UDF(key, key.preciseType, tb)
+    val empty = parseCheck(op.empty)
+    val emptyUDF = ir.UDF(empty, empty.preciseType, tb)
+    val sng = parseCheck(op.sng)
+    val sngUDF = ir.UDF(sng, sng.preciseType, tb)
+    val union = parseCheck(op.union)
+    val unionUDF = ir.UDF(union, union.preciseType, tb)
     // add closure parameters
-    closure.closureParams ++=   keyUDF.closure map { p => p.name -> p.tpt }
+    closure.closureParams ++= keyUDF.closure map { p => p.name -> p.tpt }
     closure.closureParams ++= emptyUDF.closure map { p => p.name -> p.tpt }
-    closure.closureParams ++=   sngUDF.closure map { p => p.name -> p.tpt }
+    closure.closureParams ++= sngUDF.closure map { p => p.name -> p.tpt }
     closure.closureParams ++= unionUDF.closure map { p => p.name -> p.tpt }
     // assemble dataFlow fragment
     val aliases = for {
       (alias, origin) <- sngUDF.params zip keyUDF.params
-      (aName, oName )  = (alias.name, origin.name)
-      if aName != oName
-    } yield aName -> Ident(oName)
+      if alias.name != origin.name
+    } yield alias.name -> Ident(origin.name)
 
-    val x = freshName("x$spark$")
-    val y = freshName("y$spark$")
+    val $(x, y) = $("x$spark", "y$spark")
 
     q"""$xs.map({ (..${keyUDF.params}) =>
-        (${keyUDF.body}, ${sngUDF.body.bind(aliases: _*)})
+        (${keyUDF.body}, ${bind(sngUDF.body)(aliases: _*)})
       }).reduceByKey({ (..${unionUDF.params}) =>
         ${unionUDF.body}
       }).map({ case ($x, $y) =>
@@ -332,13 +327,12 @@ class DataflowGenerator(
 
   private def opCode[B, A](op: ir.Group[B, A])
       (implicit closure: DataFlowClosure): Tree = {
-    val key      = freshName("key$spark$")
-    val iterator = freshName("iterator$spark$")
+    val $(key, iterator) = $("key$spark", "iterator$spark")
     // assemble input fragment
-    val xs       = generateOpCode(op.xs)
+    val xs = generateOpCode(op.xs)
     // generate key UDF
-    val keyFn    = parseCheck(op.key)
-    val keyUDF   = ir.UDF(keyFn, keyFn.tpe, tb)
+    val keyFun = parseCheck(op.key)
+    val keyUDF = ir.UDF(keyFun, keyFun.preciseType, tb)
     closure.closureParams ++= keyUDF.closure map { p => p.name -> p.tpt }
     // assemble dataFlow fragment
     q"""$xs.groupBy({ (..${keyUDF.params}) =>
@@ -354,11 +348,11 @@ class DataflowGenerator(
   // --------------------------------------------------------------------------
 
   private final class DataFlowClosure(
-      udfCounter:     Counter = new Counter(),
+      udfCounter: Counter = new Counter(),
       scatterCounter: Counter = new Counter()) {
-    val closureParams    = mutable.Map.empty[TermName, Tree]
+    val closureParams = mutable.Map.empty[TermName, Tree]
     val localInputParams = mutable.Map.empty[TermName, Tree]
-    val UDFs             = mutable.ArrayBuilder.make[Tree]
+    val UDFs = mutable.ArrayBuilder.make[Tree]
 
     def nextUDFName(prefix: String = "UDF") =
       TypeName(f"Emma$prefix${udfCounter.advance.get}%05d")

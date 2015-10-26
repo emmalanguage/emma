@@ -12,26 +12,25 @@ import scala.collection.mutable
 import scala.reflect.runtime.{universe => ru}
 import scala.tools.reflect.ToolBox
 
-class TempResultsManager(
-  val tb: ToolBox[ru.type],
-  val sessionID: UUID = UUID.randomUUID) extends RuntimeUtil {
+class TempResultsManager(val tb: ToolBox[ru.type], val sessionID: UUID = UUID.randomUUID)
+    extends RuntimeUtil {
+
+  import syntax._
 
   // get the path where the toolbox will place temp results
   private val sessionDir = {
-    val tempDir = "java.io.tmpdir"       ->>
-      { System.getProperty }             ->>
+    val tempDir = sys.props("java.io.tmpdir") ->>
       { FilenameUtils.separatorsToUnix } ->>
-      { s => s"file:///$s/emma/temp" }   ->>
-      { System.getProperty("emma.temp.dir", _) + "/" }
+      { s => s"file:///$s/emma/temp" } ->>
+      { sys.props.getOrElse("emma.temp.dir", _) + "/" }
 
-    tempDir                              ->>
-      { new URI(_).normalize() }         ->>
-      { _.resolve(sessionID.toString + "/") }
+    new URI(tempDir).normalize()
+      .resolve(s"$sessionID/")
   }
 
-  private val fs      = FileSystem.get(sessionDir)
+  private val fs = FileSystem.get(sessionDir)
   private var results = mutable.Set.empty[UUID]
-  private var refs    = mutable.Map.empty[String, UUID]
+  private var refs = mutable.Map.empty[String, UUID]
 
   // initialization logic
   {

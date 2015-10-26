@@ -7,7 +7,8 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
 class TestMacros(val c: blackbox.Context) extends ControlFlow with Comprehension {
-  import c.universe._
+  import universe._
+  import syntax._
 
   /**
    * Translates an Emma expression to an Algorithm.

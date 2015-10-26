@@ -4,6 +4,7 @@ import language.postfixOps
 
 trait ComprehensionCombination extends ComprehensionRewriteEngine {
   import universe._
+  import syntax._
 
   def combine(root: ExpressionRoot) = {
     // states for the state machine
@@ -54,7 +55,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     def bind(expr: Expression, root: Expression) = new Traversable[RuleMatch] {
       def foreach[U](f: RuleMatch => U) = expr match {
         case parent @ Comprehension(_, qualifiers) => for {
-          filter @ Filter(_)    <- qualifiers
+          filter @ Filter(_) <- qualifiers
           gen @ Generator(_, _) <- qualifiers takeWhile { _ != filter }
         } f(RuleMatch(root, parent, gen, filter))
           
@@ -62,13 +63,12 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       }
     }
 
-    def guard(rm: RuleMatch) = {
+    def guard(rm: RuleMatch) =
       rm.filter.usedVars(rm.root) subsetOf Set(rm.gen.lhs)
-    }
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(_, parent, gen, filter) = rm
-      val p   = mk anonFun (List(rm.gen.lhs.name -> rm.gen.lhs.info), unComprehend(filter.expr))
+      val p = lambda(gen.lhs) { unComprehend(filter.expr) }
       gen.rhs = combinator.Filter(p, gen.rhs)
       parent.qualifiers = parent.qualifiers diff List(filter)
       parent // return new parent
@@ -98,14 +98,12 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       case _ => None
     }
 
-    def guard(rm: RuleMatch) = {
+    def guard(rm: RuleMatch) =
       rm.head.usedVars(rm.root) subsetOf Set(rm.child.lhs)
-    }
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(_, ScalaExpr(tree), child) = rm
-      val f = mk anonFun (List(child.lhs.name -> child.lhs.info), tree)
-      combinator.Map(f, child.rhs)
+      combinator.Map(lambda(child.lhs) { tree }, child.rhs)
     }
   }
 
@@ -140,22 +138,20 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       }
     }
 
-    def guard(rm: RuleMatch) = (rm.parent.qualifiers :+ rm.parent.hd) forall { expr =>
-      if (expr == rm.g2)
-        expr.usedVars(rm.parent) == Set(rm.g1.lhs)
-      else
-        ! (expr.usedVars(rm.parent) contains rm.g1.lhs)
+    def guard(rm: RuleMatch) = {
+      val RuleMatch(_, parent, g1, g2) = rm
+      parent.qualifiers :+ parent.hd forall { expr =>
+        if (expr == g2) expr.usedVars(parent) == Set(g1.lhs)
+        else !expr.usedVars(parent).contains(g1.lhs)
+      }
     }
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(_, parent, g1, g2 @ Generator(_, rhs)) = rm
-      val f = mk anonFun (List(g1.lhs.name -> g1.lhs.info), unComprehend(rhs))
-      parent.qualifiers = for (q <- parent.qualifiers if q != g1) yield {
-        if (q == g2)
-          Generator(g2.lhs, combinator.FlatMap(f, g1.rhs))
-        else
-          q
-      }
+      val f = lambda(g1.lhs) { unComprehend(rhs) }
+      parent.qualifiers = for (q <- parent.qualifiers if q != g1)
+        yield if (q == g2) Generator(g2.lhs, combinator.FlatMap(f, g1.rhs)) else q
+
       parent
     }
   }
@@ -178,14 +174,8 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
    */
   object MatchEquiJoin extends Rule {
 
-    case class RuleMatch(
-      root:   Expression,
-      parent: Comprehension,
-      xs:     Generator,
-      ys:     Generator,
-      filter: Filter,
-      kx:     Function,
-      ky:     Function)
+    case class RuleMatch(root: Expression, parent: Comprehension,
+      xs: Generator, ys: Generator, filter: Filter, kx: Function, ky: Function)
 
     def bind(expr: Expression, root: Expression) = new Traversable[RuleMatch] {
       def foreach[U](f: RuleMatch => U) = expr match {
@@ -200,9 +190,9 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       }
     }
 
-    def guard(rm: RuleMatch) = {
-      !((rm.xs.usedVars(rm.root) contains rm.ys.lhs) || (rm.ys.usedVars(rm.root) contains rm.xs.lhs))
-    }
+    def guard(rm: RuleMatch) =
+      !((rm.xs.usedVars(rm.root) contains rm.ys.lhs) ||
+        (rm.ys.usedVars(rm.root) contains rm.xs.lhs))
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(root, parent, xs, ys, filter, kx, ky) = rm
@@ -211,27 +201,26 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       val join = combinator.EquiJoin(kx, ky, xs.rhs, ys.rhs)
 
       // bind join result to a fresh variable
-      val tpt = tq"(${kx.vparams.head.tpt}, ${ky.vparams.head.tpt})"
-      val vd  = mk.valDef(freshName("join"), tpt)
-      val sym = mk.freeTerm(vd.name.toString, vd.trueType)
-      val qs  = suffix drop 2 filter { _ != filter }
+      val xType = kx.vparams.head.preciseType
+      val yType = ky.vparams.head.preciseType
+      val tpe = PAIR(xType, yType)
+      val term = mk.freeTerm($"join".toString, tpe)
+      val qs = suffix drop 2 filter { _ != filter }
 
-      // substitute [v._1/x] in affected expressions
-      for {
-        expr @ ScalaExpr(_) <- parent
-        if expr.usedVars(root) contains { xs.lhs }
-        tree = q"${mk ref sym}._1" withType vd.trueType.typeArgs(0)
-      } expr.substitute(xs.lhs.name, ScalaExpr(tree))
+      for { // substitute [v._1/x] in affected expressions
+        expr @ ScalaExpr(tree) <- parent
+        if expr.usedVars(root) contains xs.lhs
+        body = q"$term._1" :: xType
+      } expr.tree = let (xs.lhs -> body) in tree
 
-      // substitute [v._2/y] in affected expressions
-      for {
-        expr @ ScalaExpr(_) <- parent
-        if expr.usedVars(root) contains { ys.lhs }
-        tree = q"${mk ref sym}._2" withType vd.trueType.typeArgs(1)
-      } expr.substitute(ys.lhs.name, ScalaExpr(tree))
+      for { // substitute [v._2/y] in affected expressions
+        expr @ ScalaExpr(tree) <- parent
+        if expr.usedVars(root) contains ys.lhs
+        body = q"$term._2" :: yType
+      } expr.tree = let (ys.lhs -> body) in tree
 
       // modify parent qualifier list
-      parent.qualifiers = prefix ::: Generator(sym, join) :: qs
+      parent.qualifiers = prefix ::: Generator(term, join) :: qs
 
       // return the modified parent
       parent
@@ -241,29 +230,17 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       Option[(Function, Function)] = p.tree match {
         case q"${lhs: Tree} == ${rhs: Tree}" =>
           val defVars = p.definedVars(root)
-
-          val lhsVars = defVars intersect lhs.freeTerms
-          val rhsVars = defVars intersect rhs.freeTerms
-
+          val lhsVars = defVars & lhs.closure
+          val rhsVars = defVars & rhs.closure
           if (lhsVars.size != 1 || rhsVars.size != 1) {
             None // Both `lhs` and `rhs` must refer to exactly one variable
-          } else if ((lhsVars contains xs.lhs) &&
-                     (rhsVars contains ys.lhs)) {
+          } else if (lhsVars(xs.lhs) && rhsVars(ys.lhs)) {
             // Filter expression has the type `f(xs.lhs) == h(ys.lhs)`
-            val vx = xs.lhs.name -> xs.lhs.info
-            val vy = ys.lhs.name -> ys.lhs.info
-            val kx = mk anonFun (List(vx), lhs)
-            val ky = mk anonFun (List(vy), rhs)
-            Some(kx, ky)
-          } else if ((lhsVars contains ys.lhs) &&
-                     (rhsVars contains xs.lhs)) {
+            Some(lambda(xs.lhs) { lhs }, lambda(ys.lhs) { rhs })
+          } else if (lhsVars(ys.lhs) && rhsVars(xs.lhs)) {
             // Filter expression has the type `f(ys.lhs) == h(xs.lhs)`
-            val vx = xs.lhs.name -> xs.lhs.info
-            val vy = ys.lhs.name -> ys.lhs.info
-            val kx = mk anonFun (List(vx), rhs)
-            val ky = mk anonFun (List(vy), lhs)
-            Some(kx, ky)
-          } else None  // Something else
+            Some(lambda(xs.lhs) { rhs }, lambda(ys.lhs) { lhs })
+          } else None // Something else
 
         case _ => None // Something else
       }
@@ -299,9 +276,9 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       }
     }
 
-    def guard(rm: RuleMatch) = {
-      !((rm.xs.usedVars(rm.root) contains rm.ys.lhs) || (rm.ys.usedVars(rm.root) contains rm.xs.lhs))
-    }
+    def guard(rm: RuleMatch) =
+      !((rm.xs.usedVars(rm.root) contains rm.ys.lhs) ||
+        (rm.ys.usedVars(rm.root) contains rm.xs.lhs))
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(root, parent, xs, ys) = rm
@@ -310,29 +287,27 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       // construct combinator node with input and predicate sides aligned
       val cross = combinator.Cross(xs.rhs, ys.rhs)
 
-      // bind cross result to a fresh variable
-      val vd  = mk.valDef(freshName("cross"), tq"(${rm.xs.tpe}, ${rm.ys.tpe})")
-      val sym = mk.freeTerm(vd.name.toString, vd.trueType)
+      // bind join result to a fresh variable
+      val tpe = PAIR(xs.tpe, ys.tpe)
+      val term = mk.freeTerm($"cross".toString, tpe)
 
-      // substitute [v._1/x] in affected expressions
-      for {
-        expr @ ScalaExpr(_) <- parent
-        if expr.usedVars(root) contains { xs.lhs }
-        tree = q"${mk ref sym}._1" withType vd.trueType.typeArgs(0)
-      } expr.substitute(xs.lhs.name, ScalaExpr(tree))
+      for { // substitute [v._1/x] in affected expressions
+        expr @ ScalaExpr(tree) <- parent
+        if expr.usedVars(root) contains xs.lhs
+        body = q"$term._1" :: xs.tpe
+      } expr.tree = let (xs.lhs -> body) in tree
 
-      // substitute [v._2/y] in affected expressions
-      for {
-        expr @ ScalaExpr(_) <- parent
-        if expr.usedVars(root) contains { ys.lhs }
-        tree = q"${mk ref sym}._2" withType vd.trueType.typeArgs(1)
-      } expr.substitute(ys.lhs.name, ScalaExpr(tree))
+      for { // substitute [v._2/y] in affected expressions
+        expr @ ScalaExpr(tree) <- parent
+        if expr.usedVars(root) contains ys.lhs
+        body = q"$term._2" :: ys.tpe
+      } expr.tree = let (ys.lhs -> body) in tree
 
       // modify parent qualifier list
-      parent.qualifiers = prefix ::: Generator(sym, cross) :: suffix.drop(2)
+      parent.qualifiers = prefix ::: Generator(term, cross) :: suffix.drop(2)
 
       // return the modified parent
-      rm.parent
+      parent
     }
   }
 
@@ -370,24 +345,24 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     def guard(rm: RuleMatch) = true
 
     def fire(rm: RuleMatch) = {
-      val RuleMatch(root, comp) = rm
-
+      val comp = rm.parent
       // the rhs of the first generator will be the input
       val in = comp.qualifiers collectFirst { case Generator(_, rhs) => rhs }
-
       assert(in.isDefined, "Undefined input for residual comprehension")
 
       unComprehend(comp) match {
         // xs.map(f)
-        case q"${map @ Select(xs, _)}[$_]($f)"
+        case q"${map: Select}[$_]($f)"
           if map.symbol == api.map =>
             combinator.Map(f, in.get)
+
         // xs.flatMap(f)
-        case q"${flatMap @ Select(xs, _)}[$_]($f)"
+        case q"${flatMap: Select}[$_]($f)"
           if flatMap.symbol == api.flatMap =>
             combinator.FlatMap(f, in.get)
+
         // xs.withFilter(f)
-        case q"${withFilter @ Select(xs, _)}($f)"
+        case q"${withFilter: Select}($f)"
           if withFilter.symbol == api.withFilter =>
             combinator.Filter(f, in.get)
       }

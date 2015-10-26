@@ -6,6 +6,7 @@ import scala.collection.mutable.ListBuffer
 
 private[emma] trait ControlFlowCompiler extends ControlFlowModel with BlackBoxUtil {
   import universe._
+  import syntax._
 
   def compileDriver[T: c.WeakTypeTag](cfGraph: CFGraph): ListBuffer[Tree] = {
     // Build driver tree starting from the (per construction unique) head block

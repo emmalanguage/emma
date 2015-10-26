@@ -4,26 +4,25 @@ import scala.reflect.macros.blackbox
 
 // TODO: add DateTime support
 class ConvertersMacros(val c: blackbox.Context) extends BlackBoxUtil {
-  import c.universe._
+  import universe._
+  import syntax._
 
-  val nextIndex = freshName("nextIndex")
-  val builder   = freshName("builder")
+  val nextIndex = $"nextIndex"
+  val builder = $"builder"
 
   /** Entry macro for emma algorithms. */
   def materializeCSVConverters[T: c.WeakTypeTag] = {
     val tpe = weakTypeOf[T]
-    val v   = freshName("value")
-    val i   = freshName("i")
-    val sep = freshName("separator")
+    val $(v, i, sep) = $("value", "i", "separator")
 
-    val fromStringFn = q"""
+    val fromStringFun = q"""
       def fromCSV($v: ${ARRAY(STRING)}): $tpe = {
-        var $i = -1;
+        var $i = -1
         def $nextIndex = { $i += 1; $i }
         ${fromString[T](tpe, q"$v")}
       }"""
 
-    val toStringFn = q"""
+    val toStringFun = q"""
       def toCSV($v: $tpe, $sep: $CHAR): ${ARRAY(STRING)} = {
         $builder.clear()
         ${toString[T](tpe, q"$v")}
@@ -32,8 +31,8 @@ class ConvertersMacros(val c: blackbox.Context) extends BlackBoxUtil {
 
     q"""new _root_.eu.stratosphere.emma.api.CSVConverters[$tpe] {
       val $builder = _root_.scala.collection.mutable.ArrayBuilder.make[$STRING]
-      $fromStringFn
-      $toStringFn
+      $fromStringFun
+      $toStringFun
     }"""
   }
 

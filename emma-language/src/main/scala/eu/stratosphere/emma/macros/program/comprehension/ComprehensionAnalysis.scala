@@ -12,6 +12,7 @@ private[emma] trait ComprehensionAnalysis
     with ComprehensionNormalization {
 
   import universe._
+  import syntax._
 
   // --------------------------------------------------------------------------
   // Comprehension Store Constructor
@@ -35,24 +36,24 @@ private[emma] trait ComprehensionAnalysis
     val terms = (for (block <- cfBlockTraverser; stmt <- block.stats) yield {
       val builder = Set.newBuilder[(TermName, Tree)]
       // Find all top-level applications on methods from the comprehended API for this statement
-      stmt traverse {
+      traverse(stmt) {
         // within an enclosing immutable ValDef
-        case vd @ q"$_ val $_: $_ = ${ComprehendableTerm(app)}" =>
-          val symb = vd.asInstanceOf[ValDef].term
-          builder += symb.name -> app
+        case q"$_ val ${name: TermName}: $_ = ${ComprehendableTerm(app)}" =>
+          builder += name -> app
+
         // within an enclosing mutable ValDef
-        case vd @ q"$_ var $_: $_ = ${ComprehendableTerm(app)}" =>
-          val symb = vd.asInstanceOf[ValDef].term
-          builder += symb.name -> app
+        case q"$_ var ${name: TermName}: $_ = ${ComprehendableTerm(app)}" =>
+          builder += name -> app
+
         // within an enclosing Assign
-        case as @ q"${_: Ident} = ${ComprehendableTerm(app)}" =>
-          val symb = as.asInstanceOf[Assign].lhs.term
-          builder += symb.name -> app
+        case q"${name: TermName} = ${ComprehendableTerm(app)}" =>
+          builder += name -> app
+
         // anonymous term
-        case app @ Apply(f, _)
-          if api methods f.symbol =>
-            builder += freshName("anon") -> app
+        case app @ Apply(f, _) if api methods f.symbol =>
+          builder += $"anon" -> app
       }
+
       builder.result()
     }).flatten.toSet
 
@@ -60,13 +61,13 @@ private[emma] trait ComprehensionAnalysis
     val comprehendedTerms = (for {
       (name, term) <- terms
     } yield {
-      val compName      = freshName(s"$name$$comp")
-      val definition    = compTermDef(term)
+      val compName = $"$name$$comp"
+      val definition = compTermDef(term)
       val comprehension = ExpressionRoot(comprehend(term, topLevel = true) match {
-        case root: combinator.Write          => root
-        case root: combinator.Fold           => root
+        case root: combinator.Write => root
+        case root: combinator.Fold => root
         case root: combinator.StatefulCreate => root
-        case root: Expression                => combinator.TempSink(name, root)
+        case root: Expression => combinator.TempSink(name, root)
       }) ->> normalize
 
       ComprehendedTerm(compName, term, comprehension, definition)
@@ -77,29 +78,21 @@ private[emma] trait ComprehensionAnalysis
   }
 
   object ComprehendableTerm {
-    def unapply(tree: Tree): Option[Tree] = {
-      tree match {
-        case q"${app @ Apply(f, _)}"
-          if api methods f.symbol =>
-            Some(app)
-        case q"${app @ Apply(f, _)}: $_"
-          if api methods f.symbol =>
-            Some(app)
-        case _ =>
-          None
-      }
+    def unapply(tree: Tree): Option[Tree] = tree match {
+      case app @ Apply(f, _) if api methods f.symbol => Some(app)
+      case q"${app @ Apply(f, _)}: $_" if api methods f.symbol => Some(app)
+      case _ => None
     }
   }
 
   /**
    * Look up a definition term ([[ValDef]] or [[Assign]]) for a comprehended term.
-   *
    * @param term The term to lookup
    * @return The (optional) definition for the term
    */
   private def compTermDef(term: Tree)(implicit cfBlocks: TraversableOnce[CFBlock]) = {
     var termDef = Option.empty[Tree]
-    for (block <- cfBlocks; stmt <- block.stats) stmt foreach {
+    for { block <- cfBlocks; stmt <- block.stats } stmt foreach {
       case vd @ q"$_ val $_: $_ = ${`term`}" => termDef = Some(vd)
       case vd @ q"$_ var $_: $_ = ${`term`}" => termDef = Some(vd)
       case as @ q"${_: Ident} = ${`term`}"   => termDef = Some(as)
@@ -121,7 +114,7 @@ private[emma] trait ComprehensionAnalysis
    */
   // FIXME: Replace flag parameters with appropriate use of partial functions
   private def comprehend(tree: Tree, input: Boolean = true, topLevel: Boolean = false): Expression =
-    tree.unAscribed match { // translate based on matched expression type
+    unAscribed(tree) match { // translate based on matched expression type
 
       // -----------------------------------------------------
       // Monad Ops
@@ -144,9 +137,9 @@ private[emma] trait ComprehensionAnalysis
       // xs.withFilter(f)
       case q"${withFilter @ Select(xs, _)}((${arg: ValDef}) => $body)"
         if withFilter.symbol == api.withFilter =>
-          val bind   = Generator(arg.term, comprehend(xs))
+          val bind = Generator(arg.term, comprehend(xs))
           val filter = Filter(comprehend(body))
-          val head   = comprehend(mk ref arg.term, input = false)
+          val head = comprehend(&(arg.term), input = false)
           Comprehension(head, bind :: filter :: Nil)
 
       // -----------------------------------------------------
@@ -205,29 +198,29 @@ private[emma] trait ComprehensionAnalysis
       // -----------------------------------------------------
 
       // stateful[S,K](xs)
-      case q"${stateful: Tree}[${stateType: TypeTree}, ${keyType: TypeTree}]($xs)"
+      case q"${stateful: Tree}[${stType: TypeTree}, ${keyType: TypeTree}]($xs)"
         if stateful.symbol == api.stateful =>
-          combinator.StatefulCreate(comprehend(xs), stateType.tpe, keyType.tpe)
+          combinator.StatefulCreate(comprehend(xs), stType.tpe, keyType.tpe)
 
       // stateful.bag()
-      case q"${fetchToStateless @ Select(ident @ Ident(_), _)}()"
+      case q"${fetchToStateless @ Select(id: Ident, _)}()"
         if fetchToStateless.symbol == api.fetchToStateless =>
-          combinator.StatefulFetch(ident)
+          combinator.StatefulFetch(id)
 
       // stateful.updateWithZero(udf)
-      case q"${updateWithZero @ Select(ident @ Ident(_), _)}[$_]($udf)"
+      case q"${updateWithZero @ Select(id: Ident, _)}[$_]($udf)"
         if updateWithZero.symbol == api.updateWithZero =>
-          combinator.UpdateWithZero(ident, udf)
+          combinator.UpdateWithZero(id, udf)
 
       // stateful.updateWithOne(updates)(keySel, udf)
-      case q"${updateWithOne @ Select(ident @ Ident(_), _)}[$_, $_]($updates)($keySel, $udf)"
+      case q"${updateWithOne @ Select(id: Ident, _)}[$_, $_]($updates)($key, $udf)"
         if updateWithOne.symbol == api.updateWithOne =>
-          combinator.UpdateWithOne(ident, comprehend(updates), keySel, udf)
+          combinator.UpdateWithOne(id, comprehend(updates), key, udf)
 
       // stateful.updateWithMany(updates)(keySel, udf)
-      case q"${updateWithMany @ Select(ident @ Ident(_), _)}[$_, $_]($updates)($keySel, $udf)"
+      case q"${updateWithMany @ Select(id: Ident, _)}[$_, $_]($updates)($key, $udf)"
         if updateWithMany.symbol == api.updateWithMany =>
-          combinator.UpdateWithMany(ident, comprehend(updates), keySel, udf)
+          combinator.UpdateWithMany(id, comprehend(updates), key, udf)
 
 
       // Interpret as boxed Scala expression (default)
@@ -241,7 +234,6 @@ private[emma] trait ComprehensionAnalysis
 
   /**
    * Inline comprehended [[ValDef]]s occurring only once with their parents.
-   *
    * @param tree The original program [[Tree]]
    * @param cfGraph The control flow graph for the comprehended algorithm
    * @param compView A view over the comprehended terms in the [[Tree]]
@@ -267,12 +259,12 @@ private[emma] trait ComprehensionAnalysis
 
     while (definitions.nonEmpty) {
       // Get a ValDef to inline
-      val vd  = definitions.head
+      val vd = definitions.head
       // Inline current value definition in the tree
-      inlined = inlined inline vd
+      inlined = inline(inlined, vd)
       // Inline in all other value definitions and continue with those
       definitions = for (other <- definitions if other.symbol != vd.symbol)
-        yield other.inline(vd).as[ValDef]
+        yield inline(other, vd).as[ValDef]
     }
 
     inlined.typeChecked
@@ -280,7 +272,6 @@ private[emma] trait ComprehensionAnalysis
 
   /**
    * Perform Fold-Group-Fusion in-place.
-   *
    * @param tree The original program [[Tree]]
    * @param cfGraph The control flow graph for the comprehended algorithm
    * @param compView A view over the comprehended terms in the [[Tree]]
@@ -293,58 +284,58 @@ private[emma] trait ComprehensionAnalysis
       gen@Generator(gSym, group: combinator.Group) <- com.comprehension.expr // For each of it's sub-expressions
       if hasProperGroupType(gen.tpe) // If this is a generator binding a proper group
     } yield {
-        // Check if all 'group.values' usages within the enclosing comprehensions are of type "fold"
-        val groupValuesUsages = (for (ctx <- com.comprehension.trees) yield ctx.collect {
-          case grpVals @ q"${id: Ident}.values" if id.symbol == gSym =>
-            (grpVals, findEnclosingFold(grpVals, ctx))
-        }).flatten.toList
+      // Check if all 'group.values' usages within the enclosing comprehensions are of type "fold"
+      val groupValuesUsages = (for { ctx <- com.comprehension.trees } yield ctx collect {
+        case groupVals @ q"${id: Ident}.values" if id.symbol == gSym =>
+          (groupVals, findEnclosingFold(groupVals, ctx))
+      }).flatten.toList
 
-        // Check if all 'group.values' usages within the enclosing comprehensions are of type "fold"
-        val allGroupValuesUsedInFold = groupValuesUsages forall { case (_, enclosingFold) => enclosingFold.isDefined }
-
-        if (groupValuesUsages.nonEmpty && allGroupValuesUsedInFold) {
-          Some(com, groupValuesUsages, gen)
-        } else
-          None
+      // Check if all 'group.values' usages within the enclosing comprehensions are of type "fold"
+      val allGroupValuesUsedInFold = groupValuesUsages forall {
+        case (_, enclosingFold) => enclosingFold.isDefined
       }
+
+      if (groupValuesUsages.nonEmpty && allGroupValuesUsedInFold) {
+        Some(com, groupValuesUsages, gen)
+      } else None
+    }
 
 
     // We only work with the first candidate, and then recursively call ourselves.
     // This is because com.comprehension.expr is modified by the com.comprehension.substitute call, so we have to generate the candidates again.
     candidates.collectFirst({ case Some((com, groupValuesUsages, gen@Generator(gSym, group: combinator.Group))) =>
-
       val comprehendedGroupValuesUsages = for {
-        ((grpVals, foldOpt), idx) <- groupValuesUsages.zipWithIndex
-        (foldTree) <- foldOpt
+        ((groupVals, foldOpt), idx) <- groupValuesUsages.zipWithIndex
+        foldTree <- foldOpt
       } yield {
-          val foldComp = ExpressionRoot(comprehend(foldTree, topLevel = true)) ->> normalize
-          (idx, grpVals, foldTree, foldComp)
-        }
+        val foldComp = ExpressionRoot(comprehend(foldTree, topLevel = true)) ->> normalize
+        (idx, groupVals, foldTree, foldComp)
+      }
 
       // Project out folds
       val folds = for {
         (_, _, _, foldComp) <- comprehendedGroupValuesUsages
       } yield foldComp.expr.as[combinator.Fold]
 
-      // Fuse the group with the folds and replace the Group with a GroupFold in the enclosing generator
-      val fGrp = foldGroup(group, folds)
-      val gNew = mk.valDef(gSym.name, fGrp.elementType)
-      gen.rhs = fGrp
-      gen.lhs = gNew.term
+      // Fuse the group with the folds and replace the Group with a GroupFold in the enclosing
+      // generator
+      val fg = foldGroup(group, folds)
+      val term = mk.freeTerm(gSym.name.toString, fg.elementType)
+      gen.rhs = fg
+      gen.lhs = term
 
       // For each 'foldTree' -> 'idx' pair
       for ((idx, _, foldTree, _) <- comprehendedGroupValuesUsages) {
-        // Replace 'foldTree' with '${valSel}._${idx}' in all trees that can be found under the enclosing 'com'
-        val replTree = if (comprehendedGroupValuesUsages.length > 1) {
-          q"${mk ref gen.lhs}.values.${TermName(s"_${idx + 1}")}".typeChecked
-        } else {
-          q"${mk ref gen.lhs}.values".typeChecked
-        }
-        com.comprehension.substitute(foldTree, replTree)
+        // Replace 'foldTree' with '${valSel}._${idx}' in all trees that can be found under the
+        // enclosing 'com'
+        val replacement = if (comprehendedGroupValuesUsages.length > 1)
+          q"${gen.lhs}.values.${TermName(s"_${idx + 1}")}".typeChecked
+        else q"${gen.lhs}.values".typeChecked
+
+        com.comprehension.replace(foldTree, replacement)
       }
 
-      com.comprehension.substitute(gSym, gen.lhs)
-
+      com.comprehension.rename(gSym, gen.lhs)
       foldGroupFusion(tree)
     })
   }
@@ -354,60 +345,66 @@ private[emma] trait ComprehensionAnalysis
    *
    * {{{ sel ->> [ withFilter | map ]* ->> fold }}}
    *
-   * set of terms in the given `context`. The set of interesting terms are thereby precisely the ones in which
-   * the given `sel` tree is followed by arbitrary many `withFilter` or `map` invocations and ends with a `fold`.
+   * set of terms in the given `context`. The set of interesting terms are thereby precisely the
+   * ones in which the given `sel` tree is followed by arbitrary many `withFilter` or `map`
+   * invocations and ends with a `fold`.
    *
    * @param sel The bottom of the tree.
    * @param ctx The context within
    * @return
    */
   def findEnclosingFold(sel: Tree, ctx: Tree) = {
-    var state: scala.Symbol = 'find_fold
-    var res: Option[Tree]   = Option.empty[Tree]
+    var state = 'find_fold
+    var result = Option.empty[Tree]
 
     val traverser = new Traverser {
-      override def traverse(tree: Tree): Unit = state match {
+      override def traverse(tree: Tree) = state match {
         case 'find_fold => tree match {
           // xs.fold(empty)(sng, union)
           case tree @ q"${fold @ Select(xs, _)}[$_](...$_)"
             if fold.symbol == api.fold =>
               state = 'find_homomorphisms
-              res = Some(tree)
+              result = Some(tree)
               traverse(xs)
-          case _ =>
-            super.traverse(tree)
+
+          case _ => super.traverse(tree)
         }
+
         case 'find_homomorphisms => tree match {
           // xs.withFilter(f)
           case q"${withFilter @ Select(xs, _)}($_)"
             if withFilter.symbol == api.withFilter =>
               traverse(xs)
+
           // xs.map(f)
-          case tree @ q"${map @ Select(xs, _)}[$_]($_)"
+          case q"${map @ Select(xs, _)}[$_]($_)"
             if map.symbol == api.map =>
               traverse(xs)
+
           case _ =>
             state = 'find_identifier
             traverse(tree)
         }
+
         case 'find_identifier => tree match {
           // xs.withFilter(f)
           case tree @ q"${_: Ident}.values"
             if tree == sel =>
               state = 'success
               super.traverse(tree)
+
           case _ =>
             state = 'find_fold
-            res = Option.empty[Tree]
+            result = None
             traverse(tree)
         }
-        case _ =>
-          super.traverse(tree)
+
+        case _ => super.traverse(tree)
       }
     }
 
     traverser.traverse(ctx)
-    res
+    result
   }
 
   /** Check if the type matches the type pattern `Group[K, DataBag[A]]`. */
@@ -416,34 +413,24 @@ private[emma] trait ComprehensionAnalysis
 
   /** Fuse a Group combinator with a list of Folds and return the resulting FoldGroup combinator. */
   private def foldGroup(group: combinator.Group, folds: List[combinator.Fold]) = folds match {
-    case fold :: Nil => combinator.FoldGroup(group.key, fold.empty, fold.sng, fold.union, group.xs)
+    case fold :: Nil =>
+      combinator.FoldGroup(group.key, fold.empty, fold.sng, fold.union, group.xs)
+
     case _ =>
       val combinator.Group(key, xs) = group
       // Derive the unique product 'empty' function
-      val empty = q"(..${for (f <- folds) yield f.empty})".typeChecked
+      val empty = q"(..${folds.map(_.empty)})".typeChecked
 
       // Derive the unique product 'sng' function
-      val x   = freshName("x")
-      val y   = freshName("y")
+      val $(x, y) = $("x", "y")
       val sng = q"($x: ${xs.elementType}) => (..${
-        for (f <- folds) yield {
-          val sng = f.sng.as[Function]
-          sng.body.rename(sng.vparams.head.name, x)
-        }
+        for (f <- folds) yield q"${f.sng}($x)"
       })".typeChecked
 
       // Derive the unique product 'union' function
       val union = q"($x: ${empty.tpe}, $y: ${empty.tpe}) => (..${
-        for ((f, i) <- folds.zipWithIndex) yield {
-          val tpe   = empty.tpe typeArgs i
-          val union = f.union.as[Function]
-          union.body substitute Map(
-            union.vparams.head.name ->
-              q"$x.${TermName(s"_${i + 1}")}".withType(tpe),
-
-            union.vparams(1).name ->
-              q"$y.${TermName(s"_${i + 1}")}".withType(tpe))
-        }
+        for ((f, i) <- folds.zipWithIndex)
+          yield q"${f.union}($x.${TermName(s"_${i + 1}")}, $y.${TermName(s"_${i + 1}")})"
       })".typeChecked
 
       combinator.FoldGroup(key, empty, sng, union, xs)
@@ -462,11 +449,11 @@ private[emma] trait ComprehensionAnalysis
 
     for {
       ComprehendedTerm(_, _, ExpressionRoot(expr), _) <- compView.terms
-      comprehension @ Comprehension(_, qualifiers)    <- expr
+      comprehension @ Comprehension(_, qualifiers) <- expr
     } comprehension.qualifiers = qualifiers flatMap {
       case Filter(ScalaExpr(x)) =>
         // Normalize the tree
-        (x ->> applyDeMorgan ->> distributeOrOverAnd ->> cleanConjuncts)
+        (x ->> deMorgan ->> distributeOrOverAnd ->> cleanConjuncts)
           .collect { case Some(nf) => Filter(ScalaExpr(nf))}
 
       case q => q :: Nil
@@ -477,43 +464,34 @@ private[emma] trait ComprehensionAnalysis
 
   /**
    * Apply DeMorgan's Rules to predicates (move negations as far in as possible).
-   * 
    * @param tree The [[Tree]] to normalize
    * @return A copy of the normalized [[Tree]]
    */
-  def applyDeMorgan(tree: Tree): Tree = {
-    object DeMorganTransformer extends Transformer {
-      def moveNegationsInside(tree: Tree): Tree = tree match {
-        case q"$p || $q" => transform(q"!$p && !$q")
-        case q"$p && $q" => transform(q"!$p || !$q")
-        case _           => q"!$tree"
-      }
-
-      override def transform(tree: Tree) = tree match {
-        case q"!$p" => moveNegationsInside(p)
-        case _      => super.transform(tree)
-      }
+  def deMorgan(tree: Tree): Tree = {
+    def moveNegationsInside(tree: Tree): Tree = tree match {
+      case q"$p || $q" => deMorgan(q"!$p && !$q")
+      case q"$p && $q" => deMorgan(q"!$p || !$q")
+      case _ => q"!$tree"
     }
 
-    DeMorganTransformer transform tree
+    transform(tree) { case q"!$p" => moveNegationsInside(p) }
   }
 
   /**
    * Distribute ∨ inwards over ∧. Repeatedly replace B ∨ (A ∧ C) with (B ∨ A) ∧ (B ∨ C).
-   *
    * @param tree The [[Tree]] to be normalized
    * @return A copy of the [[Tree]] with the distribution law applied
    */
-  def distributeOrOverAnd(tree: Tree): Tree = {
-    object DistributeTransformer extends Transformer {
-      override def transform(tree: Tree): Tree = tree match {
-        case q"$a || ($b && $c)" => q"${transform(q"$a || $b")} && ${transform(q"$a || $c")}"
-        case q"($a && $b) || $c" => q"${transform(q"$a || $c")} && ${transform(q"$b || $c")}"
-        case _ => super.transform(tree)
-      }
-    }
+  def distributeOrOverAnd(tree: Tree): Tree = transform(tree) {
+    case q"$a || ($b && $c)" =>
+      val aORb = distributeOrOverAnd(q"$a || $b")
+      val aORc = distributeOrOverAnd(q"$a || $c")
+      q"$aORb && $aORc"
 
-    DistributeTransformer transform tree
+    case q"($a && $b) || $c" =>
+      val aORc = distributeOrOverAnd(q"$a || $c")
+      val bORc = distributeOrOverAnd(q"$b || $c")
+      q"$aORc && $bORc"
   }
 
   /**

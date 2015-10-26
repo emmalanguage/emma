@@ -10,6 +10,7 @@ import scala.reflect.macros.blackbox
 
 class WorkflowMacros(val c: blackbox.Context) extends ControlFlow with Comprehension with SemanticChecks {
   import universe._
+  import syntax._
 
   val ENGINE = typeOf[Engine]
   val NATIVE = typeOf[Native]

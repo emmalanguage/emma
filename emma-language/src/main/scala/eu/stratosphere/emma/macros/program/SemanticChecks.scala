@@ -5,18 +5,18 @@ import eu.stratosphere.emma.macros.program.comprehension.ComprehensionAnalysis
 
 private[emma] trait SemanticChecks extends ComprehensionAnalysis {
   import universe._
+  import syntax._
 
-  def doSemanticChecks(t: Tree): Unit =
-    checkForStatefulAccessedFromUdf(t)
+  def doSemanticChecks(tree: Tree): Unit =
+    checkForStatefulAccessedFromUdf(tree)
 
   /**
    * Checks that .bag() is not called from the UDF of an updateWith* on the same stateful that is being updated.
    */
-  def checkForStatefulAccessedFromUdf(t: Tree): Unit =
-    t.traverse {
-      case q"${updateWith @ Select(ident @ Ident(_), _)}[$_]($udf)"
-        if api.updateWith contains updateWith.symbol =>
-        if ((udf: Tree).freeTerms.map(x => x.asInstanceOf[Symbol]) contains ident.symbol)
+  def checkForStatefulAccessedFromUdf(tree: Tree): Unit = traverse(tree) {
+    case q"${updateWith @ Select(id: Ident, _)}[$_](${udf: Tree})"
+      if api.updateWith.contains(updateWith.symbol) &&
+        id.hasTerm && udf.closure(id.term) =>
           throw new StatefulAccessedFromUdfException()
-    }
+  }
 }

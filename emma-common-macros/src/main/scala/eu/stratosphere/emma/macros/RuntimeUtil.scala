@@ -15,21 +15,18 @@ trait RuntimeUtil extends ReflectUtil {
   
   import universe._
   import internal._
+  import syntax._
 
-  def parse(str: String) =
-    tb parse str
+  def parse(string: String) =
+    tb.parse(string)
 
   def typeCheck(tree: Tree) =
     if (tree.isType) tb.typecheck(tree, tb.TYPEmode)
-    else tb typecheck tree
+    else tb.typecheck(tree)
 
   def termSym(owner: Symbol, name: TermName, tpe: Type, flags: FlagSet, pos: Position) =
-    newTermSymbol(owner, name, pos, flags).withInfo(tpe).asTerm
+    newTermSymbol(owner, name, pos, flags).withType(tpe).asTerm
 
   def typeSym(owner: Symbol, name: TypeName, flags: FlagSet, pos: Position) =
     newTypeSymbol(owner, name, pos, flags)
-
-  /** Syntax sugar for [[Tree]]s. */
-  implicit def fromTree(self: Tree): TreeOps =
-    new TreeOps(self)
 }

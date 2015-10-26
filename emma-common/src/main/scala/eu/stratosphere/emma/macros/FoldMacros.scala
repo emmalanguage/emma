@@ -14,14 +14,15 @@ import scala.reflect.macros.blackbox
  */
 class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
   import universe._
+  import syntax._
 
   private lazy val self = unbox(c.prefix.tree)
 
   // Unbox implicit type conversions
   private def unbox(tree: Tree): Tree =
-    tree.unAscribed match {
+    unAscribed(tree) match {
       case q"$_[$_]($arg)" => arg
-      case _               => tree
+      case _ => tree
     }
 
   def isEmpty = q"!$self.nonEmpty"
@@ -31,19 +32,17 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
     q"$self.fold($z)(_root_.scala.Predef.identity, $p)"
 
   def reduceOption[E: c.WeakTypeTag](p: Expr[(E, E) => E]) = {
-    val x  = freshName("x")
-    val y  = freshName("y")
+    val $(x, y) = $("x", "y")
     val oa = weakTypeOf[Option[E]]
     q"""$self.fold($None: $oa)(x => _root_.scala.Some(x): $oa, {
       case ($x, $None) => $x
       case ($None, $y) => $y
-      case ($x,    $y) => _root_.scala.Some($p($x.get, $y.get))
+      case ($x, $y) => _root_.scala.Some($p($x.get, $y.get))
     })"""
   }
 
   def minBy[E: c.WeakTypeTag](p: Expr[(E, E) => Boolean]) = {
-    val x = freshName("x")
-    val y = freshName("y")
+    val $(x, y) = $("x", "y")
     q"""$self.reduceOption[${weakTypeOf[E]}]({
       case ($x, $y) => if ($p($x, $y)) $x else $y
     })"""
@@ -53,8 +52,7 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
     q"$self.minBy(!$p(_, _))"
 
   def minWith[E, R](f: Expr[E => R])(o: Expr[Ordering[R]]) = {
-    val x = freshName("x")
-    val y = freshName("y")
+    val $(x, y) = $("x", "y")
     q"$self.minBy({ case ($x, $y) => $o.lt($f($x), $f($y)) })"
   }
 
@@ -82,10 +80,10 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
   def count() = q"$self.fold(0l)(_ => 1l, _ + _): Long"
 
   def countWith[E](p: Expr[E => Boolean]) = {
-    val x = freshName("x")
+    val x = $"x"
     q"""$self.fold(${0l})({
       case $x if $p($x) => ${1l}
-      case _            => ${0l}
+      case _ => ${0l}
     }, _ + _)"""
   }
 
@@ -96,7 +94,7 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
     q"$self.fold(${true})($p, _ && _)"
 
   def find[E: c.WeakTypeTag](p: Expr[E => Boolean]) = {
-    val x = freshName("x")
+    val x = $"x"
     q"""$self.fold($None: ${weakTypeOf[Option[E]]})({
       case $x if $p($x) => _root_.scala.Some($x)
       case _ => $None

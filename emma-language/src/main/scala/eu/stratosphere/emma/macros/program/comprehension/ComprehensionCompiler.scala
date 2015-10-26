@@ -9,6 +9,7 @@ private[emma] trait ComprehensionCompiler
     with ComprehensionCombination {
 
   import universe._
+  import syntax._
 
   /**
    * Compile a generic driver for a data-parallel runtime.
@@ -19,13 +20,13 @@ private[emma] trait ComprehensionCompiler
    * @return A [[Tree]] representing the compiled driver
    */
   def compile(tree: Tree, cfGraph: CFGraph, compView: ComprehensionView): Tree =
-    new Compiler(cfGraph, compView).transform(tree).unTypeChecked
+    new Compiler(cfGraph, compView).compile(tree).unTypeChecked
 
-  private class Compiler(cfGraph: CFGraph, compView: ComprehensionView) extends Transformer {
+  private class Compiler(cfGraph: CFGraph, compView: ComprehensionView) {
 
-    override def transform(tree: Tree): Tree = compView getByTerm tree match {
-      case Some(term) => expandComprehension(tree, cfGraph, compView)(term)
-      case None       => super.transform(tree)
+    def compile(tree: Tree): Tree = transform(tree) {
+      case t if compView.getByTerm(t).isDefined =>
+        expandComprehension(t, cfGraph, compView)(compView.getByTerm(t).get)
     }
 
     /**
@@ -167,7 +168,7 @@ private[emma] trait ComprehensionCompiler
 
       case ScalaExpr(Apply(fn, values :: Nil))
         if api.apply.alternatives contains fn.symbol =>
-          q"ir.Scatter(${transform(values)})"
+          q"ir.Scatter(${compile(values)})"
 
       case combinator.StatefulCreate(xs, stateType, keyType) =>
         val xsStr = serialize(xs)
@@ -178,38 +179,38 @@ private[emma] trait ComprehensionCompiler
         q"ir.StatefulFetch($statefulNameStr, $stateful)"
 
       case combinator.UpdateWithZero(stateful, udf) =>
-        val stateTpe = stateful.trueType.typeArgs.head
-        val keyTpe   = stateful.trueType.typeArgs(1)
-        val outTpe   = expr.elementType
-        val statefulNameStr = stateful.name.toString
-        val udfStr          = serialize(udf)
-        q"ir.UpdateWithZero[$stateTpe, $keyTpe, $outTpe]($statefulNameStr, $stateful, $udfStr)"
+        val S = stateful.preciseType.typeArgs(0)
+        val K = stateful.preciseType.typeArgs(1)
+        val R = expr.elementType
+        val statefulName = stateful.name.toString
+        val udfStr = serialize(udf)
+        q"ir.UpdateWithZero[$S, $K, $R]($statefulName, $stateful, $udfStr)"
 
-      case combinator.UpdateWithOne(stateful, upds, keySel, udf) =>
-        val stateTpe = stateful.trueType.typeArgs.head
-        val keyTpe   = stateful.trueType.typeArgs(1)
-        val updTpe   = upds.elementType
-        val outTpe   = expr.elementType
-        val statefulNameStr = stateful.name.toString
-        val usStr           = serialize(upds)
-        val keySelStr       = serialize(keySel)
-        val udfStr          = serialize(udf)
-        q"ir.UpdateWithOne[$stateTpe, $keyTpe, $updTpe, $outTpe]($statefulNameStr, $stateful, $usStr, $keySelStr, $udfStr)"
+      case combinator.UpdateWithOne(stateful, updates, key, udf) =>
+        val S = stateful.preciseType.typeArgs(0)
+        val K = stateful.preciseType.typeArgs(1)
+        val U = updates.elementType
+        val R = expr.elementType
+        val statefulName = stateful.name.toString
+        val updStr = serialize(updates)
+        val keyStr = serialize(key)
+        val udfStr = serialize(udf)
+        q"ir.UpdateWithOne[$S, $K, $U, $R]($statefulName, $stateful, $updStr, $keyStr, $udfStr)"
 
-      case combinator.UpdateWithMany(stateful, upds, keySel, udf) =>
-        val stateTpe = stateful.trueType.typeArgs.head
-        val keyTpe   = stateful.trueType.typeArgs(1)
-        val updTpe   = upds.elementType
-        val outTpe   = expr.elementType
-        val statefulNameStr = stateful.name.toString
-        val usStr           = serialize(upds)
-        val keySelStr       = serialize(keySel)
-        val udfStr          = serialize(udf)
-        q"ir.UpdateWithMany[$stateTpe, $keyTpe, $updTpe, $outTpe]($statefulNameStr, $stateful, $usStr, $keySelStr, $udfStr)"
+      case combinator.UpdateWithMany(stateful, updates, key, udf) =>
+        val S = stateful.preciseType.typeArgs(0)
+        val K = stateful.preciseType.typeArgs(1)
+        val U = updates.elementType
+        val R = expr.elementType
+        val statefulName = stateful.name.toString
+        val updStr = serialize(updates)
+        val keyStr = serialize(key)
+        val udfStr = serialize(udf)
+        q"ir.UpdateWithMany[$S, $K, $U, $R]($statefulName, $stateful, $updStr, $keyStr, $udfStr)"
 
       case e => EmptyTree
-      //throw new RuntimeException(
-      //  s"Unsupported serialization of non-combinator expression:\n${prettyPrint(e)}\n")
+        //throw new RuntimeException(
+        //  s"Unsupported serialization of non-combinator expression:\n${prettyPrint(e)}\n")
     }
 
     /**
@@ -219,19 +220,19 @@ private[emma] trait ComprehensionCompiler
      * @return A [[String]] representation of the [[Tree]]
      */
     private def serialize(tree: Tree): String = {
-      val args = tree.freeTerms.toList
-        .sortBy { _.fullName }
-        .map { sym =>
-          sym.name ->
-            (sym.info match {
-              // The following line converts a method type to a function type (eg. from "(x: Int)Int" to "Int => Int").
-              // This is necessary, because this will go into a parameter list, where we can't have method types.
-              case _: MethodType => q"$sym _".trueType
-              case _             => sym.info
-            })
+      val args = tree.closure.toList
+        .sortBy { _.name.toString }
+        .map { term =>
+          term.withType(term.info match {
+            // The following line converts a method type to a function type (eg. from "(x: Int)Int"
+            // to "Int => Int"). This is necessary, because this will go into a parameter list,
+            // where we can't have method types.
+            case _: MethodType => q"$term _".preciseType
+            case _ => term.info
+          }).asTerm
         }
 
-      val fun = mk.anonFun(args, tree)
+      val fun = lambda(args: _*) { tree }
       showCode(fun, printRootPkg = true)
     }
   }
