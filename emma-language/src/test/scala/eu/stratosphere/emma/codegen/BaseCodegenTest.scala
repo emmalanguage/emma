@@ -472,6 +472,19 @@ abstract class BaseCodegenTest(rtName: String) {
     compareBags(act._2.fetch(), exp._2.fetch())
   }
 
+  @Test def testMultipleGroupByInTheSameComprehension() = {
+    compareWithNative(emma.parallelize {
+      val cannes = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner])
+      val berlin = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
+
+      for {
+        g1 <- cannes.groupBy(x => x.year / 10)
+        g2 <- berlin.groupBy(x => x.year / 10)
+        if g1.key == g2.key
+      } yield (g1.values.count(), g2.values.count())
+    })
+  }
+
   // --------------------------------------------------------------------------
   // Fold (Global Aggregations)
   // --------------------------------------------------------------------------
