@@ -63,10 +63,10 @@ package object runtime {
     protected def doCloseSession() = logger.info(s"Closing Emma session $envSessionID (${this.getClass.getSimpleName} runtime)")
 
     def getExecutionPlan(root:Combinator[_]) : String = root match {
-      case Read(location: String, _) => buildJson(root, "Read", "") //TODO: show location
-      case Write(location: String, _, xs: Combinator[_]) => buildJson(root, "Write", getExecutionPlan(xs)) //TODO: show location
-      case TempSource(_) => buildJson(root, "TempSource(DATABAG)", "")  //TODO: show databag name if possible
-      case TempSink(name: String, xs: Combinator[_]) => buildJson(root, "TempSink", getExecutionPlan(xs))
+      case Read(location: String, _) => buildJson(root, "Read", "")
+      case Write(location: String, _, xs: Combinator[_]) => buildJson(root, "Write", getExecutionPlan(xs))
+      case TempSource(_) => buildJson(root, "TempSource (DATABAG)", "")  //TODO: show databag name if possible
+      case TempSink(name: String, xs: Combinator[_]) => buildJson(root, "TempSink ("+name+")", getExecutionPlan(xs))
       case Map(_, xs: Combinator[_]) => buildJson(root, "Map", getExecutionPlan(xs))
       case FlatMap(_, xs: Combinator[_]) => buildJson(root, "FlatMap", getExecutionPlan(xs))
       case Filter(_, xs: Combinator[_]) => buildJson(root, "Filter", getExecutionPlan(xs))
@@ -82,7 +82,15 @@ package object runtime {
       case _ => s"[${root.getClass.getName}}]"
     }
 
-    def buildJson(root:Combinator[_], name: String, parents: String): String = s"""{\"id\":\"${System.identityHashCode(root)}\", \"label\":\"$name\", \"parents\":[$parents]}"""
+    def buildJson(root:Combinator[_], name: String, parents: String): String = {
+      var nodeType = ""
+      if (name == "Read") {
+        nodeType = "type:\"INPUT\", location:\""+root.asInstanceOf[Read[_]].location+"\", "
+      } else if (name == "Write") {
+        nodeType = "type:\"INPUT\", location:\""+root.asInstanceOf[Write[_]].location+"\", "
+      }
+      s"""{\"id\":\"${System.identityHashCode(root)}\", \"label\":\"$name\", $nodeType \"parents\":[$parents]}"""
+    }
 
     def addPlan(name:String, root:Combinator[_]) = {
       executionPlanJson.push(new Plan(name, getExecutionPlan(root)))
