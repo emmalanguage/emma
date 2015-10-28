@@ -139,16 +139,15 @@ sealed abstract class DataBag[+A] extends Serializable {
  *
  * @param name The name identifying the backing parallel representation.
  * @param repr The parallel representation for this bag.
- * @param eval The method that evaluates the parallel representation and fetches the values as a Seq[A].
+ * @param vals The method that evaluates the parallel representation and fetches the values as a Seq[A].
  * @tparam A The element type of this bag.
  * @tparam R The type of the parallel representation.
  */
+// FIXME: can we compute `vals` lazily without breaking serialization?
 sealed class ParallelizedDataBag[A, R] private[api](
-  @transient val name: String,
-  @transient val repr: R,
-                 eval: => Seq[A]) extends DataBag[A] {
-  override private[emma] lazy val vals = eval
-}
+    @transient val name: String,
+    @transient val repr: R,
+    private[emma] val vals: Seq[A]) extends DataBag[A]
 
 object DataBag {
 

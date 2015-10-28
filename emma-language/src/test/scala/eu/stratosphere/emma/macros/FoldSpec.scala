@@ -5,6 +5,7 @@ import java.io.ByteArrayOutputStream
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.runtime.Native
 import org.junit.runner.RunWith
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.PropertyChecks
@@ -234,4 +235,17 @@ class FoldSpec extends FunSuite with Matchers with PropertyChecks {
       buffer.toString.toLowerCase should include ("foldgroup")
     }
   }
+
+  test("random") {
+    forAll(Gen.listOfN(100, arb[Int])) { xs: List[Int] =>
+      val rand = emma.parallelize {
+        DataBag(xs).random(7)
+      }.run(runtime)
+
+      rand should not contain theSameElementsAs (xs take 7)
+    }
+  }
+
+  def arb[A: Arbitrary]: Gen[A] =
+    implicitly[Arbitrary[A]].arbitrary
 }

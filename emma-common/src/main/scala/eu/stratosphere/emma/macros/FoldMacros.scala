@@ -107,12 +107,28 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
     })"""
   }
 
-  def bottom[E: c.WeakTypeTag](n: Expr[Int])(o: Expr[Ordering[E]]) =
-    q"""$self.fold[${weakTypeOf[List[E]]}]($Nil)(_ :: $Nil,
-      _root_.eu.stratosphere.emma.macros.FoldMacros.merge($n, _, _)($o))"""
+  def bottom[E: c.WeakTypeTag](n: Expr[Int])(o: Expr[Ordering[E]]) = {
+    val LIST_E = weakTypeOf[List[E]]
+    q"""if ($n <= ${0}) { $Nil: $LIST_E } else {
+      $self.fold[$LIST_E]($Nil)(_ :: $Nil,
+        _root_.eu.stratosphere.emma.macros.FoldMacros.merge($n, _, _)($o))
+    }"""
+  }
 
-  def top[A](n: Expr[Int])(o: Expr[Ordering[A]]) =
+  def top[E](n: Expr[Int])(o: Expr[Ordering[E]]) =
     q"$self.bottom($n)($o.reverse)"
+
+  def random[E: c.WeakTypeTag](n: Expr[Int]) = {
+    val LIST_E = weakTypeOf[List[E]]
+    val xs = freshName("xs")
+    val ys = freshName("ys")
+    q"""if ($n <= ${0}) { $Nil: $LIST_E } else {
+      $self.fold[$LIST_E]($Nil)(_ :: $Nil, { case ($xs, $ys) =>
+        if ($xs.size + $ys.size <= $n) { $xs ::: $ys }
+        else { new _root_.scala.util.Random().shuffle($xs ::: $ys).take($n) }
+      })
+    }"""
+  }
 }
 
 object FoldMacros {
