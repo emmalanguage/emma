@@ -339,7 +339,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
         ${keyUDF.body}
       }).map({ case ($key, $iterator) =>
         _root_.eu.stratosphere.emma.api.Group($key,
-          _root_.eu.stratosphere.emma.api.DataBag($iterator.toStream))
+          _root_.eu.stratosphere.emma.api.DataBag($iterator.toBuffer))
       })"""
   }
 
