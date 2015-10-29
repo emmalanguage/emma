@@ -166,9 +166,13 @@ private[emma] trait ComprehensionCompiler
       case combinator.Diff(xs, ys) =>
         q"ir.Diff(${serialize(xs)}, ${serialize(ys)})"
 
-      case ScalaExpr(Apply(fn, values :: Nil))
+      case ScalaExpr(Apply(fn, values :: Nil)) // one argument
         if api.apply.alternatives contains fn.symbol =>
           q"ir.Scatter(${compile(values)})"
+
+      case ScalaExpr(Apply(fn, Nil)) // no argument
+        if api.apply.alternatives contains fn.symbol =>
+          q"ir.Scatter(Seq.empty)"
 
       case combinator.StatefulCreate(xs, stateType, keyType) =>
         val xsStr = serialize(xs)
