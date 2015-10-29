@@ -8,7 +8,9 @@ import scala.language.existentials
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
-class WorkflowMacros(val c: blackbox.Context) extends ControlFlow with Comprehension with SemanticChecks {
+class WorkflowMacros(val c: blackbox.Context)
+    extends ControlFlow with Comprehension with SemanticChecks {
+
   import universe._
   import syntax._
 
@@ -44,7 +46,7 @@ class WorkflowMacros(val c: blackbox.Context) extends ControlFlow with Comprehen
     compView      = createComprehensionView(cfGraph)
 
     // 2. Normalize filter predicates to CNF
-    // normalizePredicates(optimized)
+//    normalizePredicates(optimized)
 
     // 3. Apply Fold-Group-Fusion where possible
     foldGroupFusion(optimized)
