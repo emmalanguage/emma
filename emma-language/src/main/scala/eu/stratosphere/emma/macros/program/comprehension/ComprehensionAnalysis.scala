@@ -508,58 +508,61 @@ private[emma] trait ComprehensionAnalysis
    *          `Some(tree)` with the tree of the cleaned/reduced disjunction.
    */
   def cleanConjuncts(tree: Tree): List[Option[Tree]] = {
-    val conjunctions = ListBuffer.empty[Disjunction]
+    def collectDisjuncts(from: Tree,
+        into: Disjunction = new Disjunction): Disjunction = {
 
-    object DisjunctTraverser extends Traverser {
-      var disjunction = new Disjunction()
-
-      override def traverse(tree: Tree) = tree match {
+      traverse(from) {
         // (A || B || ... || Y || Z)
         case q"$p || $q" =>
-          traverse(p); traverse(q)
+          collectDisjuncts(p, into)
+          collectDisjuncts(q, into)
 
         // Here we have a negated atom
         case q"!${app: Apply}" =>
-          disjunction addPredicate Predicate(app, neg = true)
+          into addPredicate Predicate(app, neg = true)
 
         // Here we have an atom with a method select attached
         case q"$lhs.$_" =>
-          traverse(lhs)
+          collectDisjuncts(lhs, into)
 
         // Here we should have only atoms
         case app: Apply =>
-          disjunction addPredicate Predicate(app, neg = false)
+          into addPredicate Predicate(app, neg = false)
 
         case expr => c.abort(c.enclosingPosition,
           s"Unexpected structure in predicate disjunction: ${showCode(expr)}")
       }
+
+      return into
     }
 
-    object ConjunctTraverser extends Traverser {
-      override def traverse(tree: Tree) = tree match {
+    def collectConjuncts(from: Tree,
+        into: ListBuffer[Disjunction] = ListBuffer.empty): List[Disjunction] = {
+
+      traverse(from) {
         // C1 && C2 && C3 && ... && C4
         case q"$p && $q" =>
-          traverse(p); traverse(q)
+          collectConjuncts(p, into)
+          collectConjuncts(q, into)
 
         // We found a disjunction
         case app: Apply =>
-          DisjunctTraverser traverse app
-          conjunctions += DisjunctTraverser.disjunction
-          DisjunctTraverser.disjunction = new Disjunction()
+          into += collectDisjuncts(app)
 
         case _ =>
           //super.traverse(tree)
           //throw new RuntimeException("Unexpected structure in predicate conjunction")
       }
+
+      return into.toList
     }
 
-    ConjunctTraverser traverse tree
-    conjunctions.toList map { _.getTree }
+    collectConjuncts(tree) map { _.getTree }
   }
 
   case class Predicate(tree: Apply, neg: Boolean) {
 
-    def negate =
+    def negate: Predicate =
       Predicate(tree, neg = !neg)
 
     def getTree: Tree =
@@ -573,10 +576,11 @@ private[emma] trait ComprehensionAnalysis
     // TODO: Implement hashcode
   }
 
-  class Disjunction(predicates: ListBuffer[Predicate] = ListBuffer.empty) {
+  class Disjunction {
+    val predicates = ListBuffer.empty[Predicate]
 
     // Add predicate if it is not contained yet
-    def addPredicate(p: Predicate) =
+    def addPredicate(p: Predicate): Unit =
       if (!predicates.contains(p)) predicates += p
     
     def getTree: Option[Tree] =
