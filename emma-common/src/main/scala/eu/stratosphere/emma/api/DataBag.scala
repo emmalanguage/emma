@@ -14,7 +14,7 @@ sealed abstract class DataBag[+A] extends Serializable {
   // -----------------------------------------------------
 
   /**
-   * Structural recursion over the bag. Assumes an algebraic specificaiton of the DataBag type using three constructors:
+   * Structural recursion over the bag. Assumes an algebraic specification of the DataBag type using three constructors:
    *
    * {{
    * def Empty[A]: DataBag[A] // constructs an empty bag
@@ -129,9 +129,23 @@ sealed abstract class DataBag[+A] extends Serializable {
   /**
    * Converts a DataBag abstraction back into a scala sequence.
    *
-   * @return A filtered version of the DataBag.
+   * @return The contents of the DataBag as a scala sequence.
    */
   def fetch(): Seq[A] = vals
+
+  // -----------------------------------------------------
+  // equals and hashCode
+  // Warning: these will fetch the DataBag to the driver.
+  // -----------------------------------------------------
+
+  override def equals(o: Any) = o match {
+    case that: DataBag[A] =>
+      (vals.size == that.vals.size) &&
+      (vals diff that.vals).isEmpty
+    case _ => false
+  }
+
+  override def hashCode(): Int = scala.util.hashing.MurmurHash3.unorderedHash(vals)
 }
 
 /**
