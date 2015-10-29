@@ -411,6 +411,13 @@
                     <systemPropertyVariables>
                         <emma.test.macro.toolboxcp>${project.basedir}/target/classes</emma.test.macro.toolboxcp>
                     </systemPropertyVariables>
+                    <includes>
+                        <include>**/Test*.java</include>
+                        <include>**/*Test.java</include>
+                        <include>**/*TestCase.java</include>
+                        <include>**/*Spec.java</include>
+                        <include>**/*Suite.java</include>
+                    </includes>
                 </configuration>
             </plugin>
         </plugins>
