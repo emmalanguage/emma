@@ -395,7 +395,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     val SRC = typeOf(op.xs.tag).precise
     // assemble input fragment
     val xs = generateOpCode(op.xs)
-    val $(iterator, stream) = $("iter$flink", "stream$flink")
+    val $(iterator, buffer) = $("iter$flink", "buffer$flink")
     // generate key UDF
     val keyFun = parseCheck(op.key)
     val keyUDF = ir.UDF(keyFun, keyFun.preciseType, tb)
@@ -403,10 +403,10 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     // assemble dataFlow fragment
     q"""$xs.groupBy(${keyUDF.func}).reduceGroup({
       ($iterator: _root_.scala.Iterator[$SRC]) =>
-        val $stream = $iterator.toStream
+        val $buffer = $iterator.toBuffer
         _root_.eu.stratosphere.emma.api.Group(
-          ${keyUDF.func}($stream.head),
-          _root_.eu.stratosphere.emma.api.DataBag($stream))
+          ${keyUDF.func}($buffer.head),
+          _root_.eu.stratosphere.emma.api.DataBag($buffer))
     })"""
   }
 
