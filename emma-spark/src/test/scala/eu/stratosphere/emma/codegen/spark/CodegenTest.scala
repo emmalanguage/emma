@@ -6,4 +6,5 @@ import eu.stratosphere.emma.runtime.SparkLocal
 class CodegenTest extends BaseCodegenTest("spark") {
 
   override def runtimeUnderTest = SparkLocal("local[1]", 6123)
+
 }

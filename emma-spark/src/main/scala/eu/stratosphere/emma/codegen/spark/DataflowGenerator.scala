@@ -61,6 +61,9 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
         case op: ir.Write[_] =>
           q"def run($sc: $SPARK_CTX, ..$params, ..$localInputs) = $opCode"
 
+        case op: ir.StatefulCreate[_, _] =>
+          q"def run($sc: $SPARK_CTX, ..$params, ..$localInputs) = $opCode"
+
         case op: ir.Combinator[_] =>
           val result = $"result$$spark"
           q"""def run($sc: $SPARK_CTX, ..$params, ..$localInputs) = {
@@ -68,6 +71,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
             $result.foreach(_ => ())
             $result
           }"""
+
       }
 
       // assemble dataFlow
@@ -81,21 +85,26 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
 
   private def generateOpCode(combinator: ir.Combinator[_])
       (implicit closure: DataFlowClosure): Tree = combinator match {
-    case op: ir.Read[_]           => opCode(op)
-    case op: ir.Write[_]          => opCode(op)
-    case op: ir.TempSource[_]     => opCode(op)
-    case op: ir.TempSink[_]       => opCode(op)
-    case op: ir.Scatter[_]        => opCode(op)
-    case op: ir.Map[_, _]         => opCode(op)
-    case op: ir.FlatMap[_, _]     => opCode(op)
-    case op: ir.Filter[_]         => opCode(op)
-    case op: ir.EquiJoin[_, _, _] => opCode(op)
-    case op: ir.Cross[_, _, _]    => opCode(op)
-    case op: ir.Fold[_, _]        => opCode(op)
-    case op: ir.FoldGroup[_, _]   => opCode(op)
-    case op: ir.Distinct[_]       => opCode(op)
-    case op: ir.Union[_]          => opCode(op)
-    case op: ir.Group[_, _]       => opCode(op)
+    case op: ir.Read[_]                    => opCode(op)
+    case op: ir.Write[_]                   => opCode(op)
+    case op: ir.TempSource[_]              => opCode(op)
+    case op: ir.TempSink[_]                => opCode(op)
+    case op: ir.Scatter[_]                 => opCode(op)
+    case op: ir.Map[_, _]                  => opCode(op)
+    case op: ir.FlatMap[_, _]              => opCode(op)
+    case op: ir.Filter[_]                  => opCode(op)
+    case op: ir.EquiJoin[_, _, _]          => opCode(op)
+    case op: ir.Cross[_, _, _]             => opCode(op)
+    case op: ir.Fold[_, _]                 => opCode(op)
+    case op: ir.FoldGroup[_, _]            => opCode(op)
+    case op: ir.Distinct[_]                => opCode(op)
+    case op: ir.Union[_]                   => opCode(op)
+    case op: ir.Group[_, _]                => opCode(op)
+    case op: ir.StatefulCreate[_, _]       => opCode(op)
+    case op: ir.StatefulFetch[_, _]        => opCode(op)
+    case op: ir.UpdateWithZero[_, _, _]    => opCode(op)
+    case op: ir.UpdateWithOne[_, _, _, _]  => opCode(op)
+    case op: ir.UpdateWithMany[_, _, _, _] => opCode(op)
     case _ => throw new RuntimeException(
       s"Unsupported ir node of type '${combinator.getClass}'")
   }
@@ -343,6 +352,66 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
         _root_.eu.stratosphere.emma.api.Group($key,
           _root_.eu.stratosphere.emma.api.DataBag($iterator.toBuffer))
       })"""
+  }
+
+  private def opCode[A, K](op: ir.StatefulCreate[A, K])
+                          (implicit closure: DataFlowClosure): Tree = {
+    val stateType = typeOf(op.tagS).dealias
+    val keyType = typeOf(op.tagK).dealias
+    // assemble input fragment
+    val xs = generateOpCode(op.xs)
+    q"""
+      import _root_.eu.stratosphere.emma.runtime.spark.StatefulBackend
+      new StatefulBackend[$stateType,$keyType]($sc,$xs)"""
+  }
+
+  private def opCode[S, K](op: ir.StatefulFetch[S, K])
+                          (implicit closure: DataFlowClosure): Tree = {
+    closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
+    q"""${TermName(op.name)}
+        .asInstanceOf[_root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[${typeOf(op.tag).dealias}, ${typeOf(op.tagK).dealias}]]
+        .fetchToStateLess()"""
+  }
+
+  private def opCode[S, K, U, O](op: ir.UpdateWithZero[S, K, O])
+                                (implicit closure: DataFlowClosure): Tree = {
+    closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
+    val updFn  = parseCheck(op.udf)
+    val updUdf = ir.UDF(updFn, updFn.tpe, tb)
+    val updUdfOutTpe = typeOf(op.tag).dealias
+    q"""${TermName(op.name)}
+        .asInstanceOf[_root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[${typeOf(op.tagS).dealias}, ${typeOf(op.tagK).dealias}]]
+        .updateWithZero[$updUdfOutTpe](${updUdf.func})"""
+  }
+
+  private def opCode[S, K, U, O](op: ir.UpdateWithOne[S, K, U, O])
+                                (implicit closure: DataFlowClosure): Tree = {
+    closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
+    val us = generateOpCode(op.updates)
+    val keyFn     = parseCheck(op.updateKeySel)
+    val keyUdf    = ir.UDF(keyFn, keyFn.tpe, tb)
+    val updateFn  = parseCheck(op.udf)
+    val updateUdf = ir.UDF(updateFn, updateFn.tpe, tb)
+    val updTpe = typeOf(op.tagU).dealias
+    val updUdfOutTpe = typeOf(op.tag).dealias
+    q"""${TermName(op.name)}.
+        asInstanceOf[_root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[${typeOf(op.tagS).dealias}, ${typeOf(op.tagK).dealias}]]
+        .updateWithOne[$updTpe, $updUdfOutTpe]($us, ${keyUdf.func}, ${updateUdf.func})"""
+  }
+
+  private def opCode[S, K, U, O](op: ir.UpdateWithMany[S, K, U, O])
+                                (implicit closure: DataFlowClosure): Tree = {
+    closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
+    val us = generateOpCode(op.updates)
+    val keyFn     = parseCheck(op.updateKeySel)
+    val keyUdf    = ir.UDF(keyFn, keyFn.tpe, tb)
+    val updateFn  = parseCheck(op.udf)
+    val updateUdf = ir.UDF(updateFn, updateFn.tpe, tb)
+    val updTpe = typeOf(op.tagU).dealias
+    val updUdfOutTpe = typeOf(op.tag).dealias
+    q"""${TermName(op.name)}
+        .asInstanceOf[_root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[${typeOf(op.tagS).dealias}, ${typeOf(op.tagK).dealias}]]
+        .updateWithMany[$updTpe, $updUdfOutTpe]($us, ${keyUdf.func}, ${updateUdf.func})"""
   }
 
   // --------------------------------------------------------------------------

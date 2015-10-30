@@ -416,7 +416,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     val K = typeOf(op.tagK).precise
     // assemble input fragment
     val xs = generateOpCode(op.xs)
-    q"new _root_.eu.stratosphere.emma.runtime.StatefulBackend[$S, $K]($env, $xs)"
+    q"new _root_.eu.stratosphere.emma.runtime.flink.StatefulBackend[$S, $K]($env, $xs)"
   }
 
   private def opCode[S, K](op: ir.StatefulFetch[S, K])
@@ -427,7 +427,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
       TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).precise)
 
     q"""${TermName(op.name)}
-      .asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[$S, $K]]
+      .asInstanceOf[_root_.eu.stratosphere.emma.runtime.flink.StatefulBackend[$S, $K]]
       .fetchToStateLess()"""
   }
 
@@ -443,7 +443,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     val R = typeOf(op.tag).precise
     closure.capture(updUDF)
     q"""${TermName(op.name)}
-      .asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[$S, $K]]
+      .asInstanceOf[_root_.eu.stratosphere.emma.runtime.flink.StatefulBackend[$S, $K]]
       .updateWithZero[$R](${updUDF.func})"""
   }
 
@@ -464,7 +464,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     closure.capture(keyUdf)
     closure.capture(updUDF)
     q"""${TermName(op.name)}
-      .asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[$S, $K]]
+      .asInstanceOf[_root_.eu.stratosphere.emma.runtime.flink.StatefulBackend[$S, $K]]
       .updateWithOne[$U, $R]($updates, ${keyUdf.func}, ${updUDF.func})"""
   }
 
@@ -485,7 +485,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     closure.capture(keyUDF)
     closure.capture(updUDF)
     q"""${TermName(op.name)}
-      .asInstanceOf[_root_.eu.stratosphere.emma.runtime.StatefulBackend[$S, $K]]
+      .asInstanceOf[_root_.eu.stratosphere.emma.runtime.flink.StatefulBackend[$S, $K]]
       .updateWithMany[$U, $R]($updates, ${keyUDF.func}, ${updUDF.func})"""
   }
 

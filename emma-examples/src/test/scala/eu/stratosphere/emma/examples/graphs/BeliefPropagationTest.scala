@@ -33,55 +33,48 @@ class BeliefPropagationTest extends FlatSpec with Matchers with BeforeAndAfter {
 
   "Belief Propagation" should "calculate unknown marginal probabilities" in withRuntime() { rt =>
     val rtName = sys.props.getOrElse("emma.execution.backend", "").toLowerCase
-    if (rtName == "flink" || rtName == "native") {
-      new BeliefPropagation(
-        path, s"$path/marginals", epsilon, iterations, rt).run()
+    new BeliefPropagation(
+      path, s"$path/marginals", epsilon, iterations, rt).run()
 
 
-      val variables = (for {
-        line <- getLinesRecursively(s"$path/variables")
-        record = line.split("\t")
-        if record(1).toShort == 1
-      } yield record(0) -> record(2).toDouble).toMap
+    val variables = (for {
+      line <- getLinesRecursively(s"$path/variables")
+      record = line.split("\t")
+      if record(1).toShort == 1
+    } yield record(0) -> record(2).toDouble).toMap
 
-      val observed = (for {
-        v@(_, p) <- variables
-        if p == 1
-      } yield v).keySet
+    val observed = (for {
+      v@(_, p) <- variables
+      if p == 1
+    } yield v).keySet
 
-      val potential = (for {
-        line <- getLinesRecursively(s"$path/potential")
-        record = line.split("\t").take(2).toSet
-        if record exists observed
-        if record exists {
-          !observed(_)
-        }
-      } yield record).toSet
-
-      val marginals = (for {
-        line <- getLinesRecursively(s"$path/marginals")
-        record = line.split("\t")
-        if record(1).toShort == 1
-      } yield record(0) -> record(2).toDouble).toMap
-
-      // If only one of two often collocated words was observed,
-      // the other one is less likely to occur in the text.
-      val unlikely = potential count {
-        _ find {
-          !observed(_)
-        } match {
-          case Some(word) => marginals(word) <= variables(word)
-          case None => false
-        }
+    val potential = (for {
+      line <- getLinesRecursively(s"$path/potential")
+      record = line.split("\t").take(2).toSet
+      if record exists observed
+      if record exists {
+        !observed(_)
       }
+    } yield record).toSet
 
-      unlikely / potential.size.toDouble should equal(1.0 +- 0.05)
-    } else {
-      println("""
-                |Skipping Belief Propagation test, because it only works with Flink and Native.
-                |(due to stateful API support)
-                |""".stripMargin)
+    val marginals = (for {
+      line <- getLinesRecursively(s"$path/marginals")
+      record = line.split("\t")
+      if record(1).toShort == 1
+    } yield record(0) -> record(2).toDouble).toMap
+
+    // If only one of two often collocated words was observed,
+    // the other one is less likely to occur in the text.
+    val unlikely = potential count {
+      _ find {
+        !observed(_)
+      } match {
+        case Some(word) => marginals(word) <= variables(word)
+        case None => false
+      }
     }
+
+    unlikely / potential.size.toDouble should equal(1.0 +- 0.05)
   }
 
   // Can be a file, or a dir. Recurses in the latter case.
