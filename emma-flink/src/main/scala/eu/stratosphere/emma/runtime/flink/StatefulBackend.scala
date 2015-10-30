@@ -1,9 +1,8 @@
-package eu.stratosphere.emma.runtime
-
-import java.util.UUID
+package eu.stratosphere.emma.runtime.flink
 
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.api.model.Identity
+import eu.stratosphere.emma.runtime.AbstractStatefulBackend
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.java.io.{TypeSerializerInputFormat, TypeSerializerOutputFormat}
 import org.apache.flink.api.scala._
@@ -12,24 +11,14 @@ import org.apache.flink.util.Collector
 
 import scala.reflect.ClassTag
 
-
 class StatefulBackend[S <: Identity[K] : ClassTag : TypeInformation, K: ClassTag : TypeInformation]
         (env: ExecutionEnvironment, xs: DataSet[S]) extends AbstractStatefulBackend[S, K] {
-
-  private val STATEFUL_BASE_PATH = String.format("%s/emma/stateful", System.getProperty("java.io.tmpdir"))
-
-  private val uuid = UUID.randomUUID()
-  private val fileNameBase = s"$STATEFUL_BASE_PATH/$uuid"
-  private var seqNumber = 0
-
-  private def currentFileName() = s"${fileNameBase}_$seqNumber"
-  private def oldFileName() = s"${fileNameBase}_${seqNumber - 1}"
 
   private val typeInformation = xs.getType()
 
 
   // Create initial file
-  xs.write(new TypeSerializerOutputFormat[S](), currentFileName(), FileSystem.WriteMode.NO_OVERWRITE)
+  writeStateToFile(xs)
 
 
   // todo: figure out how to delete the files (we can't delete it here in the update functions, because with haven't executed the dataflow yet)
@@ -104,7 +93,11 @@ class StatefulBackend[S <: Identity[K] : ClassTag : TypeInformation, K: ClassTag
     })
 
     seqNumber += 1
-    newState.write(new TypeSerializerOutputFormat[S](), currentFileName(), FileSystem.WriteMode.NO_OVERWRITE)
+    writeStateToFile(newState)
+  }
+
+  private def writeStateToFile(state : DataSet[S]) = {
+    state.write(new TypeSerializerOutputFormat[S](), currentFileName(), FileSystem.WriteMode.NO_OVERWRITE)
   }
 
   private def filterRight[O: ClassTag : TypeInformation](s: DataSet[Either[S, O]]): DataSet[O] = {

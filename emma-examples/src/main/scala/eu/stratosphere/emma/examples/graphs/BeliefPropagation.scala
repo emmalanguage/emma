@@ -95,13 +95,13 @@ class BeliefPropagation(
           m => (m.dst, m.state), (b, ms) => {
             b.previous = b.marginal
             b.marginal = ms.map(_.prob).product()
-            DataBag()
+            DataBag() : DataBag[Int]
           })
 
         beliefs.updateWithOne(variables)(
           _.identity, (b, v) => {
             b.marginal *= v.prior
-            DataBag()
+            DataBag() : DataBag[Int]
           })
 
         val normBeliefs = for {
@@ -117,7 +117,7 @@ class BeliefPropagation(
         beliefs.updateWithOne(updates)(
           _.identity, (b, u) => {
             b.marginal /= u.marginal
-            DataBag()
+            DataBag() : DataBag[Int]
           })
 
         converged = beliefs.bag() forall { b =>
@@ -167,7 +167,7 @@ class BeliefPropagation(
         messages.updateWithOne(msgUpdates)(
           _._1, (m, p) => {
             m.prob = p._2
-            DataBag()
+            DataBag() : DataBag[Int]
           })
       }
 

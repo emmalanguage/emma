@@ -43,7 +43,8 @@ abstract class Spark(val host: String, val port: Int) extends Engine {
   }
 
   override def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag](root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K] = {
-    ??? // Not supported yet
+    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
+    dataflowCompiler.execute[AbstractStatefulBackend[A, K]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
   }
 
   override def executeUpdateWithZero[S: TypeTag, K: TypeTag, B: TypeTag]
