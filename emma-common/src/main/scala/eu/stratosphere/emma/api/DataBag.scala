@@ -134,7 +134,7 @@ sealed abstract class DataBag[+A] extends Serializable {
   def fetch(): Seq[A] = vals
 
   // -----------------------------------------------------
-  // equals and hashCode
+  // equals, hashCode and toString
   // Warning: these will fetch the DataBag to the driver.
   // -----------------------------------------------------
 
@@ -146,6 +146,8 @@ sealed abstract class DataBag[+A] extends Serializable {
   }
 
   override def hashCode(): Int = scala.util.hashing.MurmurHash3.unorderedHash(vals)
+
+  override def toString: String = vals.toString
 }
 
 /**
