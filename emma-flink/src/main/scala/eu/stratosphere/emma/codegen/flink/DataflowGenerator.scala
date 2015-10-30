@@ -259,7 +259,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     val input = $"scatter$$flink"
     closure.localInputParams += input -> tq"_root_.scala.Seq[$T]"
     // assemble dataFlow fragment
-    q"$env.fromCollection($input)"
+    q"$env.fromCollection[$T]($input)"
   }
 
   private def opCode[B, A](op: ir.Map[B, A])
