@@ -188,7 +188,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     val mapUDF = ir.UDF(mapFun, mapFun.preciseType, tb)
     closure.closureParams ++= mapUDF.closure map { p => p.name -> p.tpt }
     // assemble dataFlow fragment
-    q"$xs.map((..${mapUDF.params}) => ${mapUDF.body})"
+    q"$xs.map(${mapUDF.func})"
   }
 
   private def opCode[B, A](op: ir.FlatMap[B, A])
@@ -212,7 +212,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     val fUDF = ir.UDF(predicate, predicate.preciseType, tb)
     closure.closureParams ++= fUDF.closure map { p => p.name -> p.tpt }
     // assemble dataflow fragment
-    q"$xs.filter((..${fUDF.params}) => ${fUDF.body})"
+    q"$xs.filter(${fUDF.func})"
   }
 
   private def opCode[C, A, B](op: ir.EquiJoin[C, A, B])
@@ -270,8 +270,8 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     closure.closureParams ++= sngUDF.closure map { p => p.name -> p.tpt }
     closure.closureParams ++= unionUDF.closure map { p => p.name -> p.tpt }
     // assemble dataFlow fragment
-    q"""$xs.map((..${sngUDF.params}) => ${sngUDF.body})
-      .reduce((..${unionUDF.params}) => ${unionUDF.body})"""
+    q"""$xs.map(${sngUDF.func})
+      .aggregate(${empty.as[Function].body})(${unionUDF.func}, ${unionUDF.func})"""
   }
 
   private def opCode[B, A](op: ir.FoldGroup[B, A])
@@ -300,6 +300,10 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
 
     val $(x, y) = $("x$spark", "y$spark")
 
+    // Note: it looks like as if reduceByKey could be changed to aggregateByKey like this:
+    // .aggregateByKey(${empty.as[Function].body})(${unionUDF.func}, ${unionUDF.func})
+    // but this makes LabelRankTest fail: in the `val max = mm.values.max` line,
+    // `values` ends up empty somehow, which makes the max fail.
     q"""$xs.map({ (..${keyUDF.params}) =>
         (${keyUDF.body}, ${bind(sngUDF.body)(aliases: _*)})
       }).reduceByKey({ (..${unionUDF.params}) =>
@@ -335,9 +339,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     val keyUDF = ir.UDF(keyFun, keyFun.preciseType, tb)
     closure.closureParams ++= keyUDF.closure map { p => p.name -> p.tpt }
     // assemble dataFlow fragment
-    q"""$xs.groupBy({ (..${keyUDF.params}) =>
-        ${keyUDF.body}
-      }).map({ case ($key, $iterator) =>
+    q"""$xs.groupBy(${keyUDF.func}).map({ case ($key, $iterator) =>
         _root_.eu.stratosphere.emma.api.Group($key,
           _root_.eu.stratosphere.emma.api.DataBag($iterator.toBuffer))
       })"""

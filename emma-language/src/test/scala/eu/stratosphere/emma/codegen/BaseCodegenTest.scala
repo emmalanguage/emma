@@ -471,6 +471,12 @@ abstract class BaseCodegenTest(rtName: String) {
     })
   }
 
+  @Test def testNonEmpty() = {
+    compareWithNative(emma.parallelize{
+      (DataBag().nonEmpty, DataBag(Seq(1,2,3)).nonEmpty)
+    })
+  }
+
   // --------------------------------------------------------------------------
   // Expression Normalization
   // --------------------------------------------------------------------------
