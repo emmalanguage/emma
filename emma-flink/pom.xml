@@ -79,8 +79,12 @@
 
         <!-- Test -->
         <dependency>
-            <groupId>org.specs2</groupId>
-            <artifactId>specs2_${scala.tools.version}</artifactId>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.scalacheck</groupId>
+            <artifactId>scalacheck_${scala.tools.version}</artifactId>
         </dependency>
         <dependency>
             <groupId>org.scalatest</groupId>

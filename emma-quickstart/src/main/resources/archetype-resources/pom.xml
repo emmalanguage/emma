@@ -50,7 +50,6 @@
         <!-- Testing -->
         <junit.version>4.11</junit.version>
         <scalatest.version>2.1.5</scalatest.version>
-        <specs2.version>2.3.11</specs2.version>
 
         <!-- Other dependencies -->
         <argparse4j.version>0.4.4</argparse4j.version>
@@ -142,9 +141,9 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.specs2</groupId>
-            <artifactId>specs2_${scala.tools.version}</artifactId>
-            <version>${specs2.version}</version>
+            <groupId>org.scalacheck</groupId>
+            <artifactId>scalacheck_${scala.tools.version}</artifactId>
+            <version>${scalacheck.version}</version>
             <scope>test</scope>
         </dependency>
         <dependency>

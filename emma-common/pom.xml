@@ -67,21 +67,25 @@
             <artifactId>scala-logging-slf4j_${scala.tools.version}</artifactId>
         </dependency>
 
-        <!-- Test -->
-        <dependency>
-            <groupId>org.specs2</groupId>
-            <artifactId>specs2_${scala.tools.version}</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.scalatest</groupId>
-            <artifactId>scalatest_${scala.tools.version}</artifactId>
-        </dependency>
-
         <!-- Serialization -->
         <dependency>
             <groupId>com.twitter</groupId>
             <artifactId>chill_${scala.tools.version}</artifactId>
             <version>0.5.2</version>
+        </dependency>
+
+        <!-- Test -->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.scalacheck</groupId>
+            <artifactId>scalacheck_${scala.tools.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.scalatest</groupId>
+            <artifactId>scalatest_${scala.tools.version}</artifactId>
         </dependency>
     </dependencies>
 
