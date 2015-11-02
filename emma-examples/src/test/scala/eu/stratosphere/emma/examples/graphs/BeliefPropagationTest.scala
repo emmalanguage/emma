@@ -86,12 +86,17 @@ class BeliefPropagationTest extends FlatSpec with Matchers with BeforeAndAfter {
 
   // Can be a file, or a dir. Recurses in the latter case.
   // (This is for handling the case when the output is multiple files, because the writer has parallelism > 1)
+  // Warning: skips files starting with '.' or '_'. (This is because Spark puts some misc. files in the output dir.)
   def getLinesRecursively(path: String): Seq[String] = {
     def getLinesRecursively0(f: File): Seq[String] = {
-      if (f.isDirectory) {
-        f.listFiles().flatMap(getLinesRecursively0).toSeq
+      if(!f.getName.startsWith(".") && !f.getName.startsWith("_")) {
+        if (f.isDirectory) {
+          f.listFiles().flatMap(getLinesRecursively0).toSeq
+        } else {
+          Source.fromFile(f).getLines().toSeq
+        }
       } else {
-        Source.fromFile(f).getLines().toSeq
+        Seq()
       }
     }
     getLinesRecursively0(new File(path))
