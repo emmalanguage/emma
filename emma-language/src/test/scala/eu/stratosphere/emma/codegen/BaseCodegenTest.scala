@@ -3,742 +3,554 @@ package eu.stratosphere.emma.codegen
 import java.io.File
 
 import eu.stratosphere.emma.api._
-import eu.stratosphere.emma.api.model.Identity
-import eu.stratosphere.emma.codegen.predicates._
-import eu.stratosphere.emma.codegen.testschema._
 import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.testutil._
-import org.junit.{Test, After, Before}
+
+import org.junit.runner.RunWith
+import org.scalatest._
+import org.scalatest.junit.JUnitRunner
 
 import scala.reflect.runtime.universe._
 import scala.util.Random
 
-abstract class BaseCodegenTest(rtName: String) {
+@RunWith(classOf[JUnitRunner])
+abstract class BaseCodegenTest(rtName: String)
+    extends FreeSpec  with Matchers with BeforeAndAfter {
 
-  var rt: runtime.Engine = _
-  var native: runtime.Native = _
+  val inputDir = tempPath("test/input")
+  val outputDir = tempPath("test/output")
+  def runtimeUnderTest: runtime.Engine
+  
+  object from {
+    lazy val jabberwocky = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
+    
+    lazy val imdb = read(materializeResource("/cinema/imdb.csv"),
+      new CSVInputFormat[ImdbMovie]).fetch()
 
-  val inBase = tempPath("test/input")
-  val outBase = tempPath("test/output")
+    lazy val cannes = read(materializeResource("/cinema/canneswinners.csv"),
+      new CSVInputFormat[FilmFestWinner]).fetch()
 
-  @Before def setup(): Unit = {
+    lazy val berlin = read(materializeResource("/cinema/berlinalewinners.csv"),
+      new CSVInputFormat[FilmFestWinner]).fetch()
+  }
+  
+  before {
     // make sure that the base paths exist
-    new File(inBase).mkdirs()
-    new File(outBase).mkdirs()
-    rt = runtimeUnderTest
-    native = runtime.Native()
+    new File(inputDir).mkdirs()
+    new File(outputDir).mkdirs()
   }
 
-  @After def teardown(): Unit = {
-    native.closeSession()
-    rt.closeSession()
-    deleteRecursive(new File(outBase))
-    deleteRecursive(new File(inBase))
-  }
-
-  protected def runtimeUnderTest: runtime.Engine
-
-  def compareWithNative[A](alg: Algorithm[A]) = {
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt)
-    val exp = alg.run(native)
-
-    // assert that the result contains the expected values
-    assert(act == exp,
-      s"""act != exp
-         |act: $act
-         |exp: $exp""".stripMargin)
+  after {
+    deleteRecursive { new File(outputDir) }
+    deleteRecursive { new File(inputDir) }
   }
 
   // --------------------------------------------------------------------------
-  // CSV I/O
+  // CSV converters
   // --------------------------------------------------------------------------
 
-  @Test def testCSVReadWriteCaseClassType(): Unit = {
-    testCSVReadWrite[EdgeWithLabel[Long, String]](Seq(
-      EdgeWithLabel(1L, 4L, "A"),
-      EdgeWithLabel(2L, 5L, "B"),
-      EdgeWithLabel(3L, 6L, "C")))
-  }
+  "CSV converters" - {
+    "read/write case classes" in
+      testCsvRw[LabelledEdge[Long, String]] { Seq(
+        LabelledEdge(1, 4, "A"),
+        LabelledEdge(2, 5, "B"),
+        LabelledEdge(3, 6, "C"))
+      }
 
-  private def testCSVReadWrite[A: TypeTag : CSVConverters](inp: Seq[A]): Unit = {
-    // construct a parameterized algorithm family
-    val alg = (suffix: String) => emma.parallelize {
-      val outputPath = s"$outBase/csv.$suffix"
-      // write out the original input
-      write(outputPath, new CSVOutputFormat[A])(DataBag(inp))
-      // return the output path
-      outputPath
+    def testCsvRw[A : TypeTag : CSVConverters](input: Seq[A]) =
+      withRuntime(runtimeUnderTest) { engine =>
+        withRuntime(runtime.Native()) { native =>
+          // construct a parameterized algorithm family
+          val algorithm = (suffix: String) => emma.parallelize {
+            val path = s"$outputDir/csv.$suffix"
+            // write out the original input
+            write(path, new CSVOutputFormat[A]) { DataBag(input) }
+            // return the output path
+            path
+          }
+
+          // write the input to a file using the original code and the runtime under test
+          val actual = fromPath(algorithm(rtName).run(engine))
+          val expected = fromPath(algorithm("native").run(native))
+          // assert that the result contains the expected values
+          actual should be (expected)
+        }
+      }
     }
-
-    // write the input to a file using the original code and the runtime under test
-    val actPath = alg(rtName).run(rt)
-    val expPath = alg("native").run(native)
-
-    val exp = fromPath(expPath)
-    val act = fromPath(actPath)
-
-    // assert that the result contains the expected values
-    compareBags(exp, act)
-  }
 
   // --------------------------------------------------------------------------
   // Filter
   // --------------------------------------------------------------------------
 
-  @Test def testFilterSimpleType(): Unit = {
-    val inp = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
+  "Filter" - {
+    "strings" in emma.parallelize {
+      DataBag(from.jabberwocky) withFilter { _.length > 10 }
+    }.verifyWith(runtimeUnderTest)
 
-    val len = 10
+    "tuples" in emma.parallelize {
+      DataBag(from.jabberwocky.zipWithIndex) withFilter { _._1.length > 10 }
+    }.verifyWith(runtimeUnderTest)
 
-    compareWithNative(emma.parallelize {
-      DataBag(inp).withFilter(_.length > len)
-    })
-  }
-
-  @Test def testFilterTupleType(): Unit = {
-    val inp = fromPath(materializeResource("/lyrics/Jabberwocky.txt")).zipWithIndex
-
-    val len = 10
-
-    compareWithNative(emma.parallelize {
-      DataBag(inp).withFilter(_._1.length > len)
-    })
-  }
-
-  @Test def testFilterCaseClassType(): Unit = {
-    val inp = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner]).fetch()
-
-    val len = 10
-    val year = 1980
-
-    compareWithNative(emma.parallelize {
-      DataBag(inp).withFilter(_.year > year).withFilter(_.title.length > len)
-    })
+    "case classes" in emma.parallelize {
+      DataBag(from.imdb)
+        .withFilter { _.year > 1980 }
+        .withFilter { _.title.length > 10 }
+    }.verifyWith(runtimeUnderTest)
   }
 
   // --------------------------------------------------------------------------
   // Map
   // --------------------------------------------------------------------------
 
-  @Test def testMapSimpleType(): Unit = {
-    val inp = Seq(2, 4, 6, 8, 10)
+  "Map" - {
+    "primitives" in emma.parallelize {
+      val whiteList = DataBag(1 to 5)
+      for { even <- DataBag(2 to 10 by 2) }
+        yield if (whiteList exists { _ == even }) even else 0
+    }.verifyWith(runtimeUnderTest)
 
-    // define some closure parameters
-    val denominator = 4.0
-    val offset = 15.0
+    "tuples" in emma.parallelize {
+      for { edge <- DataBag((1, 4, "A") :: (2, 5, "B") :: (3, 6, "C") :: Nil) }
+        yield if (edge._1 < edge._2) edge._1 -> edge._2 else edge._2 -> edge._1
+    }.verifyWith(runtimeUnderTest)
 
-    compareWithNative(emma.parallelize {
-      val whitelist = DataBag(Seq(1, 2, 3, 4, 5))
-      for (x <- DataBag(inp)) yield if (whitelist.exists(_ == x)) offset else offset + x / denominator
-    })
-  }
+    "case classes" in {
+      val graph = Seq(
+        LabelledEdge(1, 4, "A"),
+        LabelledEdge(2, 5, "B"),
+        LabelledEdge(3, 6, "C"))
 
-  @Test def testMapTupleType(): Unit = {
-    val inp = Seq(
-      (1L, 4L, "A"),
-      (2L, 5L, "B"),
-      (3L, 6L, "C"))
-
-    val a = 1
-    val b = 10
-
-    compareWithNative(emma.parallelize {
-      for (e <- DataBag(inp)) yield if (e._1 < e._2) (e._1 * a, e._2 * b, a * b) else (e._2 * a, e._1 * b, a * b)
-    })
-  }
-
-  @Test def testMapCaseClassType(): Unit = {
-    val inp = Seq(
-      EdgeWithLabel(1L, 4L, "A"),
-      EdgeWithLabel(2L, 5L, "B"),
-      EdgeWithLabel(3L, 6L, "C"))
-
-    val y = "Y"
-
-    compareWithNative(emma.parallelize {
-      // FIXME: for some reason, does not work on companion apply constructor 'EdgeWithLabel(e.src, e.dst, y)'
-      for (e <- DataBag(inp)) yield if (e.label == "B") new EdgeWithLabel(e.src, e.dst, y) else e.copy(label = y)
-    })
+      emma.parallelize {
+        for { edge <- DataBag(graph) } yield
+          if (edge.label == "B") LabelledEdge(edge.dst, edge.src, "B")
+          else edge.copy(label = "Y")
+      }.verifyWith(runtimeUnderTest)
+    }
   }
 
   // --------------------------------------------------------------------------
   // FlatMap
   // --------------------------------------------------------------------------
 
-  @Test def testFlatMap(): Unit = {
-    val inp = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
+  "FlapMap" - {
+    "strings" in emma.parallelize {
+      DataBag(from.jabberwocky) flatMap { line =>
+        DataBag(line split "\\W+" filter { word =>
+          word.length > 3 && word.length < 9
+        })
+      }
+    }.verifyWith(runtimeUnderTest)
 
-    val max = 3
-    val min = 9
+    "with filter" in emma.parallelize {
+      DataBag(from.jabberwocky) flatMap { line =>
+        DataBag(line split "\\W+" filter {
+          word => word.length > 3 && word.length < 9
+        })
+      } withFilter { _.length > 5 }
+    }.verifyWith(runtimeUnderTest)
 
-    compareWithNative(emma.parallelize {
-      DataBag(inp).flatMap(x => DataBag(x.split("\\W+").filter(w => w.length > min && w.length < max)))
-    })
-  }
-
-  @Test def testFlatMapWithFilter(): Unit = {
-    val inp = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
-
-    val max = 3
-    val min = 9
-    val len = 10
-
-    compareWithNative(emma.parallelize {
-      DataBag(inp).flatMap(x => DataBag(x.split("\\W+").filter(w => w.length > min && w.length < max))).withFilter(_.length > len)
-    })
-  }
-
-  @Test def testFlatMapComprehensionUncorrelatedResult(): Unit = {
-    val inp = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
-
-    val max = 3
-    val min = 9
-    val len = 10
-
-    compareWithNative(emma.parallelize {
+    "comprehension with uncorrelated result" in emma.parallelize {
       for {
-        l <- DataBag(inp)
-        w <- DataBag(l.split("\\W+").filter(w => w.length > min && w.length < max))
-        if w.length > len
-      } yield w
-    })
-  }
+        line <- DataBag(from.jabberwocky)
+        word <- DataBag(line split "\\W+" filter { word =>
+          word.length > 3 && word.length < 9
+        }) if word.length > 5
+      } yield word
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testFlatMapComprehensionCorrelatedResult(): Unit = {
-    val inp = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
-
-    val max = 3
-    val min = 9
-    val len = 10
-
-    compareWithNative(emma.parallelize {
+    "comprehension with correlated result" in emma.parallelize {
       for {
-        l <- DataBag(inp)
-        w <- DataBag(l.split("\\W+"))
-      } yield (l, w)
-    })
+        line <- DataBag(from.jabberwocky)
+        word <- DataBag(line split "\\W+")
+      } yield (line, word)
+    }.verifyWith(runtimeUnderTest)
   }
 
   // --------------------------------------------------------------------------
   // Distinct and Union
   // --------------------------------------------------------------------------
 
-  @Test def testDistinctSimpleType(): Unit = {
-    val inp = {
-      val lines = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
-      lines.flatMap(_.split("\\W+")).toStream
-    }
+  "Distinct" - {
+    "strings" in emma.parallelize {
+      DataBag(from.jabberwocky flatMap { _ split "\\W+" }).distinct()
+    }.verifyWith(runtimeUnderTest)
 
-    compareWithNative(emma.parallelize {
-      DataBag(inp).distinct()
-    })
+    "tuples" in emma.parallelize {
+      DataBag(from.jabberwocky.flatMap { _ split "\\W+" }.zipWithIndex).distinct()
+    }.verifyWith(runtimeUnderTest)
   }
 
-  @Test def testDistinctTupleType(): Unit = {
-    val inp = {
-      val lines = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
-      lines.flatMap(_.split("\\W+")).zipWithIndex.toStream
-    }
+  "Union" in {
+    val (even, odd) = from.jabberwocky
+      .flatMap { _ split "\\W+" }
+      .partition { _.length % 2 == 0 }
 
-    compareWithNative(emma.parallelize {
-      DataBag(inp).distinct()
-    })
-  }
-
-  @Test def testUnionSimpleType(): Unit = {
-    val inp = {
-      val lines = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
-      lines.flatMap(_.split("\\W+")).toStream
-    }
-
-    val lft = inp.filter(_.length % 2 == 0) // even-length words
-    val rgt = inp.filter(_.length % 2 == 1) // odd-length words
-
-    compareWithNative(emma.parallelize {
-      DataBag(lft) plus DataBag(rgt)
-    })
+    emma.parallelize {
+      DataBag(even) plus DataBag(odd)
+    }.verifyWith(runtimeUnderTest)
   }
 
   // --------------------------------------------------------------------------
   // Join & Cross
   // --------------------------------------------------------------------------
 
-  @Test def testTwoWayCrossSimpleType(): Unit = {
-    val N = 100
+  "Join" - {
+    "two-way on primitives" in emma.parallelize {
+      for {
+        x <- DataBag(1 to 50)
+        y <- DataBag(1 to 100)
+        if x == 2 * y
+      } yield (x, 2 * y, 2)
+    }.verifyWith(runtimeUnderTest)
 
-    val a = 1
-    val b = 2
+    "two-way on tuples" in emma.parallelize {
+      for {
+        x <- DataBag(5.to(15).zipWithIndex)
+        y <- DataBag(1.to(20).zipWithIndex)
+        if x._1 == y._1
+      } yield (x, y)
+    }.verifyWith(runtimeUnderTest)
 
-    compareWithNative(emma.parallelize {
-      for (x <- DataBag(1 to N); y <- DataBag(1 to Math.sqrt(N).toInt)) yield (a * x, b * y, a * b)
-    })
-  }
-
-  @Test def testTwoWayJoinSimpleType(): Unit = {
-    val N = 100
-
-    val a = 1
-    val b = 2
-
-    compareWithNative(emma.parallelize {
-      val A = DataBag(1 to N)
-      val B = DataBag(1 to N)
-
-      for (x <- A; y <- B; if x * a == y * b) yield (a * x, b * y, a * b)
-    })
-  }
-
-  @Test def testTwoWayJoinTupleType(): Unit = {
     // Q: how many cannes winners are there in the IMDB top 100?
-    compareWithNative(emma.parallelize {
-      val A = DataBag((1 to 100).zipWithIndex.toSeq)
-      val B = DataBag((1 to 100).zipWithIndex.toSeq)
+    "two-way on case classes" in emma.parallelize {
+      val cannesTop100 = for {
+        movie <- DataBag(from.imdb)
+        winner <- DataBag(from.cannes)
+        if (movie.title, movie.year) == (winner.title, winner.year)
+      } yield ("Cannes", movie.year, winner.title)
 
-      for (a <- A; b <- B; if a._1 == b._1) yield (a, b)
-    })
+      val berlinTop100 = for {
+        movie <- DataBag(from.imdb)
+        winner <- DataBag(from.berlin)
+        if (movie.title, movie.year) == (winner.title, winner.year)
+      } yield ("Berlin", movie.year, winner.title)
+
+      berlinTop100 plus cannesTop100
+    }.verifyWith(runtimeUnderTest)
+
+    "multi-way on primitives" in emma.parallelize {
+      for {
+        x <- DataBag(1 to 10)
+        y <- DataBag(1 to 20)
+        z <- DataBag(1 to 100)
+        if x * x + y * y == z * z
+      } yield (x, y, z)
+    }.verifyWith(runtimeUnderTest)
+
+    "multi-way on case classes with local input" in {
+      val imdbMovies = from.imdb
+      val cannesWinners = from.cannes
+      val berlinWinnera = from.berlin
+
+      // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
+      emma.parallelize {
+        val cannesTop100 = for {
+          movie <- DataBag(imdbMovies)
+          winner <- DataBag(cannesWinners)
+          if (winner.title, winner.year) == (movie.title, movie.year)
+        } yield (movie.year, winner.title)
+
+        val berlinTop100 = for {
+          movie <- DataBag(imdbMovies)
+          winner <- DataBag(berlinWinnera)
+          if (winner.title, winner.year) == (movie.title, movie.year)
+        } yield (movie.year, winner.title)
+
+        cannesTop100 plus berlinTop100
+      }.verifyWith(runtimeUnderTest)
+    }
   }
 
-  @Test def testTwoWayJoinComplexType(): Unit = {
-    // Q: how many cannes winners are there in the IMDB top 100?
-    compareWithNative(emma.parallelize {
-      val imdb = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-      val cannes = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner])
-      val berlin = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
-
-      val cwinners = for (x <- imdb; y <- cannes; if (x.title, x.year) ==(y.title, y.year)) yield ("Cannes", x.year, y.title)
-      val bwinners = for (x <- imdb; y <- berlin; if (x.title, x.year) ==(y.title, y.year)) yield ("Berlin", x.year, y.title)
-
-      (bwinners, cwinners)
-    })
-  }
-
-  @Test def testMultiWayJoinSimpleType(): Unit = {
-    val N = 10000
-
-    compareWithNative(emma.parallelize {
-      for (x <- DataBag(1 to Math.sqrt(N).toInt);
-           y <- DataBag(1 to Math.sqrt(N).toInt);
-           z <- DataBag(1 to N); if x * x + y * y == z * z) yield (x, y, z)
-    })
-  }
-
-  @Test def testMultiWayJoinComplexTypeLocalInput(): Unit = {
-    val imdbTop100Local = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry]).fetch()
-    val cannesWinnersLocal = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner]).fetch()
-    val berlinWinnersLocal = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner]).fetch()
-
-    // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
-    compareWithNative(emma.parallelize {
-      val imdbTop100 = DataBag(imdbTop100Local)
-      val cannesWinners = DataBag(cannesWinnersLocal)
-      val berlinWinners = DataBag(berlinWinnersLocal)
-
-      val cannesTop100 = for (w <- cannesWinners; m <- imdbTop100; if (w.title, w.year) ==(m.title, m.year)) yield (m.year, w.title)
-      val berlinTop100 = for (w <- berlinWinners; m <- imdbTop100; if (w.title, w.year) ==(m.title, m.year)) yield (m.year, w.title)
-
-      val result = cannesTop100 plus berlinTop100
-      result
-    })
-  }
-
-  @Test def testMultiWayJoinComplexType(): Unit = {
-    // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
-    compareWithNative(emma.parallelize {
-      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-      val cannesWinners = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner])
-      val berlinWinners = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
-
-      val cannesTop100 = for (w <- cannesWinners; m <- imdbTop100; if (w.title, w.year) ==(m.title, m.year)) yield (m.year, w.title)
-      val berlinTop100 = for (w <- berlinWinners; m <- imdbTop100; if (w.title, w.year) ==(m.title, m.year)) yield (m.year, w.title)
-
-      val result = cannesTop100 plus berlinTop100
-      result
-    })
-  }
+  "Cross" in emma.parallelize {
+    for {
+      x <- DataBag(3 to 100 by 3)
+      y <- DataBag(5 to 100 by 5)
+    } yield x * y
+  }.verifyWith(runtimeUnderTest)
 
   // --------------------------------------------------------------------------
-  // Group (with materialization) and FoldGroup (Aggregations)
+  // Group (with materialization) and FoldGroup (aggregations)
   // --------------------------------------------------------------------------
 
-  @Test def testGroupMaterialization() = {
-    compareWithNative(emma.parallelize {
-      DataBag(Seq(1)).groupBy(x=>x)
-    })
-  }
+  "Group" - {
+    "materialization" in emma.parallelize {
+      DataBag(Seq(1)) groupBy identity
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testGroupMaterializationWithClosure() = {
-    compareWithNative(emma.parallelize {
+    "materialization with closure" in emma.parallelize {
       val semiFinal = 8
-      val bag = DataBag(new Random().shuffle(0.until(100).toList))
+      val bag = DataBag(new Random shuffle 0.until(100).toList)
       val top = for (g <- bag groupBy { _ % semiFinal })
         yield g.values.fetch().sorted.take(semiFinal / 2).sum
 
       top.max()
-    })
+    }.verifyWith(runtimeUnderTest)
   }
 
-  @Test def testFoldGroupSimpleType() = {
-    val N = 200
+  "FoldGroup" - {
+    "of primitives" in emma.parallelize {
+      for (g <- DataBag(1 to 100 map { _ -> 0 }) groupBy { _._1 })
+        yield g.values.map { _._2 }.sum()
+    }.verifyWith(runtimeUnderTest)
 
-    compareWithNative(emma.parallelize {
-      for (x <- DataBag(1 to N map (x => (0, x))).groupBy(_._1)) yield x.values.map(_._2).sum()
-    })
-  }
+    "of case classes" in emma.parallelize {
+      for (yearly <- DataBag(from.imdb) groupBy { _.year })
+        yield yearly.values.count()
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testFoldGroupComplexTypeSingleFold() = {
-    compareWithNative(emma.parallelize {
-      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-      for (g <- imdbTop100.groupBy(_.year)) yield g.values.count()
-    })
-  }
+    "of case classes multiple times" in emma.parallelize {
+      val movies = DataBag(from.imdb)
+      
+      for (decade <- movies groupBy { _.year / 10 }) yield {
+        val total = decade.values.count()
+        val avgRating = decade.values.map { _.rating.toInt * 10 }.sum() / (total * 10.0)
+        val minRating = decade.values.map { _.rating }.min()
+        val maxRating = decade.values.map { _.rating }.max()
 
-  @Test def testFoldGroupComplexTypeMultipleFolds() = {
-    compareWithNative(emma.parallelize {
-      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-      for (g <- imdbTop100.groupBy(_.year / 10)) yield {
-        val total = g.values.count()
-        val avgRating = g.values.map(_.rating.toInt * 10).sum() / (total * 10.0)
-        val minRating = g.values.map(_.rating).min()
-        val maxRating = g.values.map(_.rating).max()
-
-        (s"${g.key * 10} - ${g.key * 10 + 9}", total, avgRating, minRating, maxRating)
+        (s"${decade.key * 10} - ${decade.key * 10 + 9}",
+          total, avgRating, minRating, maxRating)
       }
-    })
-  }
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testFoldGroupWithComplexKey() = {
-    compareWithNative(emma.parallelize {
-      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-      for (g <- imdbTop100.groupBy(x => (x.year / 10, x.rating.toInt))) yield {
-        val (year, rating) = g.key
-        (year, rating, g.values.count())
+    "with a complex key" in emma.parallelize {
+      val yearlyRatings = DataBag(from.imdb)
+        .groupBy { movie => (movie.year / 10, movie.rating.toInt) }
+      
+      for (yr <- yearlyRatings) yield {
+        val (year, rating) = yr.key
+        (year, rating, yr.values.count())
       }
-    })
-  }
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testMultipleGroupByUsingTheSameNames() = {
-    compareWithNative(emma.parallelize {
-      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
+    "with duplicate group names" in emma.parallelize {
+      val movies = DataBag(from.imdb)
 
-      val r1 = for {
-        g <- imdbTop100.groupBy(x => x.year / 10)
-      } yield (g.key, g.values.count(), g.values.map(_.rating).min())
+      val leastPopular = for {
+        decade <- movies groupBy { _.year / 10 }
+      } yield (decade.key, decade.values.count(), decade.values.map { _.rating }.min())
 
-      val r2 = for {
-        g <- imdbTop100.groupBy(x => x.year / 10)
-      } yield (g.key, g.values.count(), g.values.map(_.rating).max())
+      val mostPopular = for {
+        decade <- movies groupBy { _.year / 10 }
+      } yield (decade.key, decade.values.count(), decade.values.map { _.rating }.max())
 
-      (r1, r2)
-    })
-  }
+      (leastPopular, mostPopular)
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testMultipleGroupByInTheSameComprehension() = {
-    compareWithNative(emma.parallelize {
-      val cannes = read(materializeResource("/cinema/canneswinners.csv"), new CSVInputFormat[FilmFestivalWinner])
-      val berlin = read(materializeResource("/cinema/berlinalewinners.csv"), new CSVInputFormat[FilmFestivalWinner])
-
+    "with multiple groups in the same comprehension" in emma.parallelize {
       for {
-        g1 <- cannes.groupBy(x => x.year / 10)
-        g2 <- berlin.groupBy(x => x.year / 10)
-        if g1.key == g2.key
-      } yield (g1.values.count(), g2.values.count())
-    })
+        can10 <- DataBag(from.cannes) groupBy { _.year / 10 }
+        ber10 <- DataBag(from.berlin) groupBy { _.year / 10 }
+        if can10.key == ber10.key
+      } yield (can10.values.count(), ber10.values.count())
+    }.verifyWith(runtimeUnderTest)
   }
 
   // --------------------------------------------------------------------------
-  // Fold (Global Aggregations)
+  // Fold (global aggregations)
   // --------------------------------------------------------------------------
 
-  @Test def testFoldSimpleType() = {
-    val N = 200
+  "Fold" - {
+    "of an empty DataBag (nonEmpty)" in emma.parallelize {
+      (DataBag().nonEmpty, DataBag(1 to 3).nonEmpty)
+    }.verifyWith(runtimeUnderTest)
 
-    compareWithNative(emma.parallelize {
-      DataBag(1 to N).sum()
-    })
-  }
+    "of primitives (fold)" in emma.parallelize {
+      DataBag(0 until 100).fold(0)(identity, _ + _)
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testFoldComplexType() = {
-    compareWithNative(emma.parallelize {
-      val imdbTop100 = read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-      imdbTop100.count()
-    })
-  }
+    "of primitives (sum)" in emma.parallelize {
+      DataBag(1 to 200).sum()
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testFold() = {
-    compareWithNative(emma.parallelize {
-      val range = DataBag(0 until 100)
-      range.fold(0)(identity, _ + _)
-    })
-  }
-
-  @Test def testNonEmpty() = {
-    compareWithNative(emma.parallelize{
-      (DataBag().nonEmpty, DataBag(Seq(1,2,3)).nonEmpty)
-    })
+    "of case classes (count)" in emma.parallelize {
+      DataBag(from.imdb).count()
+    }.verifyWith(runtimeUnderTest)
   }
 
   // --------------------------------------------------------------------------
   // Stateful DataBags
   // --------------------------------------------------------------------------
 
-  @Test def testStatefulCreateFetch() = {
+  "Stateful" - {
+    "create (fetch)" in withRuntime(runtimeUnderTest) { engine =>
+      val input = State(6, 8) :: Nil
 
-    val in = Seq(State(6,8))
-
-    val alg = emma.parallelize {
-      val b1 = DataBag(in)
-      val s = stateful[State, Long](b1)
-      val b2 = s.bag()
-      b2.fetch()
-    }
-
-    val out = alg.run(rt)
-    compareBags(in, out)
-  }
-
-  @Test def testStatefulUpdate() = {
-
-    val in = Seq(State(6, 12), State(3, 4))
-
-    val alg = emma.parallelize {
-
-      val b1 = DataBag(in)
-      val s = stateful[State, Long](b1)
-
-      val o1 = s.updateWithZero(s => {
-        s.value += 1
-
-        DataBag() : DataBag[Int]
-      })
-
-      val us1 = DataBag(Seq(Update(6, 5), Update(6, 7)))
-      val o2 = s.updateWithOne(us1)(_.identity, (s, u) => {
-        s.value += u.inc
-        DataBag(Seq(42))
-      })
-
-      val us2 = DataBag(Seq(Update(3, 5), Update(3, 4)))
-      val o3 = s.updateWithMany(us2)(_.identity, (s, us) => {
-        for(
-          u <- us
-        ) yield {
-          s.value += u.inc
-        }
-      })
-
-      val us3 = DataBag(Seq(Update(3, 1), Update(6, 2), Update(6, 3)))
-      val o4 = s.updateWithMany(us3)(_.identity, (s, us) => {
-        us.map{_.inc}.sum()
-        DataBag(Seq(42))
-      })
-
-      val b2 = s.bag()
-      b2.fetch()
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt)
-    val exp = alg.run(native)
-
-    // assert that the result contains the expected values
-    compareBags(act, exp)
-  }
-
-  // --------------------------------------------------------------------------
-  // Expression Normalization
-  // --------------------------------------------------------------------------
-
-  @Test def testFilterNormalizationWithSimplePredicates() = {
-
-    compareWithNative(emma.parallelize {
-      for (x <- DataBag(1 to 1000)
-                if !(x > 5 || (x < 2 && x == 0)) || (x > 5 || !(x < 2)))
-        yield x
-    })
-  }
-
-  @Test def testFilterNormalizationWithSimplePredicatesMultipleInputs() = {
-
-    compareWithNative(emma.parallelize {
-      val X = DataBag(1 to 1000)
-      val Y = DataBag(100 to 2000)
-
-      for (x <- X; y <- Y if x < y || x + y < 100 && x % 2 == 0 || y / 2 == 0) yield y + x
-    })
-  }
-
-  @Test def testFilterNormalizationWithUDFPredicates() = {
-
-    compareWithNative(emma.parallelize {
-      for (x <- DataBag(1 to 1000)
-                   if !(A(x) || (B(x) && C(x))) || (A(x) || !B(x)))
-        yield x
-    })
-  }
-
-  @Test def testClassNameNormalization() = {
-    // without emma.substituteClassNames ImdbYear can not be found
-    val alg = emma.parallelize {
-      val entries = read(materializeResource(s"/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-      val years = for (e <- entries) yield ImdbYear(e.year)
-      years.forall { case iy @ ImdbYear(y) => iy == new ImdbYear(y) }
-    }
-
-    // compute the algorithm using the original code and the runtime under test
-    val act = alg.run(rt)
-    val exp = alg.run(native)
-    assert(act, "IMDBYear(y) == new IMDBYear(y)")
-    assert(exp, "IMDBYear(y) == new IMDBYear(y)")
-  }
-
-  @Test def testEnclosingParametersNormalization() = {
-    // a class that wraps an Emma program and a parameter used within the 'parallelize' call
-    case class MoviesWithinPeriodQuery(minYear: Int, period: Int, rt: runtime.Engine) {
-      def run() = {
-        val alg = emma.parallelize {
-          for {
-            e <- read(materializeResource("/cinema/imdb.csv"), new CSVInputFormat[IMDBEntry])
-            if e.year >= minYear && e.year < minYear + period
-          } yield e
-        }
-
-        alg.run(rt)
+      val algorithm = emma.parallelize {
+        val withState = stateful[State, Long] { DataBag(input) }
+        withState.bag().fetch()
       }
+
+      algorithm.run(engine) should equal (input)
     }
 
-    // run the algorithm
-    val exp = MoviesWithinPeriodQuery(1990, 10, runtime.Native()).run().fetch()
-    val act = MoviesWithinPeriodQuery(1990, 10, rt).run().fetch()
-    compareBags(exp, act)
+    "update" in { // FIXME: doesn't work if we move `input` inside `parallelize`
+      val input = State(6, 12) :: State(3, 4) :: Nil
+      emma.parallelize {
+        val withState = stateful[State, Long] { DataBag(input) }
+
+        withState.updateWithZero { s =>
+          s.value += 1
+          DataBag(): DataBag[Int]
+        }
+
+        val updates1 = DataBag(Update(6, 5) :: Update(6, 7) :: Nil)
+        withState.updateWithOne(updates1)(_.identity, (s, u) => {
+          s.value += u.inc
+          DataBag(42 :: Nil)
+        })
+
+        val updates2 = DataBag(Update(3, 5) :: Update(3, 4) :: Nil)
+        withState.updateWithMany(updates2)(_.identity, (s, us) => {
+          for (u <- us) yield s.value += u.inc
+        })
+
+        val updates3 = DataBag(Update(3, 1) :: Update(6, 2) :: Update(6, 3) :: Nil)
+        withState.updateWithMany(updates3)(_.identity, (s, us) => {
+          us.map { _.inc }.sum()
+          DataBag(42 :: Nil)
+        })
+
+        withState.bag()
+      }.verifyWith(runtimeUnderTest)
+    }
   }
 
-  @Test def testLocalFunctionNormalization(): Unit = {
-    compareWithNative(emma.parallelize {
+  // --------------------------------------------------------------------------
+  // Expression normalization
+  // --------------------------------------------------------------------------
+
+  "Normalization" - {
+    "of filters with simple predicates" in emma.parallelize {
+      for {
+        x <- DataBag(1 to 1000)
+        if !(x > 5 || (x < 2 && x == 0)) || (x > 5 || !(x < 2))
+      } yield x
+    }.verifyWith(runtimeUnderTest)
+
+    "of filters with simple predicates and multiple inputs" in emma.parallelize {
+      for {
+        x <- DataBag(1 to 1000)
+        y <- DataBag(100 to 2000)
+        if x < y || x + y < 100 && x % 2 == 0 || y / 2 == 0
+      } yield y + x
+    }.verifyWith(runtimeUnderTest)
+
+    "of filters with UDF predicates" in emma.parallelize {
+      for {
+        x <- DataBag(1 to 1000)
+        if !(p1(x) || (p2(x) && p3(x))) || (p1(x) || !p2(x))
+      }yield x
+    }.verifyWith(runtimeUnderTest)
+
+    // otherwise ImdbYear could not be found
+    "of case class names" in  emma.parallelize {
+      val movies = DataBag(from.imdb)
+      val years = for (mov <- movies) yield ImdbYear(mov.year)
+      years forall { case iy @ ImdbYear(y) => iy == new ImdbYear(y) }
+    }.verifyWith(runtimeUnderTest)
+
+    "of enclosing class parameters" in {
+      // a class that wraps an Emma program and a parameter used within the `parallelize` call
+      case class MoviesWithinPeriodQuery(minYear: Int, period: Int) {
+        lazy val algorithm = emma.parallelize {
+          for {
+            movie <- DataBag(from.imdb)
+            if movie.year >= minYear && movie.year < minYear + period
+          } yield movie
+        }
+      }
+
+      // run the algorithm
+      MoviesWithinPeriodQuery(1990, 10)
+        .algorithm.verifyWith(runtimeUnderTest)
+    }
+
+    "of local functions" in emma.parallelize {
       def double(x: Int) = 2 * x
-      val b1 = for (x <- DataBag(1 to 100)) yield double(x)
-
       def add(x: Int, y: Int) = x + y
-      val b2 = for (x <- DataBag(1 to 100)) yield add(x, 5)
 
-      b1 plus b2
-    })
+      val times2 = for { x <- DataBag(1 to 100) } yield double(x)
+      val increment5 = for { x <- DataBag(1 to 100) } yield add(x, 5)
+
+      times2 plus increment5
+    }.verifyWith(runtimeUnderTest)
   }
 
   // --------------------------------------------------------------------------
   // Miscellaneous
   // --------------------------------------------------------------------------
 
-  @Test def testPatternMatching() = {
-    compareWithNative(emma.parallelize {
-      val range = DataBag(0.until(100).zipWithIndex)
-      val squares = for (xy <- range) yield xy match {
-        case (x, y) => x + y
-      }
+  "Miscellaneous" - {
+    "Pattern matching in `yield`" in emma.parallelize {
+      val range = DataBag(0.to(100).zipWithIndex)
+      val squares = for (xy <- range) yield xy match { case (x, y) => x + y }
       squares.sum()
-    })
-  }
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testPartialFunction() = {
-    compareWithNative(emma.parallelize {
-      val range = DataBag(0.until(100).zipWithIndex)
+    "Map with partial function" in emma.parallelize {
+      val range = DataBag(0.to(100).zipWithIndex)
       val squares = range map { case (x, y) => x + y }
       squares.sum()
-    })
-  }
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testDestructuring() = {
-    compareWithNative(emma.parallelize {
-      val range = DataBag(0.until(100).zipWithIndex)
-      val squares = for ((x, y) <- range) yield x + y
+    "Destructuring of a generator" in emma.parallelize {
+      val range = DataBag(0.to(100).zipWithIndex)
+      val squares = for { (x, y) <- range } yield x + y
       squares.sum()
-    })
-  }
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testIntermediateValueDefinition() = {
-    compareWithNative(emma.parallelize {
-      val range = DataBag(0.until(100).zipWithIndex)
+    "Intermediate value definition" in emma.parallelize {
+      val range = DataBag(0.to(100).zipWithIndex)
       val squares = for (xy <- range; sqr = xy._1 * xy._2) yield sqr
       squares.sum()
-    })
-  }
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testRootPackageCapture() = {
-    compareWithNative(emma.parallelize {
-      val eu    = "eu"
-      val com   = "com"
-      val java  = "java"
-      val org   = "org"
+    "Root package capture" in emma.parallelize {
+      val eu = "eu"
+      val com = "com"
+      val java = "java"
+      val org = "org"
       val scala = "scala"
-      val range = DataBag(0 until 100)
-      range.sum()
-    })
-  }
+      DataBag(0 to 100).sum()
+    }.verifyWith(runtimeUnderTest)
 
-  @Test def testConstantExpressions(): Unit = {
-    compareWithNative(emma.parallelize {
-      // map
-      val A = for (x <- DataBag(1 to 100)) yield 1
+    "Constant expressions" in emma.parallelize {
+      val as = for { x <- DataBag(1 to 100) } yield 1 // map
+      val bs = DataBag(101 to 200) flatMap { _ => DataBag(2 to 4) } // flatMap
+      val cs = for { x <- DataBag(201 to 300) if 5 == 1 } yield 5 // filter
+      val ds = DataBag(301 to 400) withFilter { _ => true } // filter
+      as plus bs plus cs plus ds
+    }.verifyWith(runtimeUnderTest)
 
-      // flatMap
-      val B = DataBag(101 to 200).flatMap(_ => DataBag(Seq(2,3,4)))
-
-      // filter
-      val C = for {
-        x <- DataBag(201 to 300)
-        if 5 == 1
-      } yield 5
-
-      // filter
-      val D = DataBag(301 to 400).withFilter(x=>true)
-
-      A plus B plus C plus D
-    })
-  }
-
-  @Test def testUpdatedTempSink(): Unit = {
-    // Sieve of Eratosthenes
-    compareWithNative(emma.parallelize {
+    "Updated tmp sink (sieve of eratosthenes)" in emma.parallelize {
       val N = 20
-      val PAYLOAD = "#" * 1000
+      val payload = "#" * 100
 
       val positive = {
-        var primes = DataBag(3 to N map { x => (x, PAYLOAD) })
-
+        var primes = DataBag(3 to N map { (_, payload) })
         var p = 2
 
-        while (p <= Math.sqrt(N)) {
-          primes = for ((n, payload) <- primes if n > p && n % p != 0) yield (n, payload)
-          p = primes map { case (n, payload) => n } min()
+        while (p <= math.sqrt(N)) {
+          primes = for { (n, payload) <- primes if n > p && n % p != 0 } yield (n, payload)
+          p = primes.map { _._1 }.min()
         }
 
-        primes map { case (n, payload) => n }
+        primes map { _._1 }
       }
 
       val negative = {
-        var primes = DataBag(-N to 3 map { x => (x, PAYLOAD) })
-
+        var primes = DataBag(-N to 3 map { (_, payload) })
         var p = -2
 
-        while (p >= -Math.sqrt(N)) {
-          primes = for ((n, payload) <- primes if n < p && n % p != 0) yield (n, payload)
-          p = primes map { case (n, payload) => n } max()
+        while (p >= -math.sqrt(N)) {
+          primes = for { (n, payload) <- primes if n < p && n % p != 0 } yield (n, payload)
+          p = primes.map { _._1 }.max()
         }
 
-        primes map { case (n, payload) => n }
+        primes map { _._1 }
       }
 
       positive plus negative
-    })
+    }.verifyWith(runtimeUnderTest)
   }
-}
-
-case class ImdbYear(year: Int) {}
-
-case class State(id: Long, var value: Int) extends Identity[Long] {
-  def identity = id
-}
-
-case class Update(id: Long, inc: Int) extends Identity[Long] {
-  def identity = id
 }

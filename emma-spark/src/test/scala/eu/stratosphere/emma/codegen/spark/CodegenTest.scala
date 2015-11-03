@@ -4,7 +4,6 @@ import eu.stratosphere.emma.codegen.BaseCodegenTest
 import eu.stratosphere.emma.runtime.SparkLocal
 
 class CodegenTest extends BaseCodegenTest("spark") {
-
-  override def runtimeUnderTest = SparkLocal("local[1]", 6123)
-
+  val cores = Runtime.getRuntime.availableProcessors
+  override def runtimeUnderTest = SparkLocal(s"local[$cores]", 6123)
 }

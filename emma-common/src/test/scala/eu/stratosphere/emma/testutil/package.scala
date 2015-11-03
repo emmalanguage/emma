@@ -3,6 +3,7 @@ package eu.stratosphere.emma
 import java.io.InputStream
 import java.nio.file.{Files, Paths, StandardCopyOption}
 
+import eu.stratosphere.emma.api.Algorithm
 import org.apache.commons.io.FilenameUtils
 
 package object testutil {
@@ -78,8 +79,31 @@ package object testutil {
    * @tparam T The type of the returned value.
    * @return The result of `f` applied to the initialized `rt`.
    */
-  def withRuntime[T](rt: => runtime.Engine = runtime.default())(f: runtime.Engine => T): T = {
-    lazy val runtime = rt
-    try f(runtime) finally runtime.closeSession()
+  def withRuntime[T](rt: => runtime.Engine = runtime.default())(f: runtime.Engine => T): T =
+    try f(rt) finally rt.closeSession()
+
+  /** Syntax sugar for testing [[Algorithm]]s. */
+  implicit class AlgorithmVerification[A](val alg: Algorithm[A]) extends AnyVal {
+
+    /**
+      * Run this [[Algorithm]] on the provided `engine` and on the native runtime and ensure that
+      * the results match.
+      *
+      * @param engine The runtime to test.
+      */
+    def verifyWith(engine: runtime.Engine): Unit =
+      withRuntime(engine) { _ =>
+        withRuntime(runtime.Native()) { native =>
+          // compute the algorithm using the original code and the runtime under test
+          val actual = alg.run(engine)
+          val expected = alg.run(native)
+          // assert that the result contains the expected values
+          assert(actual == expected, s"""
+            |actual != expected
+            |actual: $actual
+            |expected: $expected
+            |""".stripMargin)
+        }
+      }
   }
 }

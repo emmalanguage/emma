@@ -1,46 +1,33 @@
 package eu.stratosphere.emma.codegen.spark
 
 import eu.stratosphere.emma.api._
-import eu.stratosphere.emma.runtime.SparkLocal
+import eu.stratosphere.emma.runtime.{Spark, SparkLocal}
 import eu.stratosphere.emma.testutil._
+
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.prop.PropertyChecks
-import org.scalatest.{BeforeAndAfter, FlatSpec, Matchers}
+import org.scalatest._
 
 @RunWith(classOf[JUnitRunner])
-class SparkRuntimeCompatibilityTest extends FlatSpec with PropertyChecks with Matchers with BeforeAndAfter {
+class SparkRuntimeCompatibilityTest extends FlatSpec with Matchers {
+  val cores = Runtime.getRuntime.availableProcessors
+  def engine = SparkLocal(s"local[$cores]", 6123)
 
-  var rt: SparkLocal = _
-
-  before {
-    rt = SparkLocal("local[1]", 6123)
+  "DataBag" should "be usable within a UDF closure" in withRuntime(engine) { case spark: Spark =>
+    val ofInterest = DataBag(1 to 10) map (_ * 10)
+    val actual = spark.sc.parallelize(1 to 100) filter { x => ofInterest exists (_ == x) }
+    val expected = 1 to 100 filter { x => ofInterest exists (_ == x) }
+    compareBags(expected, actual.collect())
   }
 
-  after {
-    rt.closeSession()
-  }
+  it should "be usable as a broadcast variable" in withRuntime(engine) { case spark: Spark =>
+    val ofInterest = DataBag(1 to 10) map (_ * 10)
+    val ofInterestBC = spark.sc.broadcast(ofInterest)
 
-  "LabelRank" should "be usable within a UDF closure" in {
-    val sc = rt.sc
+    val actual = spark.sc.parallelize(1 to 100)
+      .filter { x => ofInterestBC.value exists (_ == x) }
 
-    val numbersOfInterest = DataBag(1 to 10).map(_ * 10)
-
-    val res = sc.parallelize(1 to 100).filter(x => numbersOfInterest.exists(_ == x))
-    val exp = (1 to 100).filter(x => numbersOfInterest.exists(_ == x))
-
-    compareBags(exp, res.collect())
-  }
-
-  "LabelRank" should "be usable as a broadcast variable" in {
-    val sc = rt.sc
-
-    val numbersOfInterest = DataBag(1 to 10).map(_ * 10)
-    val numbersOfInterestBC = sc.broadcast(numbersOfInterest)
-
-    val res = sc.parallelize(1 to 100).filter(x => numbersOfInterestBC.value.exists(_ == x))
-    val exp = (1 to 100).filter(x => numbersOfInterest.exists(_ == x))
-
-    compareBags(exp, res.collect())
+    val expected = 1 to 100 filter { x => ofInterest exists (_ == x) }
+    compareBags(expected, actual.collect())
   }
 }
