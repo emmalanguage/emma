@@ -12,7 +12,7 @@ import org.apache.flink.api.scala.ExecutionEnvironment
 
 import scala.reflect.runtime.universe._
 
-abstract class Flink(val host: String, val port: Int, val planMode:Boolean = false) extends Engine {
+abstract class Flink(val host: String, val port: Int) extends Engine {
 
   import org.apache.flink.api.scala._
 
@@ -33,32 +33,20 @@ abstract class Flink(val host: String, val port: Int, val planMode:Boolean = fal
   val dataflowGenerator = new DataflowGenerator(dataflowCompiler, envSessionID)
 
   override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = {
-    if (planMode) {
-      addPlan(name, root)
-      return null.asInstanceOf[A]
-    }
-
+    addPlan(name, root)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[A](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
 
   override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = {
-    if (planMode) {
-      addPlan(name, root)
-      return null.asInstanceOf[DataBag[A]]
-    }
-
+    addPlan(name, root)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     val expr = dataflowCompiler.execute[DataSet[A]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
     DataBag(root.name, expr, expr.collect())
   }
 
   override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
-    if (planMode) {
-      addPlan(name, root)
-      return null.asInstanceOf[Unit]
-    }
-
+    addPlan(name, root)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
@@ -82,7 +70,7 @@ abstract class Flink(val host: String, val port: Int, val planMode:Boolean = fal
   private def nextTmpName = f"emma$$temp${tmpCounter.advance.get}%05d"
 }
 
-case class FlinkLocal(override val host: String, override val port: Int, override val planMode: Boolean = false) extends Flink(host, port, planMode) {
+case class FlinkLocal(override val host: String, override val port: Int) extends Flink(host, port) {
 
   logger.info(s"Initializing local execution environment for Flink ")
 

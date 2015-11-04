@@ -1,9 +1,10 @@
 package eu.stratosphere.emma
 
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
 
 import com.typesafe.scalalogging.slf4j.Logger
-import eu.stratosphere.emma.api.DataBag
+import eu.stratosphere.emma.api.{ParallelizedDataBag, DataBag}
 import eu.stratosphere.emma.ir._
 import org.slf4j.LoggerFactory
 
@@ -30,6 +31,14 @@ package object runtime {
 
     val envSessionID = UUID.randomUUID()
     var executionPlanJson: mutable.Stack[Plan] = new mutable.Stack[Plan]()
+
+    var blockingLatch:CountDownLatch = null
+
+    def setBlockingLatch(blocker: CountDownLatch) {
+      blockingLatch = blocker
+    }
+
+    def getBlockingLatch():CountDownLatch = blockingLatch
 
     def getExecutionPlanJson: mutable.Stack[Plan] = executionPlanJson
 
@@ -65,7 +74,7 @@ package object runtime {
     def getExecutionPlan(root:Combinator[_]) : String = root match {
       case Read(location: String, _) => buildJson(root, "Read", "")
       case Write(location: String, _, xs: Combinator[_]) => buildJson(root, "Write", getExecutionPlan(xs))
-      case TempSource(_) => buildJson(root, "TempSource (DATABAG)", "")  //TODO: show databag name if possible
+      case TempSource(ref) => buildJson(root, "TempSource", "")
       case TempSink(name: String, xs: Combinator[_]) => buildJson(root, "TempSink ("+name+")", getExecutionPlan(xs))
       case Map(_, xs: Combinator[_]) => buildJson(root, "Map", getExecutionPlan(xs))
       case FlatMap(_, xs: Combinator[_]) => buildJson(root, "FlatMap", getExecutionPlan(xs))
@@ -84,16 +93,27 @@ package object runtime {
 
     def buildJson(root:Combinator[_], name: String, parents: String): String = {
       var nodeType = ""
-      if (name == "Read") {
-        nodeType = "type:\"INPUT\", location:\""+root.asInstanceOf[Read[_]].location+"\", "
-      } else if (name == "Write") {
-        nodeType = "type:\"INPUT\", location:\""+root.asInstanceOf[Write[_]].location+"\", "
+
+      var label = name
+
+      name match {
+        case "Read" => nodeType = "type:\"INPUT\", location:\""+root.asInstanceOf[Read[_]].location+"\", "
+        case "Write" => nodeType = "type:\"INPUT\", location:\""+root.asInstanceOf[Write[_]].location+"\", "
+        case "TempSource" => {
+          val t = root.asInstanceOf[TempSource[_]]
+          if (t.ref != null)
+            label = "TempSource ("+t.ref.asInstanceOf[ParallelizedDataBag[_, _]].name+")"
+        }
+        case _ =>
       }
-      s"""{\"id\":\"${System.identityHashCode(root)}\", \"label\":\"$name\", $nodeType \"parents\":[$parents]}"""
+      s"""{\"id\":\"${System.identityHashCode(root)}\", \"label\":\"$label\", $nodeType\"parents\":[$parents]}"""
     }
 
     def addPlan(name:String, root:Combinator[_]) = {
-      executionPlanJson.push(new Plan(name, getExecutionPlan(root)))
+      if (blockingLatch != null) {
+        executionPlanJson.push(new Plan(name, getExecutionPlan(root)))
+        blockingLatch.await()
+      }
     }
   }
 
@@ -155,7 +175,7 @@ package object runtime {
     // reflect engine constructor
     val constructorMirror = engineClazzMirror.reflectConstructor(engineClassType.decl(termNames.CONSTRUCTOR).asMethod)
     // instantiate engine
-    constructorMirror(host, port, false).asInstanceOf[Engine]
+    constructorMirror(host, port).asInstanceOf[Engine]
   }
 
   def toCamelCase(name: String) = name.split('-').map(x => x.capitalize).mkString("")
