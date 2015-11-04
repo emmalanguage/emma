@@ -2,74 +2,104 @@ package eu.stratosphere.emma.macros
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.api.model._
+
 import org.junit.runner.RunWith
-import org.scalatest.{Matchers, FlatSpec}
+import org.scalatest._
 import org.scalatest.junit.JUnitRunner
-import org.scalatest.prop.PropertyChecks
+
+import scala.tools.reflect.ToolBoxError
 
 @RunWith(classOf[JUnitRunner])
-class SemanticChecksTest extends FlatSpec with PropertyChecks with Matchers {
-  import CheckForStatefulAccessedFromUdfTest.Foo
+class SemanticChecksTest extends FlatSpec with Matchers with RuntimeUtil {
+  import SemanticChecksTest.Foo
 
-  "The updateWith* functions" should "throw an exception when the stateful is accessed from the updateWith* UDF" in {
-    val b = DataBag(Seq(Foo(1, 1)))
+  lazy val tb = mkToolBox()
+  import universe._
 
-    // These should throw exceptions:
+  val imports =
+    q"import _root_.eu.stratosphere.emma.api._" ::
+    q"import _root_.eu.stratosphere.emma.ir._" ::
+    q"import _root_.eu.stratosphere.emma.macros.SemanticChecksTest.Foo" :: Nil
 
-    intercept[StatefulAccessedFromUdfException] {
-      val s = stateful[Foo, Int](b)
-      s.updateWithZero(x => s.bag())
+  "The updateWith* functions" should
+    "throw an exception when the stateful is accessed from the updateWith* UDF" in {
+      val bag = DataBag(Foo(1, 1) :: Nil)
+
+      // these should throw exceptions:
+
+      intercept[StatefulAccessedFromUdfException] {
+        val withState = stateful[Foo, Int](bag)
+        withState updateWithZero { _ => withState.bag() }
+      }
+
+      val updates = DataBag(Foo(1, 2) :: Nil)
+
+      intercept[StatefulAccessedFromUdfException] {
+        val withState = stateful[Foo, Int](bag)
+        withState.updateWithOne(updates)(_.id, (_, _) => withState.bag())
+      }
+
+      intercept[StatefulAccessedFromUdfException] {
+        val withState = stateful[Foo, Int](bag)
+        withState.updateWithMany(updates)(_.id, (_, _) => withState.bag())
+      }
+
+      // and these should not throw exceptions:
+      val withState = stateful[Foo, Int](bag)
+      withState.updateWithZero { _ => DataBag() }
+      withState.updateWithOne(updates)(_.id, (_, _) => DataBag())
+      withState.updateWithMany(updates)(_.id, (_, _) => DataBag())
     }
-
-    val us = DataBag(Seq(Foo(1, 2)))
-
-    intercept[StatefulAccessedFromUdfException] {
-      val s = stateful[Foo, Int](b)
-      s.updateWithOne(us)(_.s, (x,y) => s.bag())
-    }
-    intercept[StatefulAccessedFromUdfException] {
-      val s = stateful[Foo, Int](b)
-      s.updateWithMany(us)(_.s, (x,y) => s.bag())
-    }
-
-    // And these should not throw exceptions:
-    val s = stateful[Foo, Int](b)
-    s.updateWithZero(x => DataBag())
-    s.updateWithOne(us)(_.s, (x, y) => DataBag())
-    s.updateWithMany(us)(_.s, (x, y) => DataBag())
-  }
 
   "parallelize" should "check for the stateful being accessed from the updateWith* UDF" in {
-    val b = DataBag(Seq(Foo(1, 1)))
+    val bagDef = q"val bag = DataBag(Foo(1, 1) :: Nil)"
+    val updDef = q"val updates = DataBag(Foo(1, 2) :: Nil)"
 
-    """emma.parallelize {
-      val s = stateful[Foo, Int](b)
-      s.updateWithZero(x => s.bag())
-    }""" shouldNot compile
+    q"""{
+      $bagDef
+      emma.parallelize {
+        val withState = stateful[Foo, Int](bag)
+        withState updateWithZero { _ => withState.bag() }
+      }
+    }""" should failWith[StatefulAccessedFromUdfException]
 
-    """emma.parallelize {
-      val s = stateful[Foo, Int](b)
-      s.updateWithOne(us)(_.s, (x,y) => s.bag())
-    }""" shouldNot compile
+    q"""{
+      $bagDef
+      $updDef
+      emma.parallelize {
+        val withState = stateful[Foo, Int](bag)
+        withState.updateWithOne(updates)(_.id, (_, _) => withState.bag())
+      }
+    }""" should failWith[StatefulAccessedFromUdfException]
 
-    """emma.parallelize {
-      val s = stateful[Foo, Int](b)
-      s.updateWithMany(us)(_.s, (x,y) => s.bag())
-    }""" shouldNot compile
+    q"""{
+      $bagDef
+      $updDef
+      emma.parallelize {
+        val withState = stateful[Foo, Int](bag)
+        withState.updateWithMany(updates)(_.id, (_, _) => withState.bag())
+      }
+    }""" should failWith[StatefulAccessedFromUdfException]
 
-    // This should compile
-    val dummy = emma.parallelize {
-      val s = stateful[Foo, Int](b)
-      val us = DataBag(Seq(Foo(1, 2)))
-      s.updateWithZero(x => DataBag())
-      s.updateWithOne(us)(_.s, (x, y) => DataBag())
-      s.updateWithMany(us)(_.s, (x, y) => DataBag())
+    // this should compile
+    val bag = DataBag(Foo(1, 1) :: Nil)
+    emma.parallelize {
+      val withState = stateful[Foo, Int](bag)
+      val updates = DataBag(Foo(1, 2) :: Nil)
+      withState.updateWithZero { _ => DataBag() }
+      withState.updateWithOne(updates)(_.id, (_, _) => DataBag())
+      withState.updateWithMany(updates)(_.id, (_, _) => DataBag())
     }
   }
+
+  def failWith[E <: Throwable : TypeTag] =
+    include (typeOf[E].typeSymbol.name.toString) compose { (tree: Tree) =>
+      intercept[ToolBoxError] { tb.typecheck(q"{ ..$imports; $tree }") }.getMessage
+    }
 }
 
-object CheckForStatefulAccessedFromUdfTest {
-  case class Foo(@id s: Int, var n: Int) extends Identity[Int] {
-    override def identity = n
+object SemanticChecksTest {
+  case class Foo(@id id: Int, var n: Int) extends Identity[Int] {
+    override def identity = id
   }
 }
