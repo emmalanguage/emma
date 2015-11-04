@@ -7,16 +7,18 @@ private[emma] trait SemanticChecks extends ComprehensionAnalysis {
   import universe._
   import syntax._
 
-  def doSemanticChecks(tree: Tree): Unit =
-    checkForStatefulAccessedFromUdf(tree)
+  val doSemanticChecks: Tree => Unit =
+    checkForStatefulAccessedFromUdf
 
   /**
-   * Checks that .bag() is not called from the UDF of an updateWith* on the same stateful that is being updated.
-   */
-  def checkForStatefulAccessedFromUdf(tree: Tree): Unit = traverse(tree) {
-    case q"${updateWith @ Select(id: Ident, _)}[$_](${udf: Tree})"
-      if api.updateWith.contains(updateWith.symbol) &&
-        id.hasTerm && udf.closure(id.term) =>
+    * Checks that `.bag()` is not called from the UDF of an `updateWith*` on the same stateful that
+    * is being updated.
+    */
+  def checkForStatefulAccessedFromUdf(tree: Tree) = traverse(tree) {
+    case q"${updateWith @ Select(id: Ident, _)}[..$_](...${args: List[List[Tree]]})"
+      if api.updateWith.contains(updateWith.symbol) && id.hasTerm =>
+        val UDFs = if (args.size > 1) args(1) else args.head
+        if (UDFs exists { _.closure(id.term) })
           throw new StatefulAccessedFromUdfException()
   }
 }
