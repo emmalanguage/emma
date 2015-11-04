@@ -72,14 +72,15 @@ package object testutil {
   }
 
   /**
-   * Lazy initialization & execution wrapper for a piece of code that depends on a runtime object.
+   * Execution wrapper for a piece of code that depends on a runtime object.
+   * Closes the runtime session after the code is executed.
    *
-   * @param rt A call-by-name parameter for the runtime to use.
+   * @param rt The runtime to use.
    * @param f  A lambda that depends on the initialized runtime and returns a value of type T.
    * @tparam T The type of the returned value.
    * @return The result of `f` applied to the initialized `rt`.
    */
-  def withRuntime[T](rt: => runtime.Engine = runtime.default())(f: runtime.Engine => T): T =
+  def withRuntime[T](rt: runtime.Engine = runtime.default())(f: runtime.Engine => T): T =
     try f(rt) finally rt.closeSession()
 
   /** Syntax sugar for testing [[Algorithm]]s. */
