@@ -13,11 +13,11 @@ import org.scalatest.prop.PropertyChecks
 @RunWith(classOf[JUnitRunner])
 class FoldSpec extends FunSuite with Matchers with PropertyChecks {
 
-  val runtime = Native()
+  lazy val runtime = Native()
   val epsilon = 1e-9
 
   implicit override val generatorDrivenConfig =
-    PropertyCheckConfig(workers = 2)
+    PropertyCheckConfig(workers = Runtime.getRuntime.availableProcessors)
 
   test("reduceOption (sum)") {
     forAll { xs: Seq[Int] =>
