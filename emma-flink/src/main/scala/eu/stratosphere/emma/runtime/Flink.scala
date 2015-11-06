@@ -33,20 +33,20 @@ abstract class Flink(val host: String, val port: Int) extends Engine {
   val dataflowGenerator = new DataflowGenerator(dataflowCompiler, envSessionID)
 
   override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = {
-    addPlan(name, root)
+    constructExecutionPlanJson(name, root)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[A](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }
 
   override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = {
-    addPlan(name, root)
+    constructExecutionPlanJson(name, root)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     val expr = dataflowCompiler.execute[DataSet[A]](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
     DataBag(root.name, expr, expr.collect())
   }
 
   override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
-    addPlan(name, root)
+    constructExecutionPlanJson(name, root)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env) ++ closure ++ localInputs(root))
   }

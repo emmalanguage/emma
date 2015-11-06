@@ -30,20 +30,20 @@ abstract class Spark(val host: String, val port: Int) extends Engine {
   val dataflowGenerator = new DataflowGenerator(dataflowCompiler, envSessionID)
 
   override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = {
-    addPlan(name, root)
+    constructExecutionPlanJson(name, root)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[A](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
   }
 
   override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = {
-    addPlan(name, root)
+    constructExecutionPlanJson(name, root)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     val rdd = dataflowCompiler.execute[RDD[A]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
     DataBag(root.name, rdd, rdd.collect())
   }
 
   override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
-    addPlan(name, root)
+    constructExecutionPlanJson(name, root)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[RDD[A]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
   }

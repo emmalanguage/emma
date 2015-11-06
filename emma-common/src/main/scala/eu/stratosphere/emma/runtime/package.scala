@@ -92,24 +92,30 @@ package object runtime {
     }
 
     def buildJson(root:Combinator[_], name: String, parents: String): String = {
-      var nodeType = ""
-
-      var label = name
-
-      name match {
-        case "Read" => nodeType = "type:\"INPUT\", location:\""+root.asInstanceOf[Read[_]].location+"\", "
-        case "Write" => nodeType = "type:\"INPUT\", location:\""+root.asInstanceOf[Write[_]].location+"\", "
+      val json = name match {
+        case "Read" => s"""\"label\": \"$name\", type:\"INPUT\", location:\"${root.asInstanceOf[Read[_]].location}\""""
+        case "Write" => s"""\"label\": \"$name\", type:\"INPUT\", location:\"${root.asInstanceOf[Write[_]].location}\""""
         case "TempSource" => {
           val t = root.asInstanceOf[TempSource[_]]
           if (t.ref != null)
-            label = "TempSource ("+t.ref.asInstanceOf[ParallelizedDataBag[_, _]].name+")"
+            s"""\"label\": \"TempSource (${t.ref.asInstanceOf[ParallelizedDataBag[_, _]].name})\""""
+          else
+            s"""\"label\":\"TempSource\""""
         }
-        case _ =>
+        case _ => s"""\"label\":\"$name\""""
       }
-      s"""{\"id\":\"${System.identityHashCode(root)}\", \"label\":\"$label\", $nodeType\"parents\":[$parents]}"""
+
+      s"""{\"id\":\"${System.identityHashCode(root)}\", $json, \"parents\":[$parents]}"""
     }
 
-    def addPlan(name:String, root:Combinator[_]) = {
+    /**
+     * Constructs only an execution plan if a blocking latch is set in the runtime. If no latch is defined,
+     * no action is performed. If a latch is defined, a JSON object is created and the execution is blocked until
+     * the latch is released by the runtime.
+     * @param name of the plan
+     * @param root execution graph root
+     */
+    def constructExecutionPlanJson(name:String, root:Combinator[_]) = {
       if (blockingLatch != null) {
         executionPlanJson.push(new Plan(name, getExecutionPlan(root)))
         blockingLatch.await()
