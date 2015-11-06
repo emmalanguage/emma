@@ -7,7 +7,7 @@ import eu.stratosphere.emma.codegen.utils.DataflowCompiler
 import eu.stratosphere.emma.ir
 import eu.stratosphere.emma.macros.RuntimeUtil
 import eu.stratosphere.emma.runtime.logger
-import eu.stratosphere.emma.util.Counter
+
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 
@@ -38,7 +38,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
       logger.info("Generating dataflow code for '{}'", dataFlowName)
       // initialize UDF store to be passed around implicitly during dataFlow
       // opCode assembly
-      implicit val closure = new DataFlowClosure()
+      implicit val closure = new DataFlowClosure
       // generate dataFlow operator assembly code
       val opCode = generateOpCode(root)
 
@@ -77,7 +77,6 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
       // assemble dataFlow
       q"""object ${TermName(dataFlowName)} {
         import _root_.org.apache.spark.SparkContext._
-        ..${closure.UDFs.result().toSeq}
         $runMethod
       }""" ->> compile
     })
@@ -122,12 +121,9 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
             s"Cannot create Spark CsvInputFormat for non-product type ${typeOf(op.tag)}")
 
         val line = $"line$$spark"
-        val name = closure nextTermName "converter"
-        closure.UDFs += q"""val $name =
-          _root_.eu.stratosphere.emma.api.`package`.materializeCSVConverters[$tpe]"""
-
         q"""$sc.textFile($path).map({ ($line: ${typeOf[String]}) =>
-          $name.fromCSV($line.split(${fmt.separator}))
+          _root_.eu.stratosphere.emma.api.`package`.materializeCSVConverters[$tpe]
+            .fromCSV($line.split(${fmt.separator}))
         })"""
 
       case fmt: TextInputFormat[tp] =>
@@ -168,9 +164,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     val tpe = typeOf(op.tag).precise
     // add a dedicated closure variable to pass the input param
     val param = TermName(op.ref.asInstanceOf[ParallelizedDataBag[B, RDD[B]]].name)
-    closure.closureParams +=
-      param -> tq"_root_.eu.stratosphere.emma.api.DataBag[$tpe]"
-
+    closure.closureParams += param -> tq"_root_.eu.stratosphere.emma.api.DataBag[$tpe]"
     q"""$param.asInstanceOf[_root_.eu.stratosphere.emma.api.ParallelizedDataBag[$tpe,
       _root_.org.apache.spark.rdd.RDD[$tpe]]].repr"""
   }
@@ -183,19 +177,19 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
       (implicit closure: DataFlowClosure): Tree = {
     val tpe = typeOf(op.tag).precise
     // add a dedicated closure variable to pass the scattered term
-    val input = closure.nextTermName()
+    val input = $"input$$spark"
     closure.localInputParams += input -> tq"_root_.scala.Seq[$tpe]"
     q"$sc.parallelize($input)"
   }
 
-  private def opCode[OT, IT](op: ir.Map[OT, IT])
+  private def opCode[B, A](op: ir.Map[B, A])
       (implicit closure: DataFlowClosure): Tree = {
     // assemble input fragment
     val xs = generateOpCode(op.xs)
     // generate fn UDF
     val mapFun = parseCheck(op.f)
     val mapUDF = ir.UDF(mapFun, mapFun.preciseType, tb)
-    closure.closureParams ++= mapUDF.closure map { p => p.name -> p.tpt }
+    closure.capture(mapUDF)
     // assemble dataFlow fragment
     q"$xs.map(${mapUDF.func})"
   }
@@ -207,7 +201,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     // generate fn UDF
     val fmFun = parseCheck(op.f)
     val fmUDF = ir.UDF(fmFun, fmFun.preciseType, tb)
-    closure.closureParams ++= fmUDF.closure map { p => p.name -> p.tpt }
+    closure.capture(fmUDF)
     q"$xs.flatMap((..${fmUDF.params}) => ${fmUDF.body}.fetch())"
   }
 
@@ -219,7 +213,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     // generate fn UDF
     val predicate = parseCheck(op.p)
     val fUDF = ir.UDF(predicate, predicate.preciseType, tb)
-    closure.closureParams ++= fUDF.closure map { p => p.name -> p.tpt }
+    closure.capture(fUDF)
     // assemble dataflow fragment
     q"$xs.filter(${fUDF.func})"
   }
@@ -236,12 +230,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     val xs = generateOpCode(op.xs)
     val ys = generateOpCode(op.ys)
     val $(left, right) = $("xs$spark", "ys$spark")
-    // generate kx UDF
-    closure.closureParams ++= kxUDF.closure map { p => p.name -> p.tpt }
-    // generate ky UDF
-    closure.closureParams ++= kyUDF.closure map { p => p.name -> p.tpt }
-    // generate join UDF
-    closure.closureParams ++= fUDF.closure map { p => p.name -> p.tpt }
+    closure.capture(kxUDF, kyUDF, fUDF)
     // assemble dataflow fragment
     q"""val $left = $xs.map({ (..${kxUDF.params}) =>
         (${kxUDF.body}, ${kxUDF.params.head.name})
@@ -275,9 +264,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     val union = parseCheck(op.union)
     val unionUDF = ir.UDF(union, union.preciseType, tb)
     // add closure parameters
-    closure.closureParams ++= emptyUDF.closure map { p => p.name -> p.tpt }
-    closure.closureParams ++= sngUDF.closure map { p => p.name -> p.tpt }
-    closure.closureParams ++= unionUDF.closure map { p => p.name -> p.tpt }
+    closure.capture(emptyUDF, sngUDF, unionUDF)
     // assemble dataFlow fragment
     q"""$xs.map(${sngUDF.func})
       .aggregate(${empty.as[Function].body})(${unionUDF.func}, ${unionUDF.func})"""
@@ -297,10 +284,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     val union = parseCheck(op.union)
     val unionUDF = ir.UDF(union, union.preciseType, tb)
     // add closure parameters
-    closure.closureParams ++= keyUDF.closure map { p => p.name -> p.tpt }
-    closure.closureParams ++= emptyUDF.closure map { p => p.name -> p.tpt }
-    closure.closureParams ++= sngUDF.closure map { p => p.name -> p.tpt }
-    closure.closureParams ++= unionUDF.closure map { p => p.name -> p.tpt }
+    closure.capture(keyUDF, emptyUDF, sngUDF, unionUDF)
     // assemble dataFlow fragment
     val aliases = for {
       (alias, origin) <- sngUDF.params zip keyUDF.params
@@ -346,7 +330,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
     // generate key UDF
     val keyFun = parseCheck(op.key)
     val keyUDF = ir.UDF(keyFun, keyFun.preciseType, tb)
-    closure.closureParams ++= keyUDF.closure map { p => p.name -> p.tpt }
+    closure.capture(keyUDF)
     // assemble dataFlow fragment
     q"""$xs.groupBy(${keyUDF.func}).map({ case ($key, $iterator) =>
         _root_.eu.stratosphere.emma.api.Group($key,
@@ -354,81 +338,94 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
       })"""
   }
 
-  private def opCode[A, K](op: ir.StatefulCreate[A, K])
-                          (implicit closure: DataFlowClosure): Tree = {
-    val stateType = typeOf(op.tagS).dealias
-    val keyType = typeOf(op.tagK).dealias
+  private def opCode[S, K](op: ir.StatefulCreate[S, K])
+      (implicit closure: DataFlowClosure): Tree = {
+    val S = typeOf(op.tagS).precise
+    val K = typeOf(op.tagK).precise
     // assemble input fragment
     val xs = generateOpCode(op.xs)
-    q"""
-      import _root_.eu.stratosphere.emma.runtime.spark.StatefulBackend
-      new StatefulBackend[$stateType,$keyType]($sc,$xs)"""
+    q"new _root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[$S, $K]($sc, $xs)"
   }
 
   private def opCode[S, K](op: ir.StatefulFetch[S, K])
-                          (implicit closure: DataFlowClosure): Tree = {
-    closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
+      (implicit closure: DataFlowClosure): Tree = {
+    val S = typeOf(op.tag).precise
+    val K = typeOf(op.tagK).precise
+    closure.closureParams +=
+      TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).precise)
+
     q"""${TermName(op.name)}
-        .asInstanceOf[_root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[${typeOf(op.tag).dealias}, ${typeOf(op.tagK).dealias}]]
-        .fetchToStateLess()"""
+      .asInstanceOf[_root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[$S, $K]]
+      .fetchToStateLess()"""
   }
 
-  private def opCode[S, K, U, O](op: ir.UpdateWithZero[S, K, O])
-                                (implicit closure: DataFlowClosure): Tree = {
-    closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
-    val updFn  = parseCheck(op.udf)
-    val updUdf = ir.UDF(updFn, updFn.tpe, tb)
-    val updUdfOutTpe = typeOf(op.tag).dealias
+  private def opCode[S, K, U, R](op: ir.UpdateWithZero[S, K, R])
+      (implicit closure: DataFlowClosure): Tree = {
+    val S = typeOf(op.tag).precise
+    val K = typeOf(op.tagK).precise
+    val R = typeOf(op.tag).precise
+    closure.closureParams +=
+      TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).precise)
+
+    val updFun = parseCheck(op.udf)
+    val updUDF = ir.UDF(updFun, updFun.tpe, tb)
+    closure.capture(updUDF)
+
     q"""${TermName(op.name)}
-        .asInstanceOf[_root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[${typeOf(op.tagS).dealias}, ${typeOf(op.tagK).dealias}]]
-        .updateWithZero[$updUdfOutTpe](${updUdf.func})"""
+      .asInstanceOf[_root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[$S, $K]]
+      .updateWithZero[$R](${updUDF.func})"""
   }
 
-  private def opCode[S, K, U, O](op: ir.UpdateWithOne[S, K, U, O])
-                                (implicit closure: DataFlowClosure): Tree = {
-    closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
-    val us = generateOpCode(op.updates)
-    val keyFn     = parseCheck(op.updateKeySel)
-    val keyUdf    = ir.UDF(keyFn, keyFn.tpe, tb)
-    val updateFn  = parseCheck(op.udf)
-    val updateUdf = ir.UDF(updateFn, updateFn.tpe, tb)
-    val updTpe = typeOf(op.tagU).dealias
-    val updUdfOutTpe = typeOf(op.tag).dealias
-    q"""${TermName(op.name)}.
-        asInstanceOf[_root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[${typeOf(op.tagS).dealias}, ${typeOf(op.tagK).dealias}]]
-        .updateWithOne[$updTpe, $updUdfOutTpe]($us, ${keyUdf.func}, ${updateUdf.func})"""
+  private def opCode[S, K, U, R](op: ir.UpdateWithOne[S, K, U, R])
+      (implicit closure: DataFlowClosure): Tree = {
+    val S = typeOf(op.tag).precise
+    val K = typeOf(op.tagK).precise
+    val U = typeOf(op.tagU).precise
+    val R = typeOf(op.tag).precise
+    closure.closureParams +=
+      TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
+
+    val updates = generateOpCode(op.updates)
+    val keyFun = parseCheck(op.updateKeySel)
+    val keyUDF = ir.UDF(keyFun, keyFun.tpe, tb)
+    val updFun = parseCheck(op.udf)
+    val updUDF = ir.UDF(updFun, updFun.tpe, tb)
+    closure.capture(keyUDF, updUDF)
+
+    q"""${TermName(op.name)}
+      .asInstanceOf[_root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[$S, $K]]
+      .updateWithOne[$U, $R]($updates, ${keyUDF.func}, ${updUDF.func})"""
   }
 
-  private def opCode[S, K, U, O](op: ir.UpdateWithMany[S, K, U, O])
-                                (implicit closure: DataFlowClosure): Tree = {
-    closure.closureParams += TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
-    val us = generateOpCode(op.updates)
-    val keyFn     = parseCheck(op.updateKeySel)
-    val keyUdf    = ir.UDF(keyFn, keyFn.tpe, tb)
-    val updateFn  = parseCheck(op.udf)
-    val updateUdf = ir.UDF(updateFn, updateFn.tpe, tb)
-    val updTpe = typeOf(op.tagU).dealias
-    val updUdfOutTpe = typeOf(op.tag).dealias
+  private def opCode[S, K, U, R](op: ir.UpdateWithMany[S, K, U, R])
+      (implicit closure: DataFlowClosure): Tree = {
+    val S = typeOf(op.tag).precise
+    val K = typeOf(op.tagK).precise
+    val U = typeOf(op.tagU).precise
+    val R = typeOf(op.tag).precise
+    closure.closureParams +=
+      TermName(op.name) -> TypeTree(typeOf(op.tagAbstractStatefulBackend).dealias)
+
+    val updates = generateOpCode(op.updates)
+    val keyFun = parseCheck(op.updateKeySel)
+    val keyUDF = ir.UDF(keyFun, keyFun.tpe, tb)
+    val updFun = parseCheck(op.udf)
+    val updUDF = ir.UDF(updFun, updFun.tpe, tb)
+    closure.capture(keyUDF, updUDF)
+
     q"""${TermName(op.name)}
-        .asInstanceOf[_root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[${typeOf(op.tagS).dealias}, ${typeOf(op.tagK).dealias}]]
-        .updateWithMany[$updTpe, $updUdfOutTpe]($us, ${keyUdf.func}, ${updateUdf.func})"""
+      .asInstanceOf[_root_.eu.stratosphere.emma.runtime.spark.StatefulBackend[$S, $K]]
+      .updateWithMany[$U, $R]($updates, ${keyUDF.func}, ${updUDF.func})"""
   }
 
   // --------------------------------------------------------------------------
   // Auxiliary structures
   // --------------------------------------------------------------------------
 
-  private final class DataFlowClosure(
-      udfCounter: Counter = new Counter(),
-      scatterCounter: Counter = new Counter()) {
+  private final class DataFlowClosure {
     val closureParams = mutable.Map.empty[TermName, Tree]
     val localInputParams = mutable.Map.empty[TermName, Tree]
-    val UDFs = mutable.ArrayBuilder.make[Tree]
-
-    def nextUDFName(prefix: String = "UDF") =
-      TypeName(f"Emma$prefix${udfCounter.advance.get}%05d")
-
-    def nextTermName(prefix: String = "scatter") =
-      TermName(f"$prefix${scatterCounter.advance.get}%05d")
+    def capture(fs: ir.UDF*) = for (f <- fs)
+      closureParams ++= f.closure map { p => p.name -> p.tpt }
   }
 }
