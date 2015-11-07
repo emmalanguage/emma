@@ -38,26 +38,12 @@ object Algorithm {
       // runtime type
       parser.addArgument(s"--${Command.KEY_RT_TYPE}")
         .`type`[String](classOf[String])
-        .choices("native", "flink-local", "flink-remote", "spark-local", "spark-remote")
+        .choices("native", "flink", "spark")
         .dest(Command.KEY_RT_TYPE)
         .metavar("RT")
         .help(s"runtime type (default ${Command.KEY_RT_TYPE_DEFAULT}})")
-      // runtime host
-      parser.addArgument(s"--${Command.KEY_RT_HOST}")
-        .`type`[String](classOf[String])
-        .dest(Command.KEY_RT_HOST)
-        .metavar("HOST")
-        .help(s"runtime host (default ${Command.KEY_RT_HOST_DEFAULT}})")
-      // runtime port
-      parser.addArgument(s"--${Command.KEY_RT_PORT}")
-        .`type`[Integer](classOf[Integer])
-        .dest(Command.KEY_RT_PORT)
-        .metavar("PORT")
-        .help(s"runtime port (default ${Command.KEY_RT_PORT_DEFAULT}})")
 
       parser.setDefault(Command.KEY_RT_TYPE, Command.KEY_RT_TYPE_DEFAULT)
-      parser.setDefault(Command.KEY_RT_HOST, Command.KEY_RT_HOST_DEFAULT)
-      parser.setDefault(Command.KEY_RT_PORT, Command.KEY_RT_PORT_DEFAULT)
     }
 
     /**
@@ -68,10 +54,7 @@ object Algorithm {
      */
     def instantiate(ns: Namespace): Algorithm = {
       // instantiate runtime
-      val rt = runtime.factory(
-        ns.get[String](Command.KEY_RT_TYPE),
-        ns.get[String](Command.KEY_RT_HOST),
-        ns.get[Int](Command.KEY_RT_PORT))
+      val rt = runtime.factory(ns.get[String](Command.KEY_RT_TYPE))
       // instantiate and return algorithm
       val constructor = m.runtimeClass.getConstructor(classOf[Namespace], classOf[runtime.Engine])
       constructor.newInstance(ns, rt).asInstanceOf[Algorithm]

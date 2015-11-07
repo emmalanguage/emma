@@ -1,7 +1,7 @@
 package eu.stratosphere.emma.codegen.spark
 
 import eu.stratosphere.emma.api._
-import eu.stratosphere.emma.runtime.{Spark, SparkLocal}
+import eu.stratosphere.emma.runtime.Spark
 import eu.stratosphere.emma.testutil._
 
 import org.junit.runner.RunWith
@@ -11,7 +11,7 @@ import org.scalatest._
 @RunWith(classOf[JUnitRunner])
 class SparkRuntimeCompatibilityTest extends FlatSpec with Matchers {
   val cores = Runtime.getRuntime.availableProcessors
-  def engine = SparkLocal(s"local[$cores]", 6123)
+  def engine = new Spark()
 
   "DataBag" should "be usable within a UDF closure" in withRuntime(engine) { case spark: Spark =>
     val ofInterest = DataBag(1 to 10) map (_ * 10)

@@ -9,8 +9,6 @@ object Job {
       val db = for (x <- DataBag(Seq(1, 2, 3))) yield x
     }
 
-    alg.run(runtime.Native())
-    //alg.run(runtime.factory("flink-local", "localhost", 6123))
-    //alg.run(runtime.factory("spark-local", "local[*]", 6123))
+    alg.run(runtime.factory("native") // one of "native", "flink", or "spark"
   }
 }

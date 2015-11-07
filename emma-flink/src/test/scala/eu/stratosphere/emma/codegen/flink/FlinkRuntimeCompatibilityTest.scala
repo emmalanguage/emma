@@ -1,7 +1,7 @@
 package eu.stratosphere.emma.codegen.flink
 
 import eu.stratosphere.emma.api._
-import eu.stratosphere.emma.runtime.{Flink, FlinkLocal}
+import eu.stratosphere.emma.runtime.Flink
 import eu.stratosphere.emma.testutil._
 
 import org.apache.flink.api.common.functions.RichFilterFunction
@@ -13,7 +13,7 @@ import org.scalatest._
 @RunWith(classOf[JUnitRunner])
 class FlinkRuntimeCompatibilityTest extends FlatSpec with Matchers {
   import org.apache.flink.api.scala._
-  def engine = FlinkLocal("localhost", 6123)
+  def engine = new Flink()
 
   "DataBag" should "be usable within a UDF closure" in withRuntime(engine) { case flink: Flink =>
     val ofInterest = DataBag(1 to 10) map (_ * 10)

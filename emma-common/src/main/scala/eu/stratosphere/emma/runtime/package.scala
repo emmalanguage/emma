@@ -8,6 +8,7 @@ import eu.stratosphere.emma.ir._
 import org.slf4j.LoggerFactory
 import eu.stratosphere.emma.api.model.Identity
 
+import scala.reflect.runtime.{universe=>ru}
 import scala.reflect.runtime.universe._
 
 
@@ -69,7 +70,7 @@ package object runtime {
 
   case class Native() extends Engine {
 
-    logger.info(s"Initializing native execution environment")
+    logger.info(s"Initializing Native execution environment")
 
     sys addShutdownHook {
       closeSession()
@@ -97,44 +98,52 @@ package object runtime {
   }
 
   def default(): Engine = {
-    val backend = System.getProperty("emma.execution.backend", "")
-    val execmod = System.getProperty("emma.execution.mode", "")
-
-    require(backend.isEmpty || ("native" :: "flink" :: "spark" :: Nil contains backend),
-      "Unsupported execution backend (native|flink|spark).")
-    require((backend.isEmpty || backend == "native") || ("local" :: "remote" :: Nil contains execmod),
-      "Unsupported execution mode (local|remote).")
-
-    backend match {
-      case "flink" => execmod match {
-        case "local" /* */ => factory("flink-local", "localhost", 6123)
-        case "remote" /**/ => factory("flink-remote", "localhost", 6123)
+    val flinkIsAvailable = try {
+        Class.forName("org.apache.flink.api.scala.ExecutionEnvironment", false, getClass.getClassLoader); true
+      } catch {
+        case _: Throwable => false
       }
-      case "spark" => execmod match {
-        case "local" /* */ => factory("spark-local", s"local[${Runtime.getRuntime.availableProcessors()}]", 7077)
-        case "remote" /**/ => factory("spark-remote", "localhost", 7077)
+
+    val sparkIsAvailable = try {
+        Class.forName("org.apache.spark.SparkContext", false, getClass.getClassLoader); true
+      } catch {
+        case _: Throwable => false
       }
-      case _ => Native() // run native version of the code
-    }
+
+    if (flinkIsAvailable)
+      factory("flink")
+    else if (sparkIsAvailable)
+      factory("spark")
+    else
+      Native()
   }
 
-  def factory(name: String, host: String, port: Int) = {
+  def factory(name: String) = {
+    // compute class name
+    val engineClazzName = s"${getClass.getPackage.getName}.${name.capitalize}"
     // reflect engine
-    val engineClazz = rootMirror.staticClass(s"${getClass.getPackage.getName}.${toCamelCase(name)}")
-    val engineClazzMirror = rootMirror.reflectClass(engineClazz)
+    val mirror = ru.runtimeMirror(getClass.getClassLoader)
+    val engineClazz = mirror.staticClass(engineClazzName)
+    val engineClazzMirror = mirror.reflectClass(engineClazz)
     val engineClassType = appliedType(engineClazz)
 
-    if (!(engineClassType <:< typeOf[Engine]))
-      throw new RuntimeException(s"Cannot instantiate engine '${getClass.getPackage.getName}.${toCamelCase(name)}' (should implement Engine)")
+    require(engineClassType <:< typeOf[Engine], s"Cannot instantiate engine '$engineClazzName' (should implement Engine)")
+    require(!engineClazz.isAbstract, s"Cannot instantiate engine '$engineClazzName' (cannot be abtract)")
 
-    if (engineClazz.isAbstract)
-      throw new RuntimeException(s"Cannot instantiate engine '${getClass.getPackage.getName}.${toCamelCase(name)}' (cannot be abtract)")
+    // find suitable constructor
+    val constructor = engineClassType.decl(termNames.CONSTRUCTOR)
+      .alternatives.collect {
+        case c: MethodSymbol if !c.isPrivate => c -> c.typeSignature
+      }
+      .collectFirst {
+        case (c, mt @ MethodType(Nil, _)) => c.asMethod
+      }
+
+    require(constructor.isDefined, s"Cannot find nullary constructor for engine '$engineClazzName'")
 
     // reflect engine constructor
-    val constructorMirror = engineClazzMirror.reflectConstructor(engineClassType.decl(termNames.CONSTRUCTOR).asMethod)
-    // instantiate engine
-    constructorMirror(host, port).asInstanceOf[Engine]
+    val constructorMirror = engineClazzMirror.reflectConstructor(constructor.get)
+    // instantiate the Engine's default constructor
+    constructorMirror().asInstanceOf[Engine]
   }
-
-  def toCamelCase(name: String) = name.split('-').map(x => x.capitalize).mkString("")
 }

@@ -211,10 +211,6 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
-                    <systemPropertyVariables>
-                        <emma.execution.backend>${execution.backend}</emma.execution.backend>
-                        <emma.execution.mode>local</emma.execution.mode>
-                    </systemPropertyVariables>
                     <includes>
                         <include>**/*.class</include>
                     </includes>
