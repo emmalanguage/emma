@@ -45,8 +45,6 @@ class SparseMatrixVectorMultiplicationTest extends FunSuite with Matchers with B
 
           val actual = (0l to vecMap.keySet.max map vecMap).toVector
           val expect = mat **(vec, exp)
-          println(s"actual: $actual")
-          println(s"expect: $expect")
           actual zip expect forall {
             case (x, y) => (x / y - 1).abs < eps
           }
