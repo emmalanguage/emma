@@ -425,6 +425,8 @@
                         <include>**/*Spec.java</include>
                         <include>**/*Suite.java</include>
                     </includes>
+                    <!-- Memory for the Travis build -->
+                    <argLine>-Xms1024m -Xmx2048m</argLine>
                 </configuration>
             </plugin>
         </plugins>

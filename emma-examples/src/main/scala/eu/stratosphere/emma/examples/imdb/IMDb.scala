@@ -30,7 +30,7 @@ class IMDb(input: String, output: String, rt: Engine) extends Algorithm(rt) {
       if a*a + b*b == c*c
     } yield (a, b, c)
 
-    for { (a, b, c) <- pythagoras.fetch() }
+    for { (a, b, c) <- pythagoras.top(10) }
       println(s"$a^2 + $b^2 == $c^2")
 
     // read in some real data
