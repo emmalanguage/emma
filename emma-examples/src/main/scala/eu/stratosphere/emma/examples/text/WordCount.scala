@@ -38,18 +38,19 @@ class WordCount(inPath: String, outPath: String, rt: Engine) extends Algorithm(r
 
     val alg =  emma.parallelize {
 
-      //read the text file, producing a databag
-      val text = read(inPath, new TextInputFormat[String]('\n'))
+      // read the input files and split them into lowercased words
+      val words = for {
+        line <- read(inPath, new TextInputFormat[String]('\n'))
+        word <- DataBag[String](line.toLowerCase.split("\\W+"))
+      } yield word
 
-      //split the text into lowercased words and group them
-      val wordGroups = text.flatMap(s => DataBag[String](s.toLowerCase.split("\\W+")))
-        .groupBy(x => x)
+      // group the words by their identity and count the occurrence of each word
+      val counts = for {
+        group <- words.groupBy[String] { identity }
+      } yield (group.key, group.values.count())
 
-      //iterate over all groups and output a {key,count} pair for each of them
-      val wc = for(grp <- wordGroups) yield (grp.key, grp.values.count())
-
-      //write the results into a CSV file
-      write(outPath,new CSVOutputFormat[(String, Long)])(wc)
+      // write the results into a CSV file
+      write(outPath,new CSVOutputFormat[(String, Long)])(counts)
     }
 
     alg.run(rt)
