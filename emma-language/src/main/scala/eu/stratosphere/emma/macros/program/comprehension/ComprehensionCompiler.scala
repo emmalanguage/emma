@@ -54,9 +54,6 @@ private[emma] trait ComprehensionCompiler
         case _: combinator.Write          => TermName("executeWrite")
         case _: combinator.Fold           => TermName("executeFold")
         case _: combinator.StatefulCreate => TermName("executeStatefulCreate")
-        case _: combinator.UpdateWithZero => TermName("updateWithZero")
-        case _: combinator.UpdateWithOne  => TermName("updateWithOne")
-        case _: combinator.UpdateWithMany => TermName("updateWithMany")
         case _                            => TermName("executeTempSink")
       }
 

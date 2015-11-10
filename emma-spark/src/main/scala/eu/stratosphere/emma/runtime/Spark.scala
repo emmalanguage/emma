@@ -55,21 +55,6 @@ class Spark(val sc: SparkContext) extends Engine {
     dataflowCompiler.execute[AbstractStatefulBackend[A, K]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
   }
 
-  override def executeUpdateWithZero[S: TypeTag, K: TypeTag, B: TypeTag]
-    (root: UpdateWithZero[S, K, B], name: String, closure: Any*): DataBag[B] = {
-    ??? // Not supported yet
-  }
-
-  override def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
-    (root: UpdateWithOne[S, K, A, B], name: String, closure: Any*): DataBag[B] = {
-    ??? // Not supported yet
-  }
-
-  override def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
-    (root: UpdateWithMany[S, K, A, B], name: String, closure: Any*): DataBag[B] = {
-    ??? // Not supported yet
-  }
-
   override protected def doCloseSession() = {
     super.doCloseSession()
     sc.stop()
