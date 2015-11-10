@@ -32,7 +32,6 @@ class BeliefPropagationTest extends FlatSpec with Matchers with BeforeAndAfter {
   }
 
   "Belief Propagation" should "calculate unknown marginal probabilities" in withRuntime() { rt =>
-    val rtName = sys.props.getOrElse("emma.execution.backend", "").toLowerCase
     new BeliefPropagation(
       path, s"$path/marginals", epsilon, iterations, rt).run()
 

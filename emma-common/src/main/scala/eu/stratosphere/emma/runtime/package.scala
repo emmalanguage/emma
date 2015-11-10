@@ -51,15 +51,6 @@ package object runtime {
     def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag]
       (root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K]
 
-    def executeUpdateWithZero[S: TypeTag, K: TypeTag, B: TypeTag]
-      (root: UpdateWithZero[S, K, B], name: String, closure: Any*): DataBag[B]
-
-    def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
-      (root: UpdateWithOne[S, K, A, B], name: String, closure: Any*): DataBag[B]
-
-    def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
-      (root: UpdateWithMany[S, K, A, B], name: String, closure: Any*): DataBag[B]
-
     final def closeSession() = if (!closed) {
       doCloseSession()
       closed = true
@@ -86,15 +77,6 @@ package object runtime {
 
     override def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag]
       (root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K] = ???
-
-    override def executeUpdateWithZero[S: TypeTag, K: TypeTag, B: TypeTag]
-      (root: UpdateWithZero[S, K, B], name: String, closure: Any*): DataBag[B] = ???
-
-    override def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
-      (root: UpdateWithOne[S, K, A, B], name: String, closure: Any*): DataBag[B] = ???
-
-    override def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
-      (root: UpdateWithMany[S, K, A, B], name: String, closure: Any*): DataBag[B] = ???
   }
 
   def default(): Engine = {

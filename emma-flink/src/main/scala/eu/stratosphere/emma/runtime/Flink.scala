@@ -56,28 +56,4 @@ class Flink(val env: ExecutionEnvironment) extends Engine {
     resMgr.gc()
     res
   }
-
-  override def executeUpdateWithZero[S: TypeTag, K: TypeTag, B: TypeTag]
-      (root: UpdateWithZero[S, K, B], name: String, closure: Any*): DataBag[B] = {
-    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    val expr = dataflowCompiler.execute[DataSet[B]](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
-    resMgr.gc()
-    DataBag(root.name, expr, expr.collect())
-  }
-
-  override def executeUpdateWithOne[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
-      (root: UpdateWithOne[S, K, A, B], name: String, closure: Any*): DataBag[B] = {
-    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    val expr = dataflowCompiler.execute[DataSet[B]](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
-    resMgr.gc()
-    DataBag(root.name, expr, expr.collect())
-  }
-
-  override def executeUpdateWithMany[S <: Identity[K]: TypeTag, K: TypeTag, A: TypeTag, B: TypeTag]
-      (root: UpdateWithMany[S, K, A, B], name: String, closure: Any*): DataBag[B] = {
-    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    val expr = dataflowCompiler.execute[DataSet[B]](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
-    resMgr.gc()
-    DataBag(root.name, expr, expr.collect())
-  }
 }

@@ -13,7 +13,6 @@ class ConnectedComponentsTest extends FlatSpec with Matchers {
   import ConnectedComponents.Schema._
 
   "Connected components" should "find all connected sub-graphs" in withRuntime() { rt =>
-    val rtName = sys.props.getOrElse("emma.execution.backend", "").toLowerCase
     val actual = new ConnectedComponents("", "", rt).algorithm.run(rt)
     val expected =
       Component(1, 7) ::
