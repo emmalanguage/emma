@@ -26,7 +26,7 @@ package object runtime {
 
   private[emma] val logger = Logger(LoggerFactory.getLogger(classOf[Engine]))
 
-  abstract class Engine {
+  abstract class Engine extends EmmaDemoInterface{
 
     val envSessionID = UUID.randomUUID()
 
