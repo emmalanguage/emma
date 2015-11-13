@@ -8,72 +8,6 @@ import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 import org.apache.spark.util.Vector
 
-object KMeans {
-
-  object Command {
-    // argument names
-    val k = "K"
-    val epsilon = "epsilon"
-    val iterations = "iterations"
-    val input = "input-file"
-    val output = "output-file"
-  }
-
-  class Command extends Algorithm.Command[KMeans] {
-
-    // algorithm names
-    override def name = "k-means"
-
-    override def description = "K-Means Clustering"
-
-    override def setup(parser: Subparser) = {
-      // basic setup
-      super.setup(parser)
-
-      // add arguments
-      parser.addArgument(Command.k)
-        .`type`[Integer](classOf[Integer])
-        .dest(Command.k)
-        .metavar("K")
-        .help("number of clusters")
-
-      parser.addArgument(Command.epsilon)
-        .`type`[JDouble](classOf[JDouble])
-        .dest(Command.epsilon)
-        .metavar("EPSILON")
-        .help("termination threshold")
-
-      parser.addArgument(Command.iterations)
-        .`type`[Integer](classOf[Integer])
-        .dest(Command.iterations)
-        .metavar("ITERATIONS")
-        .help("number of repeated iterations")
-
-      parser.addArgument(Command.input)
-        .`type`[String](classOf[String])
-        .dest(Command.input)
-        .metavar("INPUT")
-        .help("input file")
-
-      parser.addArgument(Command.output)
-        .`type`[String](classOf[String])
-        .dest(Command.output)
-        .metavar("OUTPUT")
-        .help("output file")
-    }
-  }
-
-  object Schema {
-    type PID = Long
-
-    case class Point(@id id: PID, pos: Vector) extends Identity[PID] {
-      def identity = id
-    }
-
-    case class Solution(point: Point, cluster: PID, sqrDiff: Double = 0)
-  }
-}
-
 class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: String, rt: Engine)
     extends Algorithm(rt) {
 
@@ -157,3 +91,70 @@ class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: St
 
   def run() = algorithm.run(rt)
 }
+
+object KMeans {
+
+  object Command {
+    // argument names
+    val k = "K"
+    val epsilon = "epsilon"
+    val iterations = "iterations"
+    val input = "input-file"
+    val output = "output-file"
+  }
+
+  class Command extends Algorithm.Command[KMeans] {
+
+    // algorithm names
+    override def name = "k-means"
+
+    override def description = "K-Means Clustering"
+
+    override def setup(parser: Subparser) = {
+      // basic setup
+      super.setup(parser)
+
+      // add arguments
+      parser.addArgument(Command.k)
+        .`type`[Integer](classOf[Integer])
+        .dest(Command.k)
+        .metavar("K")
+        .help("number of clusters")
+
+      parser.addArgument(Command.epsilon)
+        .`type`[JDouble](classOf[JDouble])
+        .dest(Command.epsilon)
+        .metavar("EPSILON")
+        .help("termination threshold")
+
+      parser.addArgument(Command.iterations)
+        .`type`[Integer](classOf[Integer])
+        .dest(Command.iterations)
+        .metavar("ITERATIONS")
+        .help("number of repeated iterations")
+
+      parser.addArgument(Command.input)
+        .`type`[String](classOf[String])
+        .dest(Command.input)
+        .metavar("INPUT")
+        .help("input file")
+
+      parser.addArgument(Command.output)
+        .`type`[String](classOf[String])
+        .dest(Command.output)
+        .metavar("OUTPUT")
+        .help("output file")
+    }
+  }
+
+  object Schema {
+    type PID = Long
+
+    case class Point(@id id: PID, pos: Vector) extends Identity[PID] {
+      def identity = id
+    }
+
+    case class Solution(point: Point, cluster: PID, sqrDiff: Double = 0)
+  }
+}
+

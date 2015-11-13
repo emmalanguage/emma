@@ -6,71 +6,6 @@ import eu.stratosphere.emma.examples.Algorithm
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
-object ConnectedComponents {
-
-  object Command {
-    // argument names
-    val KEY_INPUT = "input"
-    val KEY_OUTPUT = "output"
-  }
-
-  class Command extends Algorithm.Command[ConnectedComponents] {
-
-    // algorithm names
-    override def name = "cc"
-
-    override def description = "Compute the connected components of a graph"
-
-    override def setup(parser: Subparser) = {
-      // basic setup
-      super.setup(parser)
-
-      // add arguments
-      parser.addArgument(Command.KEY_INPUT)
-        .`type`[String](classOf[String])
-        .dest(Command.KEY_INPUT)
-        .metavar("GRAPH")
-        .help("graph file")
-      parser.addArgument(Command.KEY_OUTPUT)
-        .`type`[String](classOf[String])
-        .dest(Command.KEY_OUTPUT)
-        .metavar("OUTPUT")
-        .help("components file ")
-    }
-  }
-
-  object Schema {
-
-    type VID = Long
-
-    case class Vertex(@id id: VID, neighborIDs: DataBag[VID]) extends Identity[VID] {
-      def identity = id
-    }
-
-    case class Message(receiver: VID, component: VID) {}
-
-    case class Update(@id id: VID, component: VID) extends Identity[VID] {
-      def identity = id
-    }
-
-    case class State(
-        @id vertexID:  VID,
-        /*
-        //nested version
-        var neighbors: DataBag[VID],
-        */
-        var component: VID) extends Identity[VID] {
-      def identity = vertexID
-    }
-
-    case class Component(@id vertexID: VID, component: VID) extends Identity[VID] {
-      def identity = vertexID
-    }
-
-  }
-
-}
-
 class ConnectedComponents(inputUrl: String, outputUrl: String, rt: Engine) extends Algorithm(rt) {
 
   import eu.stratosphere.emma.examples.graphs.ConnectedComponents.Schema._
@@ -156,5 +91,70 @@ class ConnectedComponents(inputUrl: String, outputUrl: String, rt: Engine) exten
 
     components.fetch()
   }
+}
+
+object ConnectedComponents {
+
+  object Command {
+    // argument names
+    val KEY_INPUT = "input"
+    val KEY_OUTPUT = "output"
+  }
+
+  class Command extends Algorithm.Command[ConnectedComponents] {
+
+    // algorithm names
+    override def name = "cc"
+
+    override def description = "Compute the connected components of a graph"
+
+    override def setup(parser: Subparser) = {
+      // basic setup
+      super.setup(parser)
+
+      // add arguments
+      parser.addArgument(Command.KEY_INPUT)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_INPUT)
+        .metavar("GRAPH")
+        .help("graph file")
+      parser.addArgument(Command.KEY_OUTPUT)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_OUTPUT)
+        .metavar("OUTPUT")
+        .help("components file ")
+    }
+  }
+
+  object Schema {
+
+    type VID = Long
+
+    case class Vertex(@id id: VID, neighborIDs: DataBag[VID]) extends Identity[VID] {
+      def identity = id
+    }
+
+    case class Message(receiver: VID, component: VID) {}
+
+    case class Update(@id id: VID, component: VID) extends Identity[VID] {
+      def identity = id
+    }
+
+    case class State(
+        @id vertexID:  VID,
+        /*
+        //nested version
+        var neighbors: DataBag[VID],
+        */
+        var component: VID) extends Identity[VID] {
+      def identity = vertexID
+    }
+
+    case class Component(@id vertexID: VID, component: VID) extends Identity[VID] {
+      def identity = vertexID
+    }
+
+  }
+
 }
 

@@ -21,56 +21,6 @@ import scala.language.postfixOps
  * there are cycles in the game graph.
  **/
 
-object TicTacToe {
-
-  case class GameState(whites: Int, blacks: Int) // Bitsets for white and black stones (9 bits in each, as the board is 3x3)
-
-  sealed trait ValueCount
-    sealed trait Value extends ValueCount // values are understood from the point of view of the player to move
-      case class Win(depth: Int) extends Value
-      case class Loss(depth: Int) extends Value
-    case class Count(count: Int) extends ValueCount // the number of successor states still unprocessed
-    case class Undefined() extends ValueCount
-
-  case class VertexWithValue(@id id: GameState, var vc: ValueCount)
-    extends Identity[GameState] { def identity = id }
-
-  case class Msg(target: GameState, value: Value)
-  case class Update(state: GameState, value: Value, decCount: Int)
-
-
-  //todo: why doesn't this work with parallelize if I move the following two functions to the TicTacToe class?
-  // Move generation
-  def parentStates(s: GameState) = {
-    for {
-      i <- 0 until 9 // go through all board positions
-      if (s.blacks & (1<<i)) != 0 // blacks has bit i set
-    } yield GameState(s.blacks & ~(1<<i), s.whites) // remove the stone at position i, and do state negation, by switching whites and blacks
-  }
-
-  // Decides whether the given state is an end-state. If it is, then it returns Win or Loss in 0 moves. If it is not, then it returns Undefined.
-  def initEndState(state: GameState) = {
-
-    def contains(s: Int, mask: Int) = (s & mask) == mask
-
-    def hasThreeInARow(s: Int) = {
-      import BinaryLiterals._
-
-      contains(s, b"111 000 000") || contains(s, b"000 111 000") || contains(s, b"000 000 111") || // rows
-        contains(s, b"100 100 100") || contains(s, b"010 010 010") || contains(s, b"001 001 001") || // columns
-        contains(s, b"100 010 001") || contains(s, b"001 010 100") // diagonals
-    }
-
-    if(hasThreeInARow(state.whites)) // White won
-      Win(0)
-    else if(hasThreeInARow(state.blacks)) // Black won
-      Loss(0)
-    else Undefined() // not end-state
-  }
-
-}
-
-
 class TicTacToe(rt: Engine = eu.stratosphere.emma.runtime.default())
     extends Algorithm(rt) {
 
@@ -180,3 +130,53 @@ class TicTacToe(rt: Engine = eu.stratosphere.emma.runtime.default())
     solution.bag()
   }
 }
+
+object TicTacToe {
+
+  case class GameState(whites: Int, blacks: Int) // Bitsets for white and black stones (9 bits in each, as the board is 3x3)
+
+  sealed trait ValueCount
+    sealed trait Value extends ValueCount // values are understood from the point of view of the player to move
+      case class Win(depth: Int) extends Value
+      case class Loss(depth: Int) extends Value
+    case class Count(count: Int) extends ValueCount // the number of successor states still unprocessed
+    case class Undefined() extends ValueCount
+
+  case class VertexWithValue(@id id: GameState, var vc: ValueCount)
+    extends Identity[GameState] { def identity = id }
+
+  case class Msg(target: GameState, value: Value)
+  case class Update(state: GameState, value: Value, decCount: Int)
+
+
+  //todo: why doesn't this work with parallelize if I move the following two functions to the TicTacToe class?
+  // Move generation
+  def parentStates(s: GameState) = {
+    for {
+      i <- 0 until 9 // go through all board positions
+      if (s.blacks & (1<<i)) != 0 // blacks has bit i set
+    } yield GameState(s.blacks & ~(1<<i), s.whites) // remove the stone at position i, and do state negation, by switching whites and blacks
+  }
+
+  // Decides whether the given state is an end-state. If it is, then it returns Win or Loss in 0 moves. If it is not, then it returns Undefined.
+  def initEndState(state: GameState) = {
+
+    def contains(s: Int, mask: Int) = (s & mask) == mask
+
+    def hasThreeInARow(s: Int) = {
+      import BinaryLiterals._
+
+      contains(s, b"111 000 000") || contains(s, b"000 111 000") || contains(s, b"000 000 111") || // rows
+        contains(s, b"100 100 100") || contains(s, b"010 010 010") || contains(s, b"001 001 001") || // columns
+        contains(s, b"100 010 001") || contains(s, b"001 010 100") // diagonals
+    }
+
+    if(hasThreeInARow(state.whites)) // White won
+      Win(0)
+    else if(hasThreeInARow(state.blacks)) // Black won
+      Loss(0)
+    else Undefined() // not end-state
+  }
+
+}
+

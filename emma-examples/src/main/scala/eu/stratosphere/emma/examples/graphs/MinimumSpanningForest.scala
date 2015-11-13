@@ -5,58 +5,6 @@ import eu.stratosphere.emma.examples.Algorithm
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
-object MinimumSpanningForest {
-
-  object Command {
-    // argument names
-    val KEY_INPUT = "input"
-    val KEY_OUTPUT = "output"
-  }
-
-  class Command extends Algorithm.Command[MinimumSpanningForest] {
-
-    // algorithm names
-    override def name = "sssp"
-
-    override def description = "parallel version of Boruvka's MSF algorithm"
-
-    override def setup(parser: Subparser) = {
-      // basic setup
-      super.setup(parser)
-
-      // add arguments
-      parser.addArgument(Command.KEY_INPUT)
-        .`type`[String](classOf[String])
-        .dest(Command.KEY_INPUT)
-        .metavar("EDGES")
-        .help("edges file (\"<src>TAB<dst>\" format expected")
-      parser.addArgument(Command.KEY_OUTPUT)
-        .`type`[String](classOf[String])
-        .dest(Command.KEY_OUTPUT)
-        .metavar("OUTPUT")
-        .help("output file (minimum spanning forest)")
-    }
-  }
-
-  // --------------------------------------------------------------------------------------------
-  // ----------------------------------- tpch -------------------------------------------------
-  // --------------------------------------------------------------------------------------------
-
-  object Schema {
-    val Unknown = 0.toShort
-    val Supervertex = 1.toShort
-    val PointsAtSupervertex = 2.toShort
-
-    case class SupervertexFindingState[VT](var tpe: Short, var pointer: VT)
-
-    case class QuestionMsg[VT](receiver: VT, sender: VT) {}
-
-    case class AnswerMsg[VT](receiver: VT, pointer: VT, pointerIsSupervertex: Boolean) {}
-
-  }
-
-}
-
 class MinimumSpanningForest(inputUrl: String, outputUrl: String, rt: Engine) extends Algorithm(rt) {
 
   import MinimumSpanningForest.Schema._
@@ -161,5 +109,57 @@ class MinimumSpanningForest(inputUrl: String, outputUrl: String, rt: Engine) ext
 
     //algorithm.run(rt)
   }
+}
+
+object MinimumSpanningForest {
+
+  object Command {
+    // argument names
+    val KEY_INPUT = "input"
+    val KEY_OUTPUT = "output"
+  }
+
+  class Command extends Algorithm.Command[MinimumSpanningForest] {
+
+    // algorithm names
+    override def name = "sssp"
+
+    override def description = "parallel version of Boruvka's MSF algorithm"
+
+    override def setup(parser: Subparser) = {
+      // basic setup
+      super.setup(parser)
+
+      // add arguments
+      parser.addArgument(Command.KEY_INPUT)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_INPUT)
+        .metavar("EDGES")
+        .help("edges file (\"<src>TAB<dst>\" format expected")
+      parser.addArgument(Command.KEY_OUTPUT)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_OUTPUT)
+        .metavar("OUTPUT")
+        .help("output file (minimum spanning forest)")
+    }
+  }
+
+  // --------------------------------------------------------------------------------------------
+  // ----------------------------------- tpch -------------------------------------------------
+  // --------------------------------------------------------------------------------------------
+
+  object Schema {
+    val Unknown = 0.toShort
+    val Supervertex = 1.toShort
+    val PointsAtSupervertex = 2.toShort
+
+    case class SupervertexFindingState[VT](var tpe: Short, var pointer: VT)
+
+    case class QuestionMsg[VT](receiver: VT, sender: VT) {}
+
+    case class AnswerMsg[VT](receiver: VT, pointer: VT, pointerIsSupervertex: Boolean) {}
+
+  }
+
 }
 

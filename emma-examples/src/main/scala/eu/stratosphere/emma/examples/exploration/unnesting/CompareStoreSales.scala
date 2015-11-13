@@ -8,6 +8,42 @@ import eu.stratosphere.emma.examples.Algorithm
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
+class CompareStoreSales(salesLUrl: String, salesRUrl: String, outputUrl: String, rt: Engine) extends Algorithm(rt) {
+
+  def this(ns: Namespace, rt: Engine) = this(
+    ns.get[String](CompareStoreSales.Command.KEY_SALES_L),
+    ns.get[String](CompareStoreSales.Command.KEY_SALES_R),
+    ns.get[String](CompareStoreSales.Command.KEY_OUTPUT),
+    rt)
+
+
+  def run() = {
+
+    import eu.stratosphere.emma.examples.exploration.unnesting.CompareStoreSales.Schema._
+
+    val algorithm = /* workflow */ {
+
+      val salesL = read(salesLUrl, new CSVInputFormat[SalesHistory])
+      val salesR = read(salesRUrl, new CSVInputFormat[SalesHistory])
+
+      val comparison = for (l <- salesL.groupBy(x => GroupKey(x.store, x.date));
+                            r <- salesR.groupBy(x => GroupKey(x.store, x.date));
+                            if l.key.store.area == r.key.store.area && l.key.date == r.key.date) yield {
+
+        val balance = for (entryL <- l.values;
+                           entryR <- r.values;
+                           if entryL.product == entryR.product) yield entryL.count * entryL.product.price - entryR.count * entryR.product.price
+
+        SalesBalance(l.key.store, r.key.store, l.key.date, balance.sum())
+      }
+
+      write(outputUrl, new CSVOutputFormat[SalesBalance])(comparison)
+    }
+
+    // algorithm.run(rt)
+  }
+}
+
 object CompareStoreSales {
 
   object Command {
@@ -65,41 +101,5 @@ object CompareStoreSales {
 
   }
 
-}
-
-class CompareStoreSales(salesLUrl: String, salesRUrl: String, outputUrl: String, rt: Engine) extends Algorithm(rt) {
-
-  def this(ns: Namespace, rt: Engine) = this(
-    ns.get[String](CompareStoreSales.Command.KEY_SALES_L),
-    ns.get[String](CompareStoreSales.Command.KEY_SALES_R),
-    ns.get[String](CompareStoreSales.Command.KEY_OUTPUT),
-    rt)
-
-
-  def run() = {
-
-    import eu.stratosphere.emma.examples.exploration.unnesting.CompareStoreSales.Schema._
-
-    val algorithm = /* workflow */ {
-
-      val salesL = read(salesLUrl, new CSVInputFormat[SalesHistory])
-      val salesR = read(salesRUrl, new CSVInputFormat[SalesHistory])
-
-      val comparison = for (l <- salesL.groupBy(x => GroupKey(x.store, x.date));
-                            r <- salesR.groupBy(x => GroupKey(x.store, x.date));
-                            if l.key.store.area == r.key.store.area && l.key.date == r.key.date) yield {
-
-        val balance = for (entryL <- l.values;
-                           entryR <- r.values;
-                           if entryL.product == entryR.product) yield entryL.count * entryL.product.price - entryR.count * entryR.product.price
-
-        SalesBalance(l.key.store, r.key.store, l.key.date, balance.sum())
-      }
-
-      write(outputUrl, new CSVOutputFormat[SalesBalance])(comparison)
-    }
-
-    // algorithm.run(rt)
-  }
 }
 

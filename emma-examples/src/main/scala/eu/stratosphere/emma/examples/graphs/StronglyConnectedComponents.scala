@@ -6,79 +6,6 @@ import eu.stratosphere.emma.examples.Algorithm
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
-object StronglyConnectedComponents {
-
-  object Command {
-    // argument names
-    val KEY_INPUT = "input"
-    val KEY_OUTPUT = "output"
-  }
-
-  class Command extends Algorithm.Command[StronglyConnectedComponents] {
-
-    // algorithm names
-    override def name = "scc"
-
-    override def description = "Compute the strongly connected components of a graph"
-
-    override def setup(parser: Subparser) = {
-      // basic setup
-      super.setup(parser)
-
-      // add arguments
-      parser.addArgument(Command.KEY_INPUT)
-        .`type`[String](classOf[String])
-        .dest(Command.KEY_INPUT)
-        .metavar("GRAPH")
-        .help("graph file")
-      parser.addArgument(Command.KEY_OUTPUT)
-        .`type`[String](classOf[String])
-        .dest(Command.KEY_OUTPUT)
-        .metavar("OUTPUT")
-        .help("components file ")
-    }
-  }
-
-  // --------------------------------------------------------------------------------------------
-  // ----------------------------------- tpch -------------------------------------------------
-  // --------------------------------------------------------------------------------------------
-
-  object Schema {
-
-    type VID = Char
-
-    case class Vertex(@id id: VID, neighborIDs: DataBag[VID]) extends Identity[VID] {
-      def identity = id
-    }
-
-    case class Message(receiver: VID, payload: VID) {}
-
-    case class UpdateComponent(@id id: VID, component: VID) extends Identity[VID] {
-      def identity = id
-    }
-
-    case class UpdateNeighbors(@id id: VID, neighbors: DataBag[VID]) extends Identity[VID] {
-      def identity = id
-    }
-
-    case class State(
-          @id vertexID:   VID,
-          var neighbors:  DataBag[VID],
-          var neighborsT: DataBag[VID],
-          var component:  VID,
-          var active:     Boolean = true)
-        extends Identity[VID] {
-      def identity = vertexID
-    }
-
-    case class Component(@id vertexID: VID, component: VID) extends Identity[VID] {
-      def identity = vertexID
-    }
-
-  }
-
-}
-
 class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: Engine) extends Algorithm(rt) {
 
   def this(ns: Namespace, rt: Engine) = this(
@@ -248,5 +175,78 @@ class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: Engin
 
     //algorithm.run(rt)
   }
+}
+
+object StronglyConnectedComponents {
+
+  object Command {
+    // argument names
+    val KEY_INPUT = "input"
+    val KEY_OUTPUT = "output"
+  }
+
+  class Command extends Algorithm.Command[StronglyConnectedComponents] {
+
+    // algorithm names
+    override def name = "scc"
+
+    override def description = "Compute the strongly connected components of a graph"
+
+    override def setup(parser: Subparser) = {
+      // basic setup
+      super.setup(parser)
+
+      // add arguments
+      parser.addArgument(Command.KEY_INPUT)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_INPUT)
+        .metavar("GRAPH")
+        .help("graph file")
+      parser.addArgument(Command.KEY_OUTPUT)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_OUTPUT)
+        .metavar("OUTPUT")
+        .help("components file ")
+    }
+  }
+
+  // --------------------------------------------------------------------------------------------
+  // ----------------------------------- tpch -------------------------------------------------
+  // --------------------------------------------------------------------------------------------
+
+  object Schema {
+
+    type VID = Char
+
+    case class Vertex(@id id: VID, neighborIDs: DataBag[VID]) extends Identity[VID] {
+      def identity = id
+    }
+
+    case class Message(receiver: VID, payload: VID) {}
+
+    case class UpdateComponent(@id id: VID, component: VID) extends Identity[VID] {
+      def identity = id
+    }
+
+    case class UpdateNeighbors(@id id: VID, neighbors: DataBag[VID]) extends Identity[VID] {
+      def identity = id
+    }
+
+    case class State(
+          @id vertexID:   VID,
+          var neighbors:  DataBag[VID],
+          var neighborsT: DataBag[VID],
+          var component:  VID,
+          var active:     Boolean = true)
+        extends Identity[VID] {
+      def identity = vertexID
+    }
+
+    case class Component(@id vertexID: VID, component: VID) extends Identity[VID] {
+      def identity = vertexID
+    }
+
+  }
+
 }
 
