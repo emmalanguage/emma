@@ -361,7 +361,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
 
   private def opCode[S, K, U, R](op: ir.UpdateWithZero[S, K, R])
       (implicit closure: DataFlowClosure): Tree = {
-    val S = typeOf(op.tag).precise
+    val S = typeOf(op.tagS).precise
     val K = typeOf(op.tagK).precise
     val R = typeOf(op.tag).precise
     closure.closureParams +=
@@ -378,7 +378,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
 
   private def opCode[S, K, U, R](op: ir.UpdateWithOne[S, K, U, R])
       (implicit closure: DataFlowClosure): Tree = {
-    val S = typeOf(op.tag).precise
+    val S = typeOf(op.tagS).precise
     val K = typeOf(op.tagK).precise
     val U = typeOf(op.tagU).precise
     val R = typeOf(op.tag).precise
@@ -399,7 +399,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
 
   private def opCode[S, K, U, R](op: ir.UpdateWithMany[S, K, U, R])
       (implicit closure: DataFlowClosure): Tree = {
-    val S = typeOf(op.tag).precise
+    val S = typeOf(op.tagS).precise
     val K = typeOf(op.tagK).precise
     val U = typeOf(op.tagU).precise
     val R = typeOf(op.tag).precise
