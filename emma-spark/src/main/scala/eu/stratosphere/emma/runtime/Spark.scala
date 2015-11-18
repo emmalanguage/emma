@@ -35,22 +35,26 @@ class Spark(val sc: SparkContext) extends Engine {
   val dataflowGenerator = new DataflowGenerator(dataflowCompiler, envSessionID)
 
   override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = {
+    for (p <- plugins) p.handleLogicalPlan(root, name, closure)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[A](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
   }
 
   override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = {
+    for (p <- plugins) p.handleLogicalPlan(root, name, closure)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     val rdd = dataflowCompiler.execute[RDD[A]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
     DataBag(root.name, rdd, rdd.collect())
   }
 
   override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
+    for (p <- plugins) p.handleLogicalPlan(root, name, closure)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[RDD[A]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
   }
 
   override def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag](root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K] = {
+    for (p <- plugins) p.handleLogicalPlan(root, name, closure)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[AbstractStatefulBackend[A, K]](dataflowSymbol, Array[Any](sc) ++ closure ++ localInputs(root))
   }
