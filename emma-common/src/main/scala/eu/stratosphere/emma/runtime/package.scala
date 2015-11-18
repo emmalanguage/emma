@@ -26,11 +26,13 @@ package object runtime {
 
   private[emma] val logger = Logger(LoggerFactory.getLogger(classOf[Engine]))
 
-  abstract class Engine extends EmmaDemoInterface{
+  abstract class Engine {
 
     val envSessionID = UUID.randomUUID()
 
     private var closed = false
+
+    var plugins: Seq[RuntimePlugin] = Seq.empty
 
     // log program run header
     {
@@ -100,7 +102,7 @@ package object runtime {
       Native()
   }
 
-  def factory(name: String) = {
+  def factory(name: String, plugins: Seq[RuntimePlugin] = Seq.empty) = {
     // compute class name
     val engineClazzName = s"${getClass.getPackage.getName}.${name.capitalize}"
     // reflect engine
@@ -126,6 +128,8 @@ package object runtime {
     // reflect engine constructor
     val constructorMirror = engineClazzMirror.reflectConstructor(constructor.get)
     // instantiate the Engine's default constructor
-    constructorMirror().asInstanceOf[Engine]
+    val engine = constructorMirror().asInstanceOf[Engine]
+    engine.plugins = plugins
+    engine
   }
 }
