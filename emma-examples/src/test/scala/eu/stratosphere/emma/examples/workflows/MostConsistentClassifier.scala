@@ -1,99 +1,106 @@
 package eu.stratosphere.emma.examples.workflows
 
+import breeze.linalg._
+
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
 import eu.stratosphere.emma.runtime.Engine
 
+import scala.collection.mutable
+import scala.util.hashing.MurmurHash3
+
 /**
   * Workflow from the original Emma paper (with slight modifications).
   *
-  * From a list of given classifiers, finds the one which most consistently marks emails originating from a
-  * blacklisted server as spam.
-  *
-  * Prints out the
+  * From a list of given classifiers, finds the one which most consistently marks emails originating
+  * from a blacklisted server as spam.
   *
   * @param input Input path
   * @param rt The runtime to use as parallel co-processor
   */
-class MostConsistentClassifier(
-      input: String,
-      rt:    Engine)
+class MostConsistentClassifier(input: String, numClassifiers: Int, rt: Engine)
     extends Algorithm(rt) {
-  import MostConsistentClassifier.{Classifier, Email, Model, Server, Features}
 
-  def extractFeatures(email: String): Features = {
-    email // TODO
-  }
+  import MostConsistentClassifier._
 
   val algorithm = emma.parallelize {
     // read and pre-process input data
     // 1) emails
-    val emails = for {
-      email <- read(s"$input/emails", new CSVInputFormat[Email])
-    } yield email -> extractFeatures(email.text)
+    val emails = read(s"$input/emails", new CSVInputFormat[Email])
+
+    // term frequency
+    val tf = for (email <- emails)
+      yield email -> featureHash(wordCount(email.content).mapValues { _.toDouble })
+
     // 2) blacklisted servers
     val blacklist = for {
       server <- read(s"$input/servers", new CSVInputFormat[Server])
       if server.isBlacklisted
     } yield server
+
     // 3) spam classifiers
-    val spamClassifiers = for {
-      (a, b) <- Seq((0.5, 0.5), (0.43, 32.0), (0.23, 79.0))
-    } yield Classifier(Model(a, b))
+    val classifiers = for (model <- 1 to numClassifiers) yield {
+      val features = read(s"$input/classifier-$model", new CSVInputFormat[(String, Double)])
+      Classifier(model, featureHash(features.fetch()))
+    }
 
     // for each different classifier
-    val classifiersWithHits = for (classifier <- spamClassifiers) yield {
-      // find out emails classified as spam
+    val modelsWithPrecision = for (classifier <- classifiers) yield {
       val spam = for {
-        (email, features) <- emails
-        if classifier predict features // TODO
+        (email, features) <- tf
+        if classifier.predict(features)
       } yield email
 
       // spam emails coming from a blacklisted server are considered consistent
       val consistent = for {
         email <- spam
-        if blacklist exists (_.ip == email.ip)
+        if blacklist.exists { _.ip == email.ip }
       } yield email
 
       // calculate the classification precision with respect to the blacklist
-      val precision = consistent.count() / (spam.count() * 1.0)
-
-      // output the
-      classifier -> precision
+      val precision = spam.count() / consistent.count().toDouble
+      classifier.model -> precision
     }
 
-    // find the most consistent classifier
-    val (Classifier(m), p) = classifiersWithHits maxBy { case (_, p) => p }
-    println(
-      s"""
-         |Most consistent classifier found:
-         | - model     = $m
-         | - precision = $p
-       """.stripMargin)
+    // find the most consistent model
+    modelsWithPrecision.maxBy { case (_, p) => p }
   }
 
-  def run() = algorithm run rt
+  def run() = algorithm.run(rt)
 }
 
 object MostConsistentClassifier {
 
-  type Features = String
+  type IP = Int
+  type Model = Long
+  type FeatureVector = SparseVector[Double]
 
-  case class Email(
-    ip:             Int,
-    text:           String
-  )
-
-  case class Server(
-    ip:             Int,
-    isBlacklisted:  Boolean
-  )
-
-  case class Classifier(model: Model) {
-    def predict(features: Features) = false // TODO
+  case class Email(ip: IP, content: String)
+  case class Server(ip: IP, isBlacklisted: Boolean)
+  case class Classifier(model: Model, weights: FeatureVector) {
+    def predict(features: FeatureVector): Boolean =
+      (features.dot(weights): Double) > 0.5
   }
 
-  case class Model(
-    a: Double,
-    b: Double)
+  val stopWords = Set("the", "i", "a", "an", "at", "are", "am", "for", "and", "or", "is", "there",
+    "it", "this", "that", "on", "was", "by", "of", "to", "in", "to", "message", "not", "be", "with",
+    "you", "have", "as", "can")
+
+  def wordCount(text: String, minLength: Int = 3): Map[String, Int] =
+    text.split(' ').toVector
+      .map { _.replaceAll("""\W+""", "").toLowerCase }
+      .filter { _.length >= minLength }
+      .filterNot(stopWords.contains)
+      .groupBy(identity)
+      .mapValues { _.length }
+
+  def featureHash(features: Iterable[(String, Double)], signed: Boolean = true): FeatureVector = {
+    val hashed = new mutable.HashMap[Int, Double].withDefaultValue(0)
+    for ((k, v) <- features) {
+      val h = MurmurHash3.stringHash(k)
+      hashed(h) = hashed(h) + { if (signed) h.signum * v else v }
+    }
+
+    SparseVector(hashed.size)(hashed.toSeq: _*)
+  }
 }
