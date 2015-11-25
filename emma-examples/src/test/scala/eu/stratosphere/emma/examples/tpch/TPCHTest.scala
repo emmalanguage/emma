@@ -137,5 +137,19 @@ class TPCHTest extends FunSuite with Matchers with BeforeAndAfterAll {
     compareBags(exp, res)
   })
 
+  test("Query10") (withRuntime() { rt =>
+
+    // execute with native and with tested environment
+    new Query10(inBase, outputPath("q10.tbl.native"), "1993-10-01", "1994-01-01", runtime.Native(), true).run()
+    new Query10(inBase, outputPath("q10.tbl.rt"), "1993-10-01", "1994-01-01", rt, true).run()
+
+    // compare the results
+    val exp = fromPath(outputPath("q10.tbl.native"))
+    val res = fromPath(outputPath("q10.tbl.rt"))
+
+    // assert that the result contains the expected values
+    compareBags(exp, res)
+  })
+
   def outputPath(suffix: String) = s"$outBase/$suffix"
 }
