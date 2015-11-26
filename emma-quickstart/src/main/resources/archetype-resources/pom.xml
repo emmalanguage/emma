@@ -49,6 +49,7 @@
 
         <!-- Testing -->
         <junit.version>4.11</junit.version>
+        <scalacheck.version>1.12.5</scalacheck.version>
         <scalatest.version>2.1.5</scalatest.version>
 
         <!-- Other dependencies -->
