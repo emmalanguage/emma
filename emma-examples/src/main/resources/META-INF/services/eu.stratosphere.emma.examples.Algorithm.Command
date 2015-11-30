@@ -9,3 +9,8 @@ eu.stratosphere.emma.examples.graphs.TriangleCount$Command
 eu.stratosphere.emma.examples.tpch.Query01$Command
 eu.stratosphere.emma.examples.tpch.Query03$Command
 eu.stratosphere.emma.examples.tpch.Query05$Command
+eu.stratosphere.emma.examples.tpch.Query06$Command
+eu.stratosphere.emma.examples.tpch.Query07$Command
+eu.stratosphere.emma.examples.tpch.Query08$Command
+eu.stratosphere.emma.examples.tpch.Query09$Command
+eu.stratosphere.emma.examples.tpch.Query10$Command
