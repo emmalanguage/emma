@@ -101,40 +101,7 @@ class Query10(inPath: String, outPath: String, begin_date: String, end_date: Str
 }
 
 
-object Query10 extends Algorithm.Command[Query10] {
-
-  // Algorithm key
-  override def name = "tpch-q10"
-
-  // Algorithm name
-  override def description = "TPC-H Query-10"
-
-  override def setup(parser: Subparser) = {
-    // basic setup
-    super.setup(parser)
-
-    // add arguments
-    parser.addArgument(Command.KEY_INPUT)
-      .`type`[String](classOf[String])
-      .dest(Command.KEY_INPUT)
-      .metavar("INPATH")
-      .help("base input file")
-    parser.addArgument(Command.KEY_OUTPUT)
-      .`type`[String](classOf[String])
-      .dest(Command.KEY_OUTPUT)
-      .metavar("OUTPUT")
-      .help("output file")
-    parser.addArgument(Command.KEY_BEGIN_DATE)
-      .`type`[String](classOf[String])
-      .dest(Command.KEY_BEGIN_DATE)
-      .metavar("BEGIN_DATE")
-      .help("begin date")
-    parser.addArgument(Command.KEY_END_DATE)
-      .`type`[String](classOf[String])
-      .dest(Command.KEY_END_DATE)
-      .metavar("END_DATE")
-      .help("end date")
-  }
+object Query10 {
 
   object Command {
     // argument names
@@ -142,6 +109,42 @@ object Query10 extends Algorithm.Command[Query10] {
     val KEY_OUTPUT = "output"
     val KEY_BEGIN_DATE = "begin_date"
     val KEY_END_DATE = "end_date"
+  }
+
+  class Command extends Algorithm.Command[Query10] {
+
+    // Algorithm key
+    override def name = "tpch-q10"
+
+    // Algorithm name
+    override def description = "TPC-H Query-10"
+
+    override def setup(parser: Subparser) = {
+      // basic setup
+      super.setup(parser)
+
+      // add arguments
+      parser.addArgument(Command.KEY_INPUT)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_INPUT)
+        .metavar("INPATH")
+        .help("base input file")
+      parser.addArgument(Command.KEY_OUTPUT)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_OUTPUT)
+        .metavar("OUTPUT")
+        .help("output file")
+      parser.addArgument(Command.KEY_BEGIN_DATE)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_BEGIN_DATE)
+        .metavar("BEGIN_DATE")
+        .help("begin date")
+      parser.addArgument(Command.KEY_END_DATE)
+        .`type`[String](classOf[String])
+        .dest(Command.KEY_END_DATE)
+        .metavar("END_DATE")
+        .help("end date")
+    }
   }
 
   object Schema {
