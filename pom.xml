@@ -319,6 +319,7 @@
                         <arg>-unchecked</arg>
                         <arg>-deprecation</arg>
                         <arg>-feature</arg>
+                        <arg>-Yrangepos</arg>
                     </args>
                 </configuration>
             </plugin>

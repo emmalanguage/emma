@@ -112,18 +112,22 @@ class WorkflowMacros(val c: blackbox.Context)
     // Final result assembly
     // ----------------------------------------------------------------------
 
-    q"""{ ..${for (term <- compView.terms) yield q"""
+    q"""{ ..${for (term <- compView.terms; id = term.id.toString) yield q"""
       println("~" * 80)
-      println("~ Comprehension `" + ${term.id.toString} + "` (original):")
+      println("~ Comprehension `" + $id + "` (source):")
+      println("~" * 80)
+      println(${term.src})
+      println("~" * 80)
+      println("~ Comprehension `" + $id + "` (original):")
       println("~" * 80)
       println(${term.comprehension.toString})
       println("~" * 80)
-      println("~ Comprehension `" + ${term.id.toString} + "` (combinatros):")
+      println("~ Comprehension `" + $id + "` (combinators):")
       println("~" * 80)
       println(${combine(term.comprehension).toString})
       println("~" * 80)
       println("")
-      println("~ Comprehension `" + ${term.id.toString} + "` (IR):")
+      println("~ Comprehension `" + $id + "` (IR):")
       println("~" * 80)
       println(${showCode(compile(optimized, cfGraph, compView))})
       println("~" * 80)
