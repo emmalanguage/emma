@@ -7,6 +7,7 @@ import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit.JUnitRunner
 
+import scala.reflect.ClassTag
 import scala.tools.reflect.ToolBoxError
 
 @RunWith(classOf[JUnitRunner])
@@ -92,8 +93,8 @@ class SemanticChecksTest extends FlatSpec with Matchers with RuntimeUtil {
     }
   }
 
-  def failWith[E <: Throwable : TypeTag] =
-    include (typeOf[E].typeSymbol.name.toString) compose { (tree: Tree) =>
+  def failWith[E <: Throwable : ClassTag] =
+    include (implicitly[ClassTag[E]].runtimeClass.getSimpleName) compose { (tree: Tree) =>
       intercept[ToolBoxError] { tb.typecheck(q"{ ..$imports; $tree }") }.getMessage
     }
 }

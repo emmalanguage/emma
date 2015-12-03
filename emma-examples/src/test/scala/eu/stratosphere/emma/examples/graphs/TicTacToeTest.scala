@@ -1,11 +1,13 @@
 package eu.stratosphere.emma.examples.graphs
 
-import eu.stratosphere.emma.testutil.withRuntime
+import eu.stratosphere.emma.testutil.{ExampleTest, withRuntime}
+import org.junit.experimental.categories.Category
 
 import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit.JUnitRunner
 
+@Category(Array(classOf[ExampleTest]))
 @RunWith(classOf[JUnitRunner])
 class TicTacToeTest extends FlatSpec with Matchers {
   import TicTacToe._
