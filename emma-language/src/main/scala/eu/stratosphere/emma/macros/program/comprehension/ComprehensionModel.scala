@@ -417,7 +417,40 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
   }
 
   case class ComprehendedTerm(id: TermName, term: Tree,
-    comprehension: ExpressionRoot, definition: Option[Tree])
+      comprehension: ExpressionRoot, definition: Option[Tree]) {
+
+    /**
+      * Get the [[Position]] of this [[ComprehendedTerm]] in the original source code.
+      *
+      * NOTE:
+      * - [[Position]]s use 1-based indexing.
+      * - To get a range [[Position]], the code has to be compiled with `-Yrangepos`.
+      * - In some corner cases (e.g. nested macro expansion), always returns a point.
+      *
+      * @return the [[Position]] in the original code
+      */
+    def pos: Position = term.pos
+
+    /**
+      * Get the original source code that resulted in this [[ComprehendedTerm]].
+      *
+      * NOTE:
+      * - To get the full source code, it has to be compiled with `-Yrangepos`.
+      * - Without `-Yrangepos` and in some corner cases, always returns one line.
+      * - Inlined code is currently not included.
+      *
+      * @return the original source code as a [[String]]
+      */
+    def src: String = {
+      val source = pos.source
+      val code = if (pos.isRange) {
+        val start = pos.start - 1
+        val length = pos.end - start
+        new String(source.content, start, length)
+      } else source.lineToString(pos.line - 1)
+      code.trim
+    }
+  }
 
   // --------------------------------------------------------------------------
   // Transformation & Traversal

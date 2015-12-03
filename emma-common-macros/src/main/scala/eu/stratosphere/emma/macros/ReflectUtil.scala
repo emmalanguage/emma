@@ -385,8 +385,10 @@ trait ReflectUtil {
       def apply(tpe: Type): Tree = withType(tpe)
       def apply[T: TypeTag]: Tree = withType[T]
       def apply(symbol: Symbol): Tree = withSym(symbol)
+      def apply(position: Position): Tree = at(position)
 
       def ^(symbol: Symbol): Tree = withSym(symbol)
+      def @@(position: Position): Tree = at(position)
 
       /** @return `true` if this [[Tree]] is annotated with a [[Type]], `false` otherwise */
       def hasType: Boolean = self.tpe != null && self.tpe != NoType
@@ -437,6 +439,14 @@ trait ReflectUtil {
         val tree = setSymbol(self, symbol)
         if (symbol.hasType) tree withType symbol.preciseType else tree
       }
+
+      /**
+        * Annotate this [[Tree]] with a specified [[Position]].
+        * @param position The [[Position]] to use for this [[Tree]]
+        * @return This [[Tree]] with its [[Position]] set
+        */
+      def at(position: Position): Tree =
+        atPos(position.makeTransparent)(self)
 
       /** Type-check this [[Tree]] if it doesn't have a [[Type]]. */
       def typeChecked: Tree = if (hasType) self else typeCheck(self)
