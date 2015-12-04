@@ -2,12 +2,14 @@ package eu.stratosphere.emma.examples.datamining.classification
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
-import eu.stratosphere.emma.runtime
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 import org.apache.spark.util.Vector
 
 /**
+ * Trains a Naive Bayes Classifier based on the input data set.
+ * It support two model Types: Bernoulli and Multinomial
+ * 
  * @author Behrouz Derakhshan
  */
 class NaiveBayes(training: String, lambda: Double, modelType: String, rt: Engine)
@@ -31,9 +33,9 @@ class NaiveBayes(training: String, lambda: Double, modelType: String, rt: Engine
     val dimension = data.find { _ => true }.get.vector.length
 
     val aggregated = for (group <- data.map(vec => (vec.label, 1L, vec.vector)).groupBy(_._1)) yield {
-      group.values.reduce(group.key, 0L, Vector.zeros(dimension)) {
-        (g1, g2) => (g1._1, g1._2 + g2._2, g1._3 + g2._3)
-      }
+      val count = group.values.count()
+      val sum = group.values.fold(Vector.zeros(dimension))(_._3, _ + _)
+      (group.key, count, sum)
     }
 
     val numDocuments = data.size()
@@ -54,7 +56,7 @@ class NaiveBayes(training: String, lambda: Double, modelType: String, rt: Engine
       val evidences = Vector.apply(itr._3.elements.map(e => math.log(e + lambda) - evidenceDenom))
       (labels, priors, evidences)
     }
-    print(model)
+    model
   }
 
 
@@ -109,10 +111,6 @@ object NaiveBayes {
 
     case class LabeledVector(label: Double, vector: Vector)
 
-  }
-
-  def main(args: Array[String]) {
-    new NaiveBayes("/home/behrouz/Documents/code/emma/emma-examples/data/vote.txt", 1.0, BERNOULI, runtime.Native()).run()
   }
 
 }

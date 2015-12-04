@@ -59,6 +59,35 @@ class Vector(val elements: Array[Double]) extends Serializable {
   }
 
   /**
+   * Check the equality of two vector members
+   * @param other
+   * @return
+   */
+  def ==(other: Vector): Boolean = {
+    if (length != other.length) {
+      false
+    } else {
+      var i = 0
+      var equal = true
+      while (i < length) {
+        if (this (i) != other(i)) {
+          equal = false
+        }
+        i += 1
+      }
+      equal
+    }
+
+  }
+
+  override def equals(other: Any)= other match {
+    case that: Vector => this == that
+    case _ => false
+  }
+
+
+
+  /**
    * return (this + plus) dot other, but without creating any intermediate storage
    * @param plus
    * @param other
