@@ -9,7 +9,7 @@ import org.apache.spark.util.Vector
 /**
  * Trains a Naive Bayes Classifier based on the input data set.
  * It support two model Types: Bernoulli and Multinomial
- * 
+ *
  * @author Behrouz Derakhshan
  */
 class NaiveBayes(training: String, lambda: Double, modelType: String, rt: Engine)
@@ -50,7 +50,6 @@ class NaiveBayes(training: String, lambda: Double, modelType: String, rt: Engine
         case MULTINOMIAL => math.log(itr._3.sum + lambda * dimension)
         case BERNOULI => math.log(itr._2 + 2.0 * lambda)
         case _ =>
-          // This should never happen.
           throw new UnknownError(s"Invalid modelType: $modelType.")
       }
       val evidences = Vector.apply(itr._3.elements.map(e => math.log(e + lambda) - evidenceDenom))
