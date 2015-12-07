@@ -6,8 +6,8 @@ package eu.stratosphere.emma.examples.datamining.classification
 
 import java.io.File
 
+import breeze.linalg.DenseVector
 import eu.stratosphere.emma.testutil._
-import org.apache.spark.util.Vector
 import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -38,7 +38,7 @@ class NaiveBayesTest extends FlatSpec with Matchers with BeforeAndAfter {
       .fromFile(s"$path/model.txt")
       .getLines().map { line =>
       val values = line.split(",").map(_.toDouble).toList
-      (values.head, values(1), new Vector(values.slice(2, values.size).toArray))
+      (values.head, values(1), new DenseVector[Double](values.slice(2, values.size).toArray))
     }.toSeq
 
     val solution = new NaiveBayes(s"$path/vote.csv", 1.0, "bernoulli", rt).algorithm.run(rt).fetch()

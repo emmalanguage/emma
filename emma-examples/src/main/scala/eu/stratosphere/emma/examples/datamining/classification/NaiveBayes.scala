@@ -1,10 +1,10 @@
 package eu.stratosphere.emma.examples.datamining.classification
 
+import breeze.linalg._
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
-import org.apache.spark.util.Vector
 
 /**
  * Trains a Naive Bayes Classifier based on the input data set.
@@ -25,10 +25,9 @@ class NaiveBayes(training: String, lambda: Double, modelType: String, rt: Engine
     rt)
 
   val algorithm = emma.parallelize {
-    
     val data = for (line <- read(training, new TextInputFormat[String]('\n'))) yield {
       val record = line.split(",").map(_.toDouble).toList
-      LabeledVector(record.head, new Vector(record.slice(1, record.size).toArray))
+      LabeledVector(record.head, new DenseVector[Double](record.slice(1, record.size).toArray))
     }
 
     // TODO: replace with take(n)
@@ -36,24 +35,23 @@ class NaiveBayes(training: String, lambda: Double, modelType: String, rt: Engine
 
     val aggregated = for (group <- data.groupBy(_.label)) yield {
       val count = group.values.count()
-      val sum = group.values.fold(Vector.zeros(dimension))(_.vector, _ + _)
+      val sum = group.values.fold(Vector.zeros[Double](dimension))(_.vector, _ + _)
       (group.key, count, sum)
     }
 
     val numDocuments = data.size()
     val numLabels = aggregated.length().toInt
-
     val priorDenom = Math.log(numDocuments + numLabels * lambda)
 
     val model = for {(label, count, vecSum ) <- aggregated} yield {
       val priors = math.log(count + lambda) - priorDenom
       val evidenceDenom = modelType match {
-        case MULTINOMIAL => math.log(vecSum.sum + lambda * dimension)
+        case MULTINOMIAL => math.log(sum(vecSum) + lambda * dimension)
         case BERNOULI => math.log(count + 2.0 * lambda)
         case _ =>
           throw new UnknownError(s"Invalid modelType: $modelType.")
       }
-      val evidences = Vector.apply(vecSum.elements.map(e => math.log(e + lambda) - evidenceDenom))
+      val evidences = vecSum.map(v => math.log(v + lambda) - evidenceDenom)
       (label, priors, evidences)
     }
     model
@@ -109,7 +107,7 @@ object NaiveBayes {
 
   object Schema {
 
-    case class LabeledVector(label: Double, vector: Vector)
+    case class LabeledVector(label: Double, vector: Vector[Double])
 
   }
 
