@@ -27,11 +27,27 @@ class MostConsistentClassifier(input: String, numClassifiers: Int, rt: Engine)
     // read and pre-process input data
     // 1) emails
     val emails = read(s"$input/emails", new CSVInputFormat[Email])
+    val numEmails = emails.count().toDouble
 
     // term frequency
     val tf = for {
-      email <- emails
-    } yield email -> featureHash(wordCount(email.content) mapValues { _.toDouble })
+      Email(id, _, content) <- emails
+      (term, count) <- DataBag(wordCount(content).toSeq)
+    } yield (id, term, 1 + math.log(count))
+
+    val idf = for (byTerm <- tf.groupBy { case (_, term, _) => term })
+      yield byTerm.key -> math.log(numEmails / byTerm.values.count())
+
+    val tfIdf = for {
+      (doc, term, freq) <- tf
+      (word, inverse) <- idf
+      if word == term
+    } yield (doc, term, freq * inverse)
+
+    val features = for (byDoc <- tfIdf.groupBy { case (doc, _, _) => doc }) yield {
+      val bag = byDoc.values.map { case (_, term, freq) => term -> freq }
+      byDoc.key -> featureHash(bag.fetch())
+    }
 
     // 2) blacklisted servers
     val blacklist = for {
@@ -41,22 +57,24 @@ class MostConsistentClassifier(input: String, numClassifiers: Int, rt: Engine)
 
     // 3) spam classifiers
     val classifiers = for (model <- 1 to numClassifiers) yield {
-      val features = read(s"$input/classifier-$model", new CSVInputFormat[(String, Double)])
-      Classifier(model, featureHash(features.fetch()))
+      val bag = read(s"$input/classifier-$model", new CSVInputFormat[(String, Double)])
+      Classifier(model, featureHash(bag.fetch()))
     }
 
     // for each different classifier
     val modelsWithPrecision = for (classifier <- classifiers) yield {
       val spam = for {
-        (email, features) <- tf
-        if classifier.predict(features)
-      } yield email
+        (doc, vec) <- features
+        if classifier.predict(vec)
+      } yield doc
 
       // spam emails coming from a blacklisted server are considered consistent
       val consistent = for {
-        email <- spam
-        if blacklist.exists { _.ip == email.ip }
-      } yield email
+        Email(id, ip, _) <- emails
+        doc <- spam
+        if id == doc
+        if blacklist.exists { _.ip == ip }
+      } yield doc
 
       // calculate the classification precision with respect to the blacklist
       val precision = spam.count() / consistent.count().toDouble
@@ -73,25 +91,23 @@ class MostConsistentClassifier(input: String, numClassifiers: Int, rt: Engine)
 object MostConsistentClassifier {
 
   type IP = Int
-  type Model = Long
+  type EmailId = String
+  type ModelId = Long
   type FeatureVector = SparseVector[Double]
 
-  case class Email(ip: IP, content: String)
-  case class Server(ip: IP, isBlacklisted: Boolean)
-  case class Classifier(model: Model, weights: FeatureVector) {
-    def predict(features: FeatureVector): Boolean =
-      (features dot weights: Double) > 0.5
-  }
+  val threshold = 0.5
 
-  val stopWords = Set("the", "i", "a", "an", "at", "are", "am", "for", "and", "or", "is", "there",
-    "it", "this", "that", "on", "was", "by", "of", "to", "in", "to", "message", "not", "be", "with",
-    "you", "have", "as", "can")
+  case class Email(id: EmailId, ip: IP, content: String)
+  case class Server(ip: IP, isBlacklisted: Boolean)
+  case class Classifier(model: ModelId, weights: FeatureVector) {
+    def predict(features: FeatureVector): Boolean =
+      (features dot weights: Double) > threshold
+  }
 
   def wordCount(text: String, minLength: Int = 3): Map[String, Int] =
     text.split(' ').toVector
-      .map { _.replaceAll("""\W+""", "").toLowerCase }
+      .map { _.replaceAll("""\P{Alnum}""", "").toLowerCase }
       .filter { _.length >= minLength }
-      .filterNot(stopWords.contains)
       .groupBy(identity)
       .mapValues { _.length }
 
@@ -101,6 +117,7 @@ object MostConsistentClassifier {
       val h = MurmurHash3.stringHash(k)
       hashed(h) = hashed(h) + { if (signed) h.signum * v else v }
     }
+
     SparseVector(hashed.size)(hashed.toSeq: _*)
   }
 }
