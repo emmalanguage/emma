@@ -25,16 +25,18 @@ class NaiveBayes(training: String, lambda: Double, modelType: String, rt: Engine
     rt)
 
   val algorithm = emma.parallelize {
+    
     val data = for (line <- read(training, new TextInputFormat[String]('\n'))) yield {
       val record = line.split(",").map(_.toDouble).toList
       LabeledVector(record.head, new Vector(record.slice(1, record.size).toArray))
     }
 
+    // TODO: replace with take(n)
     val dimension = data.find { _ => true }.get.vector.length
 
-    val aggregated = for (group <- data.map(vec => (vec.label, 1L, vec.vector)).groupBy(_._1)) yield {
+    val aggregated = for (group <- data.groupBy(_.label)) yield {
       val count = group.values.count()
-      val sum = group.values.fold(Vector.zeros(dimension))(_._3, _ + _)
+      val sum = group.values.fold(Vector.zeros(dimension))(_.vector, _ + _)
       (group.key, count, sum)
     }
 
@@ -43,17 +45,16 @@ class NaiveBayes(training: String, lambda: Double, modelType: String, rt: Engine
 
     val priorDenom = Math.log(numDocuments + numLabels * lambda)
 
-    val model = for {itr <- aggregated} yield {
-      val labels = itr._1
-      val priors = math.log(itr._2 + lambda) - priorDenom
+    val model = for {(label, count, vecSum ) <- aggregated} yield {
+      val priors = math.log(count + lambda) - priorDenom
       val evidenceDenom = modelType match {
-        case MULTINOMIAL => math.log(itr._3.sum + lambda * dimension)
-        case BERNOULI => math.log(itr._2 + 2.0 * lambda)
+        case MULTINOMIAL => math.log(vecSum.sum + lambda * dimension)
+        case BERNOULI => math.log(count + 2.0 * lambda)
         case _ =>
           throw new UnknownError(s"Invalid modelType: $modelType.")
       }
-      val evidences = Vector.apply(itr._3.elements.map(e => math.log(e + lambda) - evidenceDenom))
-      (labels, priors, evidences)
+      val evidences = Vector.apply(vecSum.elements.map(e => math.log(e + lambda) - evidenceDenom))
+      (label, priors, evidences)
     }
     model
   }
