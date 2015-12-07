@@ -6,7 +6,7 @@ import eu.stratosphere.emma.api.model._
 import eu.stratosphere.emma.examples.Algorithm
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
-import org.apache.spark.util.Vector
+import breeze.linalg.{sum, DenseVector}
 
 class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: String, rt: Engine)
     extends Algorithm(rt) {
@@ -25,12 +25,13 @@ class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: St
     // read input
     val points = for (line <- read(input, new TextInputFormat[String]('\n'))) yield {
       val record = line.split("\t")
-      Point(record.head.toLong, Vector(record.tail.map { _.toDouble }))
+      Point(record.head.toLong, DenseVector(record.tail.map { _.toDouble }))
     }
 
     val dimensions = points.find { _ => true }.get.pos.length
     var bestSolution = DataBag(Seq.empty[Solution])
     var minSqrDist = 0.0
+    val zeroVec = DenseVector.zeros[Double](dimensions)
 
     for (i <- 1 to iterations) {
       // initialize forgy cluster means
@@ -40,19 +41,22 @@ class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: St
       // initialize solution
       var solution = for (p <- points) yield {
         val closestCentroid = centroids.minBy { (m1, m2) =>
-          (p.pos squaredDist m1.pos) < (p.pos squaredDist m2.pos)
+          val diff1 = p.pos - m1.pos
+          val diff2 = p.pos - m2.pos
+          (diff1.t * diff1) < (diff2.t * diff2)
         }.get
 
-        val sqrDiff = p.pos squaredDist closestCentroid.pos
+        val diff    = p.pos - closestCentroid.pos
+        val sqrDiff = diff.t * diff
         Solution(p, closestCentroid.id, sqrDiff)
       }
 
       do {
         // update means
         val newMeans = for (cluster <- solution.groupBy { _.cluster }) yield {
-          val sum = cluster.values.map { _.point.pos }.reduce(Vector.zeros(dimensions)) { _ + _ }
-          val cnt = cluster.values.map { _.point.pos }.count()
-          Point(cluster.key, sum / cnt)
+          val sum = cluster.values.fold(zeroVec)( _.point.pos, _ + _ )
+          val cnt = cluster.values.count().toDouble //FIXME Long is converted to Double here
+          Point(cluster.key, sum :/ cnt)
         }
 
         // compute change between the old and the new means
@@ -60,15 +64,18 @@ class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: St
           mean <- centroids
           newMean <- newMeans
           if mean.id == newMean.id
-        } yield mean.pos squaredDist newMean.pos).sum()
+        } yield sum((mean.pos - newMean.pos) :* (mean.pos - newMean.pos))).sum()
 
         // update solution: re-assign clusters
         solution = for (s <- solution) yield {
           val closestMean = centroids.minBy { (m1, m2) =>
-            (s.point.pos squaredDist m1.pos) < (s.point.pos squaredDist m2.pos)
+            val diff1 = s.point.pos - m1.pos
+            val diff2 = s.point.pos - m2.pos
+            (diff1.t * diff1) < (diff2.t * diff2)
           }.get
 
-          val sqrDiff = s.point.pos squaredDist closestMean.pos
+          val diff    = s.point.pos - closestMean.pos
+          val sqrDiff = diff.t * diff
           s.copy(cluster = closestMean.id, sqrDiff = sqrDiff)
         }
 
@@ -150,7 +157,7 @@ object KMeans {
   object Schema {
     type PID = Long
 
-    case class Point(@id id: PID, pos: Vector) extends Identity[PID] {
+    case class Point(@id id: PID, pos: DenseVector[Double]) extends Identity[PID] {
       def identity = id
     }
 
