@@ -29,32 +29,36 @@ class Flink(val env: ExecutionEnvironment) extends Engine {
 
   val resMgr = new TempResultsManager(dataflowCompiler.tb, envSessionID)
 
-  override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = {
-    for (p <- plugins) p.handleLogicalPlan(root, name, closure)
+  override def executeFold[A: TypeTag, B: TypeTag]
+      (root: Fold[A, B], name: String, ctx: Context, closure: Any*): A = {
+    for (p <- plugins) p.handleLogicalPlan(root, name, ctx, closure: _*)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     val res = dataflowCompiler.execute[A](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
     resMgr.gc()
     res
   }
 
-  override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = {
-    for (p <- plugins) p.handleLogicalPlan(root, name, closure)
+  override def executeTempSink[A: TypeTag]
+      (root: TempSink[A], name: String, ctx: Context, closure: Any*): DataBag[A] = {
+    for (p <- plugins) p.handleLogicalPlan(root, name, ctx, closure: _*)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     val expr = dataflowCompiler.execute[DataSet[A]](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
     resMgr.gc()
     DataBag(root.name, expr, expr.collect())
   }
 
-  override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = {
-    for (p <- plugins) p.handleLogicalPlan(root, name, closure)
+  override def executeWrite[A: TypeTag]
+      (root: Write[A], name: String, ctx: Context, closure: Any*): Unit = {
+    for (p <- plugins) p.handleLogicalPlan(root, name, ctx, closure: _*)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
     resMgr.gc()
   }
 
   override def executeStatefulCreate[S <: Identity[K]: TypeTag, K: TypeTag]
-      (root: StatefulCreate[S, K], name: String, closure: Any*): AbstractStatefulBackend[S, K] = {
-    for (p <- plugins) p.handleLogicalPlan(root, name, closure)
+      (root: StatefulCreate[S, K], name: String, ctx: Context, closure: Any*)
+      : AbstractStatefulBackend[S, K] = {
+    for (p <- plugins) p.handleLogicalPlan(root, name, ctx, closure: _*)
     val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
     val res = dataflowCompiler.execute[AbstractStatefulBackend[S, K]](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
     resMgr.gc()
