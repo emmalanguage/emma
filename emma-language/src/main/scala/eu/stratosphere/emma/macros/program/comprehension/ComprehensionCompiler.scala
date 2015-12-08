@@ -11,6 +11,12 @@ private[emma] trait ComprehensionCompiler
   import universe._
   import syntax._
 
+  val ROOT = q"_root_"
+  val SCALA = q"$ROOT.scala"
+  val EMMA = q"$ROOT.eu.stratosphere.emma"
+  val IR = q"$EMMA.ir"
+  val CONTEXT = q"$EMMA.runtime.Context"
+
   /**
    * Compile a generic driver for a data-parallel runtime.
    *
@@ -43,12 +49,13 @@ private[emma] trait ComprehensionCompiler
 
       // Apply combinators to get a purely-functional, logical plan
       val root = combine(term.comprehension).expr
-
       // Extract the comprehension closure
       val closure = term.comprehension.freeTerms
-
       // Get the TermName associated with this comprehended term
       val name = term.id.encodedName
+      // Get the source code positions
+      val positions = if (term.pos == NoPosition) Set.empty[(Int, Int)]
+        else Set(term.pos.start - 1 -> term.pos.end)
 
       val execute = root match {
         case _: combinator.Write          => TermName("executeWrite")
@@ -58,13 +65,10 @@ private[emma] trait ComprehensionCompiler
       }
 
       q"""{
-        import _root_.scala.reflect.runtime.universe._
-        import _root_.eu.stratosphere.emma.ir
-        val __root   = ${serialize(root)}
-        val __result = engine.$execute(__root, ${name.toString}, ..${
-          for (s <- closure) yield if (s.isMethod) q"${s.name} _" else q"${s.name}"
+        import $SCALA.reflect.runtime.universe._
+        engine.$execute(${serialize(root)}, ${name.toString}, $CONTEXT($positions), ..${
+          for (sym <- closure) yield if (sym.isMethod) q"${sym.name} _" else q"${sym.name}"
         })
-        __result
       }"""
     }
 
@@ -77,36 +81,36 @@ private[emma] trait ComprehensionCompiler
      */
     private def serialize(expr: Expression): Tree = expr match {
       case combinator.Read(loc, fmt) =>
-        q"ir.Read($loc, $fmt)"
+        q"$IR.Read($loc, $fmt)"
 
       case combinator.Write(loc, fmt, xs) =>
-        q"ir.Write($loc, $fmt, ${serialize(xs)})"
+        q"$IR.Write($loc, $fmt, ${serialize(xs)})"
 
       case combinator.TempSource(id) =>
-        q"ir.TempSource($id)"
+        q"$IR.TempSource($id)"
 
       case combinator.TempSink(name, xs) =>
-        q"ir.TempSink(${name.toString}, ${serialize(xs)})"
+        q"$IR.TempSink(${name.toString}, ${serialize(xs)})"
 
       case combinator.Map(f, xs) =>
         val elTpe = expr.elementType
         val xsTpe = xs.elementType
         val fStr  = serialize(f)
         val xsStr = serialize(xs)
-        q"ir.Map[$elTpe, $xsTpe]($fStr, $xsStr)"
+        q"$IR.Map[$elTpe, $xsTpe]($fStr, $xsStr)"
 
       case combinator.FlatMap(f, xs) =>
         val elTpe = expr.elementType
         val xsTpe = xs.elementType
         val fStr  = serialize(f)
         val xsStr = serialize(xs)
-        q"ir.FlatMap[$elTpe, $xsTpe]($fStr, $xsStr)"
+        q"$IR.FlatMap[$elTpe, $xsTpe]($fStr, $xsStr)"
 
       case combinator.Filter(p, xs) =>
         val elTpe = expr.elementType
         val pStr  = serialize(p)
         val xsStr = serialize(xs)
-        q"ir.Filter[$elTpe]($pStr, $xsStr)"
+        q"$IR.Filter[$elTpe]($pStr, $xsStr)"
 
       case combinator.EquiJoin(kx, ky, xs, ys) =>
         val elTpe = expr.elementType
@@ -117,7 +121,7 @@ private[emma] trait ComprehensionCompiler
         val xsStr = serialize(xs)
         val ysStr = serialize(ys)
         val join  = serialize(q"(x: $xsTpe, y: $ysTpe) => (x, y)".typeChecked)
-        q"ir.EquiJoin[$elTpe, $xsTpe, $ysTpe]($kxStr, $kyStr, $join, $xsStr, $ysStr)"
+        q"$IR.EquiJoin[$elTpe, $xsTpe, $ysTpe]($kxStr, $kyStr, $join, $xsStr, $ysStr)"
 
       case combinator.Cross(xs, ys) =>
         val elTpe = expr.elementType
@@ -126,14 +130,14 @@ private[emma] trait ComprehensionCompiler
         val xsStr = serialize(xs)
         val ysStr = serialize(ys)
         val join  = serialize(q"(x: $xsTpe, y: $ysTpe) => (x, y)".typeChecked)
-        q"ir.Cross[$elTpe, $xsTpe, $ysTpe]($join, $xsStr, $ysStr)"
+        q"$IR.Cross[$elTpe, $xsTpe, $ysTpe]($join, $xsStr, $ysStr)"
 
       case combinator.Group(key, xs) =>
         val elTpe = expr.elementType
         val xsTpe = xs.elementType
         val kStr  = serialize(key)
         val xsStr = serialize(xs)
-        q"ir.Group[$elTpe, $xsTpe]($kStr, $xsStr)"
+        q"$IR.Group[$elTpe, $xsTpe]($kStr, $xsStr)"
 
       case combinator.Fold(empty, sng, union, xs, _) =>
         val exprTpe  = expr.tpe
@@ -142,7 +146,7 @@ private[emma] trait ComprehensionCompiler
         val sngStr   = serialize(sng)
         val unionStr = serialize(union)
         val xsStr    = serialize(xs)
-        q"ir.Fold[$exprTpe, $xsTpe]($emptyStr, $sngStr, $unionStr, $xsStr)"
+        q"$IR.Fold[$exprTpe, $xsTpe]($emptyStr, $sngStr, $unionStr, $xsStr)"
 
       case combinator.FoldGroup(key, empty, sng, union, xs) =>
         val elTpe    = expr.elementType
@@ -152,32 +156,32 @@ private[emma] trait ComprehensionCompiler
         val sngStr   = serialize(sng)
         val unionStr = serialize(union)
         val xsStr    = serialize(xs)
-        q"ir.FoldGroup[$elTpe, $xsTpe]($keyStr, $emptyStr, $sngStr, $unionStr, $xsStr)"
+        q"$IR.FoldGroup[$elTpe, $xsTpe]($keyStr, $emptyStr, $sngStr, $unionStr, $xsStr)"
 
       case combinator.Distinct(xs) =>
-        q"ir.Distinct(${serialize(xs)})"
+        q"$IR.Distinct(${serialize(xs)})"
 
       case combinator.Union(xs, ys) =>
-        q"ir.Union(${serialize(xs)}, ${serialize(ys)})"
+        q"$IR.Union(${serialize(xs)}, ${serialize(ys)})"
 
       case combinator.Diff(xs, ys) =>
-        q"ir.Diff(${serialize(xs)}, ${serialize(ys)})"
+        q"$IR.Diff(${serialize(xs)}, ${serialize(ys)})"
 
       case ScalaExpr(Apply(fn, values :: Nil)) // one argument
         if api.apply.alternatives contains fn.symbol =>
-          q"ir.Scatter(${compile(values)})"
+          q"$IR.Scatter(${compile(values)})"
 
       case ScalaExpr(Apply(fn, Nil)) // no argument
         if api.apply.alternatives contains fn.symbol =>
-          q"ir.Scatter(Seq.empty)"
+          q"$IR.Scatter(Seq.empty)"
 
       case combinator.StatefulCreate(xs, stateType, keyType) =>
         val xsStr = serialize(xs)
-        q"ir.StatefulCreate[$stateType, $keyType]($xsStr)"
+        q"$IR.StatefulCreate[$stateType, $keyType]($xsStr)"
 
       case combinator.StatefulFetch(stateful) =>
         val statefulNameStr = stateful.name.toString
-        q"ir.StatefulFetch($statefulNameStr, $stateful)"
+        q"$IR.StatefulFetch($statefulNameStr, $stateful)"
 
       case combinator.UpdateWithZero(stateful, udf) =>
         val S = stateful.preciseType.typeArgs(0)
@@ -185,7 +189,7 @@ private[emma] trait ComprehensionCompiler
         val R = expr.elementType
         val statefulName = stateful.name.toString
         val udfStr = serialize(udf)
-        q"ir.UpdateWithZero[$S, $K, $R]($statefulName, $stateful, $udfStr)"
+        q"$IR.UpdateWithZero[$S, $K, $R]($statefulName, $stateful, $udfStr)"
 
       case combinator.UpdateWithOne(stateful, updates, key, udf) =>
         val S = stateful.preciseType.typeArgs(0)
@@ -196,7 +200,7 @@ private[emma] trait ComprehensionCompiler
         val updStr = serialize(updates)
         val keyStr = serialize(key)
         val udfStr = serialize(udf)
-        q"ir.UpdateWithOne[$S, $K, $U, $R]($statefulName, $stateful, $updStr, $keyStr, $udfStr)"
+        q"$IR.UpdateWithOne[$S, $K, $U, $R]($statefulName, $stateful, $updStr, $keyStr, $udfStr)"
 
       case combinator.UpdateWithMany(stateful, updates, key, udf) =>
         val S = stateful.preciseType.typeArgs(0)
@@ -207,7 +211,7 @@ private[emma] trait ComprehensionCompiler
         val updStr = serialize(updates)
         val keyStr = serialize(key)
         val udfStr = serialize(udf)
-        q"ir.UpdateWithMany[$S, $K, $U, $R]($statefulName, $stateful, $updStr, $keyStr, $udfStr)"
+        q"$IR.UpdateWithMany[$S, $K, $U, $R]($statefulName, $stateful, $updStr, $keyStr, $udfStr)"
 
       case e => EmptyTree
         //throw new RuntimeException(
