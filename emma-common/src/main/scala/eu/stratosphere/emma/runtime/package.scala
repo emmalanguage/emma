@@ -14,6 +14,8 @@ import scala.reflect.runtime.universe._
 
 package object runtime {
 
+  case class Context(srcPositions: Set[(Int, Int)])
+
   // add new root file appender
   {
     val appender = new org.apache.log4j.RollingFileAppender()
@@ -44,14 +46,18 @@ package object runtime {
 
     val defaultDOP: Int
 
-    def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A
+    def executeFold[A: TypeTag, B: TypeTag]
+        (root: Fold[A, B], name: String, ctx: Context, closure: Any*): A
 
-    def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A]
+    def executeTempSink[A: TypeTag]
+        (root: TempSink[A], name: String, ctx: Context, closure: Any*): DataBag[A]
 
-    def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit
+    def executeWrite[A: TypeTag]
+        (root: Write[A], name: String, ctx: Context, closure: Any*): Unit
 
     def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag]
-      (root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K]
+        (root: StatefulCreate[A, K], name: String, ctx: Context, closure: Any*)
+        : AbstractStatefulBackend[A, K]
 
     final def closeSession() = if (!closed) {
       doCloseSession()
@@ -71,14 +77,18 @@ package object runtime {
 
     override lazy val defaultDOP = 1
 
-    override def executeFold[A: TypeTag, B: TypeTag](root: Fold[A, B], name: String, closure: Any*): A = ???
+    override def executeFold[A: TypeTag, B: TypeTag]
+        (root: Fold[A, B], name: String, ctx: Context, closure: Any*): A = ???
 
-    override def executeTempSink[A: TypeTag](root: TempSink[A], name: String, closure: Any*): DataBag[A] = ???
+    override def executeTempSink[A: TypeTag]
+        (root: TempSink[A], name: String, ctx: Context, closure: Any*): DataBag[A] = ???
 
-    override def executeWrite[A: TypeTag](root: Write[A], name: String, closure: Any*): Unit = ???
+    override def executeWrite[A: TypeTag]
+        (root: Write[A], name: String, ctx: Context, closure: Any*): Unit = ???
 
     override def executeStatefulCreate[A <: Identity[K]: TypeTag, K: TypeTag]
-      (root: StatefulCreate[A, K], name: String, closure: Any*): AbstractStatefulBackend[A, K] = ???
+        (root: StatefulCreate[A, K], name: String, ctx: Context, closure: Any*)
+        : AbstractStatefulBackend[A, K] = ???
   }
 
   def default(): Engine = {
