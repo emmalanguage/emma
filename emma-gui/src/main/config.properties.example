@@ -1,0 +1,2 @@
+port=8080
+exampleConfigurationLocation=src/main/resources/examples.json

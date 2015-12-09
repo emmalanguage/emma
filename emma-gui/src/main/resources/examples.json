@@ -1,0 +1,141 @@
+[
+  {
+    "name": "WordCount",
+    "class": "eu.stratosphere.emma.examples.text.WordCount",
+    "parameter": {
+      "input": "src/main/resources/examples/wordcount/hamlet.txt",
+      "output": "src/main/resources/examples/wordcount/output"
+    }
+  },
+  /*  emma.parallelize is commented out
+  {
+    "name": "GraphColoring",
+    "class": "eu.stratosphere.emma.examples.graphs.GraphColoring",
+    "parameter": {
+      "input": "src/main/resources/examples/graphcoloring/edges.tsv",
+      "output": "src/main/resources/examples/graphcoloring/vertex-colors.tsv"
+    }
+  },
+  */
+  {
+    "name": "TriangleCount",
+    "class": "eu.stratosphere.emma.examples.graphs.TriangleCount",
+    "parameter": {
+      "input": "src/main/resources/examples/graphcoloring/edges.tsv",
+      "output": ""
+    },
+    "comprehensions": {
+      "incoming$comp$2": [[97, 156]],
+      "edges$comp$2": [[158, 280]],
+      "anon$2$comp$1":[[319, 583]]
+    }
+  },
+  {
+    "name": "LabelRank",
+    "class": "eu.stratosphere.emma.examples.graphs.LabelRank",
+    "parameter": {
+      "input": "src/main/resources/examples/labelrank/edges.tsv",
+      "output": "src/main/resources/examples/labelrank/labels",
+      "max-oscillations": 5,
+      "inflation": 2.0,
+      "cutoff": 0.1,
+      "similarity": 0.3
+    },
+    "comprehensions": {
+      "directed$comp$2": [[179, 237]],
+      "edges$comp$2": [[240, 479]],
+      "vertices$comp$2": [[482, 573]],
+      "labels$comp$5": [[578, 696]],
+      "propLabels$comp$2": [[863, 1261]],
+      "inflation$comp$2": [[1271, 1380]],
+      "anon$6$comp$1": [[1398, 1415]],
+      "infLabels$comp$2": [[1421,1611]],
+      "maxLabels$comp$2": [[1617, 1795]],
+      "condSums$comp$2": [[1800, 2133]],
+      "anon$7$comp$1": [[2144, 2160]],
+      "labels$comp$4": [[2166, 2345]],
+      "anon$8$comp$1": [[2351, 2375]]
+    }
+  },
+  {
+    "name": "SparseMatrixVectorMultiplication",
+    "class": "eu.stratosphere.emma.examples.graphs.SparseMatrixVectorMultiplication",
+    "parameter": {
+      "input": "src/main/resources/examples/spmv",
+      "output": "src/main/resources/examples/spmv/result",
+      "exponent": 2
+    }
+  },
+  {
+    "name": "TPCH-Query01",
+    "class": "eu.stratosphere.emma.examples.tpch.Query01",
+    "parameter": {
+      "input": "src/main/resources/examples/tpch",
+      "output": "src/main/resources/examples/tpch/q1.tbl",
+      "delta": 30
+    }
+  },
+  {
+    "name": "TPCH-Query03",
+    "class": "eu.stratosphere.emma.examples.tpch.Query03",
+    "parameter": {
+      "input": "src/main/resources/examples/tpch",
+      "output": "src/main/resources/examples/tpch/q3.tbl",
+      "segment": "AUTOMOBILE",
+      "date": "1996-06-30"
+    }
+  },
+  {
+    "name": "TPCH-Query05",
+    "class": "eu.stratosphere.emma.examples.tpch.Query05",
+    "parameter": {
+      "input": "src/main/resources/examples/tpch",
+      "output": "src/main/resources/examples/tpch/q5.tbl",
+      "region": "AMERICA",
+      "date": "1994-01-01"
+    }
+  }
+  /*
+  {
+    "name": "TPCH-Query06",
+    "class": "eu.stratosphere.emma.examples.tpch.Query06",
+    "parameter": {
+      "input": "src/main/resources/examples/tpch",
+      "output": "src/main/resources/examples/tpch/q6.tbl",
+      "date": "1994-01-01",
+      "discount": 0.06,
+      "quantity": 24
+    }
+  },
+  {
+    "name": "TPCH-Query07",
+    "class": "eu.stratosphere.emma.examples.tpch.Query07",
+    "parameter": {
+      "input": "src/main/resources/examples/tpch",
+      "output": "src/main/resources/examples/tpch/q7.tbl",
+      "nation1": "ARGENTINA",
+      "nation2": "GERMANY"
+    }
+  },
+  {
+    "name": "TPCH-Query08",
+    "class": "eu.stratosphere.emma.examples.tpch.Query08",
+    "parameter": {
+      "input": "src/main/resources/examples/tpch",
+      "output": "src/main/resources/examples/tpch/q8.tbl",
+      "nation": "ETHIOPIA",
+      "region": "AMERICA",
+      "type": "ECONOMY ANODIZED STEEL"
+    }
+  },
+  {
+    "name": "TPCH-Query09",
+    "class": "eu.stratosphere.emma.examples.tpch.Query09",
+    "parameter": {
+      "input": "src/main/resources/examples/tpch",
+      "output": "src/main/resources/examples/tpch/q9.tbl",
+      "color": "green"
+    }
+  }
+*/
+]
