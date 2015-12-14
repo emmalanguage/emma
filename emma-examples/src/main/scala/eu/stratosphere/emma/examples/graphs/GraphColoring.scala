@@ -18,57 +18,56 @@ class GraphColoring(input: String, output: String, rt: Engine)
     ns get GraphColoring.Command.keyOutput,
     rt)
 
-  def run() = {
-    val algorithm = /* emma.parallelize */ {
-      // read an undirected graph and direct it from smaller to larger IDs
-      val incoming   = read(input, new CSVInputFormat[Schema.Edge])
-      val outgoing   = for (Edge(src, dst) <- incoming) yield Edge(dst, src)
-      val undirected = (incoming plus outgoing).distinct()
-      val directed   = for (e <- undirected; if e.src < e.dst) yield e
+  def run() = algorithm.run(rt)
 
-      // collect all vertices and initialize them with the minimal color
-      var colored  = (for (Edge(src, _) <- undirected)
-        yield ColoredVertex(src)).distinct()
+  val algorithm = emma.parallelize {
+    // read an undirected graph and direct it from smaller to larger IDs
+    val incoming   = read(input, new CSVInputFormat[Schema.Edge])
+    val outgoing   = for (Edge(src, dst) <- incoming) yield Edge(dst, src)
+    val undirected = (incoming plus outgoing).distinct()
+    val directed   = for (e <- undirected; if e.src < e.dst) yield e
 
-      val vertices = stateful[Vertex, Vid] {
-        for (ColoredVertex(id, _) <- colored) yield Vertex(id)
-      }
-      
-      // initialize all messages with the minimal color
-      var messages = for (Edge(src, dst) <- directed)
-        yield Message(src, dst)
+    // collect all vertices and initialize them with the minimal color
+    var colored  = (for (Edge(src, _) <- undirected)
+      yield ColoredVertex(src)).distinct()
 
-      // resolve conflicting colors until convergence
-      while (messages.nonEmpty) {
-        messages = vertices.updateWithMany(messages)(
-          _.dst, (v, ms) => { // if the color is taken choose a new one
-            if (ms exists { _.col == v.col }) {
-              val colors = for {
-                e <- directed
-                if e.dst == v.id
-                u <- colored
-                if e.src == u.id
-              } yield u.col
-              // calculate the range of unavailable colors
-              val (from, to) = colors.fold(List.empty[(Cid, Cid)])(
-                col => (col, col) :: Nil, merge(_, _)).head
-              // update with the minimal free color
-              val col = if (from > minCol) minCol else next(to)
-              v.col   = col
-              // send the new color to neighbors with greater ID
-              for (Edge(src, dst) <- directed; if src == v.id)
-                yield Message(src, dst, col)
-            } else DataBag()
-          })
-
-        colored = for (Vertex(id, col) <- vertices.bag())
-          yield ColoredVertex(id, col)
-      }
-
-      write(output, new CSVOutputFormat[ColoredVertex]) { colored }
+    val vertices = stateful[Vertex, Vid] {
+      for (ColoredVertex(id, _) <- colored) yield Vertex(id)
     }
 
-    //algorithm run rt
+    // initialize all messages with the minimal color
+    var messages = for (Edge(src, dst) <- directed)
+      yield Message(src, dst)
+
+    // resolve conflicting colors until convergence
+    while (messages.nonEmpty) {
+      messages = vertices.updateWithMany(messages)(
+        _.dst, (v, ms) => { // if the color is taken choose a new one
+          if (ms exists { _.col == v.col }) {
+            val colors = for {
+              e <- directed
+              if e.dst == v.id
+              u <- colored
+              if e.src == u.id
+            } yield u.col
+            // calculate the range of unavailable colors
+            val (from, to) = colors.fold(List.empty[(Cid, Cid)])(
+              col => (col, col) :: Nil, merge(_, _)).head
+            // update with the minimal free color
+            val col = if (from > minCol) minCol else next(to)
+            v.col   = col
+            // send the new color to neighbors with greater ID
+            for (Edge(src, dst) <- directed; if src == v.id)
+              yield Message(src, dst, col)
+          } else DataBag()
+        })
+
+      colored = for (Vertex(id, col) <- vertices.bag())
+        yield ColoredVertex(id, col)
+    }
+
+    write(output, new CSVOutputFormat[ColoredVertex]) { colored }
+    colored
   }
 }
 

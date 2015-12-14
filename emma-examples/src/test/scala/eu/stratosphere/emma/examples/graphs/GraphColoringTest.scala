@@ -42,17 +42,15 @@ class GraphColoringTest extends FlatSpec with PropertyChecks with Matchers with 
   }
 
   "After graph coloring any two neighbors" should "have different colors" in withRuntime() { rt =>
-    new GraphColoring(s"$path/edges.tsv", s"$path/vertex-colors.tsv", rt).run()
+    val alg = new GraphColoring(s"$path/edges.tsv", s"$path/vertex-colors", rt).algorithm
 
     val edges = for {
       line <- Source.fromFile(s"$path/edges.tsv").getLines()
       record = line split "\t" map { _.toLong }
     } yield record(0) -> record(1)
 
-    val vertexColor = (for {
-      line <- Source.fromFile(s"$path/vertex-colors.tsv").getLines()
-      record = line split "\t" map { _.toLong }
-    } yield record(0) -> record(1)).toMap
+    val vertexColor = (for { cv <- alg.run(rt).fetch() }
+      yield cv.id -> cv.col).toMap
 
     for ((src, dst) <- edges) {
       vertexColor(src) should not be vertexColor(dst)
