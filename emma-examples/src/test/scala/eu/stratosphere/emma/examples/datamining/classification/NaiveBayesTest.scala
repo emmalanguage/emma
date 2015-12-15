@@ -18,7 +18,6 @@ import scala.io.Source
 @Category(Array(classOf[ExampleTest]))
 @RunWith(classOf[JUnitRunner])
 class NaiveBayesTest extends FlatSpec with Matchers with BeforeAndAfter {
-
   val dir = "/classification/naivebayes"
   val path = tempPath(dir)
 
@@ -43,6 +42,6 @@ class NaiveBayesTest extends FlatSpec with Matchers with BeforeAndAfter {
 
     val solution = new NaiveBayes(s"$path/vote.csv", 1.0, "bernoulli", rt).algorithm.run(rt).fetch()
 
-    solution should equal(expectedModel)
+    solution should contain theSameElementsAs expectedModel
   }
 }
