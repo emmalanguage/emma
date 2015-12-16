@@ -57,6 +57,7 @@
       "anon$8$comp$1": [[2351, 2375]]
     }
   },
+  /*
   {
     "name": "SparseMatrixVectorMultiplication",
     "class": "eu.stratosphere.emma.examples.graphs.SparseMatrixVectorMultiplication",
@@ -66,6 +67,7 @@
       "exponent": 2
     }
   },
+  */
   {
     "name": "TPCH-Query01",
     "class": "eu.stratosphere.emma.examples.tpch.Query01",
