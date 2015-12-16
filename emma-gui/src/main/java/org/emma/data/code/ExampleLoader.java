@@ -3,10 +3,7 @@ package org.emma.data.code;
 import com.google.gson.JsonObject;
 import net.sourceforge.argparse4j.inf.Namespace;
 
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.util.Map;
 
 /**
@@ -45,18 +42,17 @@ public abstract class ExampleLoader {
         if (is == null)
             throw new FileNotFoundException(filePath + " not found.");
 
-        InputStreamReader isr = new InputStreamReader(is);
+        char[] buffer = new char[1000];
 
-        char[] buffer = new char[10000];
-        try {
-            while (isr.read(buffer) != -1) {
-                sourceCode.append(new String(buffer));
+        try (Reader in = new InputStreamReader(is)) {
+            int readCount;
+            while ((readCount = in.read(buffer, 0, buffer.length)) > 0) {
+                sourceCode.append(buffer, 0, readCount);
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-
-        return sourceCode.toString();
+        return sourceCode.toString().trim();
     }
 
     public abstract JsonObject loadComprehensionBoxes(String className);

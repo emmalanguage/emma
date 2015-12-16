@@ -4,7 +4,7 @@ import java.util.concurrent.CountDownLatch
 
 import eu.stratosphere.emma.api.ParallelizedDataBag
 import eu.stratosphere.emma.ir._
-import eu.stratosphere.emma.runtime.RuntimePlugin
+import eu.stratosphere.emma.runtime.{Context, RuntimePlugin}
 import org.emma.data.plan.Plan
 
 import scala.collection.mutable
@@ -25,9 +25,9 @@ class EmmaDemoInterface extends RuntimePlugin{
 
   def getExecutionPlanJson(): mutable.Stack[Plan] = executionPlanJson
 
-  override def handleLogicalPlan(root: Combinator[_], name: String, closure: Any*): Unit = {
+  override def handleLogicalPlan(root: Combinator[_], name: String, ctx: Context, closure: Any*): Unit = {
     if (blockingLatch != null) {
-      executionPlanJson.push(new Plan(name, getExecutionPlan(root)))
+      executionPlanJson.push(new Plan(name, getExecutionPlan(root), ctx.srcPositions))
       blockingLatch.await()
     }
   }

@@ -1,6 +1,7 @@
 'use strict';
 
 var codeCanvas = null;
+var codeStartIndex = 0;
 var canvases = {};
 var tabCount = 0;
 var requestBase = "http://localhost:8080/"
@@ -151,10 +152,13 @@ function loadCode(name) {
                 codeCanvasElement.height(code.height()+20);
                 code.parent().width(contentWidth+20);
 
+                //TODO load from plan, comprehensions
                 currentComprehensions = {};
+                /*
                 if (data.comprehensions != null) {
                     currentComprehensions = data.comprehensions;
                 }
+                */
             } else {
                 console.log("No sources available. Did you compile the sources of emma-examples?");
                 code.html("No sources available.");
@@ -169,7 +173,7 @@ function loadPlan(name) {
         method: "GET",
         url: requestBase+"plan/loadGraph?name="+name,
         success: function(data) {
-            if (data.plan != null) {
+            if (data.graph != null) {
                 loadedExample = name;
                 $('#plan-tab-content').html("");
                 buildPlan(data);
@@ -206,7 +210,7 @@ function loadPlanFromCache(name, cache) {
     }
     initRuntime(name);
 
-    currentExecution = planCache[0].plan.name;
+    currentExecution = planCache[0].graph.name;
     planNames[currentExecution].executed = 0;
     setWaitingState();
     $('a[href="#panel0"]').click();
@@ -221,9 +225,9 @@ function initRuntime(name) {
 }
 
 function buildPlan(data) {
-    addToExecutionOrder(currentExecution, data.plan.name);
+    addToExecutionOrder(currentExecution, data.graph.name);
 
-    currentExecution = data.plan.name;
+    currentExecution = data.graph.name;
     if (!(currentExecution in planNames)) {
         var planIndex = Object.keys(planNames).length;
         planNames[currentExecution] = {
@@ -231,13 +235,17 @@ function buildPlan(data) {
             executed: 0
         };
         planCache.push(data);
-        addTab(data.plan);
+        addTab(data.graph);
 
-        drawPlan(data.plan, tabCount-1);
+        drawPlan(data.graph, tabCount-1);
 
         localStorage.setItem(loadedExample, JSON.stringify(planCache));
     }
     $('#plan-canvas'+(tabCount-1)).fadeIn(fadeSpeed);
+
+    if (data.comprehensions != null) {
+        currentComprehensions[currentExecution] = data.comprehensions;
+    }
 }
 
 function addToExecutionOrder(currentExecution, newName) {
@@ -291,17 +299,22 @@ function drawComprehensionBoxes(name) {
 
     if (boxes != null && boxes.length > 0) {
         boxes.forEach(function(box){
-            drawComprehensionBox(box[0], box[1]);
+            drawComprehensionBox(box[0] - codeStartIndex - 1, box[1] - codeStartIndex - 1);
         });
     }
 
     if (iterationMarker.length > 0) {
+        var maxWidth = $('#code-canvas').width();
         for (var i in iterationMarker) {
             var iteration = iterationMarker[i];
-            var clientRect = setSelectionRange($('#code-container code')[0], iteration[0], iteration[1]);
+            var clientRect = setSelectionRange($('#code-container code')[0], iteration[0] - codeStartIndex - 1, iteration[1] - codeStartIndex - 1);
             if (clientRect != null && codeCanvas) {
                 var margin = 3;
-                var rectangle = new codeCanvas.Shape.Rectangle(new codeCanvas.Point(clientRect.left - margin, clientRect.top - margin), clientRect.width + margin, clientRect.height + margin);
+                var rectangle = new codeCanvas.Shape.Rectangle(
+                    new codeCanvas.Point(margin, clientRect.top - margin),
+                    maxWidth - 2*margin,
+                    clientRect.height + margin
+                );
                 rectangle.strokeColor = iterationColors[i%iterationColors.length];
                 rectangle.strokeWidth = 2;
             }
@@ -312,10 +325,16 @@ function drawComprehensionBoxes(name) {
 }
 
 function drawComprehensionBox(begin, end) {
-    var margin = 2;
+    var margin = 4;
     var clientRect = setSelectionRange($('#code-container code')[0], begin, end);
+
     if (clientRect != null) {
-        var rectangle = new codeCanvas.Shape.Rectangle(new codeCanvas.Point(clientRect.left - margin, clientRect.top - margin), clientRect.width + margin, clientRect.height + margin);
+        var maxWidth = $('#code-canvas').width();
+        var rectangle = new codeCanvas.Shape.Rectangle(
+            new codeCanvas.Point(margin, clientRect.top - margin),
+            maxWidth - 2*margin,
+            clientRect.height + margin
+        );
         rectangle.fillColor = comprehensionHighlightColor;
     }
 }
@@ -327,17 +346,30 @@ function setSelectionRange(el, start, end) {
         var textNodes = getTextNodesIn(el);
         var foundStart = false;
         var charCount = 0, endCharCount;
+        var text = "";
 
         for (var i = 0, textNode; textNode = textNodes[i++]; ) {
+            var text = $(textNode).text();
             endCharCount = charCount + textNode.length;
+
+            var lineBreakCount = text.split("\n").length - 1
+
+            endCharCount += lineBreakCount;
+
             if (!foundStart && start >= charCount && (start < endCharCount || (start == endCharCount && i <= textNodes.length))) {
-                range.setStart(textNode, start - charCount);
+                //start from previous character if selected character is a newline
+                if (text[start - charCount] == '\n')
+                    start--;
+
+                range.setStart(textNode, start - charCount - lineBreakCount);
                 foundStart = true;
             }
+
             if (foundStart && end <= endCharCount) {
                 range.setEnd(textNode, end - charCount);
                 break;
             }
+
             charCount = endCharCount;
         }
 
@@ -346,16 +378,14 @@ function setSelectionRange(el, start, end) {
         var clientRect = range.getBoundingClientRect();
 
         var box = null;
-
         if (range.getClientRects().length > 0) {
             var box = {
                 top: clientRect.top - offset.top + codeContainer.scrollTop() + 1,
                 left: range.getClientRects()[0].left - offset.left + codeContainer.scrollLeft(),
                 width: clientRect.width,
-                height: clientRect.height
+                height: clientRect.height || 19
             };
         }
-
         return box;
     } else if (document.selection && document.body.createTextRange) {
         var textRange = document.body.createTextRange();
@@ -368,13 +398,13 @@ function setSelectionRange(el, start, end) {
 }
 
 function filterParallelizeFunction(code) {
+    codeStartIndex = code.indexOf('def run()');
 
-    var startIndex = code.indexOf('def run()');
-    while (code[--startIndex] != '\n') {}
+    while (code[--codeStartIndex] != '\n') {}
 
     var bracesCount = 0;
     var start = false;
-    var index = startIndex;
+    var index = codeStartIndex;
     while (!start || bracesCount != 0) {
         if (!start && code[index] == '{')
             start = true;
@@ -388,19 +418,9 @@ function filterParallelizeFunction(code) {
         index++;
     }
 
-    var algorithm = code.substr(startIndex + 1, index-startIndex);
+    var algorithm = code.substr(codeStartIndex + 1, index-codeStartIndex);
 
-    var firstChar = 0;
-    while (algorithm[firstChar] == ' ' || algorithm[firstChar] == '\t') {
-        firstChar++
-    }
-
-    var newCode = "";
-    algorithm.split('\n').forEach(function(line){
-        newCode += line.substr(firstChar)+"\n";
-    });
-
-    return newCode;
+    return algorithm;
 }
 
 function getTextNodesIn(node) {
@@ -481,7 +501,7 @@ function run() {
             method: "GET",
             url: requestBase+"plan/run",
             success: function(data) {
-                if (data.plan != null) {
+                if (data.graph != null) {
                     var planIndex = planNames[currentExecution].index;
                     var planTab = $('a[href="#panel'+planIndex+'"]');
                     updateTabLabel(planTab, currentExecution, planNames[currentExecution]);

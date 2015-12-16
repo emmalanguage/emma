@@ -39,7 +39,11 @@ class PlanServlet extends HttpServlet {
 
   def createResponse(resp: HttpServletResponse): Unit = {
     val map = new java.util.HashMap[String, Any]
-    map.put("plan", waitForPlan())
+    val plan = waitForPlan()
+    if (plan != null) {
+      map.put("graph", new Graph(plan))
+      map.put("comprehensions", plan.getComprehensions)
+    }
     map.put("isLast", !runner.isAlive)
 
     resp.setHeader("Content-Type", "application/json")
@@ -57,7 +61,7 @@ class PlanServlet extends HttpServlet {
     runner.start()
   }
 
-  private def waitForPlan(): Graph = {
+  private def waitForPlan(): Plan = {
     val executionPlan: mutable.Stack[Plan] = localRuntime.getRuntimePlugin.getExecutionPlanJson()
     var plan: Plan = null
 
@@ -80,7 +84,7 @@ class PlanServlet extends HttpServlet {
     }
 
     if (plan != null) {
-      return new Graph(plan)
+      return plan
     }
 
     null
