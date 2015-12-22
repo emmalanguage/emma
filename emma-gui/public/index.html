@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Emma-Demo</title>
+    <link rel="stylesheet" href="css/normalize.css"/>
+    <link rel="stylesheet" href="css/foundation.min.css"/>
+    <link rel="stylesheet" href="css/styles/monokai_sublime.css"/>
+    <link rel="stylesheet" href="css/foundation-icons.css"/>
+    <link rel="stylesheet" href="css/app.css"/>
+</head>
+<body>
+<header>
+    <nav class="top-bar" data-topbar role="navigation">
+        <ul class="title-area">
+            <li class="name">
+                <h1><a href="/">Emma-Demo</a></h1>
+            </li>
+            <li class="icon">
+                <a href="javascript:clearPage();" title="new"><i class="fi-page"></i></a>
+            </li>
+            <li class="icon">
+                <a href="#" data-options="align:bottom" data-dropdown="drop" title="load example">
+                    <i class="fi-page-filled"></i>
+                </a>
+
+                <div id="drop" class="content f-dropdown" data-dropdown-content>
+                    <h6>Load Sample Code</h6>
+
+                    <ul id="exampleList">
+
+                    </ul>
+                </div>
+            </li>
+            <li class="icon">
+                <a href="javascript:clearCache();" title="clear cache"><i class="fi-prohibited"></i></a>
+            </li>
+            <li class="icon">
+                <a href="javascript:run();" title="run plan (F9)" id="play-button">
+                    <!--i class="fi-play"></i-->
+                </a>
+            </li>
+        </ul>
+        <ul class="title-area right">
+            <li class="name">
+                <h1><a id="status"></a></h1>
+            </li>
+        </ul>
+    </nav>
+</header>
+<section id="main-section">
+    <div class="code-wrapper">
+        <br>
+        <div id="code-tab-wrapper">
+            <ul id="code-tabs" class="tabs">
+                <li class="tab-title active">
+                    <a href="#code-panel0">Code</a>
+                </li>
+                <li id="code-options">
+                    <i id="code-zoom-in" class="text-zoom fi-zoom-in"></i>
+                    <i id="code-zoom-out" class="text-zoom fi-zoom-out"></i>
+                </li>
+            </ul>
+            <div class="tabs-content">
+                <div class="content active" id="code-panel0">
+                    <div id="code-container" class="hljs">
+                        <canvas id="code-canvas"></canvas>
+                        <pre><code class="scala"></code></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="log-wrapper">
+            <div id="log-options">
+                <span id="clear-log-button" class="label"><i class="fi-prohibited"></i> clear</span>
+                <div class="switch tiny" style="display: inline-block; margin: 0;">
+                    <input id="scroll-lock" type="checkbox" checked="">
+                    <label id="scroll-lock-label" for="scroll-lock">&nbsp;</label>
+                    <span style="color: white;">scroll lock</span>
+                </div>
+            </div>
+            <div id="log-container">
+
+            </div>
+        </div>
+    </div>
+
+    <div id="plan-wrapper">
+        Plan: <span id="example-name"></span><br>
+        <div id="tab-wrapper">
+            <ul id="plan-tabs" class="tabs" data-tab>
+
+            </ul>
+            <div id="plan-tab-content" class="tabs-content">
+                No example selected
+            </div>
+        </div>
+
+    </div>
+</section>
+<footer></footer>
+</body>
+<script src="js/jquery-1.11.3.min.js"></script>
+<script src="js/jquery-ui.min.js"></script>
+<script src="js/foundation/foundation.min.js"></script>
+<script src="js/foundation/foundation.dropdown.js"></script>
+<script src="js/highlight.pack.js"></script>
+<script src="js/paper-full-v0.9.23.min.js"></script>
+<script src="js/drawing.helpers.js"></script>
+<script src="js/plan-canvas.js"></script>
+<script src="js/graph.js"></script>
+<script src="js/app.js"></script>
+<script src="js/dagre.min.js"></script>
+<script>hljs.initHighlightingOnLoad();</script>
+<script src="js/trajanSCC.js"></script>
+
+<script>
+    $(document).ready(function(){
+        $(".code-wrapper").resizable({
+            minWidth: $(".code-wrapper").parent().width()*0.2,
+            maxWidth: $(".code-wrapper").parent().width()*0.8,
+            handles: 'e'
+        });
+
+        $(document).foundation();
+        resizeContainers();
+
+        loadExamples();
+        //loadExample('eu.stratosphere.emma.examples.graphs.LabelRank');
+        //eu.stratosphere.emma.examples.graphs.TriangleCount
+        //eu.stratosphere.emma.examples.graphs.GraphColoring
+        //eu.stratosphere.emma.examples.text.WordCount
+    });
+
+</script>
+</html>

@@ -1,0 +1,198 @@
+.title-area li{
+    float: left;
+    margin-right: 20px;
+}
+
+.title-area li.icon{
+    font-size: 30px;
+}
+
+#main-section {
+    padding: 10px;
+}
+
+.code-wrapper {
+    width: 50%;
+    float: left;
+    padding-right: 5px;
+}
+
+#plan-wrapper {
+    overflow: hidden;
+}
+
+#drop {
+    max-width: none;
+    box-sizing: initial;
+    width: auto;
+    z-index: 91;
+}
+
+#drop ul li {
+    float: none;
+}
+
+#code-container {
+    height: 500px;
+    overflow: auto;
+    position: relative;
+    z-index: 1;
+    font-size: 16px;
+}
+
+#code-container code {
+    min-height: 48px;
+    width: auto !important;
+    border: 0;
+    background: transparent !important;
+}
+
+#code-container pre {
+    overflow: initial;
+    width: auto !important;
+}
+
+#code-canvas {
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    z-index: -1;
+}
+
+#plan-tab-content {
+    color: white;
+}
+
+#plan-canvas {
+    border: 1px solid black;
+    background-color: #23241f;
+}
+
+.ui-resizable-handle.ui-resizable-e {
+    background-image: url('/img/handle-v.png');
+    background-position: -3px center;
+    background-repeat: no-repeat;
+}
+
+.ui-resizable-handle.ui-resizable-s {
+    background-image: url('/img/handle-h.png');
+    background-position: center 2px;
+    background-repeat: no-repeat;
+}
+
+.ui-resizable-e {
+    cursor: e-resize;
+    width: 7px;
+    right: 0px;
+    top: 0;
+    height: 100%;
+}
+
+.ui-resizable-s {
+    cursor: s-resize;
+    height: 7px;
+    right: 0px;
+    bottom: 0;
+    width: 100%;
+}
+
+.ui-resizable-handle {
+    position: absolute;
+    font-size: 0.1px;
+    display: block;
+    -ms-touch-action: none;
+    touch-action: none;
+}
+
+.ui-resizable {
+    position: relative;
+}
+
+#tab-wrapper {
+    background-color: #333;
+    border: 1px solid black;
+}
+
+.tabs .tab-title {
+    border-bottom: 1px solid #F55B11;
+}
+
+.tabs .tab-title a {
+    padding: 0 1rem;
+    background-color: transparent;
+    color: #F55B11;
+}
+
+.tabs .tab-title a:hover {
+    background-color: white;
+}
+
+.tabs-content {
+    margin-bottom: 0;
+}
+
+.tabs-content>.content {
+    padding: 0;
+}
+
+#example-name {
+    font-weight: bold;
+}
+
+.hljs {
+    background-color: #333;
+    overflow: initial;
+}
+
+#code-tab-wrapper {
+    border: 1px solid black;
+    padding-bottom: 7px;
+}
+
+#code-tabs {
+    background-color: #333;
+}
+
+#log-wrapper {
+    background-color: #333;
+}
+
+#log-container {
+    font: 10pt courier;
+    color: white;
+    overflow: auto;
+    white-space: nowrap;
+    background-color: #333;
+}
+
+#log-options {
+    margin-left: 1px;
+}
+
+.log-entry {
+    color: #F55B11;
+}
+
+.log-error {
+    color: red;
+}
+
+#clear-log-button {
+    height: 24px;
+    padding-top: 6px;
+    cursor: pointer;
+}
+
+@media screen and (-webkit-min-device-pixel-ratio:0) {
+ #scroll-lock-label {
+     padding-top: 1px;
+ }
+}
+
+.text-zoom {
+    font-size: 20px;
+    color: #F55B11;
+    float: right;
+    cursor: pointer;
+    margin: 0px 5px;
+}

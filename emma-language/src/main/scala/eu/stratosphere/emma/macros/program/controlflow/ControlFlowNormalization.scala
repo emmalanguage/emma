@@ -21,7 +21,6 @@ private[emma] trait ControlFlowNormalization extends BlackBoxUtil {
     ${ tree                     ->>
        normalizeEnclosingParams ->>
        normalizeClassNames      ->>
-       unTypeCheck              ->>
        normalizeControlFlow }
   }""".typeChecked.as[Block].expr
 
