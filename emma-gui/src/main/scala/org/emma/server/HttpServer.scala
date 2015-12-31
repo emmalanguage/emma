@@ -7,7 +7,6 @@ import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.ServletHolder
 import org.eclipse.jetty.webapp.WebAppContext
 import org.emma.config.ConfigReader
-import org.emma.runtime.LocalRuntime
 import org.emma.servlets.{CodeServlet, LogEventServlet}
 
 object HttpServer {
@@ -16,7 +15,6 @@ object HttpServer {
 
   @throws(classOf[Exception])
   def main(args: Array[String]) {
-    LocalRuntime.getInstance
     System.setOut(createLoggingProxy(System.out))
     val server: HttpServer.type = HttpServer
     server.start()
@@ -47,10 +45,8 @@ object HttpServer {
       server.start()
       System.out.println("Started server at port: " + ConfigReader.getString("port"))
       server.join()
-    } catch {
-      case e: Exception => {
-        e.printStackTrace()
-      }
+    } catch { case ex: Exception =>
+        ex.printStackTrace()
     }
   }
 
