@@ -7,9 +7,6 @@ import com.google.gson.JsonParser;
 
 import java.util.ArrayList;
 
-/**
- * Created by Andi on 22.09.2015.
- */
 public class Graph {
     public ArrayList<Node> nodes = new ArrayList<>();
     public ArrayList<Edge> edges = new ArrayList<>();

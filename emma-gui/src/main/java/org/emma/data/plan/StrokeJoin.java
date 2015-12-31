@@ -1,8 +1,5 @@
 package org.emma.data.plan;
 
-/**
- * Created by Andi on 22.09.2015.
- */
 public enum StrokeJoin {
     MITER("miter"),
     ROUND("round"),

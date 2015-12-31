@@ -1,11 +1,7 @@
 package org.emma.utils;
 
-import java.util.Iterator;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
-/**
- * Created by Andi on 04.11.2015.
- */
 public class LogQueue {
 
     private static LogQueue instance = null;

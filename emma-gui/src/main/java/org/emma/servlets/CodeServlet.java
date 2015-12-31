@@ -13,9 +13,6 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.*;
 
-/**
- * Created by Andi on 05.08.2015.
- */
 public class CodeServlet extends HttpServlet {
 
     private ExampleLoader exampleLoader = new ExampleFileLoader();

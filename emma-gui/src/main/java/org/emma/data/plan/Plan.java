@@ -6,9 +6,6 @@ import scala.collection.immutable.Set;
 
 import java.util.ArrayList;
 
-/**
- * Created by Andi on 18.11.2015.
- */
 public class Plan {
     String name;
     String plan;

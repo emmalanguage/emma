@@ -2,9 +2,6 @@ package org.emma.data.code;
 
 import com.google.gson.JsonObject;
 
-/**
- * Created by Andi on 23.09.2015.
- */
 public class Example {
     String code = "";
     JsonObject comprehensions = new JsonObject();

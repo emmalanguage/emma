@@ -10,9 +10,6 @@ import org.emma.data.plan.Plan
 import scala.collection.mutable
 import scala.reflect.runtime.universe._
 
-/**
- * Created by Andi on 18.11.2015.
- */
 class EmmaDemoInterface extends RuntimePlugin{
   var blockingLatch:CountDownLatch = null
   var executionPlanJson: mutable.Stack[Plan] = new mutable.Stack[Plan]()
