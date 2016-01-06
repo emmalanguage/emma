@@ -665,12 +665,20 @@ $('#code-tabs').on('toggled', function (event, tab) {
     }
 });
 
+function scrollToTab(tab) {
+    var middlePoint = $('#plan-tabs').width() / 2 - tab.width() / 2;
+    var scrollPosition = tab.offset().left - tab.parent().offset().left + tab.parent().scrollLeft() - middlePoint;
+    $('#plan-tabs').scrollLeft(scrollPosition);
+}
+
 $('#plan-tabs').on('toggled', function (event, tab) {
     if (codeCanvas != null) {
         codeCanvas.project.activeLayer.removeChildren();
         codeCanvas.view.draw();
         var planCanvasId = tab.find('a').attr('href').replace('#panel','#plan-canvas');
         $(planCanvasId).hide().fadeIn(fadeSpeed);
+
+        scrollToTab(tab);
     }
     updateComprehensionBoxes();
 });

@@ -135,6 +135,23 @@
     padding: 0;
 }
 
+#plan-tabs {
+    overflow-x: auto;
+    height: 44px;
+}
+
+#plan-tabs li a {
+    display: inline-block;
+}
+
+#plan-tabs li {
+    display: inline;
+    list-style: none;
+    white-space: nowrap;
+    float: none;
+    padding-bottom: 4px;
+}
+
 #example-name {
     font-weight: bold;
 }
