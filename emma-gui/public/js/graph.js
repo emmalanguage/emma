@@ -1,8 +1,8 @@
-var strokeColor = '#F55B11',
+var strokeColor = 'black',
     strokeWidth = 1,
     font = 'Courier New',
     fontSize = 18,
-    fillColor = 'black',
+    fillColor = 'white',
     globalXOffset = 0,
     globalYOffset = 0;
 
@@ -70,10 +70,10 @@ var Node = function(obj, planCanvas){
     node.height = node.text.bounds.height + node.padding[0] + node.padding[2];
 
     return node;
-}
+};
 
 var Edge = function(obj) {
-    var edge = $.extend(obj,
+    return $.extend(obj,
     {
         xOffset: 0,
         yOffset: 0,
@@ -126,8 +126,7 @@ var Edge = function(obj) {
             path = roundPath(path, 5);
         }
     });
-    return edge;
-}
+};
 
 var nodes = [];
 var edges = [];
@@ -182,6 +181,16 @@ function initGraph(plan, id) {
             node.toolTipObject.bringToFront();
         }
     });
+}
+
+function loadStylesFromCss() {
+    var node = $('#hidden-area').append($('<div id="plan-node">')).find('#plan-node');
+    strokeColor = node.css('border-color');
+    strokeWidth = node.css('border-width').replace('px','');
+    font = node.css('font-family');
+    fontSize = node.css('font-size').replace('px','');
+    fillColor = node.css('background-color');
+    node.remove();
 }
 
 function getGraphDimensions(g) {

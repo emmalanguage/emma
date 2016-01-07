@@ -1,0 +1,102 @@
+@import url("/css/styles/vs.css");
+
+.top-bar {
+    background: #e8e8e8;
+}
+
+.top-bar .name h1 a {
+    color: black;
+}
+
+#tab-wrapper {
+    background-color: #e8e8e8;
+    border: 1px solid black;
+}
+.tabs .tab-title {
+    border-bottom: 1px solid #2F74D0;
+}
+
+.tabs .tab-title a {
+    color: #2F74D0;
+}
+
+.tabs .tab-title.active a {
+    background-color: white !important;
+}
+
+.tabs .tab-title a:hover {
+    background-color: white !important;
+}
+
+#code-tabs {
+    background-color: #e8e8e8;
+}
+
+#code-tab-wrapper {
+    border: 1px solid black;
+}
+
+#log-wrapper {
+    background-color: #e8e8e8;
+    border-left: 1px solid black;
+    border-right: 1px solid black;
+    border-bottom: 1px solid black;
+}
+
+#log-container {
+    font: 10pt courier;
+    background-color: #e8e8e8;
+    color: black;
+}
+
+.hljs {
+    background-color: #e8e8e8;
+}
+
+.log-entry {
+    color: #F55B11;
+}
+
+.log-error {
+    color: red;
+}
+
+.text-zoom {
+    font-size: 20px;
+}
+
+a {
+    color: #2F74D0;
+}
+
+a:hover{
+    color: black;
+}
+
+.label {
+    background-color: #2F74D0;
+}
+
+.switch input:checked+label {
+    background-color: #2F74D0;
+}
+
+.switch span {
+    color: black;
+}
+
+.gear:before {
+    content: url('/img/gear-blue.gif');
+    display: inline-block;
+    height: 35px;
+    vertical-align: middle;
+}
+
+/* PLAN CANVAS STYLES */
+
+#plan-node {
+    background-color: white;
+    border: 1px solid black;
+    font-size: 18px;
+    font-family: 'Courier New';
+}

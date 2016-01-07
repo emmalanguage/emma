@@ -23,12 +23,12 @@ var logBufferSize = 500;
 var checkLogSizeIteration = 0;
 var iterationMarker = [];
 var iterationColors = [
-    '#DFDF00',
-    '#80B584',
-    '#01F33E',
-    '#BBBBFF',
     '#24E0FB',
+    '#DFDF00',
     '#3923D6',
+    '#BBBBFF',
+    '#01F33E',
+    '#80B584',
 ];
 
 $(window).resize(resizeContainers);
@@ -118,7 +118,7 @@ function loadExample(name) {
         $('#example-name').html("");
     }
 
-    $('#status').html('<img src="/img/gear.gif" /> loading plan...');
+    $('#status').html('<i class="gear"/> loading plan...');
 
     loadCode(name);
 
@@ -576,7 +576,7 @@ function markIterations(name){
             var color = iterationColors[i%iterationColors.length];
             for (var j in iteration) {
                 var planName = iteration[j];
-                $('li a[plan-name="'+planName+'"]').parent().css("background-color", color);
+                $('li a[plan-name="'+planName+'"]').css("background-color", color);
                 if (currentComprehensions[planName]) {
                     if (currentComprehensions[planName][0][0] < minSelection)
                         minSelection = currentComprehensions[planName][0][0];
@@ -604,12 +604,12 @@ function setInitState() {
 
 function setRunningState() {
     $("#play-button").html('<i class="fi-pause"></i>');
-    $('#status').html('<img src="/img/gear.gif" /> compiling and executing "'+currentExecution+'"');
+    $('#status').html('<i class="gear"/> compiling and executing "'+currentExecution+'"');
 }
 
 function setWaitingState() {
     $("#play-button").html('<i class="fi-play"></i>');
-    $('#status').html("ready");
+    $('#status').html('ready');
 }
 
 function setFinishState() {
@@ -625,7 +625,12 @@ function logScrollBottom() {
 }
 
 function clearCache() {
-    localStorage.clear();
+    for(var key in localStorage)
+    {
+        if (key.startsWith("eu.stratosphere")) {
+            localStorage.removeItem(key);
+        }
+    }
     clearPage();
 }
 
@@ -668,7 +673,9 @@ $('#code-tabs').on('toggled', function (event, tab) {
 function scrollToTab(tab) {
     var middlePoint = $('#plan-tabs').width() / 2 - tab.width() / 2;
     var scrollPosition = tab.offset().left - tab.parent().offset().left + tab.parent().scrollLeft() - middlePoint;
-    $('#plan-tabs').scrollLeft(scrollPosition);
+    $('#plan-tabs').animate({
+        scrollLeft: scrollPosition
+    }, 400, "easeOutCirc");
 }
 
 $('#plan-tabs').on('toggled', function (event, tab) {
@@ -723,7 +730,7 @@ function registerKeyListener() {
     window.onkeyup = function(e) {
        var key = e.keyCode ? e.keyCode : e.which;
 
-       if (key == 120) {
+       if (key == 120) {    //F9
            run();
        }
     }

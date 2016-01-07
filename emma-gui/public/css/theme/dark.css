@@ -1,0 +1,103 @@
+@import url("/css/styles/monokai_sublime.css");
+
+.top-bar {
+    background: #333;
+}
+
+.top-bar .name h1 a {
+    color: white;
+}
+
+#tab-wrapper {
+    background-color: #333;
+    border: 1px solid black;
+}
+
+.tabs .tab-title {
+    border-bottom: 1px solid #F55B11;
+}
+
+.tabs .tab-title a {
+    color: #F55B11;
+}
+
+.tabs .tab-title.active a {
+    background-color: white !important;
+}
+
+.tabs .tab-title a:hover {
+    background-color: white !important;
+}
+
+#code-tabs {
+    background-color: #333;
+}
+
+#code-tab-wrapper {
+    border: 1px solid black;
+}
+
+#log-wrapper {
+    background-color: #333;
+    border-left: 1px solid black;
+    border-right: 1px solid black;
+    border-bottom: 1px solid black;
+}
+
+#log-container {
+    font: 10pt courier;
+    background-color: #333;
+    color: white;
+}
+
+.hljs {
+    background-color: #333;
+}
+
+.log-entry {
+    color: #F55B11;
+}
+
+.log-error {
+    color: red;
+}
+
+.text-zoom {
+    font-size: 20px;
+}
+
+a {
+    color: #F55B11;
+}
+
+a:hover {
+    color: #d84c09;
+}
+
+.label {
+    background-color: #F55B11;
+}
+
+.switch input:checked+label {
+    background-color: #F55B11;
+}
+
+.switch span {
+    color: white;
+}
+
+.gear:before {
+    content: url('/img/gear-orange.gif');
+    display: inline-block;
+    height: 35px;
+    vertical-align: middle;
+}
+
+/* PLAN CANVAS STYLES */
+
+#plan-node {
+    background-color: black;
+    border: 1px solid #F55B11;
+    font-size: 18px;
+    font-family: 'Courier New';
+}
