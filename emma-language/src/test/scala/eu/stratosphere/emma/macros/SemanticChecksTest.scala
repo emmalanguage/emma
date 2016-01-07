@@ -93,10 +93,84 @@ class SemanticChecksTest extends FlatSpec with Matchers with RuntimeUtil {
     }
   }
 
+  it should "check write access and application of outer methods / functions / variables / properties" in {
+    type E = UnstableApplicationToEnclosingScopeException
+    q"""
+        object SomeObject {
+          var x = 0
+          emma.parallelize {
+            List(23,42,99).foreach { y => x = x + y }
+          }
+        }
+      """ should failWith[E]
+
+    q"""
+        object SomeObject {
+          var x = 0
+          emma.parallelize {
+            List(23,42,99).foreach { y => x += y }
+          }
+        }
+      """ should failWith[E]
+
+    q"""
+        object SomeObject {
+          var x = 0
+          emma.parallelize {
+            x += 1
+          }
+        }
+      """ should failWith[E]
+
+    q"""
+        object SomeClosure {
+          var x = 0
+          emma.parallelize {
+            val lst = List(23,99,42) // disambiguation default arguments / Loc
+            x = lst.foldLeft(Int.MinValue)(Math.max(_,_))
+          }
+        }
+      """ should failWith[E]
+
+    q"""
+      class MyClass(var x:Int = 0) {
+        emma.parallelize {
+          val lst = List(23,99,42)
+          x = lst.foldLeft(Int.MinValue)(Math.max(_,_))
+        }
+      }
+      """ should failWith[E]
+
+    q"""
+       class MyClass {
+        private var _x:Int = 42
+        def x = _x
+        def x_=(newX:Int) { _x = newX}
+
+        emma.parallelize {
+          val lst = List(23,99,42)
+          x = lst.foldLeft(Int.MinValue)(Math.max(_,_))
+        }
+       }
+      """ should failWith[E]
+
+    noException should be thrownBy {tb.typecheck(withImports(
+      q"""
+        object MyObject {
+          def getFourtyTwo:Int = 42
+          emma.parallelize {
+            List(1,2,3,getFourtyTwo, 99).map(_ * 2)
+          }
+        }
+      """))}
+  }
+
   def failWith[E <: Throwable : ClassTag] =
     include (implicitly[ClassTag[E]].runtimeClass.getSimpleName) compose { (tree: Tree) =>
-      intercept[ToolBoxError] { tb.typecheck(q"{ ..$imports; $tree }") }.getMessage
+      intercept[ToolBoxError] { tb.typecheck(withImports(tree)) }.getMessage
     }
+
+  def withImports(tree: universe.Tree): universe.Tree = q"{ ..$imports; $tree }"
 }
 
 object SemanticChecksTest {

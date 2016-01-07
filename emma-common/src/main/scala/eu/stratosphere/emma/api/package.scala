@@ -168,4 +168,10 @@ package object api {
       | "updateWith* call, and use that one in place of this .bag() call.""".stripMargin)
   // Note: Don't catch this!
   // This should terminate the program, because the stateful will be in an invalid state after throwing this.
+
+  class UnstableApplicationToEnclosingScopeException(id: String) extends InvalidProgramException( s"""
+      | The user defined function is performing an application in the enclosing scope: (`$id`).
+      | This may also be the result of write access to a mutable member of the enclosing scope
+      | (for instance setting a mutable variable or attribute).
+    """.stripMargin)
 }
