@@ -20,44 +20,56 @@ class GuiPlugin(parties: Int = 1) extends RuntimePlugin {
     latch = new CountDownLatch(parties)
   }
 
-  def getExecutionPlan(root: Combinator[_]): String = root match {
-    case root@Read(location: String, _) =>
-      buildJson(root, "Read", "path: \n" + root.location, "")
-    case root@Write(location: String, _, xs: Combinator[_]) =>
-      buildJson(root, "Write", "path: \n" + root.location, getExecutionPlan(xs))
-    case TempSource(ref) =>
+  def getExecutionPlan[A](root: Combinator[A]): String = root match {
+    case Read(location: String, _) =>
+      buildJson(root, "Read", s"path:\n$location", "")
+    case Write(location: String, _, xs) =>
+      buildJson(root, "Write", s"path:\n$location", getExecutionPlan(xs))
+    case TempSource(_) =>
       buildJson(root, "TempSource", "", "")
-    case TempSink(name: String, xs: Combinator[_]) =>
-      buildJson(root, "TempSink (" + name + ")", "", getExecutionPlan(xs))
-    case Map(f: String, xs: Combinator[_]) =>
-      buildJson(root, "Map", "function: \n" + f, getExecutionPlan(xs))
-    case FlatMap(f: String, xs: Combinator[_]) =>
-      buildJson(root, "FlatMap", "function: \n" + f, getExecutionPlan(xs))
-    case Filter(p: String, xs: Combinator[_]) =>
-      buildJson(root, "Filter", "predicate: \n" + p, getExecutionPlan(xs))
-    case EquiJoin(keyx: String, keyy: String, f: String, xs: Combinator[_], ys: Combinator[_]) =>
-      buildJson(root, "EquiJoin", "keyX: \n" + keyx + "\nkeyY: \n" + keyy + "\nfunction: \n" + f, getExecutionPlan(xs) + ", " + getExecutionPlan(ys))
-    case Cross(f: String, xs: Combinator[_], ys: Combinator[_]) =>
-      buildJson(root, "Cross", "function: \n" + f, getExecutionPlan(xs) + ", " + getExecutionPlan(ys))
-    case Group(key: String, xs: Combinator[_]) =>
-      buildJson(root, "Group", "key: \n" + key, getExecutionPlan(xs))
-    case Fold(empty: String, sng: String, union: String, xs: Combinator[_]) =>
-      buildJson(root, "Fold", "empty: \n" + empty + "\nsingle: \n" + sng + "\nunion: \n" + union, getExecutionPlan(xs))
-    case FoldGroup(key: String, empty: String, sng: String, union: String, xs: Combinator[_]) =>
-      buildJson(root, "FoldGroup", "key: \n" + key + "\nempty: \n" + empty + "\nsingle: \n" + sng + "\nunion: \n" + union, getExecutionPlan(xs))
-    case Distinct(xs: Combinator[_]) =>
+    case TempSink(name: String, xs) =>
+      buildJson(root, s"TempSink\n($name)", "", getExecutionPlan(xs))
+    case Map(f, xs) =>
+      buildJson(root, "Map", s"function:\n$f", getExecutionPlan(xs))
+    case FlatMap(f, xs) =>
+      buildJson(root, "FlatMap", s"function:\n$f", getExecutionPlan(xs))
+    case Filter(p, xs) =>
+      buildJson(root, "Filter", s"predicate:\n$p", getExecutionPlan(xs))
+    case EquiJoin(kx, ky, f, xs, ys) =>
+      buildJson(root, "EquiJoin", s"Kx:\n$kx\nKy:\n$ky\nfunction:\n$f",
+        s"${getExecutionPlan(xs)}, ${getExecutionPlan(ys)}")
+    case Cross(f, xs, ys) =>
+      buildJson(root, "Cross", s"function:\n$f",
+        s"${getExecutionPlan(xs)}, ${getExecutionPlan(ys)}")
+    case Group(key, xs) =>
+      buildJson(root, "Group", s"key:\n$key", getExecutionPlan(xs))
+    case Fold(emp, sng, uni, xs) =>
+      buildJson(root, "Fold", s"empty:\n$emp\nsingle:\n$sng\nunion:\n$uni",
+        getExecutionPlan(xs))
+    case FoldGroup(key, emp, sng, uni, xs) =>
+      buildJson(root, "FoldGroup", s"key:\n$key\nempty:\n$emp\nsingle:\n$sng\nunion:\n$uni",
+        getExecutionPlan(xs))
+    case Distinct(xs) =>
       buildJson(root, "Distinct", "", getExecutionPlan(xs))
-    case Union(xs: Combinator[_], ys: Combinator[_]) =>
-      buildJson(root, "Union", "", getExecutionPlan(xs) + ", " + getExecutionPlan(ys))
-    case Diff(xs: Combinator[_], ys: Combinator[_]) =>
-      buildJson(root, "Diff", "", getExecutionPlan(xs) + ", " + getExecutionPlan(ys))
-    case Scatter(xs: Combinator[_]) =>
-      buildJson(root, "Scatter", "", getExecutionPlan(xs))
-    case StatefulCreate(xs: Combinator[_]) =>
+    case Union(xs, ys) =>
+      buildJson(root, "Union", "", s"${getExecutionPlan(xs)}, ${getExecutionPlan(ys)}")
+    case Diff(xs, ys) =>
+      buildJson(root, "Diff", "", s"${getExecutionPlan(xs)}, ${getExecutionPlan(ys)}")
+    case Scatter(xs) =>
+      buildJson(root, "Scatter", "", "")
+    case StatefulCreate(xs) =>
       buildJson(root, "StatefulCreate", "", getExecutionPlan(xs))
-    case _ =>
-      System.err.println("Unsupported class: " + root.getClass.getName)
-      s"[${root.getClass.getName}}]"
+    case StatefulFetch(name, _) =>
+      buildJson(root, s"StatefulFetch\n($name)", "", "")
+    case UpdateWithZero(name, _, udf) =>
+      buildJson(root, s"Update\n($name)", s"function:\n$udf",
+        getExecutionPlan(Read(name, null)))
+    case UpdateWithOne(name, _, upd, key, udf) =>
+      buildJson(root, s"UpdateWith\n($name)", s"key:\n$key\nfunction:\n$udf",
+        s"${getExecutionPlan(Read(name, null))}, ${getExecutionPlan(upd)}")
+    case UpdateWithMany(name, _, upd, key, udf) =>
+      buildJson(root, s"UpdateWith*\n($name)", s"key:\n$key\nfunction:\n$udf",
+        s"${getExecutionPlan(Read(name, null))}, ${getExecutionPlan(upd)}")
   }
 
   def buildJson(root: Combinator[_], name: String, toolTipText: String, parents: String): String = {
