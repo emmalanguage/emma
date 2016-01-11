@@ -46,6 +46,11 @@
                     <!--i class="fi-play"></i-->
                 </a>
             </li>
+            <li class="icon">
+                <a href="javascript:fastForward();" id="forward-button">
+                    <!--i class="fi-fast-forward"></i-->
+                </a>
+            </li>
         </ul>
         <ul class="title-area right">
             <li class="name">
@@ -132,9 +137,10 @@
     $(document).ready(function(){
         constructThemeChooser("theme-container");
         loadStylesFromCss();
-        $(".code-wrapper").resizable({
-            minWidth: $(".code-wrapper").parent().width()*0.2,
-            maxWidth: $(".code-wrapper").parent().width()*0.8,
+        var codeWrapper = $(".code-wrapper");
+        codeWrapper.resizable({
+            minWidth: codeWrapper.parent().width()*0.2,
+            maxWidth: codeWrapper.parent().width()*0.8,
             handles: 'e'
         });
 

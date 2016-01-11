@@ -4,7 +4,7 @@ var codeCanvas = null;
 var codeStartIndex = 0;
 var canvases = {};
 var tabCount = 0;
-var requestBase = "http://localhost:8080/"
+var requestBase = "http://localhost:8080/";
 var fullExampleName = "";
 var planNames = {};
 var planCache = [];
@@ -20,6 +20,7 @@ var fontSizeStep = 2;
 var codeHeightMinFactor = 0.2;
 var codeHeightMaxFactor = 0.9;
 var logBufferSize = 500;
+var fastForwardRun = true;
 var checkLogSizeIteration = 0;
 var iterationMarker = [];
 var iterationColors = [
@@ -28,7 +29,7 @@ var iterationColors = [
     '#3923D6',
     '#BBBBFF',
     '#01F33E',
-    '#80B584',
+    '#80B584'
 ];
 
 $(window).resize(resizeContainers);
@@ -43,7 +44,7 @@ $(".code-wrapper").resize(function(){
 });
 
 function clearPage(){
-    var code = $('#code-container code');
+    var code = $('#code-container').find('code');
     code.html("");
     code.width("auto");
     code.parent().width("auto");
@@ -93,7 +94,7 @@ function loadExamples() {
                     $('#exampleList').append('<li><a title="'+example.key+'">'+example.value+'</a></li>');
                 });
 
-                $('#exampleList li a').click(function(e){
+                $('#exampleList').find('li a').click(function(e){
                     var exampleName = $(e.target).attr('title');
                     loadExample(exampleName);
                 });
@@ -105,7 +106,7 @@ function loadExamples() {
 
 function loadExample(name) {
     fullExampleName = name;
-    var code = $('#code-container code');
+    var code = $('#code-container').find('code');
     code.html("");
     init();
 
@@ -131,7 +132,7 @@ function loadExample(name) {
 
 function loadCode(name) {
     setupCodeCanvas();
-    var code = $('#code-container code');
+    var code = $('#code-container').find('code');
 
     $.ajax({
         method: "GET",
@@ -139,7 +140,7 @@ function loadCode(name) {
         async: false,
         success: function(data) {
             if (data != null) {
-                var codeCanvasElement = $('#code-container canvas');
+                var codeCanvasElement = $('#code-container').find('canvas');
 
                 code.html(filterParallelizeFunction(data.code));
                 code.each(function(i, block) {
@@ -178,7 +179,7 @@ function loadPlan(name) {
                 $('#plan-tab-content').html("");
                 buildPlan(data);
 
-                $('#plan-tabs li:last a').click();
+                $('#plan-tabs').find('li:last a').click();
 
                 if (!data.isLast) {
                     setWaitingState();
@@ -254,7 +255,7 @@ function addToExecutionOrder(currentExecution, newName) {
         executionOrder.forEach(function(edge){
             if (edge[0] == currentExecution && edge[1] == newName) {
                 found = true;
-                return;
+                return false;
             }
         });
         if (!found)
@@ -307,7 +308,7 @@ function drawComprehensionBoxes(name) {
         var maxWidth = $('#code-canvas').width();
         for (var i in iterationMarker) {
             var iteration = iterationMarker[i];
-            var clientRect = setSelectionRange($('#code-container code')[0], iteration[0] - codeStartIndex - 1, iteration[1] - codeStartIndex - 1);
+            var clientRect = setSelectionRange($('#code-container').find('code')[0], iteration[0] - codeStartIndex - 1, iteration[1] - codeStartIndex - 1);
             if (clientRect != null && codeCanvas) {
                 var margin = 3;
                 var rectangle = new codeCanvas.Shape.Rectangle(
@@ -326,7 +327,7 @@ function drawComprehensionBoxes(name) {
 
 function drawComprehensionBox(begin, end) {
     var margin = 4;
-    var clientRect = setSelectionRange($('#code-container code')[0], begin, end);
+    var clientRect = setSelectionRange($('#code-container').find('code')[0], begin, end);
 
     if (clientRect != null) {
         var maxWidth = $('#code-canvas').width();
@@ -352,7 +353,7 @@ function setSelectionRange(el, start, end) {
             var text = $(textNode).text();
             endCharCount = charCount + textNode.length;
 
-            var lineBreakCount = text.split("\n").length - 1
+            var lineBreakCount = text.split("\n").length - 1;
 
             endCharCount += lineBreakCount;
 
@@ -418,9 +419,7 @@ function filterParallelizeFunction(code) {
         index++;
     }
 
-    var algorithm = code.substr(codeStartIndex + 1, index-codeStartIndex);
-
-    return algorithm;
+    return code.substr(codeStartIndex + 1, index-codeStartIndex);
 }
 
 function getTextNodesIn(node) {
@@ -442,12 +441,14 @@ function resizeContainers() {
 }
 
 function resizeRightView() {
-    var height = $("html").height() - $("#tab-wrapper").offset().top - 11;
-    var width = $('#plan-tab-content').width();
-    $("#tab-wrapper").css("height", height);
+    var wrapper = $("#tab-wrapper");
+    var content = $('#plan-tab-content');
+    var height = $("html").height() - wrapper.offset().top - 11;
+    var width = content.width();
+    wrapper.css("height", height);
 
     height -= $('#plan-tabs').height();
-    $('#plan-tab-content .content').each(function(i, tabContent){
+    content.find('.content').each(function(i, tabContent){
         $(tabContent).css("height", height);
     });
 
@@ -459,40 +460,41 @@ function resizeRightView() {
 }
 
 function resizeLeftView() {
+    var wrapper = $("#code-tab-wrapper");
+    var codeTabs = $('#code-tabs');
     var maxHeight = $("html").height()
-        - $("#code-tab-wrapper").offset().top
-        - $('#code-tabs').height()
-        - $('#code-tab-wrapper ui-resizable-handle').height()
+        - wrapper.offset().top
+        - codeTabs.height()
+        - wrapper.find('.ui-resizable-handle').height()
         - $('#log-options').height()
         - 20;
 
-    var wrapperHeight = parseInt($("#code-tab-wrapper").css("height").replace("px",""));
+    var wrapperHeight = parseInt(wrapper.css("height").replace("px",""));
 
     if (wrapperHeight > maxHeight) {
-        $("#code-tab-wrapper").height(maxHeight*codeHeightMaxFactor);
+        wrapper.height(maxHeight*codeHeightMaxFactor);
     }
 
     //init height
     if ($('#code-tab-wrapper[style*="height"]').length == 0) {
-        $('#code-tab-wrapper').css('height', maxHeight*codeHeightMaxFactor);
+        wrapper.css('height', maxHeight*codeHeightMaxFactor);
     }
 
-    var newHeight = $("#code-tab-wrapper").height() - $('#code-tabs').height();
+    var codeHeight = wrapper.height() - codeTabs.height();
 
-    var codeHeight = newHeight;
     var logHeight = maxHeight - codeHeight;
     $("#code-container").css("height", codeHeight);
     $('#log-container').css("height", logHeight);
 
-    $("#code-tab-wrapper").resizable({
+    wrapper.resizable({
         minHeight: maxHeight*codeHeightMinFactor,
         maxHeight: maxHeight*codeHeightMaxFactor,
         handles: 's'
     });
 }
 
-function run() {
-    var running = $('#play-button i').hasClass("fi-pause")
+function run(async, callback) {
+    var running = $('#play-button').find('i').hasClass("fi-pause");
 
     if (!running) {
         setRunningState();
@@ -500,6 +502,7 @@ function run() {
         $.ajax({
             method: "GET",
             url: requestBase+"plan/run",
+            async: async,
             success: function(data) {
                 if (data.graph != null) {
                     var planIndex = planNames[currentExecution].index;
@@ -524,17 +527,33 @@ function run() {
                 } else {
                     setFinishState();
                 }
+
+                if (callback) {
+                    callback(data);
+                }
             },
             error: handleError
         });
+    } else {
+        fastForwardRun = false;
+        setStoppingState();
     }
+}
+
+function fastForward() {
+    run(true, function(data){
+        if (!data.isLast) {
+            if (fastForwardRun)
+                fastForward();
+        }
+    });
+    fastForwardRun = true;
 }
 
 function detectIterations() {
     var vertices = [];
     for (var name in planNames) {
-        var v = new Vertex(name);
-        vertices[planNames[name].index] = v;
+        vertices[planNames[name].index] = new Vertex(name);
     }
 
     for (var i in executionOrder) {
@@ -599,6 +618,7 @@ function addLogHtml(html) {
 
 function setInitState() {
     $("#play-button").html('');
+    $("#forward-button").html('');
     $('#status').html('');
 }
 
@@ -609,12 +629,20 @@ function setRunningState() {
 
 function setWaitingState() {
     $("#play-button").html('<i class="fi-play"></i>');
+    $("#forward-button").html('<i class="fi-fast-forward"></i>');
     $('#status').html('ready');
 }
 
 function setFinishState() {
     $("#play-button").html('');
+    $("#forward-button").html('');
     $('#status').html("finished");
+}
+
+function setStoppingState() {
+    $("#play-button").html('<i class="fi-play"></i>');
+    $("#forward-button").html('<i class="fi-fast-forward"></i>');
+    $('#status').html('<i class="gear"/> stopping...');
 }
 
 function logScrollBottom() {
@@ -645,13 +673,14 @@ eventSource.onerror = function(e) {
     addLogHtml("<div class='log-error'>ERROR: Lost connection to Log server. Reload to try again!</div>");
     alert("An error occurred! Detailed information in the log.");
     eventSource.close();
-}
+};
 
 function trimLog() {
     if (checkLogSizeIteration++ % 20 == 0) {
-        var lineCount = $('#log-container div').length;
+        var logContainer = $('#log-container');
+        var lineCount = logContainer.find('div').length;
         if (lineCount > logBufferSize) {
-            $("#log-container div:lt("+(lineCount - logBufferSize)+")").remove();
+            logContainer.find("div:lt("+(lineCount - logBufferSize)+")").remove();
         }
         checkLogSizeIteration = 1;
     }
@@ -660,7 +689,7 @@ function trimLog() {
 $('#code-tabs').on('toggled', function (event, tab) {
     if (tab.find('a').attr('href') == '#code-panel1') {
         logScrollBottom();
-        $('#code-tabs li a[href="#code-panel1"]').html("Log");
+        $(this).find('li a[href="#code-panel1"]').html("Log");
         $('#log-options').show();
         $('#code-options').hide();
     } else {
@@ -671,9 +700,10 @@ $('#code-tabs').on('toggled', function (event, tab) {
 });
 
 function scrollToTab(tab) {
-    var middlePoint = $('#plan-tabs').width() / 2 - tab.width() / 2;
+    var planTabs = $('#plan-tabs');
+    var middlePoint = planTabs.width() / 2 - tab.width() / 2;
     var scrollPosition = tab.offset().left - tab.parent().offset().left + tab.parent().scrollLeft() - middlePoint;
-    $('#plan-tabs').animate({
+    planTabs.animate({
         scrollLeft: scrollPosition
     }, 400, "easeOutCirc");
 }
@@ -702,36 +732,38 @@ $('#scroll-lock').change(function(){
 });
 
 function updateCodeCanvasSize() {
-    $('#code-canvas').css("width", 1);
-    $('#code-canvas').css("height", 1);
-    $('#code-canvas').css("width", $('#code-container')[0].scrollWidth);
-    $('#code-canvas').css("height", $('#code-container')[0].scrollHeight);
+    var codeContainer = $('#code-container')[0];
+    $('#code-canvas').css("width", 1)
+                    .css("height", 1)
+                    .css("width", codeContainer.scrollWidth)
+                    .css("height", codeContainer.scrollHeight);
 }
 
 function updateComprehensionBoxes() {
     updateCodeCanvasSize();
-    var comprehensionName = $('#plan-tabs li.active a').attr("plan-name");
+    var comprehensionName = $('#plan-tabs').find('li.active a').attr("plan-name");
     drawComprehensionBoxes(comprehensionName);
 }
 
 $('#code-zoom-in').click(function(){
-    var fontSize = parseInt($('#code-container').css('font-size').replace('px',''));
-    $('#code-container').css('font-size',(fontSize+fontSizeStep)+"px");
+    var codeContainer = $('#code-container');
+    var fontSize = parseInt(codeContainer.css('font-size').replace('px',''));
+    codeContainer.css('font-size',(fontSize+fontSizeStep)+"px");
     updateComprehensionBoxes();
 });
 
 $('#code-zoom-out').click(function(){
-    var fontSize = parseInt($('#code-container').css('font-size').replace('px',''));
-    $('#code-container').css('font-size',(fontSize-fontSizeStep)+"px");
+    var codeContainer = $('#code-container');
+    var fontSize = parseInt(codeContainer.css('font-size').replace('px',''));
+    codeContainer.css('font-size',(fontSize-fontSizeStep)+"px");
     updateComprehensionBoxes();
 });
 
 function registerKeyListener() {
-    window.onkeyup = function(e) {
-       var key = e.keyCode ? e.keyCode : e.which;
-
-       if (key == 120) {    //F9
-           run();
-       }
+    window.onkeydown = function(e) {
+        var key = e.keyCode ? e.keyCode : e.which;
+        if (key == 120) {    //F9
+            run();
+        }
     }
 }
