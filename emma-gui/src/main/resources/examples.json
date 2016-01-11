@@ -1,5 +1,32 @@
 [
   {
+    "name": "IMDb",
+    "class": "eu.stratosphere.emma.examples.imdb.IMDb",
+    "parameter": {
+      "input": "src/main/resources/examples/cinema",
+      "output": "src/main/resources/examples/cinema/output"
+    }
+  },
+  {
+    "name": "AlternatingLeastSquares",
+    "class": "eu.stratosphere.emma.examples.graphs.AlternatingLeastSquares2",
+    "parameter": {
+      "input": "src/main/resources/examples/als/r.base",
+      "output": "src/main/resources/examples/als/output",
+      "lambda": 0.065,
+      "features": 5,
+      "iterations": 5
+    }
+  },
+  {
+    "name": "WordCount",
+    "class": "eu.stratosphere.emma.examples.text.WordCount",
+    "parameter": {
+      "input": "src/main/resources/examples/wordcount/hamlet.txt",
+      "output": "src/main/resources/examples/wordcount/output"
+    }
+  },
+  {
     "name": "WordCount",
     "class": "eu.stratosphere.emma.examples.text.WordCount",
     "parameter": {
@@ -23,11 +50,6 @@
     "parameter": {
       "input": "src/main/resources/examples/graphcoloring/edges.tsv",
       "output": ""
-    },
-    "comprehensions": {
-      "incoming$comp$2": [[97, 156]],
-      "edges$comp$2": [[158, 280]],
-      "anon$2$comp$1":[[319, 583]]
     }
   },
   {
@@ -40,21 +62,6 @@
       "inflation": 2.0,
       "cutoff": 0.1,
       "similarity": 0.3
-    },
-    "comprehensions": {
-      "directed$comp$2": [[179, 237]],
-      "edges$comp$2": [[240, 479]],
-      "vertices$comp$2": [[482, 573]],
-      "labels$comp$5": [[578, 696]],
-      "propLabels$comp$2": [[863, 1261]],
-      "inflation$comp$2": [[1271, 1380]],
-      "anon$6$comp$1": [[1398, 1415]],
-      "infLabels$comp$2": [[1421,1611]],
-      "maxLabels$comp$2": [[1617, 1795]],
-      "condSums$comp$2": [[1800, 2133]],
-      "anon$7$comp$1": [[2144, 2160]],
-      "labels$comp$4": [[2166, 2345]],
-      "anon$8$comp$1": [[2351, 2375]]
     }
   },
   /*
