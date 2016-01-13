@@ -42,6 +42,14 @@
     }
   },
   {
+    "name": "TransitiveClosure",
+    "class": "eu.stratosphere.emma.examples.graphs.TransitiveClosure",
+    "parameter": {
+      "input": "src/main/resources/examples/trans-closure/edges.tsv",
+      "output": "/tmp/emma/examples/trans-closure/output"
+    }
+  },
+  {
     "name": "LabelRank",
     "class": "eu.stratosphere.emma.examples.graphs.LabelRank",
     "parameter": {
