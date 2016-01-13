@@ -18,8 +18,6 @@ function setupPlanCanvas(id) {
         var canvasDomElement = $("#"+canvasId);
         var planCanvas = new paper.PaperScope().setup(document.getElementById(canvasId));
 
-        var project = planCanvas.project;
-
         var tool = new paper.Tool();
 
         tool.distanceThreshold = 8;
@@ -29,32 +27,24 @@ function setupPlanCanvas(id) {
         //zoom view
         canvasDomElement.bind('mousewheel DOMMouseScroll MozMousePixelScroll', function(e){
             var delta = 0;
-            var children = project.activeLayer.children;
-
             e.preventDefault();
             e = e || window.event;
             if (e.type == 'mousewheel') {       //this is for chrome/IE
                 delta = e.originalEvent.wheelDelta;
             } else if (e.type == 'DOMMouseScroll') {  //this is for FireFox
-                delta = e.originalEvent.detail*-1;  //FireFox reverses the scroll so we force to to re-reverse...
+                delta = e.originalEvent.detail*-1;
             }
 
+            var point = new paper.Point(e.originalEvent.offsetX, e.originalEvent.offsetY);
+            point = paper.view.viewToProject(point);
+            var zoomCenter = point.subtract(paper.view.center);
+            var moveFactor = tool.zoomFactor - 1.0;
             if ((delta > 0) && (paper.view.zoom < upperZoomLimit)) {
                 //scroll up
-
-                var point = new paper.Point(e.originalEvent.offsetX, e.originalEvent.offsetY);
-                point = paper.view.viewToProject(point);
-                var zoomCenter = point.subtract(paper.view.center);
-                var moveFactor = tool.zoomFactor - 1.0;
                 paper.view.zoom *= tool.zoomFactor;
                 paper.view.center = paper.view.center.add(zoomCenter.multiply(moveFactor / tool.zoomFactor));
                 tool.mode = '';
-
             } else if((delta < 0) && (paper.view.zoom>lowerZoomLimit)){ //scroll down
-                var point = new paper.Point(e.originalEvent.offsetX, e.originalEvent.offsetY);
-                point = paper.view.viewToProject(point);
-                var zoomCenter = point.subtract(paper.view.center);
-                var moveFactor = tool.zoomFactor - 1.0;
                 paper.view.zoom /= tool.zoomFactor;
                 paper.view.center = paper.view.center.subtract(zoomCenter.multiply(moveFactor))
             }
@@ -88,16 +78,16 @@ function setupPlanCanvas(id) {
             planCanvas.project.view.scrollBy(point);
             lastX = x;
             lastY = y;
-        }
+        };
 
         //pan view
-        tool.onMouseUp = function (event) {
+        tool.onMouseUp = function () {
             if (IsDrag == true) {
                 // reset
                 IsDrag = false;
                 window.document.body.style.cursor = 'default';
             }
-        }
+        };
 
         initWordWrap(planCanvas);
         canvases["#"+canvasId] = planCanvas;
@@ -110,20 +100,19 @@ function setupPlanCanvas(id) {
 function initWordWrap(planCanvas) {
     planCanvas.PointText.prototype.wordwrap = function(text, maxChar){
         var lines = [],
-            space = -1,
-            times = 0;
+            space = -1;
 
         function cut(){
             for (var i = 0; i < text.length; i++){
-                (text[i] == ' ') && (space = i);
+                (isWhiteSpace(text[i])) && (space = i);
 
                 if(i >= maxChar){
-                    (space == -1 || text[i] == ' ') && (space = i);
+                    (space == -1 || isWhiteSpace(text[i])) && (space = i);
 
                     if(space>0)
-                        lines.push(text.slice((text[0] == ' ' ? 1 : 0),space));
+                        lines.push(text.slice((isWhiteSpace(text[0]) ? 1 : 0),space));
 
-                    text = text.slice(text[0] == ' ' ? (space+1) : space);
+                    text = text.slice(isWhiteSpace(text[0]) ? (space+1) : space);
                     space = -1;
                     break;
                 }
@@ -133,12 +122,15 @@ function initWordWrap(planCanvas) {
 
         function check(){
             if (text.length <= maxChar){
-                lines.push(text[0] == ' ' ? text.slice(1) : text);
+                lines.push(isWhiteSpace(text[0]) ? text.slice(1) : text);
                 text='';
             }else if(text.length){
                 cut();
             }
-            return;
+        }
+
+        function isWhiteSpace(char) {
+            return char.match(/\s/g) != null;
         }
 
         check();
