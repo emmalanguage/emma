@@ -32,8 +32,7 @@ var iterationColors = [
     '#80B584'
 ];
 
-$(window).resize(resizeContainers);
-registerKeyListener();
+registerListeners();
 
 $("#code-tab-wrapper").resize(function(){
     resizeLeftView();
@@ -280,6 +279,15 @@ function addTab(plan) {
     tabCount++;
 }
 
+function scrollToTab(tab) {
+    var planTabs = $('#plan-tabs');
+    var middlePoint = planTabs.width() / 2 - tab.width() / 2;
+    var scrollPosition = tab.offset().left - tab.parent().offset().left + tab.parent().scrollLeft() - middlePoint;
+    planTabs.animate({
+        scrollLeft: scrollPosition
+    }, 400, "easeOutCirc");
+}
+
 function updateTabLabel(planTab, name, planMetaData) {
     planMetaData.executed += 1;
     var shortName = name.substr(0, name.indexOf('$'));
@@ -340,6 +348,12 @@ function drawComprehensionBox(begin, end) {
     }
 }
 
+function updateComprehensionBoxes() {
+    updateCodeCanvasSize();
+    var comprehensionName = $('#plan-tabs').find('li.active a').attr("plan-name");
+    drawComprehensionBoxes(comprehensionName);
+}
+
 function setSelectionRange(el, start, end) {
     if (document.createRange && window.getSelection) {
         var range = document.createRange();
@@ -347,7 +361,6 @@ function setSelectionRange(el, start, end) {
         var textNodes = getTextNodesIn(el);
         var foundStart = false;
         var charCount = 0, endCharCount;
-        var text = "";
 
         for (var i = 0, textNode; textNode = textNodes[i++]; ) {
             var text = $(textNode).text();
@@ -493,6 +506,14 @@ function resizeLeftView() {
     });
 }
 
+function updateCodeCanvasSize() {
+    var codeContainer = $('#code-container')[0];
+    $('#code-canvas').css("width", 1)
+        .css("height", 1)
+        .css("width", codeContainer.scrollWidth)
+        .css("height", codeContainer.scrollHeight);
+}
+
 function run(async, callback) {
     var running = $('#play-button').find('i').hasClass("fi-pause");
 
@@ -513,8 +534,8 @@ function run(async, callback) {
                     detectIterations();
                     markIterations(fullExampleName);
 
-                    var planIndex = planNames[currentExecution].index;
-                    var planTab = $('a[href="#panel'+planIndex+'"]');
+                    planIndex = planNames[currentExecution].index;
+                    planTab = $('a[href="#panel'+planIndex+'"]');
                     planTab.click();
 
                     for(var id in canvases) {
@@ -616,6 +637,17 @@ function addLogHtml(html) {
     logScrollBottom();
 }
 
+function trimLog() {
+    if (checkLogSizeIteration++ % 20 == 0) {
+        var logContainer = $('#log-container');
+        var lineCount = logContainer.find('div').length;
+        if (lineCount > logBufferSize) {
+            logContainer.find("div:lt("+(lineCount - logBufferSize)+")").remove();
+        }
+        checkLogSizeIteration = 1;
+    }
+}
+
 function setInitState() {
     $("#play-button").html('');
     $("#forward-button").html('');
@@ -662,108 +694,93 @@ function clearCache() {
     clearPage();
 }
 
-var eventSource = new EventSource(requestBase+"log");
-eventSource.onmessage = function(event) {
-    addLogHtml("<div>"+event.data+"</div>");
-};
+function registerListeners() {
+    $(window).resize(resizeContainers);
 
-eventSource.onerror = function(e) {
-    console.error(e);
-    setWaitingState();
-    addLogHtml("<div class='log-error'>ERROR: Lost connection to Log server. Reload to try again!</div>");
-    alert("An error occurred! Detailed information in the log.");
-    eventSource.close();
-};
+    //log listener
+    var eventSource = new EventSource(requestBase+"log");
+    eventSource.onmessage = function(event) {
+        addLogHtml("<div>"+event.data+"</div>");
+    };
+    eventSource.onerror = function(e) {
+        console.error(e);
+        setWaitingState();
+        addLogHtml("<div class='log-error'>ERROR: Lost connection to Log server. Reload to try again!</div>");
+        alert("An error occurred! Detailed information in the log.");
+        eventSource.close();
+    };
 
-function trimLog() {
-    if (checkLogSizeIteration++ % 20 == 0) {
-        var logContainer = $('#log-container');
-        var lineCount = logContainer.find('div').length;
-        if (lineCount > logBufferSize) {
-            logContainer.find("div:lt("+(lineCount - logBufferSize)+")").remove();
-        }
-        checkLogSizeIteration = 1;
-    }
-}
-
-$('#code-tabs').on('toggled', function (event, tab) {
-    if (tab.find('a').attr('href') == '#code-panel1') {
-        logScrollBottom();
-        $(this).find('li a[href="#code-panel1"]').html("Log");
-        $('#log-options').show();
-        $('#code-options').hide();
-    } else {
-        $('#log-options').hide();
-        $('#code-options').show();
-        updateComprehensionBoxes();
-    }
-});
-
-function scrollToTab(tab) {
-    var planTabs = $('#plan-tabs');
-    var middlePoint = planTabs.width() / 2 - tab.width() / 2;
-    var scrollPosition = tab.offset().left - tab.parent().offset().left + tab.parent().scrollLeft() - middlePoint;
-    planTabs.animate({
-        scrollLeft: scrollPosition
-    }, 400, "easeOutCirc");
-}
-
-$('#plan-tabs').on('toggled', function (event, tab) {
-    if (codeCanvas != null) {
-        codeCanvas.project.activeLayer.removeChildren();
-        codeCanvas.view.draw();
-        var planCanvasId = tab.find('a').attr('href').replace('#panel','#plan-canvas');
-        $(planCanvasId).hide().fadeIn(fadeSpeed);
-
-        scrollToTab(tab);
-    }
-    updateComprehensionBoxes();
-});
-
-$('#clear-log-button').click(function(){
-    $('#log-container').html("");
-});
-
-$('#scroll-lock').change(function(){
-    scrollLock = this.checked;
-    if (scrollLock) {
-        logScrollBottom();
-    }
-});
-
-function updateCodeCanvasSize() {
-    var codeContainer = $('#code-container')[0];
-    $('#code-canvas').css("width", 1)
-                    .css("height", 1)
-                    .css("width", codeContainer.scrollWidth)
-                    .css("height", codeContainer.scrollHeight);
-}
-
-function updateComprehensionBoxes() {
-    updateCodeCanvasSize();
-    var comprehensionName = $('#plan-tabs').find('li.active a').attr("plan-name");
-    drawComprehensionBoxes(comprehensionName);
-}
-
-$('#code-zoom-in').click(function(){
-    var codeContainer = $('#code-container');
-    var fontSize = parseInt(codeContainer.css('font-size').replace('px',''));
-    codeContainer.css('font-size',(fontSize+fontSizeStep)+"px");
-    updateComprehensionBoxes();
-});
-
-$('#code-zoom-out').click(function(){
-    var codeContainer = $('#code-container');
-    var fontSize = parseInt(codeContainer.css('font-size').replace('px',''));
-    codeContainer.css('font-size',(fontSize-fontSizeStep)+"px");
-    updateComprehensionBoxes();
-});
-
-function registerKeyListener() {
+    //key listener
     window.onkeydown = function(e) {
         var key = e.keyCode ? e.keyCode : e.which;
         if (key == 120) {    //F9
             run();
         }
-    }
+
+        if (key == 39) {
+            //select to next tab
+            $('#plan-tabs').find('li.active').next().find('a').click();
+        }
+
+        if (key == 37) {
+            //select to previous tab
+            $('#plan-tabs').find('li.active').prev().find('a').click();
+        }
+    };
+
+    //code tab click
+    $('#code-tabs').on('toggled', function (event, tab) {
+        if (tab.find('a').attr('href') == '#code-panel1') {
+            logScrollBottom();
+            $(this).find('li a[href="#code-panel1"]').html("Log");
+            $('#log-options').show();
+            $('#code-options').hide();
+        } else {
+            $('#log-options').hide();
+            $('#code-options').show();
+            updateComprehensionBoxes();
+        }
+    });
+
+    //plan tab click
+    $('#plan-tabs').on('toggled', function (event, tab) {
+        if (codeCanvas != null) {
+            codeCanvas.project.activeLayer.removeChildren();
+            codeCanvas.view.draw();
+            var planCanvasId = tab.find('a').attr('href').replace('#panel','#plan-canvas');
+            $(planCanvasId).hide().fadeIn(fadeSpeed);
+
+            scrollToTab(tab);
+        }
+        updateComprehensionBoxes();
+    });
+
+    //clear log button click
+    $('#clear-log-button').click(function(){
+        $('#log-container').html("");
+    });
+
+    //click scroll lock switch
+    $('#scroll-lock').change(function(){
+        scrollLock = this.checked;
+        if (scrollLock) {
+            logScrollBottom();
+        }
+    });
+
+    //zoom button click
+    $('#code-zoom-in').click(function(){
+        var codeContainer = $('#code-container');
+        var fontSize = parseInt(codeContainer.css('font-size').replace('px',''));
+        codeContainer.css('font-size',(fontSize+fontSizeStep)+"px");
+        updateComprehensionBoxes();
+    });
+
+    //zoom button click
+    $('#code-zoom-out').click(function(){
+        var codeContainer = $('#code-container');
+        var fontSize = parseInt(codeContainer.css('font-size').replace('px',''));
+        codeContainer.css('font-size',(fontSize-fontSizeStep)+"px");
+        updateComprehensionBoxes();
+    });
 }
