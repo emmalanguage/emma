@@ -18,7 +18,7 @@ import scala.io.Source
 class AlternatingLeastSquares2Test extends FunSuite
     with PropertyChecks with Matchers with BeforeAndAfter {
 
-  import AlternatingLeastSquares2.Schema._
+  import AlternatingLeastSquares2._
   import AlternatingLeastSquares2Test._
 
   // default parameters

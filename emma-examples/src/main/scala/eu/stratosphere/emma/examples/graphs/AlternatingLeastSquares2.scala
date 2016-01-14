@@ -1,215 +1,176 @@
 package eu.stratosphere.emma.examples.graphs
 
+import breeze.linalg._
+
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.api.model._
 import eu.stratosphere.emma.examples.Algorithm
 import eu.stratosphere.emma.runtime.Engine
+
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
 import scala.util.Random
 
-class AlternatingLeastSquares2(
-      input:      String,
-      output:     String,
-      features:   Int,
-      lambda:     Double,
-      iterations: Int,
-      rt:         Engine)
-    extends Algorithm(rt) {
-  import eu.stratosphere.emma.examples.graphs.AlternatingLeastSquares2.Schema._
+class AlternatingLeastSquares2(input: String, output: String, features: Int, lambda: Double,
+    iterations: Int, rt: Engine) extends Algorithm(rt) {
+
+  import eu.stratosphere.emma.examples.graphs.AlternatingLeastSquares2._
 
   def this(ns: Namespace, rt: Engine) = this(
-    ns get AlternatingLeastSquares2.Command.keyInput,
-    ns get AlternatingLeastSquares2.Command.keyOutput,
-    ns get AlternatingLeastSquares2.Command.keyFeatures,
-    ns get AlternatingLeastSquares2.Command.keyLambda,
-    ns get AlternatingLeastSquares2.Command.keyIterations,
+    ns.get(AlternatingLeastSquares2.Command.input),
+    ns.get(AlternatingLeastSquares2.Command.output),
+    ns.get(AlternatingLeastSquares2.Command.features),
+    ns.get(AlternatingLeastSquares2.Command.lambda),
+    ns.get(AlternatingLeastSquares2.Command.iterations),
     rt)
 
-  def run() = algorithm run rt
+  def run() = algorithm.run(rt)
 
   val algorithm = emma.parallelize {
-    val _features = features
-    val _lambda   = lambda
     // reusable values
-    val E  = Mat eye features
-    val V0 = Vector.fill(features          )(0.0)
-    val M0 = Vector.fill(features, features)(0.0)
-    // IO formats
-    val inputFormat  = new CSVInputFormat [Rating]
-    val outputFormat = new CSVOutputFormat[Rating]
+    val E = DenseMatrix.eye[Double](features)
+    val V0 = Vector.zeros[Double](features)
+    val M0 = DenseMatrix.zeros[Double](features, features)
 
     val ratings = for { // read input and gather all ratings
-      g <- read(input, inputFormat) groupBy { _.identity }
-    } yield {
-      val avg = g.values.map(_.value).sum() / g.values.count()
-      Rating(g.key._1, g.key._2, avg)
+      dup <- read(input, new CSVInputFormat[Rating]).groupBy(_.identity)
+    } yield { // if duplicate ratings present, take the average
+      val sum = dup.values.map(_.value).sum()
+      val n = dup.values.count()
+      Rating(dup.key._1, dup.key._2, sum / n)
     }
 
-    // initialize users partition
-    var users = for (g <- ratings groupBy { _.user })
-      yield Vertex(g.key, g.values.count(), V0)
+    // initialize user features with zeros
+    var users = for (perUser <- ratings.groupBy(_.user))
+      yield User(perUser.key, V0)
 
-    // initialize items partition
-    var items = for (g <- ratings groupBy { _.item }) yield {
-      val rnd = new Random(g.key.hashCode)
-      val cnt = g.values.count()
-      val avg = g.values.map(_.value).sum() / cnt
-      val Fi  = Vector.iterate(avg, _features) { _ => rnd.nextDouble() }
-      Vertex(g.key, cnt, Fi)
+    // initialize item features with random values
+    var items = for (perItem <- ratings.groupBy(_.item)) yield {
+      val random = new Random(perItem.key.hashCode)
+      val Fi = Vector.fill(features) { random.nextDouble() }
+      val sum = perItem.values.map(_.value).sum()
+      val ni = perItem.values.count()
+      Fi(0) = sum / ni
+      Item(perItem.key, Fi)
     }
 
-    // initialize dummy messages
-    var messages = for (user <- users; if user.degree < 0)
-      yield Message(user.id, user.degree, user.F, 0)
-
-    // iterations alternate between the users / items partitions
+    // iterations alternate between the user / item features
     // all feature vectors are updated per iteration
     for (_ <- 1 to iterations) {
-      messages = for { // derive preferences
-        user   <- users
-        rating <- ratings
-        if rating.user == user.id
-        item   <- items
-        if rating.item == item.id
-      } yield Message(user.id, user.degree, item.F, rating.value)
+      // derive user preferences
+      val userPrefs = for {
+        user <- users
+        rate <- ratings
+        if rate.user == user.id
+        item <- items
+        if rate.item == item.id
+      } yield Pref(user.id, item.features, rate.value)
 
-      users = for { // update state of users
-        g <- messages groupBy { m => m.dst -> m.degree }
-      } yield { // calculate new feature vector
-        val Vu = g.values.fold(V0)(m => m.F * m.rating, _ + _)
-        val Au = g.values.fold(M0)(m => m.F outer m.F,  _ + _)
-        val Eu = E * (_lambda * g.key._2)
-        Vertex(g.key._1, g.key._2, (Au + Eu) invMul Vu)
+      // update user features
+      users = for (perUser <- userPrefs.groupBy(_.id)) yield {
+        val nu = perUser.values.count()
+        val Vu = perUser.values.fold(V0)(_.scaledFeatures, _ + _)
+        val Au = perUser.values.fold(M0)(_.crossFeatures, _ + _)
+        val Eu = E * (lambda * nu)
+        User(perUser.key, inv(Au + Eu) * Vu)
       }
 
-      messages = for { // derive preferences
-        item   <- items
-        rating <- ratings
-        if rating.item == item.id
-        user   <- users
-        if rating.user == user.id
-      } yield Message(item.id, item.degree, user.F, rating.value)
+      // derive item preferences
+      val itemPrefs = for {
+        item <- items
+        rate <- ratings
+        if rate.item == item.id
+        user <- users
+        if rate.user == user.id
+      } yield Pref(item.id, user.features, rate.value)
 
-      items = for { // update state of users
-        g <- messages groupBy { m => m.dst -> m.degree }
-      } yield { // calculate new feature vector
-        val Vi = g.values.fold(V0)(m => m.F * m.rating, _ + _)
-        val Ai = g.values.fold(M0)(m => m.F outer m.F,  _ + _)
-        val Ei = E * (_lambda * g.key._2)
-        Vertex(g.key._1, g.key._2, (Ai + Ei) invMul Vi)
+      // update item features
+      items = for (perItem <- itemPrefs.groupBy(_.id)) yield {
+        val ni = perItem.values.count()
+        val Vi = perItem.values.fold(V0)(_.scaledFeatures, _ + _)
+        val Ai = perItem.values.fold(M0)(_.crossFeatures, _ + _)
+        val Ei = E * (lambda * ni)
+        Item(perItem.key, inv(Ai + Ei) * Vi)
       }
     }
 
     // calculate missing ratings
     val recommendations = for (user <- users; item <- items)
-      yield Rating(user.id, item.id, user.F inner item.F)
+      yield Rating(user.id, item.id, user.features.t * item.features)
+
     // write results to output
-    write(output, outputFormat) { recommendations }
+    write(output, new CSVOutputFormat[Rating]) { recommendations }
     recommendations
   }
 }
 
 object AlternatingLeastSquares2 {
+  type Id = Long
+
+  case class Rating(@id user: Id, @id item: Id, value: Double)
+      extends Identity[(Id, Id)] { def identity = (user, item) }
+
+  case class User(@id id: Id, features: Vector[Double])
+      extends Identity[Id] { def identity = id }
+
+  case class Item(@id id: Id, features: Vector[Double])
+    extends Identity[Id] { def identity = id }
+
+  case class Pref(@id id: Id, features: Vector[Double], rating: Double)
+      extends Identity[Id] {
+    def identity = id
+    def scaledFeatures = features * rating
+    def crossFeatures = {
+      val rowMatrix = features.toDenseVector.toDenseMatrix
+      rowMatrix.t * rowMatrix
+    }
+  }
 
   class Command extends Algorithm.Command[AlternatingLeastSquares2] {
     import Command._
-
-    override def name = "als"
-
-    override def description =
-      "Compute recommendations from a list of ratings."
+    val name = "als2"
+    val description = "Compute recommendations from a set of ratings."
 
     override def setup(parser: Subparser) = {
       super.setup(parser)
 
-      parser.addArgument(keyInput)
+      parser.addArgument(input)
         .`type`(classOf[String])
-        .dest(keyInput)
-        .metavar("RATINGS")
+        .dest(input)
+        .metavar("INPUT")
         .help("ratings file")
 
-      parser.addArgument(keyOutput)
+      parser.addArgument(output)
         .`type`(classOf[String])
-        .dest(keyOutput)
+        .dest(output)
         .metavar("OUTPUT")
         .help("recommendations file")
 
-      parser.addArgument(keyFeatures)
+      parser.addArgument(features)
         .`type`(classOf[Int])
-        .dest(keyFeatures)
+        .dest(features)
         .metavar("FEATURES")
-        .help("number of features per user/item")
+        .help("number of latent features")
 
-      parser.addArgument(keyLambda)
+      parser.addArgument(lambda)
         .`type`(classOf[Double])
-        .dest(keyLambda)
+        .dest(lambda)
         .metavar("LAMBDA")
-        .help("lambda factor")
+        .help("regularization factor")
 
-      parser.addArgument(keyIterations)
+      parser.addArgument(iterations)
         .`type`(classOf[Int])
-        .dest(keyIterations)
+        .dest(iterations)
         .metavar("ITERATIONS")
         .help("number of iterations")
     }
   }
 
   object Command {
-    val keyInput      = "input"
-    val keyOutput     = "output"
-    val keyFeatures   = "features"
-    val keyLambda     = "lambda"
-    val keyIterations = "iterations"
-  }
-
-  object Schema {
-    type Vid = Long
-    type Vec = Vector[Double]
-    type Mat = Vector[Vector[Double]]
-
-    case class Rating(@id user: Vid, @id item: Vid, value: Double)
-        extends Identity[(Vid, Vid)] { def identity = user -> item }
-
-    case class Vertex(@id id: Vid, degree: Long, F: Vec)
-        extends Identity[Vid] { def identity = id }
-
-    case class Message(@id dst: Vid, degree: Long, F: Vec, rating: Double)
-        extends Identity[Vid] { def identity = dst }
-
-    implicit class VecOps(val self: Vec) extends AnyVal {
-      def +(that: Double) = self map { _ + that }
-      def *(that: Double) = self map { _ * that }
-
-      def +(that: Vec) = self zip that map { case (x, y) => x + y }
-      def *(that: Vec) = self zip that map { case (x, y) => x * y }
-
-      def inner(that: Vec) = (self * that).sum
-      def outer(that: Vec) = self map { x => that map { _ * x } }
-    }
-
-    implicit class MatOps(val self: Mat) extends AnyVal {
-      def +(that: Double) = self map { _ + that }
-      def *(that: Double) = self map { _ * that }
-
-      def +(that: Mat) = self zip that map { case (u, v) => u + v }
-      def *(that: Mat) = self zip that map { case (u, v) => u * v }
-      
-      def rows = self.length
-      def cols = if (self.isEmpty) 0 else self.head.length
-      
-      def invMul(that: Vec) = {
-        import breeze.linalg._
-        val matrix = DenseMatrix.create(rows, cols, self.flatten.toArray)
-        val vector = DenseVector(that.toArray)
-        (inv(matrix) * vector).toScalaVector()
-      }
-    }
-
-    object Mat {
-      def eye(n: Int) = Vector.range(0, n) map { i =>
-        (Vector.fill(i)(0.0) :+ 1.0) ++ Vector.fill(n - i - 1)(0.0)
-      }
-    }
+    val input = "input"
+    val output = "output"
+    val features = "features"
+    val lambda = "lambda"
+    val iterations = "iterations"
   }
 }
