@@ -69,7 +69,7 @@ a {
     color: #2F74D0;
 }
 
-a:hover{
+a:hover, a:focus{
     color: black;
 }
 

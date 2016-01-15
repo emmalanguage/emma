@@ -26,10 +26,16 @@
     box-sizing: initial;
     width: auto;
     z-index: 91;
+    padding-right: 0;
 }
 
 #drop ul li {
     float: none;
+}
+
+#droplist {
+    max-height: 500px;
+    overflow-y: auto;
 }
 
 #code-container {
@@ -162,9 +168,17 @@
 }
 
 .text-zoom {
-    float: right;
+    position: absolute;
     cursor: pointer;
     margin: 0px 5px;
+}
+
+#code-zoom-in {
+    right: 0px;
+}
+
+#code-zoom-out {
+    right: 25px;
 }
 
 #hidden-area {

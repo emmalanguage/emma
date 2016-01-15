@@ -412,7 +412,7 @@ function setSelectionRange(el, start, end) {
 }
 
 function filterParallelizeFunction(code) {
-    codeStartIndex = code.indexOf('def run()');
+    codeStartIndex = code.indexOf('emma.parallelize');
 
     while (code[--codeStartIndex] != '\n') {}
 
@@ -473,14 +473,32 @@ function resizeRightView() {
 }
 
 function resizeLeftView() {
+    var codeWrapper = $(".code-wrapper");
+    codeWrapper.resizable({
+        minWidth: codeWrapper.parent().width()*0.2,
+        maxWidth: codeWrapper.parent().width()*0.8,
+        handles: 'e'
+    });
+
     var wrapper = $("#code-tab-wrapper");
+
     var codeTabs = $('#code-tabs');
+
     var maxHeight = $("html").height()
         - wrapper.offset().top
         - codeTabs.height()
         - wrapper.find('.ui-resizable-handle').height()
         - $('#log-options').height()
-        - 20;
+        - 14;   //margin bottom
+
+    if (codeTabs.find('li').css('borderBottomWidth').replace('px','') == 0) {
+        //firefox fix
+        maxHeight += 2
+    }
+
+    if (wrapper.find('.ui-resizable-handle').height() == null) {
+        maxHeight -= 7;
+    }
 
     var wrapperHeight = parseInt(wrapper.css("height").replace("px",""));
 
@@ -494,9 +512,13 @@ function resizeLeftView() {
     }
 
     var codeHeight = wrapper.height() - codeTabs.height();
-
     var logHeight = maxHeight - codeHeight;
-    $("#code-container").css("height", codeHeight);
+    var codeContainer = $("#code-container");
+
+    if (codeContainer.css('paddingBottom').replace('px','') == "0") {
+        codeHeight -=3;
+    }
+    codeContainer.css("height", codeHeight);
     $('#log-container').css("height", logHeight);
 
     wrapper.resizable({

@@ -1,10 +1,13 @@
-var strokeColor = 'black',
-    strokeWidth = 1,
-    font = 'Courier New',
-    fontSize = 18,
-    fillColor = 'white',
-    globalXOffset = 0,
-    globalYOffset = 0;
+var GraphStyle = {
+    strokeColor: 'black',
+    strokeWidth: 1,
+    font: 'Courier New',
+    fontSize: 18,
+    fillColor: 'white',
+    globalXOffset: 0,
+    globalYOffset: 0,
+    initialized: false
+};
 
 var graphData = null;
 
@@ -59,9 +62,9 @@ var Node = function(obj, planCanvas){
     node.text = new planCanvas.PointText({
         position: [node.x, node.y],
         content: "",
-        fillColor: node.textColor || strokeColor,
-        fontFamily: font,
-        fontSize: fontSize
+        fillColor: node.textColor || GraphStyle.strokeColor,
+        fontFamily: GraphStyle.font,
+        fontSize: GraphStyle.fontSize
     });
 
     node.setLabel(node.label);
@@ -113,8 +116,8 @@ var Edge = function(obj) {
             var path = arrow({
                 label: this.label,
                 segments: segments,
-                strokeColor: this.strokeColor || strokeColor,
-                strokeWidth: this.strokeWidth || strokeWidth,
+                strokeColor: this.strokeColor || GraphStyle.strokeColor,
+                strokeWidth: this.strokeWidth || GraphStyle.strokeWidth,
                 dashArray: this.dashArray || 1,
                 strokeCap: this.strokeCap,
                 strokeJoin: this.strokeJoin,
@@ -132,6 +135,8 @@ var nodes = [];
 var edges = [];
 
 function initGraph(plan, id) {
+    if (!GraphStyle.initialized)
+        loadStylesFromCss();
 
     var g = new dagre.graphlib.Graph();
     g.setGraph({});
@@ -184,12 +189,14 @@ function initGraph(plan, id) {
 }
 
 function loadStylesFromCss() {
-    var node = $('#hidden-area').append($('<div id="plan-node">')).find('#plan-node');
-    strokeColor = node.css('border-color');
-    strokeWidth = node.css('border-width').replace('px','');
-    font = node.css('font-family');
-    fontSize = node.css('font-size').replace('px','');
-    fillColor = node.css('background-color');
+    GraphStyle.initialized = true;
+    $('#hidden-area').append($('<div id="plan-node">'));
+    var node = $('#plan-node');
+    GraphStyle.strokeColor = node.css('borderTopColor');
+    GraphStyle.strokeWidth = node.css('borderTopWidth').replace('px','');
+    GraphStyle.font = node.css('font-family');
+    GraphStyle.fontSize = node.css('font-size').replace('px','');
+    GraphStyle.fillColor = node.css('background-color');
     node.remove();
 }
 

@@ -32,10 +32,11 @@
 
                 <div id="drop" class="content f-dropdown" data-dropdown-content>
                     <h6>Load Sample Code</h6>
+                    <div id="droplist">
+                        <ul id="exampleList">
 
-                    <ul id="exampleList">
-
-                    </ul>
+                        </ul>
+                    </div>
                 </div>
             </li>
             <li class="icon">
@@ -136,13 +137,6 @@
 <script>
     $(document).ready(function(){
         constructThemeChooser("theme-container");
-        loadStylesFromCss();
-        var codeWrapper = $(".code-wrapper");
-        codeWrapper.resizable({
-            minWidth: codeWrapper.parent().width()*0.2,
-            maxWidth: codeWrapper.parent().width()*0.8,
-            handles: 'e'
-        });
 
         $(document).foundation();
         resizeContainers();

@@ -71,8 +71,7 @@ function drawArrow(type, p1, p2, color) {
                 new paper.Point(points[2], points[3]),
                 new paper.Point(p1[0], p1[1])
             ],
-            strokeColor: color,
-            //fillColor: color
+            strokeColor: color
         });
     } else if (type == "arrow") {
         var endPoints = calcArrow(p1[0], p1[1], p2[0], p2[1]);
@@ -89,14 +88,13 @@ function drawArrow(type, p1, p2, color) {
                 new paper.Point(e2, e3)
             ],
             strokeColor: color,
-            fillColor: color,
+            fillColor: color
         });
     } else if (type == "circle"){
         new paper.Shape.Circle({
             center: new paper.Point(p2[0], p2[1]),
             radius: 5,
-            strokeColor: color,
-            //fillColor: color
+            strokeColor: color
         });
     } else {
         console.error("Unknown arrow type: ",type);
@@ -110,10 +108,10 @@ function drawLabel(obj) {
         var segment = obj.segments[i];
         var segment2 = obj.segments[i+1];
 
-        var distance = Math.pow(segment2[0]-segment[0],2) + Math.pow(segment2[1]-segment[1],2)
+        var distance = Math.pow(segment2[0]-segment[0],2) + Math.pow(segment2[1]-segment[1],2);
         if (distance > maxLength) {
             maxLength = distance;
-            sx = segment[0]
+            sx = segment[0];
             sy = segment[1];
             ex = segment2[0];
             ey = segment2[1];
@@ -159,18 +157,16 @@ function shortVector(px0, py0, px1, py1) {
     vector[0] *= (multiplier * - 1);
     vector[1] *= (multiplier * - 1);
 
-    var lastPoint = [
+    return [
         px0 + vector[0],
         py0 + vector[1]
     ];
-
-    return lastPoint;
 }
 
 function calcCone(px0, py0, px1, py1) {
     var vector = [
         px0 - px1,
-        py0 - py1,
+        py0 - py1
     ];
 
     //rotate 90 degree
@@ -219,7 +215,7 @@ function roundPath(path,radius) {
             });
         } else {
             path.add({
-                point: curPoint,
+                point: curPoint
             });
         }
 
@@ -240,9 +236,9 @@ function drawRect(planCanvas, node) {
     node.shape = new planCanvas.Shape.Rectangle({
         point: new planCanvas.Point(node.x - node.width/2 + node.xOffset, node.y - node.height/2 + node.yOffset),
         size: new planCanvas.Size(node.width, node.height),
-        strokeColor: node.strokeColor || strokeColor,
-        strokeWidth: node.strokeWidth || strokeWidth,
-        fillColor: node.fillColor || fillColor,
+        strokeColor: node.strokeColor || GraphStyle.strokeColor,
+        strokeWidth: node.strokeWidth || GraphStyle.strokeWidth,
+        fillColor: node.fillColor || GraphStyle.fillColor,
         dashArray: node.dashArray
     });
     node.text.position = [node.x + node.xOffset, node.y + node.yOffset];
@@ -255,10 +251,10 @@ function drawRect(planCanvas, node) {
     var group = new paper.Group([node.shape, node.text]);
 
     if (node.toolTipObject) {
-        group.onMouseEnter = function(e){
+        group.onMouseEnter = function(){
             node.toolTipObject.visible = true;
         };
-        group.onMouseLeave = function(e){
+        group.onMouseLeave = function(){
             node.toolTipObject.visible = false;
         };
     }
@@ -276,15 +272,15 @@ function drawInput(planCanvas, node) {
 
 function drawToolTip(canvas, node, text) {
     var tooltipOffset = 10;
-    var textSize = fontSize - 4;
+    var textSize = GraphStyle.fontSize - 4;
 
     var startX = node.x + node.width/2 + node.xOffset + tooltipOffset;
     var startY = node.y + node.yOffset - textSize/2;
 
     var tooltipText = new canvas.PointText({
         content: text,
-        fillColor: strokeColor,
-        fontFamily: font,
+        fillColor: GraphStyle.strokeColor,
+        fontFamily: GraphStyle.font,
         fontSize: textSize,
         point:[startX, node.y + node.yOffset + 5]
     });
@@ -294,9 +290,9 @@ function drawToolTip(canvas, node, text) {
     var background = new canvas.Shape.Rectangle({
         from:[startX - 1, startY - 1],
         to: [startX + tooltipText.bounds.width + 1, startY + tooltipText.bounds.height + 1],
-        fillColor: fillColor,
-        strokeColor: node.strokeColor || strokeColor,
-        strokeWidth: node.strokeWidth || strokeWidth,
+        fillColor: GraphStyle.fillColor,
+        strokeColor: node.strokeColor || GraphStyle.strokeColor,
+        strokeWidth: node.strokeWidth || GraphStyle.strokeWidth
     });
 
     node.toolTipObject = new paper.Group([background, tooltipText]);
@@ -308,9 +304,9 @@ function drawConstant(planCanvas, node) {
     node.shape = new planCanvas.Shape.Circle({
         center: [node.x + node.xOffset, node.y + node.yOffset],
         radius: radius,
-        strokeColor: node.strokeColor || strokeColor,
-        strokeWidth: node.strokeWidth || strokeWidth,
-        fillColor: node.fillColor || fillColor,
+        strokeColor: node.strokeColor || GraphStyle.strokeColor,
+        strokeWidth: node.strokeWidth || GraphStyle.strokeWidth,
+        fillColor: node.fillColor || GraphStyle.fillColor,
         dashArray: node.dashArray
     });
     node.text.position = [node.x + node.xOffset, node.y + node.yOffset];
@@ -322,17 +318,17 @@ paper.Shape.Cylinder = function (object) {
     var lowerEllipse = new paper.Shape.Ellipse({
        center: [object.x + object.xOffset, object.y + object.height/2 + object.yOffset],
        radius: [object.width / 2, 5],
-       fillColor: object.fillColor || fillColor,
-       strokeColor: object.strokeColor || strokeColor,
-       strokeWidth: object.strokeWidth || strokeWidth,
+       fillColor: object.fillColor || GraphStyle.fillColor,
+       strokeColor: object.strokeColor || GraphStyle.strokeColor,
+       strokeWidth: object.strokeWidth || GraphStyle.strokeWidth,
        dashArray: object.dashArray
     });
 
     var rect = paper.Shape.Rectangle({
        point: new paper.Point(object.x - object.width/2 + object.xOffset, object.y - object.height/2 + object.yOffset + 5),
        size: new paper.Size(object.width, object.height - 5),
-       strokeWidth: object.strokeWidth || strokeWidth,
-       fillColor: object.fillColor || fillColor
+       strokeWidth: object.strokeWidth || GraphStyle.strokeWidth,
+       fillColor: object.fillColor || GraphStyle.fillColor
     });
 
     //border lines
@@ -341,8 +337,8 @@ paper.Shape.Cylinder = function (object) {
             new paper.Point(object.x - object.width/2 + object.xOffset, object.y + object.yOffset - object.height / 2 + 5),
             new paper.Point(object.x - object.width/2 + object.xOffset, object.y + object.yOffset + object.height / 2)
         ],
-        strokeColor: object.strokeColor || strokeColor,
-        strokeWidth: object.strokeWidth || strokeWidth,
+        strokeColor: object.strokeColor || GraphStyle.strokeColor,
+        strokeWidth: object.strokeWidth || GraphStyle.strokeWidth,
         dashArray: object.dashArray || null
     });
 
@@ -351,8 +347,8 @@ paper.Shape.Cylinder = function (object) {
             new paper.Point(object.x + object.width/2 + object.xOffset, object.y + object.yOffset - object.height / 2 + 5),
             new paper.Point(object.x + object.width/2 + object.xOffset, object.y + object.yOffset + object.height / 2)
         ],
-        strokeColor: object.strokeColor || strokeColor,
-        strokeWidth: object.strokeWidth || strokeWidth,
+        strokeColor: object.strokeColor || GraphStyle.strokeColor,
+        strokeWidth: object.strokeWidth || GraphStyle.strokeWidth,
         dashArray: object.dashArray || null
     });
 
@@ -360,20 +356,20 @@ paper.Shape.Cylinder = function (object) {
     var upperEllipse = new paper.Shape.Ellipse({
        center: [object.x + object.xOffset, object.y + object.yOffset - object.height/2 + 5],
        radius: [object.width/2, 5],
-       fillColor: object.fillColor || fillColor,
-       strokeColor: object.strokeColor || strokeColor,
-       strokeWidth: object.strokeWidth || strokeWidth,
+       fillColor: object.fillColor || GraphStyle.fillColor,
+       strokeColor: object.strokeColor || GraphStyle.strokeColor,
+       strokeWidth: object.strokeWidth || GraphStyle.strokeWidth,
        dashArray: object.dashArray || null
     });
 
     var group = new paper.Group([lowerEllipse, rect, leftLine, rightLine, upperEllipse, object.text]);
 
     if (object.toolTipObject) {
-        group.onMouseEnter = function(e){
+        group.onMouseEnter = function(){
             object.toolTipObject.visible = true;
         };
 
-        group.onMouseLeave = function(e){
+        group.onMouseLeave = function(){
             object.toolTipObject.visible = false;
         };
     }
