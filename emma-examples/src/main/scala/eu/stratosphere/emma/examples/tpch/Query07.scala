@@ -105,7 +105,7 @@ class Query07(inPath: String, outPath: String, nation1: String, nation2: String,
           g.key.suppNation,
           g.key.custNation,
           g.key.year,
-          tr(g.values.map(x => x.volume).sum()))
+          tr(g.values.map(x => x.volume).sum))
       }
 
       // write out the result

@@ -8,6 +8,7 @@ import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
 import scala.collection.mutable
 import scala.math.pow
+import scala.Ordering.by
 
 class LabelRank(
       input:           String,
@@ -49,7 +50,7 @@ class LabelRank(
     val loops     = for (v <- vertexIds) yield Edge(v, v)
     val edges     = (directed plus reversed plus loops).distinct()
     val vertices  = for (ge <- edges.groupBy(_.src))
-      yield Vertex(ge.key, ge.values.count())
+      yield Vertex(ge.key, ge.values.size)
 
     var labels    = for {
       e <- edges
@@ -70,15 +71,15 @@ class LabelRank(
       } yield Label(li.vertex, li.label, lj.prob)
 
       val propLabels = for (gp <- propagation.groupBy(_.identity)) yield {
-        val sum = gp.values.map(_.prob).sum()
-        val cnt = gp.values.count()
+        val sum = gp.values.map(_.prob).sum
+        val cnt = gp.values.size
         Label(gp.key._1, gp.key._2, sum / cnt)
       }
 
       val inflation = for (gi <- propLabels.groupBy(_.vertex))
-        yield gi.key -> gi.values.map(l => pow(l.prob, inf)).sum()
+        yield gi.key -> gi.values.map(l => pow(l.prob, inf)).sum
 
-      inflation.count()
+      inflation.size
 
       val infLabels = for {
         pl <- propLabels
@@ -103,9 +104,9 @@ class LabelRank(
       val condSums = for (gc <- condUpdates.groupBy(_._1))
         yield gc.key -> gc.values.map {
           case (_, ls1, ls2) => if (ls1 subsetOf ls2) 1 else 0
-        }.sum()
+        }.sum
 
-      condSums.count()
+      condSums.size
 
       labels = for {
         l <- infLabels
@@ -116,12 +117,12 @@ class LabelRank(
         if s._2 <= sim * v.degree
       } yield identity(l)
 
-      changes = labels.count()
+      changes = labels.size
       oscillating(changes) += 1
     }
 
     labels = for (gl <- labels.groupBy(_.vertex)) yield
-      Label(gl.key, gl.values.maxBy(_.prob < _.prob).get.label, 1.0)
+      Label(gl.key, gl.values.max(by(_.prob)).label, 1.0)
 
     write(output, new CSVOutputFormat[Label]) { labels }
     labels

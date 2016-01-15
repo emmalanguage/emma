@@ -84,7 +84,7 @@ class Query05(inPath: String, outPath: String, region: String, date: String, rt:
 
         new Result(
           g.key.name,
-          tr(g.values.map(x => x.extendedPrice * (1 - x.discount)).sum()))
+          tr(g.values.map(x => x.extendedPrice * (1 - x.discount)).sum))
       }
 
       // write out the result

@@ -39,7 +39,9 @@ class MinimumSpanningForest(inputUrl: String, outputUrl: String, rt: Engine) ext
         //---------------------------------------------------------------------
         // Phase 1. min-edge picking (TODO: resolve ties)
         //---------------------------------------------------------------------
-        val Emin = for (g <- edges.groupBy(_.src)) yield g.values.minBy((x, y) => x.label < y.label).head
+        val Emin = for (g <- edges.groupBy(_.src))
+          yield g.values.min(comparing { (x, y) => x.label < y.label })
+
         // extend S
         S = S plus Emin
 

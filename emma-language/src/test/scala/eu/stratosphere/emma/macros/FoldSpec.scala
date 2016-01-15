@@ -1,6 +1,8 @@
 package eu.stratosphere.emma.macros
 
 import java.io.ByteArrayOutputStream
+import java.util.Collections
+import java.util.concurrent.ConcurrentHashMap
 
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.runtime.Native
@@ -63,29 +65,28 @@ class FoldSpec extends FunSuite with Matchers with PropertyChecks {
     }
   }
 
-  test("count, size and length") {
+  test("count and size") {
     forAll { xs: Seq[Int] =>
-      val (count, size, length) = emma.parallelize {
+      val (count, size) = emma.parallelize {
         val bag = DataBag(xs)
-        (bag.count(), bag.size(), bag.length())
+        (bag.count(_ => true), bag.size)
       } run runtime
 
       count  should be (xs count { _ => true })
       size   should be (xs.size)
-      length should be (xs.length)
     }
   }
 
   test("min and max of empty DataBag") {
     intercept[NoSuchElementException] {
       emma.parallelize {
-        DataBag(Seq.empty[Int]).min()
+        DataBag(Seq.empty[Int]).min
       } run runtime
     }
 
     intercept[NoSuchElementException] {
       emma.parallelize {
-        DataBag(Seq.empty[Int]).max()
+        DataBag(Seq.empty[Int]).max
       } run runtime
     }
   }
@@ -95,48 +96,11 @@ class FoldSpec extends FunSuite with Matchers with PropertyChecks {
       whenever(xs.nonEmpty) {
         val (min, max) = emma.parallelize {
           val bag = DataBag(xs)
-          (bag.min(), bag.max())
+          (bag.min, bag.max)
         } run runtime
 
         min should be (xs.min)
         max should be (xs.max)
-      }
-    }
-  }
-
-  test("minBy and maxBy (first 5 letters)") {
-    forAll { xs: Seq[String] =>
-      val (min, max) = emma.parallelize {
-        val lt = (x: String, y: String) =>
-          x.take(5) < y.take(5)
-
-        val bag = DataBag(xs)
-        (bag minBy lt, bag maxBy lt)
-      } run runtime
-
-      if (xs.isEmpty) {
-        min should be ('empty)
-        max should be ('empty)
-      } else {
-        min.get take 5 should be(xs.map { _ take 5 }.min)
-        max.get take 5 should be(xs.map { _ take 5 }.max)
-      }
-    }
-  }
-
-  test("minWith and maxWith (length)") {
-    forAll { xs: Seq[String] =>
-      val (min, max) = emma.parallelize {
-        val bag = DataBag(xs)
-        (bag minWith { _.length }, bag maxWith { _.length })
-      } run runtime
-
-      if (xs.isEmpty) {
-        min should be ('empty)
-        max should be ('empty)
-      } else {
-        min.get.length should be(xs.map { _.length }.min)
-        max.get.length should be(xs.map { _.length }.max)
       }
     }
   }
@@ -159,7 +123,7 @@ class FoldSpec extends FunSuite with Matchers with PropertyChecks {
     forAll { xs: Seq[Int] =>
       val (sum, product) = emma.parallelize {
         val bag = DataBag(xs)
-        (bag.sum(), bag.product())
+        (bag.sum, bag.product)
       } run runtime
 
       sum     should be (xs.sum)
@@ -167,22 +131,10 @@ class FoldSpec extends FunSuite with Matchers with PropertyChecks {
     }
   }
 
-  test("sumWith and productWith (length)") {
-    forAll { xs: Seq[String] =>
-      val (sum, product) = emma.parallelize {
-        val bag = DataBag(xs)
-        (bag sumWith { _.length }, bag productWith { _.length })
-      } run runtime
-
-      sum     should be (xs.map { _.length }.sum)
-      product should be (xs.map { _.length }.product)
-    }
-  }
-
-  test("countWith (even)") {
+  test("count (even)") {
     forAll { xs: Seq[Int] =>
       val even = emma.parallelize {
-        DataBag(xs) countWith { _ % 2 == 0 }
+        DataBag(xs) count { _ % 2 == 0 }
       } run runtime
 
       even should be (xs count { _ % 2 == 0 })
@@ -222,24 +174,22 @@ class FoldSpec extends FunSuite with Matchers with PropertyChecks {
     }
   }
 
-  test("fold group fusion (char count)") {
-    forAll { str: String =>
-      val buffer = new ByteArrayOutputStream()
-      Console.withOut(buffer) {
-        emma.comprehend {
-          for (g <- DataBag(str) groupBy identity)
-            yield g.key -> g.values.count()
-        }
+  test("fold group fusion") {
+    val buffer = new ByteArrayOutputStream()
+    Console.withOut(buffer) {
+      emma.comprehend {
+        for (g <- DataBag(1 to 100) groupBy identity)
+          yield g.key -> g.values.size
       }
-
-      buffer.toString.toLowerCase should include ("foldgroup")
     }
+
+    buffer.toString.toLowerCase should include ("foldgroup")
   }
 
-  test("random") {
+  test("sample") {
     forAll(Gen.listOfN(100, arb[Int])) { xs: List[Int] =>
       val rand = emma.parallelize {
-        DataBag(xs).random(7)
+        DataBag(xs).sample(7)
       }.run(runtime)
 
       rand should not contain theSameElementsAs (xs take 7)

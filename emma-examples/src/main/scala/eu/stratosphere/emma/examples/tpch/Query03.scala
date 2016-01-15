@@ -70,7 +70,7 @@ class Query03(inPath: String, outPath: String, segment: String, date: String, rt
 
         new Result(
           g.key.orderKey,
-          tr(g.values.map(x => x.extendedPrice * (1 - x.discount)).sum()),
+          tr(g.values.map(x => x.extendedPrice * (1 - x.discount)).sum),
           g.key.orderDate,
           g.key.shipPriority)
       }

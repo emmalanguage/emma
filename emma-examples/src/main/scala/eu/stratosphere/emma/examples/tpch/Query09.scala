@@ -92,7 +92,7 @@ class Query09(inPath: String, outPath: String, color: String, rt: Engine, val tr
         new Result(
           g.key.nation,
           g.key.year,
-          tr(g.values.map(x => x.amount).sum())
+          tr(g.values.map(x => x.amount).sum)
         )
       }
 

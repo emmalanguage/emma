@@ -155,6 +155,9 @@ package object api {
   implicit def materializeCSVConverters[T]: CSVConverters[T] =
     macro ConvertersMacros.materializeCSVConverters[T]
 
+  def comparing[A](lt: (A, A) => Boolean): Ordering[A] =
+    Ordering.fromLessThan(lt)
+
   // -----------------------------------------------------
   // exceptions
   // -----------------------------------------------------

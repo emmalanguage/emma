@@ -16,12 +16,16 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
   import universe._
   import syntax._
 
+  private lazy val id = q"_root_.scala.Predef.identity"
+  private lazy val option = q"_root_.scala.Option"
+  private lazy val some = q"_root_.scala.Some"
+  private lazy val list = q"_root_.scala.List"
   private lazy val self = unbox(c.prefix.tree)
 
   // Unbox implicit type conversions
   private def unbox(tree: Tree): Tree =
     unAscribed(tree) match {
-      case q"$_[$_]($arg)" => arg
+      case q"$_[$_](${arg: Tree})" => arg
       case _ => tree
     }
 
@@ -29,57 +33,33 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
   def nonEmpty = q"$self.exists(_ => ${true})"
 
   def reduce[E](z: Expr[E])(p: Expr[(E, E) => E]) =
-    q"$self.fold($z)(_root_.scala.Predef.identity, $p)"
+    q"$self.fold($z)($id, $p)"
 
   def reduceOption[E: c.WeakTypeTag](p: Expr[(E, E) => E]) = {
+    val E = weakTypeOf[E]
     val $(x, y) = $("x", "y")
-    val oa = weakTypeOf[Option[E]]
-    q"""$self.fold($None: $oa)(x => _root_.scala.Some(x): $oa, {
+    q"""$self.fold($option.empty[$E])($option(_), {
       case ($x, $None) => $x
       case ($None, $y) => $y
-      case ($x, $y) => _root_.scala.Some($p($x.get, $y.get))
+      case ($x, $y) => $some($p($x.get, $y.get))
     })"""
   }
 
-  def minBy[E: c.WeakTypeTag](p: Expr[(E, E) => Boolean]) = {
-    val $(x, y) = $("x", "y")
-    q"""$self.reduceOption[${weakTypeOf[E]}]({
-      case ($x, $y) => if ($p($x, $y)) $x else $y
-    })"""
-  }
+  def min[E](o: Expr[Ordering[E]]) =
+    q"$self.reduceOption($o.min(_, _)).get"
 
-  def maxBy[E](p: Expr[(E, E) => Boolean]) =
-    q"$self.minBy(!$p(_, _))"
+  def max[E](o: Expr[Ordering[E]]) =
+    q"$self.reduceOption($o.max(_, _)).get"
 
-  def minWith[E, R](f: Expr[E => R])(o: Expr[Ordering[R]]) = {
-    val $(x, y) = $("x", "y")
-    q"$self.minBy({ case ($x, $y) => $o.lt($f($x), $f($y)) })"
-  }
-
-  def maxWith[E, R](f: Expr[E => R])(o: Expr[Ordering[R]]) =
-    q"$self.minWith($f)($o.reverse)"
-
-  def min[E]()(o: c.Expr[Ordering[E]]) =
-    q"$self.reduceOption($o.min).get"
-
-  def max[E]()(o: c.Expr[Ordering[E]]) =
-    q"$self.reduceOption($o.max).get"
-
-  def sumWith[E, R](f: Expr[E => R])(n: Expr[Numeric[R]]) =
-    q"$self.fold($n.zero)($f, $n.plus)"
-
-  def productWith[A, B](f: Expr[A => B])(n: Expr[Numeric[B]]) =
-    q"$self.fold($n.one)($f, $n.times)"
-
-  def sum[E]()(n: Expr[Numeric[E]]) =
+  def sum[E](n: Expr[Numeric[E]]) =
     q"$self.reduce($n.zero)($n.plus)"
 
-  def product[E]()(n: Expr[Numeric[E]]) =
+  def product[E](n: Expr[Numeric[E]]) =
     q"$self.reduce($n.one)($n.times)"
 
-  def count() = q"$self.fold(0l)(_ => 1l, _ + _): Long"
+  def size = q"$self.fold(${0l})(_ => ${1l}, _ + _): $LONG"
 
-  def countWith[E](p: Expr[E => Boolean]) = {
+  def count[E](p: Expr[E => Boolean]) = {
     val x = $"x"
     q"""$self.fold(${0l})({
       case $x if $p($x) => ${1l}
@@ -94,21 +74,22 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
     q"$self.fold(${true})($p, _ && _)"
 
   def find[E: c.WeakTypeTag](p: Expr[E => Boolean]) = {
+    val E = weakTypeOf[E]
     val x = $"x"
-    q"""$self.fold($None: ${weakTypeOf[Option[E]]})({
-      case $x if $p($x) => _root_.scala.Some($x)
+    q"""$self.fold($option.empty[$E])({
+      case $x if $p($x) => $some($x)
       case _ => $None
     }, {
-      case ($x @ _root_.scala.Some(_), _) => $x
-      case (_, $x @ _root_.scala.Some(_)) => $x
+      case ($x @ $some(_), _) => $x
+      case (_, $x @ $some(_)) => $x
       case (_, _) => $None
     })"""
   }
 
   def bottom[E: c.WeakTypeTag](n: Expr[Int])(o: Expr[Ordering[E]]) = {
-    val LIST_E = weakTypeOf[List[E]]
-    q"""if ($n <= ${0}) { $Nil: $LIST_E } else {
-      $self.fold[$LIST_E]($Nil)(_ :: $Nil,
+    val E = weakTypeOf[E]
+    q"""if ($n <= ${0}) $list.empty[$E] else {
+      $self.fold($list.empty[$E])(_ :: $Nil,
         _root_.eu.stratosphere.emma.macros.FoldMacros.merge($n, _, _)($o))
     }"""
   }
@@ -116,16 +97,26 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
   def top[E](n: Expr[Int])(o: Expr[Ordering[E]]) =
     q"$self.bottom($n)($o.reverse)"
 
-  def random[E: c.WeakTypeTag](n: Expr[Int]) = {
-    val LIST_E = weakTypeOf[List[E]]
-    val xs = $"xs"
-    val ys = $"ys"
-    q"""if ($n <= ${0}) { $Nil: $LIST_E } else {
-      $self.fold[$LIST_E]($Nil)(_ :: $Nil, { case ($xs, $ys) =>
-        if ($xs.size + $ys.size <= $n) { $xs ::: $ys }
-        else { new _root_.scala.util.Random().shuffle($xs ::: $ys).take($n) }
-      })
-    }"""
+  def sample[E: c.WeakTypeTag](n: Expr[Int]) = {
+    val E = weakTypeOf[E]
+    val $(x, y, sx, sy, rand, seed) = $("x", "y", "sx", "sy", "rand", "seed")
+    val now = q"_root_.java.lang.System.currentTimeMillis"
+    q"""if ($n <= ${0}) $list.empty[$E] else
+      $self.fold(($list.empty[$E], $now))({
+        case $x => ($x :: $Nil, $x.hashCode)
+      }, { case (($x, $sx), ($y, $sy)) =>
+        if ($x.size + $y.size <= $n) ($x ::: $y, $sx ^ $sy) else {
+          val $seed = $now ^ (($sx << ${Integer.SIZE}) | $sy)
+          val $rand = new _root_.scala.util.Random($seed)
+          ($rand.shuffle($x ::: $y).take($n), $rand.nextLong())
+        }
+      })._1"""
+  }
+
+  def writeCsv[E: c.WeakTypeTag](location: Expr[String]) = {
+    val E = weakTypeOf[E]
+    q"""_root_.eu.stratosphere.emma.api.write($location,
+      new _root_.eu.stratosphere.emma.api.CSVOutputFormat[$E])($self)"""
   }
 }
 

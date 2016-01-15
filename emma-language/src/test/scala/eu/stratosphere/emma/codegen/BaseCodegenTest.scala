@@ -132,7 +132,7 @@ abstract class BaseCodegenTest(rtName: String)
   // FlatMap
   // --------------------------------------------------------------------------
 
-  "FlapMap" - {
+  "FlatMap" - {
     "strings" in emma.parallelize {
       DataBag(from.jabberwocky) flatMap { line =>
         DataBag(line split "\\W+" filter { word =>
@@ -283,29 +283,29 @@ abstract class BaseCodegenTest(rtName: String)
       val top = for (g <- bag groupBy { _ % semiFinal })
         yield g.values.fetch().sorted.take(semiFinal / 2).sum
 
-      top.max()
+      top.max
     }.verifyWith(runtimeUnderTest)
   }
 
   "FoldGroup" - {
     "of primitives" in emma.parallelize {
       for (g <- DataBag(1 to 100 map { _ -> 0 }) groupBy { _._1 })
-        yield g.values.map { _._2 }.sum()
+        yield g.values.map { _._2 }.sum
     }.verifyWith(runtimeUnderTest)
 
     "of case classes" in emma.parallelize {
       for (yearly <- DataBag(from.imdb) groupBy { _.year })
-        yield yearly.values.count()
+        yield yearly.values.size
     }.verifyWith(runtimeUnderTest)
 
     "of case classes multiple times" in emma.parallelize {
       val movies = DataBag(from.imdb)
       
       for (decade <- movies groupBy { _.year / 10 }) yield {
-        val total = decade.values.count()
-        val avgRating = decade.values.map { _.rating.toInt * 10 }.sum() / (total * 10.0)
-        val minRating = decade.values.map { _.rating }.min()
-        val maxRating = decade.values.map { _.rating }.max()
+        val total = decade.values.size
+        val avgRating = decade.values.map { _.rating.toInt * 10 }.sum / (total * 10.0)
+        val minRating = decade.values.map { _.rating }.min
+        val maxRating = decade.values.map { _.rating }.max
 
         (s"${decade.key * 10} - ${decade.key * 10 + 9}",
           total, avgRating, minRating, maxRating)
@@ -318,7 +318,7 @@ abstract class BaseCodegenTest(rtName: String)
       
       for (yr <- yearlyRatings) yield {
         val (year, rating) = yr.key
-        (year, rating, yr.values.count())
+        (year, rating, yr.values.size)
       }
     }.verifyWith(runtimeUnderTest)
 
@@ -327,11 +327,11 @@ abstract class BaseCodegenTest(rtName: String)
 
       val leastPopular = for {
         decade <- movies groupBy { _.year / 10 }
-      } yield (decade.key, decade.values.count(), decade.values.map { _.rating }.min())
+      } yield (decade.key, decade.values.size, decade.values.map { _.rating }.min)
 
       val mostPopular = for {
         decade <- movies groupBy { _.year / 10 }
-      } yield (decade.key, decade.values.count(), decade.values.map { _.rating }.max())
+      } yield (decade.key, decade.values.size, decade.values.map { _.rating }.max)
 
       (leastPopular, mostPopular)
     }.verifyWith(runtimeUnderTest)
@@ -341,7 +341,7 @@ abstract class BaseCodegenTest(rtName: String)
         can10 <- DataBag(from.cannes) groupBy { _.year / 10 }
         ber10 <- DataBag(from.berlin) groupBy { _.year / 10 }
         if can10.key == ber10.key
-      } yield (can10.values.count(), ber10.values.count())
+      } yield (can10.values.size, ber10.values.size)
     }.verifyWith(runtimeUnderTest)
   }
 
@@ -359,11 +359,11 @@ abstract class BaseCodegenTest(rtName: String)
     }.verifyWith(runtimeUnderTest)
 
     "of primitives (sum)" in emma.parallelize {
-      DataBag(1 to 200).sum()
+      DataBag(1 to 200).sum
     }.verifyWith(runtimeUnderTest)
 
     "of case classes (count)" in emma.parallelize {
-      DataBag(from.imdb).count()
+      DataBag(from.imdb).size
     }.verifyWith(runtimeUnderTest)
   }
 
@@ -406,7 +406,7 @@ abstract class BaseCodegenTest(rtName: String)
 
         val updates3 = DataBag(Update(3, 1) :: Update(6, 2) :: Update(6, 3) :: Nil)
         withState.updateWithMany(updates3)(_.identity, (s, us) => {
-          us.map { _.inc }.sum()
+          us.map { _.inc }.sum
           DataBag(42 :: Nil)
         })
 
@@ -484,25 +484,25 @@ abstract class BaseCodegenTest(rtName: String)
     "Pattern matching in `yield`" in emma.parallelize {
       val range = DataBag(0.to(100).zipWithIndex)
       val squares = for (xy <- range) yield xy match { case (x, y) => x + y }
-      squares.sum()
+      squares.sum
     }.verifyWith(runtimeUnderTest)
 
     "Map with partial function" in emma.parallelize {
       val range = DataBag(0.to(100).zipWithIndex)
       val squares = range map { case (x, y) => x + y }
-      squares.sum()
+      squares.sum
     }.verifyWith(runtimeUnderTest)
 
     "Destructuring of a generator" in emma.parallelize {
       val range = DataBag(0.to(100).zipWithIndex)
       val squares = for { (x, y) <- range } yield x + y
-      squares.sum()
+      squares.sum
     }.verifyWith(runtimeUnderTest)
 
     "Intermediate value definition" in emma.parallelize {
       val range = DataBag(0.to(100).zipWithIndex)
       val squares = for (xy <- range; sqr = xy._1 * xy._2) yield sqr
-      squares.sum()
+      squares.sum
     }.verifyWith(runtimeUnderTest)
 
     "Root package capture" in emma.parallelize {
@@ -511,7 +511,7 @@ abstract class BaseCodegenTest(rtName: String)
       val java = "java"
       val org = "org"
       val scala = "scala"
-      DataBag(0 to 100).sum()
+      DataBag(0 to 100).sum
     }.verifyWith(runtimeUnderTest)
 
     "Constant expressions" in emma.parallelize {
@@ -532,7 +532,7 @@ abstract class BaseCodegenTest(rtName: String)
 
         while (p <= math.sqrt(N)) {
           primes = for { (n, payload) <- primes if n > p && n % p != 0 } yield (n, payload)
-          p = primes.map { _._1 }.min()
+          p = primes.map { _._1 }.min
         }
 
         primes map { _._1 }
@@ -544,7 +544,7 @@ abstract class BaseCodegenTest(rtName: String)
 
         while (p >= -math.sqrt(N)) {
           primes = for { (n, payload) <- primes if n < p && n % p != 0 } yield (n, payload)
-          p = primes.map { _._1 }.max()
+          p = primes.map { _._1 }.max
         }
 
         primes map { _._1 }

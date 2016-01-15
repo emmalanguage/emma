@@ -19,19 +19,19 @@ class UnComprehensionTest extends FunSuite with Matchers with RuntimeUtil {
 
   test("fold-group fusion") {
     val actual = q"""_root_.eu.stratosphere.emma.macros.reComprehend {
-      DataBag(1 to 100).groupBy { _ % 7 }.map { _.values.sum() }.product()
+      DataBag(1 to 100).groupBy { _ % 7 }.map { _.values.sum }.product
     }.run(Native())"""
 
-    val expected = DataBag(1 to 100).groupBy { _ % 7 }.map { _.values.sum() }.product()
+    val expected = DataBag(1 to 100).groupBy { _ % 7 }.map { _.values.sum }.product
     actual should evalTo (expected)
   }
 
   test("filter only") {
     val actual = q"""_root_.eu.stratosphere.emma.macros.reComprehend {
-      (for (x <- DataBag(1 to 100) if x % 2 == 0) yield x).sum()
+      (for (x <- DataBag(1 to 100) if x % 2 == 0) yield x).sum
     }.run(Native())"""
 
-    val expected = (for (x <- DataBag(1 to 100) if x % 2 == 0) yield x).sum()
+    val expected = (for (x <- DataBag(1 to 100) if x % 2 == 0) yield x).sum
     actual should evalTo (expected)
   }
 
@@ -42,7 +42,7 @@ class UnComprehensionTest extends FunSuite with Matchers with RuntimeUtil {
         y <- DataBag(1 to 200)
         z = x + y
         if z % 2 == 0
-      } yield z).sum()
+      } yield z).sum
     }.run(Native())"""
 
     val expected = (for {
@@ -50,7 +50,7 @@ class UnComprehensionTest extends FunSuite with Matchers with RuntimeUtil {
       y <- DataBag(1 to 200)
       z = x + y
       if z % 2 == 0
-    } yield z).sum()
+    } yield z).sum
 
     actual should evalTo (expected)
   }
@@ -61,14 +61,14 @@ class UnComprehensionTest extends FunSuite with Matchers with RuntimeUtil {
         x <- DataBag(1 to 100)
         y <- DataBag(1 to 200)
         if x == y
-      } yield x * y).sum()
+      } yield x * y).sum
     }.run(Native())"""
 
     val expected = (for {
       x <- DataBag(1 to 100)
       y <- DataBag(1 to 200)
       if x == y
-    } yield x * y).sum()
+    } yield x * y).sum
 
     actual should evalTo (expected)
   }

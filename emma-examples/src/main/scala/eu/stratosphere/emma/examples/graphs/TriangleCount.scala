@@ -33,7 +33,7 @@ class TriangleCount(input: String, output: String, rt: Engine)
       e <- edges
       p <- paths2
       if e == p
-    } yield p).count() / 3
+    } yield p).size / 3
     // print the result to the console
     println(s"The number of triangles in the graph is $triangles")
     triangles

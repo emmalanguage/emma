@@ -65,11 +65,11 @@ class Query01(inPath: String, outPath: String, delta: Int, rt: Engine, truncate:
           def tr(v: Double) = if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
 
           // compute base aggregates
-          val sumQty = g.values.map(_.quantity).sum()
-          val sumBasePrice = g.values.map(_.extendedPrice).sum()
-          val sumDiscPrice = g.values.map(l => l.extendedPrice * (1 - l.discount)).sum()
-          val sumCharge = g.values.map(l => l.extendedPrice * (1 - l.discount) * (1 + l.tax)).sum()
-          val countOrder = g.values.count()
+          val sumQty = g.values.map(_.quantity).sum
+          val sumBasePrice = g.values.map(_.extendedPrice).sum
+          val sumDiscPrice = g.values.map(l => l.extendedPrice * (1 - l.discount)).sum
+          val sumCharge = g.values.map(l => l.extendedPrice * (1 - l.discount) * (1 + l.tax)).sum
+          val countOrder = g.values.size
           // compute result
           new Result(
             g.key.returnFlag,

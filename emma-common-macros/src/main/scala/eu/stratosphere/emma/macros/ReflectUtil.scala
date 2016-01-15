@@ -221,6 +221,21 @@ trait ReflectUtil {
     case id: Ident  if id.symbol == valDef.symbol => valDef.rhs
   }
 
+  /**
+    * Reverse eta expansion.
+    * @param tree the [[Tree]] to normalize
+    * @return the [[Tree]] with all eta expansions inlined
+    */
+  def etaCompact(tree: Tree): Tree = {
+    val etas = tree.collect {
+      case vd: ValDef if vd.hasTerm &&
+        vd.term.name.toString.matches("""eta(\$\d+)+""") => vd
+    }
+
+    if (etas.isEmpty) tree
+    else etas.foldLeft(tree)(inline)
+  }
+
   /** [[Tree]], [[Name]] and [[Symbol]] constructors. */
   object mk {
 

@@ -79,7 +79,7 @@ class StronglyConnectedComponents(inputUrl: String, outputUrl: String, rt: Engin
 
             // aggregate updates from incoming messages
             val updates = for (g <- messages groupBy { _.receiver })
-              yield UpdateComponent(g.key, g.values.map { _.payload }.max())
+              yield UpdateComponent(g.key, g.values.map { _.payload }.max)
 
             // update state
             val delta = state.updateWithOne(updates)(_.id, (state, update) =>

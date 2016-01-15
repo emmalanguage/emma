@@ -47,7 +47,7 @@ class WordCount(inPath: String, outPath: String, rt: Engine) extends Algorithm(r
       // group the words by their identity and count the occurrence of each word
       val counts = for {
         group <- words.groupBy[String] { identity }
-      } yield (group.key, group.values.count())
+      } yield (group.key, group.values.size)
 
       // write the results into a CSV file
       write(outPath,new CSVOutputFormat[(String, Long)])(counts)

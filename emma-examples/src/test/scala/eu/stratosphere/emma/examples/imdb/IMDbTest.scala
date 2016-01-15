@@ -18,7 +18,7 @@ class IMDbTest extends FunSuite with Matchers with BeforeAndAfter {
   val path = tempPath(dir)
 
   before {
-    new File(path).mkdirs()
+    new File(s"$path/output").mkdirs()
     materializeResource(s"$dir/imdb.csv")
     materializeResource(s"$dir/berlinalewinners.csv")
     materializeResource(s"$dir/canneswinners.csv")

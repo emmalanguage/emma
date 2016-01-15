@@ -33,7 +33,7 @@ class SparseMatrixVectorMultiplication(
       } yield mv.copy(value = vv.value * mv.value)
       // calculate the next power of the result vector
       vector = for (row <- products groupBy { _.row })
-        yield VectorElement(row.key, row.values.map(_.value).sum())
+        yield VectorElement(row.key, row.values.map(_.value).sum)
     }
 
     val result = for (v <- vector) yield v

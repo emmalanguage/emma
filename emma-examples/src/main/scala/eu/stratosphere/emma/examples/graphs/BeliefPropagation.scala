@@ -38,13 +38,13 @@ class BeliefPropagation(
         gav <- evidence groupBy { _.identity }
       } yield {
         val (v, s) = gav.key
-        val avg    = gav.values.map(_.prior).sum() / gav.values.count()
+        val avg    = gav.values.map(_.prior).sum / gav.values.size
         Variable(v, s, avg)
       }
 
       val normVars = for {
         gnv <- aggVars groupBy { _.id }
-      } yield gnv.key -> gnv.values.map(_.prior).sum()
+      } yield gnv.key -> gnv.values.map(_.prior).sum
 
       val variables = for {
         v <- aggVars
@@ -57,13 +57,13 @@ class BeliefPropagation(
         goe <- potential groupBy { _.undirectedId }
       } yield {
         val (v1, v2, s1, s2) = goe.key
-        val avg = goe.values.map(_.prob).sum() / goe.values.count()
+        val avg = goe.values.map(_.prob).sum / goe.values.size
         Potential(v1, v2, s1, s2, avg)
       }
 
       val normEdges = for {
         gne <- outEdges groupBy { e => (e.var1, e.var2) }
-      } yield gne.key -> gne.values.map(_.prob).sum()
+      } yield gne.key -> gne.values.map(_.prob).sum
 
       val normOut = for {
         e <- outEdges
@@ -94,7 +94,7 @@ class BeliefPropagation(
         beliefs.updateWithMany(messages.bag())(
           m => (m.dst, m.state), (b, ms) => {
             b.previous = b.marginal
-            b.marginal = ms.map(_.prob).product()
+            b.marginal = ms.map(_.prob).product
             DataBag() : DataBag[Int]
           })
 
@@ -106,7 +106,7 @@ class BeliefPropagation(
 
         val normBeliefs = for {
           gnb <- beliefs.bag() groupBy { _.variable }
-        } yield gnb.key -> gnb.values.map(_.marginal).sum()
+        } yield gnb.key -> gnb.values.map(_.marginal).sum
 
         val updates = for {
           b <- beliefs.bag()
@@ -127,7 +127,7 @@ class BeliefPropagation(
         val products = for {
           gp <- messages.bag() groupBy { m => (m.dst, m.state) }
         } yield {
-          val prob   = gp.values.map(_.prob).product()
+          val prob   = gp.values.map(_.prob).product
           //val (v, s) = gp.key // todo: This doesn't work with parallelize
           //Belief(v, s, prob)
           Belief(gp.key._1, gp.key._2, prob)
@@ -162,7 +162,7 @@ class BeliefPropagation(
         } yield m.identity -> (v.prior * e.prob * p.marginal / m.prob)
 
         val msgUpdates = for (g <- probabilities groupBy { _._1 })
-          yield g.key -> g.values.sumWith { _._2 }
+          yield g.key -> g.values.map(_._2).sum
 
         messages.updateWithOne(msgUpdates)(
           _._1, (m, p) => {

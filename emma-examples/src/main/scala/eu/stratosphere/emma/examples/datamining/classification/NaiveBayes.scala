@@ -33,13 +33,13 @@ class NaiveBayes(input: String, lambda: Double, modelType: String, rt: Engine)
     val dimension = data.find { _ => true }.get.vector.length
 
     val aggregated = for (group <- data.groupBy(_.label)) yield {
-      val cnt = group.values.count()
+      val cnt = group.values.size
       val sum = group.values.fold(Vector.zeros[Double](dimension))(_.vector, _ + _)
       (group.key, cnt, sum)
     }
 
-    val numDocuments = data.size()
-    val numLabels = aggregated.length()
+    val numDocuments = data.size
+    val numLabels = aggregated.size
     val priorDenom = math.log(numDocuments + numLabels * lambda)
 
     val model = for ((label, count, vecSum) <- aggregated) yield {

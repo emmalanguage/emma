@@ -35,8 +35,8 @@ class AlternatingLeastSquares2(input: String, output: String, features: Int, lam
     val ratings = for { // read input and gather all ratings
       dup <- read(input, new CSVInputFormat[Rating]).groupBy(_.identity)
     } yield { // if duplicate ratings present, take the average
-      val sum = dup.values.map(_.value).sum()
-      val n = dup.values.count()
+      val sum = dup.values.map(_.value).sum
+      val n = dup.values.size
       Rating(dup.key._1, dup.key._2, sum / n)
     }
 
@@ -48,8 +48,8 @@ class AlternatingLeastSquares2(input: String, output: String, features: Int, lam
     var items = for (perItem <- ratings.groupBy(_.item)) yield {
       val random = new Random(perItem.key.hashCode)
       val Fi = Vector.fill(features) { random.nextDouble() }
-      val sum = perItem.values.map(_.value).sum()
-      val ni = perItem.values.count()
+      val sum = perItem.values.map(_.value).sum
+      val ni = perItem.values.size
       Fi(0) = sum / ni
       Item(perItem.key, Fi)
     }
@@ -68,7 +68,7 @@ class AlternatingLeastSquares2(input: String, output: String, features: Int, lam
 
       // update user features
       users = for (perUser <- userPrefs.groupBy(_.id)) yield {
-        val nu = perUser.values.count()
+        val nu = perUser.values.size
         val Vu = perUser.values.fold(V0)(_.scaledFeatures, _ + _)
         val Au = perUser.values.fold(M0)(_.crossFeatures, _ + _)
         val Eu = E * (lambda * nu)
@@ -86,7 +86,7 @@ class AlternatingLeastSquares2(input: String, output: String, features: Int, lam
 
       // update item features
       items = for (perItem <- itemPrefs.groupBy(_.id)) yield {
-        val ni = perItem.values.count()
+        val ni = perItem.values.size
         val Vi = perItem.values.fold(V0)(_.scaledFeatures, _ + _)
         val Ai = perItem.values.fold(M0)(_.crossFeatures, _ + _)
         val Ei = E * (lambda * ni)

@@ -59,15 +59,15 @@ class IMDb(input: String, output: String, rt: Engine) extends Algorithm(rt) {
     val festivalsWon = for {
       filmography <- filmographies
         .groupBy { case (director, movie) => director }
-    } yield filmography.key -> filmography.values.count()
+    } yield filmography.key -> filmography.values.size
 
     for { (director, wins) <- festivalsWon.fetch() }
       println(s"Director $director won $wins festivals.")
 
     // write the results
-    write(s"$output/triangles.csv", new CSVOutputFormat[(Int, Int, Int)])(pythagoras)
-    write(s"$output/winners.csv", new CSVOutputFormat[Movie])(winners)
-    write(s"$output/festivalswon.csv", new CSVOutputFormat[(String, Long)])(festivalsWon)
+    pythagoras.writeCsv(s"$output/triangles")
+    winners.writeCsv(s"$output/winners")
+    festivalsWon.writeCsv(s"$output/festivalswon")
   }
 }
 

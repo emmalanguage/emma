@@ -91,7 +91,7 @@ class Query02(inPath: String, outPath: String, size: Int, tpe: String, region: S
       } yield (ps, s, n, r)
 
       // minimal supplier cost for region
-      val minSupplierCost = join.map { case (ps, s, n, r) => ps.supplyCost } min()
+      val minSupplierCost = join.map { case (ps, s, n, r) => ps.supplyCost }.min
 
       // apply filter on size, tpe and name + minimal supplier cost
       val result = for {

@@ -83,7 +83,7 @@ class Query10(inPath: String, outPath: String, begin_date: String, end_date: Str
           new Result(
             g.key.c_custkey,
             g.key.c_name,
-            tr(g.values.map(x => x.extendedPrice * (1 - x.l_discount)).sum()),
+            tr(g.values.map(x => x.extendedPrice * (1 - x.l_discount)).sum),
             g.key.c_acctbal,
             g.key.n_name,
             g.key.c_address,

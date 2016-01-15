@@ -55,7 +55,7 @@ class TicTacToe(rt: Engine = eu.stratosphere.emma.runtime.default())
     val allEdgeTargets = edges map {_.dst}
     val inDegrees = for {
       g <- allEdgeTargets.groupBy {x => x}
-    } yield (g.key, g.values.count())
+    } yield (g.key, g.values.size)
 
     // Init still undefined values to count(inDegree)
     val statesWithValues = for {
@@ -84,7 +84,7 @@ class TicTacToe(rt: Engine = eu.stratosphere.emma.runtime.default())
 
       valueChanges = solution.updateWithMany(msgs)(
         _.target, (v, msgs) => {
-          if (msgs.count > 0) {
+          if (msgs.size > 0) {
             if (msgs.exists(_.value.isInstanceOf[Loss])) {
               v.vc match {
                 case _: Win   =>
@@ -99,7 +99,7 @@ class TicTacToe(rt: Engine = eu.stratosphere.emma.runtime.default())
             } else {
               v.vc match {
                 case count: Count =>
-                  val newCount = count.count - msgs.count().asInstanceOf[Int]
+                  val newCount = count.count - msgs.size.asInstanceOf[Int]
                   if (newCount > 0) {
                     v.vc = Count(newCount)
                     DataBag()

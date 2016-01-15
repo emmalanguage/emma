@@ -73,7 +73,7 @@ class ConnectedComponents(inputUrl: String, outputUrl: String, rt: Engine) exten
 
       // aggregate updates from incoming messages
       val updates = for (g <- messages groupBy { _.receiver })
-        yield Update(g.key, g.values.map { _.component }.max())
+        yield Update(g.key, g.values.map { _.component }.max)
 
       // update state
       delta = state.updateWithOne(updates)(_.id, (state, update) =>

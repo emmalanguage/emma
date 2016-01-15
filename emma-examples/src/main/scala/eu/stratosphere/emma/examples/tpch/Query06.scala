@@ -66,7 +66,7 @@ class Query06(inPath: String, outPath: String, date: String, discount: Double, q
       yield {
         def tr(v: Double) = if (_truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
         new Result(
-          tr(g.values.map(x => x.extendedPrice * x.discount).sum()))
+          tr(g.values.map(x => x.extendedPrice * x.discount).sum))
       }
 
       // write out the result

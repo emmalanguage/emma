@@ -34,7 +34,7 @@ class CompareStoreSales(salesLUrl: String, salesRUrl: String, outputUrl: String,
                            entryR <- r.values;
                            if entryL.product == entryR.product) yield entryL.count * entryL.product.price - entryR.count * entryR.product.price
 
-        SalesBalance(l.key.store, r.key.store, l.key.date, balance.sum())
+        SalesBalance(l.key.store, r.key.store, l.key.date, balance.sum)
       }
 
       write(outputUrl, new CSVOutputFormat[SalesBalance])(comparison)

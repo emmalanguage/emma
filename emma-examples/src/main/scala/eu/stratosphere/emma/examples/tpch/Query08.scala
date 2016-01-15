@@ -105,8 +105,8 @@ class Query08(inPath: String, outPath: String, nation: String, region: String, t
 
         new Result(
           g.key.year,
-          tr(g.values.map(x => if (x.nation == x.nationVariable) x.volume else 0).sum() /
-              g.values.map(x => x.volume).sum()))
+          tr(g.values.map(x => if (x.nation == x.nationVariable) x.volume else 0).sum /
+              g.values.map(x => x.volume).sum))
       }
 
       // write out the result

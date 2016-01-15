@@ -46,22 +46,22 @@ class AlternatingLeastSquares(
       val u   = g.key._1
       val i   = g.key._2
       val rs  = g.values
-      val avg = rs.map(_.value).sum() / rs.count()
+      val avg = rs.map(_.value).sum / rs.size
       Rating(u, i, avg)
     } // read input and gather all ratings
 
     var users = for (g <- ratings.groupBy(_.user)) yield {
       val u  = g.key
       val Ru = g.values
-      Vertex(u, Ru.count(), V0)
+      Vertex(u, Ru.size, V0)
     } // initialize users partition
 
     var items = for (g <- ratings.groupBy(_.item)) yield {
       val i   = g.key
       val Ri  = g.values
-      val cnt = Ri.count()
+      val cnt = Ri.size
       val rnd = new Random(i.hashCode)
-      val avg = Ri.map(_.value).sum() / cnt
+      val avg = Ri.map(_.value).sum / cnt
       val Fi  = Array.iterate(avg, features) { _ => rnd.nextDouble() }
       Vertex(i, cnt, DenseVector(Fi))
     } // initialize items partition

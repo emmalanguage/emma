@@ -36,15 +36,15 @@ class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: St
     for (i <- 1 to iterations) {
       // initialize forgy cluster means
       var change = 0.0
-      var centroids = DataBag(points.random(k))
+      var centroids = DataBag(points.sample(k))
 
       // initialize solution
       var solution = for (p <- points) yield {
-        val closestCentroid = centroids.minBy { (m1, m2) =>
+        val closestCentroid = centroids.min(comparing { (m1, m2) =>
           val diff1 = p.pos - m1.pos
           val diff2 = p.pos - m2.pos
           (diff1.t * diff1) < (diff2.t * diff2)
-        }.get
+        })
 
         val diff    = p.pos - closestCentroid.pos
         val sqrDiff = diff.t * diff
@@ -54,9 +54,9 @@ class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: St
       do {
         // update means
         val newMeans = for (cluster <- solution.groupBy { _.cluster }) yield {
-          val sum = cluster.values.fold(zeroVec)( _.point.pos, _ + _ )
-          val cnt = cluster.values.count().toDouble //FIXME Long is converted to Double here
-          Point(cluster.key, sum :/ cnt)
+          val sum = cluster.values.fold(zeroVec)(_.point.pos, _ + _)
+          val cnt = cluster.values.size.toDouble
+          Point(cluster.key, sum / cnt)
         }
 
         // compute change between the old and the new means
@@ -64,15 +64,15 @@ class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: St
           mean <- centroids
           newMean <- newMeans
           if mean.id == newMean.id
-        } yield sum((mean.pos - newMean.pos) :* (mean.pos - newMean.pos))).sum()
+        } yield sum((mean.pos - newMean.pos) :* (mean.pos - newMean.pos))).sum
 
         // update solution: re-assign clusters
         solution = for (s <- solution) yield {
-          val closestMean = centroids.minBy { (m1, m2) =>
+          val closestMean = centroids.min(comparing { (m1, m2) =>
             val diff1 = s.point.pos - m1.pos
             val diff2 = s.point.pos - m2.pos
             (diff1.t * diff1) < (diff2.t * diff2)
-          }.get
+          })
 
           val diff    = s.point.pos - closestMean.pos
           val sqrDiff = diff.t * diff
@@ -83,7 +83,7 @@ class KMeans(k: Int, epsilon: Double, iterations: Int, input: String, output: St
         centroids = newMeans
       } while (change > epsilon)
 
-      val sumSqrDist = solution.map { _.sqrDiff }.sum()
+      val sumSqrDist = solution.map { _.sqrDiff }.sum
       if (i <= 1 || sumSqrDist < minSqrDist) {
         minSqrDist = sumSqrDist
         bestSolution = solution
