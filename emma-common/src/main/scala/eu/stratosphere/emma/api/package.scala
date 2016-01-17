@@ -150,7 +150,8 @@ package object api {
    * @param self the actual [[DataBag]] instance
    * @tparam E the type of elements to fold over
    */
-  implicit class DataBagWithFolds[+E](val self: DataBag[E]) extends AnyVal with Folds[E]
+  implicit final class DataBagFolds[+E] private[api] (val self: DataBag[E])
+      extends AnyVal with Folds[E]
 
   implicit def materializeCSVConverters[T]: CSVConverters[T] =
     macro ConvertersMacros.materializeCSVConverters[T]

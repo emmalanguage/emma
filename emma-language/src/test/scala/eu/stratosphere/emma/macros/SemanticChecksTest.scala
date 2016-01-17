@@ -6,6 +6,7 @@ import eu.stratosphere.emma.api.model._
 import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit.JUnitRunner
+import org.scalatest.matchers.Matcher
 
 import scala.reflect.ClassTag
 import scala.tools.reflect.ToolBoxError
@@ -165,12 +166,23 @@ class SemanticChecksTest extends FlatSpec with Matchers with RuntimeUtil {
       """))}
   }
 
-  def failWith[E <: Throwable : ClassTag] =
-    include (implicitly[ClassTag[E]].runtimeClass.getSimpleName) compose { (tree: Tree) =>
-      intercept[ToolBoxError] { tb.typecheck(withImports(tree)) }.getMessage
+  "Manually instantiating DataBag extensions" should "not be allowed" in {
+    q"""emma.parallelize {
+      val bag = DataBagFolds(DataBag(1 to 100))
+      bag.sum
+    }""" should failWith ("DataBag extensions")
+  }
+
+  def failWith[E <: Throwable : ClassTag]: Matcher[Tree] =
+    failWith (implicitly[ClassTag[E]].runtimeClass.getSimpleName)
+
+  def failWith(error: String): Matcher[Tree] =
+    include (error.toLowerCase) compose { (tree: Tree) =>
+      intercept[ToolBoxError] { tb.typecheck(withImports(tree)) }.getMessage.toLowerCase
     }
 
-  def withImports(tree: universe.Tree): universe.Tree = q"{ ..$imports; $tree }"
+  def withImports(tree: Tree): Tree =
+    q"{ ..$imports; $tree }"
 }
 
 object SemanticChecksTest {

@@ -23,10 +23,11 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
   private lazy val self = unbox(c.prefix.tree)
 
   // Unbox implicit type conversions
-  private def unbox(tree: Tree): Tree =
+  private def unbox(tree: Tree) =
     unAscribed(tree) match {
-      case q"$_[$_](${arg: Tree})" => arg
-      case _ => tree
+      case q"$_[$_]($arg)" => arg
+      case _ => c.abort(c.enclosingPosition,
+        "Manually instantiating DataBag extensions is not supported")
     }
 
   def isEmpty = q"!$self.nonEmpty"
