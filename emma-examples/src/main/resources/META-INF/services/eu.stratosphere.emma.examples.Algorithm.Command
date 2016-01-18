@@ -8,6 +8,7 @@ eu.stratosphere.emma.examples.graphs.LabelRank$Command
 eu.stratosphere.emma.examples.graphs.StronglyConnectedComponents$Command
 eu.stratosphere.emma.examples.graphs.TriangleCount$Command
 eu.stratosphere.emma.examples.tpch.Query01$Command
+eu.stratosphere.emma.examples.tpch.Query02$Command
 eu.stratosphere.emma.examples.tpch.Query03$Command
 eu.stratosphere.emma.examples.tpch.Query05$Command
 eu.stratosphere.emma.examples.tpch.Query06$Command

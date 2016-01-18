@@ -50,6 +50,20 @@ class TPCHTest extends FunSuite with Matchers with BeforeAndAfterAll {
     compareBags(exp, res)
   })
 
+  test("Query02") (withRuntime() { rt =>
+
+    // execute with native and with tested environment
+    new Query02(inBase, outputPath("q2.tbl.native"), 14, "BRASS", "EUROPE", runtime.Native()).run()
+    new Query02(inBase, outputPath("q2.tbl.rt"), 14, "BRASS", "EUROPE", rt).run()
+
+    // compare the results
+    val exp = fromPath(outputPath("q2.tbl.native"))
+    val res = fromPath(outputPath("q2.tbl.rt"))
+
+    // assert that the result contains the expected values
+    compareBags(exp, res)
+  })
+
   test("Query03") (withRuntime() { rt =>
 
     // execute with native and with tested environment
