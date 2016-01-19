@@ -1,3 +1,20 @@
+#example-name {
+    position: relative;
+    overflow: hidden;
+    width: 800px;
+    height: 40px;
+    text-overflow: ellipsis;
+    float: left;
+}
+
+#example-name div{
+    font-weight: bold;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 2000px;
+}
+
 .title-area li{
     float: left;
     margin-right: 20px;
@@ -5,6 +22,11 @@
 
 .title-area li.icon{
     font-size: 30px;
+}
+
+.title-area.right{
+    position: absolute;
+    right: 0;
 }
 
 #main-section {
@@ -132,10 +154,6 @@
     white-space: nowrap;
     float: none;
     padding-bottom: 4px;
-}
-
-#example-name {
-    font-weight: bold;
 }
 
 .hljs {

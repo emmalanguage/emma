@@ -12,6 +12,7 @@
     background-color: #e8e8e8;
     border: 1px solid black;
 }
+
 .tabs .tab-title {
     border-bottom: 1px solid #2F74D0;
 }
@@ -26,6 +27,16 @@
 
 .tabs .tab-title a:hover {
     background-color: white !important;
+}
+
+.title-area.right{
+    position: absolute;
+    right: 0;
+    background: #e8e8e8;
+}
+
+#example-name {
+    color: black;
 }
 
 #code-tabs {

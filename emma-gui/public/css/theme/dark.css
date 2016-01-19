@@ -29,6 +29,16 @@
     background-color: white !important;
 }
 
+.title-area.right{
+    position: absolute;
+    right: 0;
+    background: #333;
+}
+
+#example-name {
+    color: white;
+}
+
 #code-tabs {
     background-color: #333;
 }

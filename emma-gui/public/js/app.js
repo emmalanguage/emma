@@ -68,7 +68,7 @@ function init() {
     $('a[href="#code-panel0"]').click();
 
     setInitState();
-    $('#example-name').html("");
+    $('#example-name').find('div').html("");
 
     if (codeCanvas != null) {
         codeCanvas.project.activeLayer.removeChildren();
@@ -113,9 +113,9 @@ function loadExample(name) {
 
     var exampleName = $("a[title='"+name+"']").text();
     if (exampleName) {
-        $('#example-name').html(exampleName+((planCaching && cache != null)?' (cached)':''));
+        $('#example-name').find('div').html(exampleName+((planCaching && cache != null)?' (cached)':''));
     } else {
-        $('#example-name').html("");
+        $('#example-name').find('div').html("");
     }
 
     $('#status').html('<i class="gear"/> loading plan...');
@@ -724,11 +724,12 @@ function registerListeners() {
     eventSource.onmessage = function(event) {
         addLogHtml("<div>"+event.data+"</div>");
     };
+
     eventSource.onerror = function(e) {
-        console.error(e);
         setWaitingState();
         addLogHtml("<div class='log-error'>ERROR: Lost connection to Log server. Reload to try again!</div>");
         alert("An error occurred! Detailed information in the log.");
+        console.error(e);
         eventSource.close();
     };
 
