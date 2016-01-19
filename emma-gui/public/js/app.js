@@ -9,6 +9,7 @@ var fullExampleName = "";
 var planNames = {};
 var planCache = [];
 var currentExecution = "";
+var currentState = 'init';
 var executionOrder = [];
 var loadedExample = "";
 var planCaching = true;
@@ -78,7 +79,7 @@ function init() {
 
 var handleError = function(jqXHR, textStatus, errorThrown) {
     console.error(textStatus, errorThrown, jqXHR);
-    setWaitingState();
+    setReadyState();
     addLogHtml("<div class='log-error'>ERROR: status: '"+textStatus+"', errorThrown: '"+errorThrown+"'</div>");
     alert("An error occurred! Detailed information in the log.");
 };
@@ -152,15 +153,9 @@ function loadCode(name) {
                 codeCanvasElement.height(code.height()+20);
                 code.parent().width(contentWidth+20);
 
-                //TODO load from plan, comprehensions
                 currentComprehensions = {};
-                /*
-                if (data.comprehensions != null) {
-                    currentComprehensions = data.comprehensions;
-                }
-                */
             } else {
-                console.log("No sources available. Did you compile the sources of emma-examples?");
+                console.error("No sources available. Did you compile the sources of emma-examples?");
                 code.html("No sources available.");
             }
         },
@@ -181,7 +176,7 @@ function loadPlan(name) {
                 $('#plan-tabs').find('li:last a').click();
 
                 if (!data.isLast) {
-                    setWaitingState();
+                    setReadyState();
                 }
 
             } else {
@@ -212,11 +207,12 @@ function loadPlanFromCache(name, cache) {
 
     currentExecution = planCache[0].graph.name;
     planNames[currentExecution].executed = 0;
-    setWaitingState();
+    setReadyState();
     $('a[href="#panel0"]').click();
 }
 
 function initRuntime(name) {
+    executionOrder = [];
     $.ajax({
         method: "GET",
         url: requestBase+"plan/initRuntime?name="+name,
@@ -537,9 +533,13 @@ function updateCodeCanvasSize() {
 }
 
 function run(async, callback) {
-    var running = $('#play-button').find('i').hasClass("fi-pause");
 
-    if (!running) {
+    if (currentState == 'finish') {
+        prepareRerun();
+        return;
+    }
+
+    if (currentState == 'ready') {
         setRunningState();
         addLogHtml("<div class='log-entry'>running: "+currentExecution+"</div>");
         $.ajax({
@@ -566,7 +566,7 @@ function run(async, callback) {
                 }
 
                 if (!data.isLast) {
-                    setWaitingState();
+                    setReadyState();
                 } else {
                     setFinishState();
                 }
@@ -577,10 +577,21 @@ function run(async, callback) {
             },
             error: handleError
         });
-    } else {
+    } else if (currentState == 'running'){
         fastForwardRun = false;
         setStoppingState();
     }
+}
+
+function prepareRerun() {
+    initRuntime(fullExampleName);
+    currentExecution = planCache[0].graph.name;
+    $('a[href="#panel0"]').click();
+    for (var name in planNames) {
+        planNames[name].executed = 0;
+    }
+
+    setReadyState();
 }
 
 function fastForward() {
@@ -671,29 +682,34 @@ function trimLog() {
 }
 
 function setInitState() {
+    currentState = 'init';
     $("#play-button").html('');
     $("#forward-button").html('');
     $('#status').html('');
 }
 
 function setRunningState() {
+    currentState = 'running';
     $("#play-button").html('<i class="fi-pause"></i>');
     $('#status').html('<i class="gear"/> compiling and executing "'+currentExecution+'"');
 }
 
-function setWaitingState() {
+function setReadyState() {
+    currentState = 'ready';
     $("#play-button").html('<i class="fi-play"></i>');
     $("#forward-button").html('<i class="fi-fast-forward"></i>');
     $('#status').html('ready');
 }
 
 function setFinishState() {
-    $("#play-button").html('');
+    currentState = 'finish';
+    $("#play-button").html('<i class="fi-refresh"></i>');
     $("#forward-button").html('');
     $('#status').html("finished");
 }
 
 function setStoppingState() {
+    currentState = 'stopping';
     $("#play-button").html('<i class="fi-play"></i>');
     $("#forward-button").html('<i class="fi-fast-forward"></i>');
     $('#status').html('<i class="gear"/> stopping...');
@@ -726,7 +742,6 @@ function registerListeners() {
     };
 
     eventSource.onerror = function(e) {
-        setWaitingState();
         addLogHtml("<div class='log-error'>ERROR: Lost connection to Log server. Reload to try again!</div>");
         alert("An error occurred! Detailed information in the log.");
         console.error(e);
