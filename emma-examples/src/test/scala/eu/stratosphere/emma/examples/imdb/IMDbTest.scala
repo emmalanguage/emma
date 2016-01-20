@@ -9,6 +9,7 @@ import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit.JUnitRunner
 
+@Ignore
 @Category(Array(classOf[ExampleTest]))
 @RunWith(classOf[JUnitRunner])
 class IMDbTest extends FunSuite with Matchers with BeforeAndAfter {
