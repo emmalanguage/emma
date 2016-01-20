@@ -115,10 +115,10 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
    *
    * ==Guard==
    * 1. The rhs `f x` must refer to exactly one generator variable and this variable should be `x`.
-   * 2. The remaining combinators as well as the head should refer to `x`.
+   * 2. The remaining generators and guards, as well as the head should not refer to `x`.
    *
    * ==Rewrite==
-   * {{{ [[ e | qs, x ← xs, qs', y ← flatMap f xs, qs'' ]]  }}}
+   * {{{ [[ e | qs, y ← flatMap f xs, qs'' ]]  }}}
    */
   object MatchFlatMap extends Rule {
 

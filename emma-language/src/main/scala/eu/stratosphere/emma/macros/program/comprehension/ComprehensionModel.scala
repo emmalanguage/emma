@@ -184,7 +184,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
     }
 
     /**
-     * Which generator-defined vars in the given Comprehension context are visible in bu this monad
+     * Which generator-defined vars in the given Comprehension context are visible in this monad
      * expression?
      */
     def definedVars(context: Expression): Set[TermSymbol] = {
