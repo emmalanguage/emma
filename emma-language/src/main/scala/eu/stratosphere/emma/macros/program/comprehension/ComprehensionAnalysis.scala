@@ -454,7 +454,7 @@ private[emma] trait ComprehensionAnalysis
       case Filter(ScalaExpr(x)) =>
         // Normalize the tree
         (x ->> deMorgan ->> distributeOrOverAnd ->> cleanConjuncts)
-          .collect { case Some(nf) => Filter(ScalaExpr(nf))}
+          .collect { case Some(nf) => Filter(ScalaExpr(nf)) }
 
       case q => q :: Nil
     }
@@ -514,8 +514,8 @@ private[emma] trait ComprehensionAnalysis
       traverse(from) {
         // (A || B || ... || Y || Z)
         case q"$p || $q" =>
-          collectDisjuncts(p, into)
-          collectDisjuncts(q, into)
+          collectDisjuncts(q"$p", into)
+          collectDisjuncts(q"$q", into)
 
         // Here we have a negated atom
         case q"!${app: Apply}" =>
@@ -523,10 +523,10 @@ private[emma] trait ComprehensionAnalysis
 
         // Here we have an atom with a method select attached
         case q"$lhs.$_" =>
-          collectDisjuncts(lhs, into)
+          collectDisjuncts(q"$lhs", into)
 
-        // Here we should have only atoms
-        case app: Apply =>
+        /* In the following we should have only atoms --these are kept as they are-- */
+        case app @ (_: Apply | _: Literal | _: Match) =>
           into addPredicate Predicate(app, neg = false)
 
         case expr => c.abort(c.enclosingPosition,
@@ -542,11 +542,11 @@ private[emma] trait ComprehensionAnalysis
       traverse(from) {
         // C1 && C2 && C3 && ... && C4
         case q"$p && $q" =>
-          collectConjuncts(p, into)
-          collectConjuncts(q, into)
+          collectConjuncts(q"$p", into)
+          collectConjuncts(q"$q", into)
 
-        // We found a disjunction
-        case app: Apply =>
+        // We found an atom
+        case app @ (_: Apply | _: Literal | _: Match) =>
           into += collectDisjuncts(app)
 
         case _ =>
@@ -560,7 +560,7 @@ private[emma] trait ComprehensionAnalysis
     collectConjuncts(tree) map { _.getTree }
   }
 
-  case class Predicate(tree: Apply, neg: Boolean) {
+  case class Predicate(tree: Tree, neg: Boolean) {
 
     def negate: Predicate =
       Predicate(tree, neg = !neg)
@@ -588,8 +588,16 @@ private[emma] trait ComprehensionAnalysis
       if (alwaysTrue) None else predicates.map { _.getTree }
         .reduceOption { (p, q) => q"$p || $q" }
 
-    def alwaysTrue: Boolean = predicates combinations 2 exists {
-      case ListBuffer(p, q) => p.neg != q.neg && p.tree.equalsStructure(q.tree)
+    /** if we have contradicting predicates (A || !A) the disjunction is always true
+      * the same holds for predicates with constant literals `true` (A || true || B || ... || Z)
+      * @return true, if this disjunct is always true
+      */
+    def alwaysTrue: Boolean = {
+      val contradict = predicates combinations 2 exists {
+        case ListBuffer(p, q) => p.neg != q.neg && p.tree.equalsStructure(q.tree)
+      }
+      val taut = predicates exists { _.tree.equalsStructure(q"true")}
+      contradict || taut
     }
   }
 }

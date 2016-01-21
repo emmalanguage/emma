@@ -46,7 +46,7 @@ class WorkflowMacros(val c: blackbox.Context)
     compView      = createComprehensionView(cfGraph)
 
     // 2. Normalize filter predicates to CNF
-//    normalizePredicates(optimized)
+    normalizePredicates(optimized)
 
     // 3. Apply Fold-Group-Fusion where possible
     foldGroupFusion(optimized)
