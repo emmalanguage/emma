@@ -252,7 +252,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
 
   sealed trait Qualifier extends Expression
 
-  case class Filter(expr: Expression) extends Qualifier {
+  case class Guard(expr: Expression) extends Qualifier {
     def tpe = typeOf[Boolean]
     def descend[U](f: Expression => U) = expr foreach f
   }
@@ -502,7 +502,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       case MonadJoin(xs)                       => MonadJoin(xform(xs))
       case Comprehension(h, qs)                => Comprehension(xform(h), qs map xform)
       // Qualifiers
-      case Filter(xs)                          => Filter(xform(xs))
+      case Guard(xs)                          => Guard(xform(xs))
       case Generator(lhs, rhs)                 => Generator(lhs, xform(rhs))
       // Environment & Host Language Connectors
       case ScalaExpr(tree)                     => ScalaExpr(xform(tree))
@@ -549,7 +549,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       case MonadJoin(expr)                        => traverse(expr)
       case Comprehension(head, qualifiers)        => qualifiers foreach traverse; traverse(head)
       // Qualifiers
-      case Filter(expr) => traverse(expr)
+      case Guard(expr) => traverse(expr)
       case Generator(_, rhs)                      => traverse(rhs)
       // Environment & Host Language Connectors
       case ScalaExpr(_)                           =>
@@ -663,7 +663,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       """.stripMargin.trim // ^${e.tpe.toString}
 
       // Qualifiers
-      case Filter(expr) =>
+      case Guard(expr) =>
         s"${pp(expr)}"
 
       case Generator(lhs, rhs) =>
@@ -943,9 +943,9 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
 
   /** Helper pattern matcher. Matches a prefix of Filters in a Qualifier sequence. */
   object FilterPrefix {
-    def unapply(qs: List[Qualifier]): Option[(List[Filter], List[Qualifier])] = {
-      val (filters, rest) = qs span { case _: Filter => true; case _ => false }
-      Some(filters.as[List[Filter]], rest)
+    def unapply(qs: List[Qualifier]): Option[(List[Guard], List[Qualifier])] = {
+      val (filters, rest) = qs span { case _: Guard => true; case _ => false }
+      Some(filters.as[List[Guard]], rest)
     }
   }
 }

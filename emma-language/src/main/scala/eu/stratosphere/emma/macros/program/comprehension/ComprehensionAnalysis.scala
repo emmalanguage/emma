@@ -138,9 +138,9 @@ private[emma] trait ComprehensionAnalysis
       case q"${withFilter @ Select(xs, _)}((${arg: ValDef}) => $body)"
         if withFilter.symbol == api.withFilter =>
           val bind = Generator(arg.term, comprehend(xs))
-          val filter = Filter(comprehend(body))
+          val guard = Guard(comprehend(body))
           val head = comprehend(&(arg.term), input = false)
-          Comprehension(head, bind :: filter :: Nil)
+          Comprehension(head, bind :: guard :: Nil)
 
       // -----------------------------------------------------
       // Grouping and Set operations
@@ -453,10 +453,10 @@ private[emma] trait ComprehensionAnalysis
           case comprehension: Comprehension =>
             val hd = comprehension.hd
             val qualifiers = comprehension.qualifiers flatMap {
-              case Filter(ScalaExpr(x)) =>
+              case Guard(ScalaExpr(x)) =>
                 // Normalize the tree
                 (x ->> deMorgan ->> distributeOrOverAnd ->> cleanConjuncts)
-                  .collect { case Some(nf) => Filter(ScalaExpr(nf)) }
+                  .collect { case Some(nf) => Guard(ScalaExpr(nf)) }
 
               case q =>
                 q :: Nil

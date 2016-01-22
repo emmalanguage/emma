@@ -43,28 +43,28 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
    * {{{ [[ e | qs, x ← xs, qs1, p x, qs2 ]] }}}
    *
    * ==Guard==
-   * The filter expression `p x` must refer to at most one generator variable and this variable should be `x`.
+   * The guard expression `p x` must refer to at most one generator variable and this variable should be `x`.
    *
    * ==Rewrite==
    * {{{ [[ e | qs, x ← filter p xs, qs1, qs2 ]] }}}
    */
   object MatchFilter extends Rule {
 
-    case class RuleMatch(root: Expression, parent: Comprehension, gen: Generator, filter: Filter)
+    case class RuleMatch(root: Expression, parent: Comprehension, gen: Generator, guard: Guard)
 
     def bind(expr: Expression, root: Expression) = new Traversable[RuleMatch] {
       def foreach[U](f: RuleMatch => U) = expr match {
         case parent @ Comprehension(_, qualifiers) => for {
-          filter @ Filter(_) <- qualifiers
-          gen @ Generator(_, _) <- qualifiers takeWhile { _ != filter }
-        } f(RuleMatch(root, parent, gen, filter))
+          guard @ Guard(_) <- qualifiers
+          gen @ Generator(_, _) <- qualifiers takeWhile { _ != guard }
+        } f(RuleMatch(root, parent, gen, guard))
           
         case _ =>
       }
     }
 
     def guard(rm: RuleMatch) =
-      rm.filter.usedVars(rm.root) subsetOf Set(rm.gen.lhs)
+      rm.guard.usedVars(rm.root) subsetOf Set(rm.gen.lhs)
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(_, parent, gen, filter) = rm
@@ -188,16 +188,16 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
   object MatchEquiJoin extends Rule {
 
     case class RuleMatch(root: Expression, parent: Comprehension,
-      xs: Generator, ys: Generator, filter: Filter, kx: Function, ky: Function)
+      xs: Generator, ys: Generator, guard: Guard, kx: Function, ky: Function)
 
     def bind(expr: Expression, root: Expression) = new Traversable[RuleMatch] {
       def foreach[U](f: RuleMatch => U) = expr match {
         case parent @ Comprehension(_, qualifiers) => for {
-          filter @ Filter(p: ScalaExpr) <- qualifiers
-          pairs = qualifiers takeWhile { _ != filter } sliding 2
+          guard @ Guard(p: ScalaExpr) <- qualifiers
+          pairs = qualifiers takeWhile { _ != guard } sliding 2
           (xs: Generator) :: (ys: Generator) :: Nil <- pairs
           (kx, ky) <- parseJoinPredicate(root, xs, ys, p)
-        } f(RuleMatch(root, parent, xs, ys, filter, kx, ky))
+        } f(RuleMatch(root, parent, xs, ys, guard, kx, ky))
 
         case _ =>
       }
