@@ -332,10 +332,10 @@ private[emma] trait ComprehensionAnalysis
           q"${gen.lhs}.values.${TermName(s"_${idx + 1}")}".typeChecked
         else q"${gen.lhs}.values".typeChecked
 
-        com.comprehension.replace(foldTree, replacement)
+        com.comprehension.expr = com.comprehension.expr.replace(foldTree, replacement)
       }
 
-      com.comprehension.rename(gSym, gen.lhs)
+      com.comprehension.expr = com.comprehension.expr.rename(gSym, gen.lhs)
       foldGroupFusion(tree)
     })
   }

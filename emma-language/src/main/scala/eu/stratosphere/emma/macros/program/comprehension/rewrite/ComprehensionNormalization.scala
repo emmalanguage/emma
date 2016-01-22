@@ -44,7 +44,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
       val hd = parent.hd
       val qs = xs ::: child.qs ::: ys.tail
       // return new parent
-      letexpr (gen.lhs -> child.hd.as[ScalaExpr].tree) in Comprehension(qs, hd)
+      substituteExpr (gen.lhs -> child.hd.as[ScalaExpr].tree) in Comprehension(qs, hd)
     }
   }
 

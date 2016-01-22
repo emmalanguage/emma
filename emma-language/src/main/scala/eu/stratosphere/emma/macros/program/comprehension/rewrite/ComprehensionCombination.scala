@@ -224,7 +224,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       val hd = parent.hd
       val qs = prefix ::: Generator(term, join) :: rest
       // return new parent
-      letexpr (
+      substituteExpr (
         xs.lhs -> (q"$term._1" :: xType),
         ys.lhs -> (q"$term._2" :: yType)) in Comprehension(qs, hd)
     }
@@ -298,7 +298,7 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       val hd = parent.hd
       val qs = prefix ::: Generator(term, cross) :: suffix.drop(2)
       // return new parent
-      letexpr (
+      substituteExpr (
         xs.lhs -> (q"$term._1" :: xs.tpe),
         ys.lhs -> (q"$term._2" :: ys.tpe)) in Comprehension(qs, hd)
     }

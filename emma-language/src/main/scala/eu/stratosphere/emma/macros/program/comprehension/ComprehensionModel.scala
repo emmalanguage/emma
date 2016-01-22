@@ -59,8 +59,12 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
 
   // TODO: unify with ReflectUtil.syntax.let (with two distinct in methods)
 
-  case class letexpr(bindings: (Symbol, Tree)*) {
-    def in(expr: Expression): Expression = expr.substitute { bindings.toMap }
+  /** Bind a dictionary of [[Symbol]]-value pairs in all enclosing trees. */
+  case class substituteExpr(bindings: (Symbol, Tree)*) {
+    def in(expr: Expression): Expression =
+      new ExpressionTransformer {
+        override def xform(tree: Tree) = model.substitute(tree)(bindings.toMap)
+      }.transform(expr)
   }
 
   // --------------------------------------------------------------------------
@@ -121,18 +125,6 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       }.flatten
     }
 
-    /** Bind a dictionary of [[Symbol]]-value pairs in all enclosing trees and assign the result to `expr`. */
-    def substitute(dict: Map[Symbol, Tree]): Unit =
-      expr = expr.substitute(dict)
-
-    /** Substitute `find` with `replacement` in all enclosing trees and assign the result to `expr`. */
-    def replace(find: Tree, replacement: Tree): Unit =
-      expr = expr.replace(find, replacement)
-
-    /** Rename `key` as `alias` in all enclosing trees and assign the result to `expr`. */
-    def rename(key: Symbol, alias: TermSymbol): Unit =
-      expr = expr.rename(key, alias)
-
     override def toString =
       prettyPrint(expr)
   }
@@ -190,12 +182,6 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       cet.traverse(context)
       cet.env
     }
-
-    /** Bind a dictionary of [[Symbol]]-value pairs in all enclosing trees. */
-    def substitute(dict: Map[Symbol, Tree]): Expression =
-      new ExpressionTransformer {
-        override def xform(tree: Tree) = model.substitute(tree)(dict)
-      }.transform(this)
 
     /** Substitute `find` with `replacement` in all enclosing trees. */
     def replace(find: Tree, replacement: Tree): Expression =
