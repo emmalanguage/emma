@@ -534,12 +534,9 @@ private[emma] trait ComprehensionAnalysis
         case q"$lhs.$_" =>
           collectDisjuncts(q"$lhs", into)
 
-        /* In the following we should have only atoms --these are kept as they are-- */
-        case app @ (_: Apply | _: Literal | _: Match) =>
-          into addPredicate Predicate(app, neg = false)
-
-        case expr => c.abort(c.enclosingPosition,
-          s"Unexpected structure in predicate disjunction: ${showCode(expr)}")
+        // In the following we should have only atoms, these are kept as they are
+        case _ =>
+          into addPredicate Predicate(from, neg = false)
       }
 
       into
@@ -555,12 +552,8 @@ private[emma] trait ComprehensionAnalysis
           collectConjuncts(q"$q", into)
 
         // We found an atom
-        case app @ (_: Apply | _: Literal | _: Match) =>
-          into += collectDisjuncts(app)
-
         case _ =>
-          //super.traverse(tree)
-          //throw new RuntimeException("Unexpected structure in predicate conjunction")
+          into += collectDisjuncts(from)
       }
 
       into.toList
