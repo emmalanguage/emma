@@ -124,23 +124,23 @@ private[emma] trait ComprehensionAnalysis
       case q"${map @ Select(xs, _)}[$_]((${arg: ValDef}) => $body)"
         if map.symbol == api.map =>
           val bind = Generator(arg.term, comprehend(xs))
-          val head = comprehend(body, input = false)
-          Comprehension(head, bind :: Nil)
+          val hd = comprehend(body, input = false)
+          Comprehension(bind :: Nil, hd)
 
       // xs.flatMap(f)
       case q"${flatMap @ Select(xs, _)}[$_]((${arg: ValDef}) => $body)"
         if flatMap.symbol == api.flatMap =>
           val bind = Generator(arg.term, comprehend(xs))
-          val head = comprehend(body, input = false)
-          MonadJoin(Comprehension(head, bind :: Nil))
+          val hd = comprehend(body, input = false)
+          MonadJoin(Comprehension(bind :: Nil, hd))
 
       // xs.withFilter(f)
       case q"${withFilter @ Select(xs, _)}((${arg: ValDef}) => $body)"
         if withFilter.symbol == api.withFilter =>
           val bind = Generator(arg.term, comprehend(xs))
           val guard = Guard(comprehend(body))
-          val head = comprehend(&(arg.term), input = false)
-          Comprehension(head, bind :: guard :: Nil)
+          val hd = comprehend(&(arg.term), input = false)
+          Comprehension(bind :: guard :: Nil, hd)
 
       // -----------------------------------------------------
       // Grouping and Set operations
@@ -452,7 +452,7 @@ private[emma] trait ComprehensionAnalysis
         override def transform(expr: Expression): Expression = expr match {
           case comprehension: Comprehension =>
             val hd = comprehension.hd
-            val qualifiers = comprehension.qualifiers flatMap {
+            val qs = comprehension.qs flatMap {
               case Guard(ScalaExpr(x)) =>
                 // Normalize the tree
                 (x ->> deMorgan ->> distributeOrOverAnd ->> cleanConjuncts)
@@ -461,7 +461,7 @@ private[emma] trait ComprehensionAnalysis
               case q =>
                 q :: Nil
             }
-            Comprehension(hd, qualifiers)
+            Comprehension(qs, hd)
           case _ =>
             super.transform(expr)
         }

@@ -26,8 +26,8 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
     case class RuleMatch(parent: Comprehension, gen: Generator, child: Comprehension)
 
     def bind(expr: Expression, root: Expression) = expr match {
-      case parent @ Comprehension(_, qualifiers) => qualifiers collectFirst {
-        case gen @ Generator(_, child @ Comprehension(_: ScalaExpr, _)) =>
+      case parent @ Comprehension(qs, _) => qs collectFirst {
+        case gen @ Generator(_, child @ Comprehension(_, _: ScalaExpr)) =>
           RuleMatch(parent, gen, child)
       }
       
@@ -38,13 +38,13 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(parent, gen, child) = rm
-      val (xs, ys) = parent.qualifiers span { _ != gen }
+      val (xs, ys) = parent.qs span { _ != gen }
 
       // construct new parent components
       val hd = parent.hd
-      val qualifiers = xs ::: child.qualifiers ::: ys.tail
+      val qs = xs ::: child.qs ::: ys.tail
       // return new parent
-      letexpr (gen.lhs -> child.hd.as[ScalaExpr].tree) in Comprehension(hd, qualifiers)
+      letexpr (gen.lhs -> child.hd.as[ScalaExpr].tree) in Comprehension(qs, hd)
     }
   }
 
@@ -64,7 +64,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
     case class RuleMatch(parent: Comprehension, child: Expression)
 
     def bind(expr: Expression, root: Expression) = expr match {
-      case MonadJoin(parent @ Comprehension(child, _)) =>
+      case MonadJoin(parent @ Comprehension(_, child)) =>
         Some(RuleMatch(parent, child))
       case _ => None
     }
@@ -75,17 +75,17 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
       case RuleMatch(parent, child: Comprehension) =>
         // construct new parent components
         val hd = child.hd
-        val qualifiers = parent.qualifiers ++ child.qualifiers
+        val qs = parent.qs ++ child.qs
         // return new parent
-        Comprehension(hd, qualifiers)
+        Comprehension(qs, hd)
 
       case RuleMatch(parent, child: Expression) =>
         val term = mk.freeTerm($"head".toString, child.elementType)
         // construct new parent components
         val hd = ScalaExpr(&(term))
-        val qualifiers = parent.qualifiers :+ Generator(term, child)
+        val qs = parent.qs :+ Generator(term, child)
         // return new parent
-        Comprehension(hd, qualifiers)
+        Comprehension(qs, hd)
     }
   }
 
@@ -131,7 +131,7 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
     case class RuleMatch(fold: c.Fold, map: Comprehension, child: Generator)
 
     def bind(expr: Expression, root: Expression) = expr match {
-      case fold @ c.Fold(_, _, _, map @ Comprehension(_: ScalaExpr, List(child: Generator)), _) =>
+      case fold @ c.Fold(_, _, _, map @ Comprehension(List(child: Generator), _: ScalaExpr), _) =>
         Some(RuleMatch(fold, map, child))
       
       case _ => None

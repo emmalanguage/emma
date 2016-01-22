@@ -237,13 +237,13 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
     def descend[U](f: Expression => U) = expr foreach f
   }
 
-  case class Comprehension(hd: Expression, qualifiers: List[Qualifier])
+  case class Comprehension(qs: List[Qualifier], hd: Expression)
       extends MonadExpression {
 
     def tpe = DATA_BAG(hd.tpe)
 
     def descend[U](f: Expression => U) = {
-      for (q <- qualifiers) q foreach f
+      for (q <- qs) q foreach f
       hd foreach f
     }
   }
@@ -500,9 +500,9 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       // Monads
       case MonadUnit(xs)                       => MonadUnit(xform(xs))
       case MonadJoin(xs)                       => MonadJoin(xform(xs))
-      case Comprehension(h, qs)                => Comprehension(xform(h), qs map xform)
+      case Comprehension(qs, hd)               => Comprehension(qs map xform, xform(hd))
       // Qualifiers
-      case Guard(xs)                          => Guard(xform(xs))
+      case Guard(xs)                           => Guard(xform(xs))
       case Generator(lhs, rhs)                 => Generator(lhs, xform(rhs))
       // Environment & Host Language Connectors
       case ScalaExpr(tree)                     => ScalaExpr(xform(tree))
@@ -547,9 +547,9 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       // Monads
       case MonadUnit(expr)                        => traverse(expr)
       case MonadJoin(expr)                        => traverse(expr)
-      case Comprehension(head, qualifiers)        => qualifiers foreach traverse; traverse(head)
+      case Comprehension(qs, hd)                  => qs foreach traverse; traverse(hd)
       // Qualifiers
-      case Guard(expr) => traverse(expr)
+      case Guard(expr)                            => traverse(expr)
       case Generator(_, rhs)                      => traverse(rhs)
       // Environment & Host Language Connectors
       case ScalaExpr(_)                           =>
@@ -586,10 +586,10 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
     override def traverse(t: Expression) = if (!T) {
       if (t == needle) T = true
       else t match {
-        case Comprehension(head, qualifiers) =>
+        case Comprehension(qs, hd) =>
           S.push(mutable.Set.empty[TermSymbol])
-          qualifiers foreach traverse
-          traverse(head)
+          qs foreach traverse
+          traverse(hd)
           if (!T) S.pop()
 
         case Generator(lhs, rhs) =>
@@ -657,8 +657,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       case MonadUnit(xs) =>
         s"η ( ${pp(xs, offset + " " * 4)} )"
 
-      case Comprehension(h, qs) => s"""
-        |[ ${pp(h, offset + " " * 2)} |
+      case Comprehension(qs, hd) => s"""
+        |[ ${pp(hd, offset + " " * 2)} |
         |  ${offset + pp(qs, offset + " " * 2)} ]
       """.stripMargin.trim // ^${e.tpe.toString}
 
@@ -805,7 +805,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
     // -----------------------------------------------------
 
     // for { x <- xs; y <- ys; if p; if q } yield f(x, y)
-    case Comprehension(head, Generator(lhs, rhs) :: FilterPrefix(fs, qs)) =>
+    case Comprehension(Generator(lhs, rhs) :: FilterPrefix(fs, qs), hd) =>
       // apply all filters to the uncomprehended 'rhs' first
       val xs = fs.foldLeft(unComprehend(rhs)) { (result, filter) =>
         q"$result.withFilter(${lambda(lhs) { unComprehend(filter.expr) }})"
@@ -814,8 +814,8 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       // append a map or a flatMap to the result depending on the size of the residual qualifier
       // sequence 'qs'
       qs match {
-        case Nil => q"$xs.map(${lambda(lhs) { unComprehend(head) }})"
-        case _ => q"$xs.flatMap(${lambda(lhs) { unComprehend(Comprehension(head, qs)) }})"
+        case Nil => q"$xs.map(${lambda(lhs) { unComprehend(hd) }})"
+        case _ => q"$xs.flatMap(${lambda(lhs) { unComprehend(Comprehension(qs, hd)) }})"
       }
 
     // xs map f
