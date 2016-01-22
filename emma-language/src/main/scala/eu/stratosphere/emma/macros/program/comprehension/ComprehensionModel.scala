@@ -54,6 +54,16 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
   val GROUP = typeOf[eu.stratosphere.emma.api.Group[Nothing, Nothing]].typeConstructor
 
   // --------------------------------------------------------------------------
+  // Comprehension Syntax
+  // --------------------------------------------------------------------------
+
+  // TODO: unify with ReflectUtil.syntax.let (with two distinct in methods)
+
+  case class letexpr(bindings: (Symbol, Tree)*) {
+    def in(expr: Expression): Expression = expr.substitute { bindings.toMap }
+  }
+
+  // --------------------------------------------------------------------------
   // Comprehension Model
   // --------------------------------------------------------------------------
 
@@ -111,16 +121,17 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       }.flatten
     }
 
-    /** Substitute `find` with `replacement` in all enclosing trees. */
-    def replace(find: Tree, replacement: Tree): Unit =
-      expr = new ExpressionTransformer {
-        override def xform(tree: Tree) = model.replace(tree)(find, replacement)
-      }.transform(expr)
+    /** Bind a dictionary of [[Symbol]]-value pairs in all enclosing trees and assign the result to `expr`. */
+    def substitute(dict: Map[Symbol, Tree]): Unit =
+      expr = expr.substitute(dict)
 
+    /** Substitute `find` with `replacement` in all enclosing trees and assign the result to `expr`. */
+    def replace(find: Tree, replacement: Tree): Unit =
+      expr = expr.replace(find, replacement)
+
+    /** Rename `key` as `alias` in all enclosing trees and assign the result to `expr`. */
     def rename(key: Symbol, alias: TermSymbol): Unit =
-      expr = new ExpressionTransformer {
-        override def xform(tree: Tree) = model.rename(tree, key, alias)
-      }.transform(expr)
+      expr = expr.rename(key, alias)
 
     override def toString =
       prettyPrint(expr)
@@ -192,23 +203,41 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       cet.traverse(context)
       cet.env
     }
+
+    /** Bind a dictionary of [[Symbol]]-value pairs in all enclosing trees. */
+    def substitute(dict: Map[Symbol, Tree]): Expression =
+      new ExpressionTransformer {
+        override def xform(tree: Tree) = model.substitute(tree)(dict)
+      }.transform(this)
+
+    /** Substitute `find` with `replacement` in all enclosing trees. */
+    def replace(find: Tree, replacement: Tree): Expression =
+      new ExpressionTransformer {
+        override def xform(tree: Tree) = model.replace(tree)(find, replacement)
+      }.transform(this)
+
+    /** Rename `key` as `alias` in all enclosing trees. */
+    def rename(key: Symbol, alias: TermSymbol): Expression =
+      new ExpressionTransformer {
+        override def xform(tree: Tree) = model.rename(tree, key, alias)
+      }.transform(this)
   }
 
   // Monads
 
   sealed trait MonadExpression extends Expression
 
-  case class MonadJoin(var expr: MonadExpression) extends MonadExpression {
+  case class MonadJoin(expr: MonadExpression) extends MonadExpression {
     def tpe = DATA_BAG(expr.tpe)
     def descend[U](f: Expression => U) = expr foreach f
   }
 
-  case class MonadUnit(var expr: MonadExpression) extends MonadExpression {
+  case class MonadUnit(expr: MonadExpression) extends MonadExpression {
     def tpe = DATA_BAG(expr.tpe)
     def descend[U](f: Expression => U) = expr foreach f
   }
 
-  case class Comprehension(var hd: Expression, var qualifiers: List[Qualifier])
+  case class Comprehension(hd: Expression, qualifiers: List[Qualifier])
       extends MonadExpression {
 
     def tpe = DATA_BAG(hd.tpe)
@@ -223,7 +252,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
 
   sealed trait Qualifier extends Expression
 
-  case class Filter(var expr: Expression) extends Qualifier {
+  case class Filter(expr: Expression) extends Qualifier {
     def tpe = typeOf[Boolean]
     def descend[U](f: Expression => U) = expr foreach f
   }
@@ -235,7 +264,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
 
   // Environment & Host Language Connectors
 
-  case class ScalaExpr(var tree: Tree) extends Expression {
+  case class ScalaExpr(tree: Tree) extends Expression {
     def tpe = tree.preciseType
     def descend[U](f: Expression => U) = ()
   }
@@ -261,7 +290,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       def descend[U](f: Expression => U) = ()
     }
 
-    case class TempSink(id: TermName, var xs: Expression) extends Combinator {
+    case class TempSink(id: TermName, xs: Expression) extends Combinator {
       val tpe = xs.tpe
       def descend[U](f: Expression => U) = xs foreach f
     }
@@ -277,7 +306,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       def descend[U](f: Expression => U) = xs foreach f
     }
 
-    case class Filter(var p: Tree, var xs: Expression) extends Combinator {
+    case class Filter(p: Tree, xs: Expression) extends Combinator {
       def tpe = xs.tpe
       def descend[U](f: Expression => U) = xs foreach f
     }
@@ -303,7 +332,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       }
     }
 
-    case class Group(var key: Tree, var xs: Expression) extends Combinator {
+    case class Group(key: Tree, xs: Expression) extends Combinator {
 
       def tpe = {
         val K = key.preciseType.typeArgs(1)
@@ -315,14 +344,12 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
         xs foreach f
     }
 
-    case class Fold(var empty: Tree, var sng: Tree, var union: Tree, var xs: Expression,
-        var origin: Tree) extends Combinator {
+    case class Fold(empty: Tree, sng: Tree, union: Tree, xs: Expression, origin: Tree) extends Combinator {
       def tpe = sng.preciseType.typeArgs(1) // Function[A, B]#B
       def descend[U](f: Expression => U) = xs foreach f
     }
 
-    case class FoldGroup(var key: Tree, var empty: Tree, var sng: Tree, var union: Tree,
-        var xs: Expression) extends Combinator {
+    case class FoldGroup(key: Tree, empty: Tree, sng: Tree, union: Tree, xs: Expression) extends Combinator {
 
       def tpe = {
         val K = key.preciseType.typeArgs(1)
@@ -334,12 +361,12 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
         xs foreach f
     }
 
-    case class Distinct(var xs: Expression) extends Combinator {
+    case class Distinct(xs: Expression) extends Combinator {
       def tpe = xs.tpe
       def descend[U](f: Expression => U) = xs foreach f
     }
 
-    case class Union(var xs: Expression, var ys: Expression) extends Combinator {
+    case class Union(xs: Expression, ys: Expression) extends Combinator {
 
       def tpe = ys.tpe
 
@@ -349,7 +376,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       }
     }
 
-    case class Diff(var xs: Expression, var ys: Expression) extends Combinator {
+    case class Diff(xs: Expression, ys: Expression) extends Combinator {
 
       def tpe = ys.tpe
 
@@ -359,7 +386,7 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       }
     }
 
-    case class StatefulCreate(var xs: Expression, stateType: Type, keyType: Type)
+    case class StatefulCreate(xs: Expression, stateType: Type, keyType: Type)
         extends Combinator {
       def tpe = typeOf[Unit]
       def descend[U](f: Expression => U) = xs foreach f

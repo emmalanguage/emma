@@ -447,16 +447,25 @@ private[emma] trait ComprehensionAnalysis
   def normalizePredicates(tree: Tree)
       (implicit cfGraph: CFGraph, compView: ComprehensionView) = {
 
-    for {
-      ComprehendedTerm(_, _, ExpressionRoot(expr), _) <- compView.terms
-      comprehension @ Comprehension(_, qualifiers) <- expr
-    } comprehension.qualifiers = qualifiers flatMap {
-      case Filter(ScalaExpr(x)) =>
-        // Normalize the tree
-        (x ->> deMorgan ->> distributeOrOverAnd ->> cleanConjuncts)
-          .collect { case Some(nf) => Filter(ScalaExpr(nf)) }
+    for (ComprehendedTerm(_, _, root @ ExpressionRoot(expr), _) <- compView.terms) {
+      root.expr = new ExpressionTransformer {
+        override def transform(expr: Expression): Expression = expr match {
+          case comprehension: Comprehension =>
+            val hd = comprehension.hd
+            val qualifiers = comprehension.qualifiers flatMap {
+              case Filter(ScalaExpr(x)) =>
+                // Normalize the tree
+                (x ->> deMorgan ->> distributeOrOverAnd ->> cleanConjuncts)
+                  .collect { case Some(nf) => Filter(ScalaExpr(nf)) }
 
-      case q => q :: Nil
+              case q =>
+                q :: Nil
+            }
+            Comprehension(hd, qualifiers)
+          case _ =>
+            super.transform(expr)
+        }
+      }.transform(expr)
     }
 
     tree
@@ -533,7 +542,7 @@ private[emma] trait ComprehensionAnalysis
           s"Unexpected structure in predicate disjunction: ${showCode(expr)}")
       }
 
-      return into
+      into
     }
 
     def collectConjuncts(from: Tree,
@@ -554,7 +563,7 @@ private[emma] trait ComprehensionAnalysis
           //throw new RuntimeException("Unexpected structure in predicate conjunction")
       }
 
-      return into.toList
+      into.toList
     }
 
     collectConjuncts(tree) map { _.getTree }

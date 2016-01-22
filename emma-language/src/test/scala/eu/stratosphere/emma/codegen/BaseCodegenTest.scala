@@ -522,7 +522,7 @@ abstract class BaseCodegenTest(rtName: String)
       as plus bs plus cs plus ds
     }.verifyWith(runtimeUnderTest)
 
-    "Updated tmp sink (sieve of eratosthenes)" in emma.parallelize {
+    "Updated tmp sink (sieve of Eratosthenes)" in emma.parallelize {
       val N = 20
       val payload = "#" * 100
 

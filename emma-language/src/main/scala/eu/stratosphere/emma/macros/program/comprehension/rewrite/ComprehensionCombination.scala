@@ -69,9 +69,20 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     def fire(rm: RuleMatch) = {
       val RuleMatch(_, parent, gen, filter) = rm
       val p = lambda(gen.lhs) { unComprehend(filter.expr) }
-      gen.rhs = combinator.Filter(p, gen.rhs)
-      parent.qualifiers = parent.qualifiers diff List(filter)
-      parent // return new parent
+      // construct new parent components
+      val hd = parent.hd
+      val qualifiers = parent.qualifiers.foldLeft(List.empty[Qualifier])((qs, q) => q match {
+        case _ if q == filter =>
+          // do not include original guard in the result
+          qs
+        case _ if q == gen =>
+          // wrap the rhs of the generator in a filter combinator
+          qs :+ gen.copy(rhs = combinator.Filter(p, gen.rhs))
+        case _ =>
+          qs :+ q
+      })
+      // return new parent
+      Comprehension(hd, qualifiers) // return new parent
     }
   }
 
@@ -149,10 +160,12 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
     def fire(rm: RuleMatch) = {
       val RuleMatch(_, parent, g1, g2 @ Generator(_, rhs)) = rm
       val f = lambda(g1.lhs) { unComprehend(rhs) }
-      parent.qualifiers = for (q <- parent.qualifiers if q != g1)
+      // construct new parent components
+      val hd = parent.hd
+      val qualifiers = for (q <- parent.qualifiers if q != g1)
         yield if (q == g2) Generator(g2.lhs, combinator.FlatMap(f, g1.rhs)) else q
-
-      parent
+      // return new parent
+      Comprehension(hd, qualifiers)
     }
   }
 
@@ -207,23 +220,13 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       val term = mk.freeTerm($"join".toString, tpe)
       val qs = suffix drop 2 filter { _ != filter }
 
-      for { // substitute [v._1/x] in affected expressions
-        expr @ ScalaExpr(tree) <- parent
-        if expr.usedVars(root) contains xs.lhs
-        body = q"$term._1" :: xType
-      } expr.tree = let (xs.lhs -> body) in tree
-
-      for { // substitute [v._2/y] in affected expressions
-        expr @ ScalaExpr(tree) <- parent
-        if expr.usedVars(root) contains ys.lhs
-        body = q"$term._2" :: yType
-      } expr.tree = let (ys.lhs -> body) in tree
-
-      // modify parent qualifier list
-      parent.qualifiers = prefix ::: Generator(term, join) :: qs
-
-      // return the modified parent
-      parent
+      // construct new parent components
+      val hd = parent.hd
+      val qualifiers = prefix ::: Generator(term, join) :: qs
+      // return new parent
+      letexpr (
+        xs.lhs -> (q"$term._1" :: xType),
+        ys.lhs -> (q"$term._2" :: yType)) in Comprehension(hd, qualifiers)
     }
 
     private def parseJoinPredicate(root: Expression, xs: Generator, ys: Generator, p: ScalaExpr):
@@ -291,23 +294,13 @@ trait ComprehensionCombination extends ComprehensionRewriteEngine {
       val tpe = PAIR(xs.tpe, ys.tpe)
       val term = mk.freeTerm($"cross".toString, tpe)
 
-      for { // substitute [v._1/x] in affected expressions
-        expr @ ScalaExpr(tree) <- parent
-        if expr.usedVars(root) contains xs.lhs
-        body = q"$term._1" :: xs.tpe
-      } expr.tree = let (xs.lhs -> body) in tree
-
-      for { // substitute [v._2/y] in affected expressions
-        expr @ ScalaExpr(tree) <- parent
-        if expr.usedVars(root) contains ys.lhs
-        body = q"$term._2" :: ys.tpe
-      } expr.tree = let (ys.lhs -> body) in tree
-
-      // modify parent qualifier list
-      parent.qualifiers = prefix ::: Generator(term, cross) :: suffix.drop(2)
-
-      // return the modified parent
-      parent
+      // construct new parent components
+      val hd = parent.hd
+      val qualifiers = prefix ::: Generator(term, cross) :: suffix.drop(2)
+      // return new parent
+      letexpr (
+        xs.lhs -> (q"$term._1" :: xs.tpe),
+        ys.lhs -> (q"$term._2" :: ys.tpe)) in Comprehension(hd, qualifiers)
     }
   }
 

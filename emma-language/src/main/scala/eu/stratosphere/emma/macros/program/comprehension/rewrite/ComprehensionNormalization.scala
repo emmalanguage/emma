@@ -38,22 +38,13 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
 
     def fire(rm: RuleMatch) = {
       val RuleMatch(parent, gen, child) = rm
-      val rest = parent
-        .dropWhile { _ != gen }
-        .tail // trim prefix
-        .takeWhile {
-          case Generator(lhs, _) => lhs.name.toString != gen.toString
-          case _ => true
-        } // trim suffix
-
       val (xs, ys) = parent.qualifiers span { _ != gen }
-      parent.qualifiers = xs ::: child.qualifiers ::: ys.tail
 
-      for (expr @ ScalaExpr(tree) <- rest)
-        expr.tree = let (gen.lhs -> child.hd.as[ScalaExpr].tree) in tree
-
-      // new parent
-      rm.parent
+      // construct new parent components
+      val hd = parent.hd
+      val qualifiers = xs ::: child.qualifiers ::: ys.tail
+      // return new parent
+      letexpr (gen.lhs -> child.hd.as[ScalaExpr].tree) in Comprehension(hd, qualifiers)
     }
   }
 
@@ -82,15 +73,19 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
 
     def fire(rm: RuleMatch) = rm match {
       case RuleMatch(parent, child: Comprehension) =>
-        parent.qualifiers ++= child.qualifiers
-        parent.hd = child.hd
-        parent // return new root
+        // construct new parent components
+        val hd = child.hd
+        val qualifiers = parent.qualifiers ++ child.qualifiers
+        // return new parent
+        Comprehension(hd, qualifiers)
 
       case RuleMatch(parent, child: Expression) =>
         val term = mk.freeTerm($"head".toString, child.elementType)
-        parent.qualifiers ++= Generator(term, child) :: Nil
-        parent.hd = ScalaExpr(&(term))
-        parent // return new root
+        // construct new parent components
+        val hd = ScalaExpr(&(term))
+        val qualifiers = parent.qualifiers :+ Generator(term, child)
+        // return new parent
+        Comprehension(hd, qualifiers)
     }
   }
 
@@ -111,13 +106,11 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
     }
 
     def fire(rm: RuleMatch) = {
-      val expr @ ScalaExpr(tree) = rm.expr
-      expr.tree = transform(tree) {
+      val ScalaExpr(tree) = rm.expr
+      ScalaExpr(transform(tree) {
         case q"(..${args: List[Tree]}).${TermName(offset(i))}"
           if args.size > 1 => args(i.toInt - 1)
-      }
-
-      expr
+      })
     }
   }
 
@@ -151,9 +144,11 @@ trait ComprehensionNormalization extends ComprehensionRewriteEngine {
       val tpe = fold.empty.preciseType
       val head = map.hd.as[ScalaExpr].tree
       val body = q"${fold.sng}($head)" :: tpe
-      fold.sng = lambda(child.lhs) { body }
-      fold.xs = child.rhs
-      fold // return new root
+      // construct new parent components
+      val sng = lambda(child.lhs) { body }
+      val xs = child.rhs
+      // return new parent
+      fold.copy(sng = sng, xs = xs)
     }
   }
 }
