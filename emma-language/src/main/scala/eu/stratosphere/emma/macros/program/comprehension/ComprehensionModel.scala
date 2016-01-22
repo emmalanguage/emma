@@ -145,25 +145,12 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
     /** @return The element [[Type]] of this [[Expression]] */
     def elementType: Type = tpe.typeArgs.head
 
-    /**
-     * Recurse down the children of this [[Expression]] and apply a side-effecting function to each
-     * one. Implementations of this method should fulfill the following criteria:
-     *
-     * 1. Call [[Expression.foreach]] on every child;
-     * 2. DO NOT call [[Expression.descend]] explicitly;
-     * 3. Recurse in a bottom-up instead of top-down order.
-     *
-     * @param f A side-effecting function to apply to each child
-     * @tparam U The return type of the side-effecting function
-     */
-    protected def descend[U](f: Expression => U): Unit
-
-    def foreach[U](f: Expression => U) = {
-      descend(f); f(this)
-    }
-
-    override def toString() =
-      prettyPrint(this)
+    def foreach[U](f: Expression => U) =
+      new ExpressionTraverser {
+        override def traverse(e: Expression) = {
+          super.traverse(e); f(e)
+        }
+      }.traverse(this)
 
     /**
      * Which of the vars defined in the given Comprehension context are used by this monad
@@ -221,6 +208,9 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       new ExpressionTransformer {
         override def xform(tree: Tree) = model.rename(tree, key, alias)
       }.transform(this)
+
+    override def toString() =
+      prettyPrint(this)
   }
 
   // Monads
@@ -229,23 +219,14 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
 
   case class MonadJoin(expr: MonadExpression) extends MonadExpression {
     def tpe = DATA_BAG(expr.tpe)
-    def descend[U](f: Expression => U) = expr foreach f
   }
 
   case class MonadUnit(expr: MonadExpression) extends MonadExpression {
     def tpe = DATA_BAG(expr.tpe)
-    def descend[U](f: Expression => U) = expr foreach f
   }
 
-  case class Comprehension(qs: List[Qualifier], hd: Expression)
-      extends MonadExpression {
-
+  case class Comprehension(qs: List[Qualifier], hd: Expression) extends MonadExpression {
     def tpe = DATA_BAG(hd.tpe)
-
-    def descend[U](f: Expression => U) = {
-      for (q <- qs) q foreach f
-      hd foreach f
-    }
   }
 
   // Qualifiers
@@ -254,19 +235,16 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
 
   case class Guard(expr: Expression) extends Qualifier {
     def tpe = typeOf[Boolean]
-    def descend[U](f: Expression => U) = expr foreach f
   }
 
   case class Generator(var lhs: TermSymbol, var rhs: Expression) extends Qualifier {
     def tpe = rhs.elementType
-    def descend[U](f: Expression => U) = rhs foreach f
   }
 
   // Environment & Host Language Connectors
 
   case class ScalaExpr(tree: Tree) extends Expression {
     def tpe = tree.preciseType
-    def descend[U](f: Expression => U) = ()
   }
 
   // Combinators
@@ -277,141 +255,91 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
 
     case class Read(location: Tree, format: Tree) extends Combinator {
       def tpe = DATA_BAG(format.preciseType.typeArgs.head)
-      def descend[U](f: Expression => U) = ()
     }
 
     case class Write(location: Tree, format: Tree, in: Expression) extends Combinator {
       def tpe = typeOf[Unit]
-      def descend[U](f: Expression => U) = in foreach f
     }
 
     case class TempSource(id: Ident) extends Combinator {
       val tpe = id.preciseType
-      def descend[U](f: Expression => U) = ()
     }
 
     case class TempSink(id: TermName, xs: Expression) extends Combinator {
       val tpe = xs.tpe
-      def descend[U](f: Expression => U) = xs foreach f
     }
 
     case class Map(f: Tree, xs: Expression) extends Combinator {
       def tpe = DATA_BAG(f.preciseType.typeArgs.last)
-      def descend[U](f: Expression => U) = xs foreach f
     }
 
     case class FlatMap(f: Tree, xs: Expression) extends Combinator {
       // Since the return type of f is DataBag[DataBag[T]], don't wrap!
       def tpe = f.preciseType.typeArgs.last
-      def descend[U](f: Expression => U) = xs foreach f
     }
 
     case class Filter(p: Tree, xs: Expression) extends Combinator {
       def tpe = xs.tpe
-      def descend[U](f: Expression => U) = xs foreach f
     }
 
-    case class EquiJoin(keyx: Tree, keyy: Tree, xs: Expression, ys: Expression)
-        extends Combinator {
-
+    case class EquiJoin(keyx: Tree, keyy: Tree, xs: Expression, ys: Expression) extends Combinator {
       def tpe = DATA_BAG(PAIR(xs.elementType, ys.elementType))
-
-      def descend[U](f: Expression => U): Unit = {
-        xs foreach f
-        ys foreach f
-      }
     }
 
     case class Cross(xs: Expression, ys: Expression) extends Combinator {
-
       def tpe = DATA_BAG(PAIR(xs.elementType, ys.elementType))
-
-      def descend[U](f: Expression => U) = {
-        xs foreach f
-        ys foreach f
-      }
     }
 
     case class Group(key: Tree, xs: Expression) extends Combinator {
-
       def tpe = {
         val K = key.preciseType.typeArgs(1)
         val V = DATA_BAG(xs.elementType)
         DATA_BAG(GROUP(K, V))
       }
-
-      def descend[U](f: Expression => U) =
-        xs foreach f
     }
 
     case class Fold(empty: Tree, sng: Tree, union: Tree, xs: Expression, origin: Tree) extends Combinator {
       def tpe = sng.preciseType.typeArgs(1) // Function[A, B]#B
-      def descend[U](f: Expression => U) = xs foreach f
     }
 
     case class FoldGroup(key: Tree, empty: Tree, sng: Tree, union: Tree, xs: Expression) extends Combinator {
-
       def tpe = {
         val K = key.preciseType.typeArgs(1)
         val V = sng.preciseType.typeArgs(1)
         DATA_BAG(GROUP(K, V))
       }
-
-      def descend[U](f: Expression => U) =
-        xs foreach f
     }
 
     case class Distinct(xs: Expression) extends Combinator {
       def tpe = xs.tpe
-      def descend[U](f: Expression => U) = xs foreach f
     }
 
     case class Union(xs: Expression, ys: Expression) extends Combinator {
-
       def tpe = ys.tpe
-
-      def descend[U](f: Expression => U) = {
-        xs foreach f
-        ys foreach f
-      }
     }
 
     case class Diff(xs: Expression, ys: Expression) extends Combinator {
-
       def tpe = ys.tpe
-
-      def descend[U](f: Expression => U) = {
-        xs foreach f
-        ys foreach f
-      }
     }
 
-    case class StatefulCreate(xs: Expression, stateType: Type, keyType: Type)
-        extends Combinator {
+    case class StatefulCreate(xs: Expression, stateType: Type, keyType: Type) extends Combinator {
       def tpe = typeOf[Unit]
-      def descend[U](f: Expression => U) = xs foreach f
     }
 
     case class StatefulFetch(stateful: Ident) extends Combinator {
       def tpe = DATA_BAG(stateful.preciseType.typeArgs.head)
-      def descend[U](f: Expression => U) = ()
     }
 
     case class UpdateWithZero(stateful: Ident, udf: Tree) extends Combinator {
       def tpe = udf.preciseType.typeArgs.last
-      def descend[U](f: Expression => U) = ()
     }
 
-    case class UpdateWithOne(stateful: Ident, updates: Expression, key: Tree, udf: Tree)
-        extends Combinator {
+    case class UpdateWithOne(stateful: Ident, updates: Expression, key: Tree, udf: Tree) extends Combinator {
       def tpe = udf.preciseType.typeArgs.last
-      def descend[U](f: Expression => U) = updates foreach f
     }
 
-    case class UpdateWithMany(stateful: Ident, updates: Expression, key: Tree, udf: Tree)
-        extends Combinator {
+    case class UpdateWithMany(stateful: Ident, updates: Expression, key: Tree, udf: Tree) extends Combinator {
       def tpe = udf.preciseType.typeArgs.last
-      def descend[U](f: Expression => U) = updates foreach f
     }
 
   }
