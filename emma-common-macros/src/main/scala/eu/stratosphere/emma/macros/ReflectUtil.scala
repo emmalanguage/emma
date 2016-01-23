@@ -173,7 +173,7 @@ trait ReflectUtil {
    * @param symbols The sequence of [[Symbol]]s to rename
    * @return This [[Tree]] with the specified [[Symbol]]s replaced
    */
-  def refresh(in: Tree)(symbols: Symbol*): Tree =
+  def refresh(in: Tree)(symbols: TermSymbol*): Tree =
     rename(in, { for (sym <- symbols)
       yield sym -> termSym(sym.owner, $"${sym.name}", sym.info, pos = sym.pos)
     }: _*)
@@ -184,31 +184,21 @@ trait ReflectUtil {
    * @param dict A [[Map]] of aliases to replace
    * @return This [[Tree]] with the specified [[Symbol]]s replaced 
    */
-  def rename(in: Tree, dict: Map[Symbol, TermSymbol]): Tree =
+  def rename(in: Tree, dict: Map[TermSymbol, TermSymbol]): Tree =
     if (dict.isEmpty) in else transform(in) {
-      case vd: ValDef if dict contains vd.symbol => val_(dict(vd.symbol)) := vd.rhs
-      case id: Ident  if dict contains id.symbol => &(dict(id.symbol))
-      case bd: Bind   if dict contains bd.symbol => dict(bd.symbol) @@ bd.body
+      case vd: ValDef if vd.hasTerm && (dict contains vd.term) => val_(dict(vd.symbol.asTerm)) := vd.rhs
+      case id: Ident  if id.hasTerm && (dict contains id.term) => &(dict(id.symbol.asTerm))
+      case bd: Bind   if bd.hasTerm && (dict contains bd.term) => dict(bd.symbol.asTerm) @@ bd.body
     }
 
   /**
-   * Replace a sequence of [[Symbol]]s with references to their aliases.
+   * Replace a sequence of [[TermSymbol]]s with references to their aliases.
    * @param in The [[Tree]] to rename in
-   * @param aliases A sequence of aliases to replace
-   * @return This [[Tree]] with the specified [[Symbol]]s replaced
+   * @param aliases A sequence of [[TermSymbol]] key-alias pairs to replace
+   * @return This [[Tree]] with the specified [[TermSymbol]]s replaced
    */
-  def rename(in: Tree, aliases: (Symbol, TermSymbol)*): Tree =
+  def rename(in: Tree, aliases: (TermSymbol, TermSymbol)*): Tree =
     rename(in, aliases.toMap)
-
-  /**
-   * Replace a [[Symbol]]s with a reference to an alias.
-   * @param in The [[Tree]] to rename in
-   * @param key The [[Symbol]] to rename
-   * @param alias An alternative [[Symbol]] to use
-   * @return This [[Tree]] with the specified [[Symbol]] replaced
-   */
-  def rename(in: Tree, key: Symbol, alias: TermSymbol): Tree =
-    rename(in, key -> alias)
 
   /**
    * Inline a value definitions in a [[Tree]]. It's assumed that it's part of the [[Tree]].
@@ -313,7 +303,6 @@ trait ReflectUtil {
     def val_(term: TermSymbol): ValDef = mk.valDef(term)
     def val_(name: TermName, tpe: Type): ValDef = mk.valDef(name, tpe)
     def val_(name: String, tpe: Type): ValDef = val_(TermName(name), tpe)
-    def λ(args: TermSymbol*)(body: Tree): Function = lambda(args: _*) { body }
     def lambda(args: TermSymbol*)(body: Tree): Function = mk.anonFun(args.toList, body)
 
     case class let(bindings: (Symbol, Tree)*) {

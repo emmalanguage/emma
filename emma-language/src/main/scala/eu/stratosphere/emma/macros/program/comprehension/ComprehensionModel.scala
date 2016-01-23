@@ -67,6 +67,14 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       }.transform(expr)
   }
 
+  /** Replace references to [[TermSymbol]]'s with their aliases in all enclosing trees. */
+  case class renameExpr(aliases: (TermSymbol, TermSymbol)*) {
+    def in(expr: Expression): Expression =
+      new ExpressionTransformer {
+        override def xform(tree: Tree) = model.rename(tree, aliases.toMap)
+      }.transform(expr)
+  }
+
   // --------------------------------------------------------------------------
   // Comprehension Model
   // --------------------------------------------------------------------------
@@ -187,12 +195,6 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
     def replace(find: Tree, replacement: Tree): Expression =
       new ExpressionTransformer {
         override def xform(tree: Tree) = model.replace(tree)(find, replacement)
-      }.transform(this)
-
-    /** Rename `key` as `alias` in all enclosing trees. */
-    def rename(key: Symbol, alias: TermSymbol): Expression =
-      new ExpressionTransformer {
-        override def xform(tree: Tree) = model.rename(tree, key, alias)
       }.transform(this)
 
     override def toString() =

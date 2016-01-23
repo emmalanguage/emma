@@ -335,7 +335,7 @@ private[emma] trait ComprehensionAnalysis
         com.comprehension.expr = com.comprehension.expr.replace(foldTree, replacement)
       }
 
-      com.comprehension.expr = com.comprehension.expr.rename(gSym, gen.lhs)
+      com.comprehension.expr = renameExpr(gSym -> gen.lhs) in com.comprehension.expr
       foldGroupFusion(tree)
     })
   }
