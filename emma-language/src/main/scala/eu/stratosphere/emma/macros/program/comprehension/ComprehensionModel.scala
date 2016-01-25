@@ -75,6 +75,14 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       }.transform(expr)
   }
 
+  /** Substitute `find` with `replacement` in all enclosing trees. */
+  case class replaceExpr(find: Tree, replacement: Tree) {
+    def in(expr: Expression): Expression =
+      new ExpressionTransformer {
+        override def xform(tree: Tree) = model.replace(tree)(find, replacement)
+      }.transform(expr)
+  }
+
   // --------------------------------------------------------------------------
   // Comprehension Model
   // --------------------------------------------------------------------------
@@ -190,12 +198,6 @@ private[emma] trait ComprehensionModel extends BlackBoxUtil { model =>
       cet.traverse(context)
       cet.env
     }
-
-    /** Substitute `find` with `replacement` in all enclosing trees. */
-    def replace(find: Tree, replacement: Tree): Expression =
-      new ExpressionTransformer {
-        override def xform(tree: Tree) = model.replace(tree)(find, replacement)
-      }.transform(this)
 
     override def toString() =
       prettyPrint(this)

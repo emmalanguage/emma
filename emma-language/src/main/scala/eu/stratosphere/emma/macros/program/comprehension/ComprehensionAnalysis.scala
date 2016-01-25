@@ -332,7 +332,7 @@ private[emma] trait ComprehensionAnalysis
           q"${gen.lhs}.values.${TermName(s"_${idx + 1}")}".typeChecked
         else q"${gen.lhs}.values".typeChecked
 
-        com.comprehension.expr = com.comprehension.expr.replace(foldTree, replacement)
+        com.comprehension.expr = replaceExpr(foldTree, replacement) in com.comprehension.expr
       }
 
       com.comprehension.expr = renameExpr(gSym -> gen.lhs) in com.comprehension.expr
