@@ -62,6 +62,7 @@ function init() {
     currentExecution = "";
     executionOrder = [];
     loadedExample = "";
+    iterationMarker = [];
 
     $('#plan-tabs').html("");
     $('#plan-tab-content').html("No example selected");
