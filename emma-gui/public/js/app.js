@@ -2,6 +2,7 @@
 
 var codeCanvas = null;
 var codeStartIndex = 0;
+var codeHasCarriageReturns = false;
 var canvases = {};
 var tabCount = 0;
 var requestBase = "http://localhost:8080/";
@@ -68,6 +69,7 @@ function init() {
     $('#plan-tab-content').html("No example selected");
     $('#log-container').html("");
     $('a[href="#code-panel0"]').click();
+    $('#code-container').scrollTop(0);
 
     setInitState();
     $('#example-name').find('div').html("");
@@ -142,6 +144,8 @@ function loadCode(name) {
         success: function(data) {
             if (data != null) {
                 var codeCanvasElement = $('#code-container').find('canvas');
+
+                codeHasCarriageReturns = data.code.indexOf("\r") > -1;
 
                 code.html(filterParallelizeFunction(data.code));
                 code.each(function(i, block) {
@@ -305,7 +309,7 @@ function drawComprehensionBoxes(name) {
 
     if (boxes != null && boxes.length > 0) {
         boxes.forEach(function(box){
-            drawComprehensionBox(box[0] - codeStartIndex - 1, box[1] - codeStartIndex - 1);
+            drawComprehensionBox(box[0] - codeStartIndex, box[1] - codeStartIndex);
         });
     }
 
@@ -313,7 +317,7 @@ function drawComprehensionBoxes(name) {
         var maxWidth = $('#code-canvas').width();
         for (var i in iterationMarker) {
             var iteration = iterationMarker[i];
-            var clientRect = setSelectionRange($('#code-container').find('code')[0], iteration[0] - codeStartIndex - 1, iteration[1] - codeStartIndex - 1);
+            var clientRect = setSelectionRange($('#code-container').find('code')[0], iteration[0] - codeStartIndex, iteration[1] - codeStartIndex);
             if (clientRect != null && codeCanvas) {
                 var margin = 3;
                 var rectangle = new codeCanvas.Shape.Rectangle(
@@ -352,59 +356,55 @@ function updateComprehensionBoxes() {
 }
 
 function setSelectionRange(el, start, end) {
+
     if (document.createRange && window.getSelection) {
         var range = document.createRange();
-        range.selectNodeContents(el);
         var textNodes = getTextNodesIn(el);
         var foundStart = false;
-        var charCount = 0, endCharCount;
+        var charCount = 0, from, to;
 
         for (var i = 0, textNode; textNode = textNodes[i++]; ) {
             var text = $(textNode).text();
-            endCharCount = charCount + textNode.length;
 
-            var lineBreakCount = text.split("\n").length - 1;
+            from = charCount;
 
-            endCharCount += lineBreakCount;
+            charCount += text.length;
 
-            if (!foundStart && start >= charCount && (start < endCharCount || (start == endCharCount && i <= textNodes.length))) {
-                //start from previous character if selected character is a newline
-                if (text[start - charCount] == '\n')
-                    start--;
+            if (codeHasCarriageReturns) {
+                charCount += text.split("\n").length - 1;
+            }
 
-                range.setStart(textNode, start - charCount - lineBreakCount);
+            to = charCount;
+
+            if (!foundStart && start >= from && start <= to) {
+                range.setStart(textNode, start - from);
                 foundStart = true;
             }
 
-            if (foundStart && end <= endCharCount) {
-                range.setEnd(textNode, end - charCount);
+            if (foundStart && end >= from && end <= to) {
+                range.setEnd(textNode, end - from);
                 break;
             }
-
-            charCount = endCharCount;
         }
 
         var codeContainer = $(el).parents('#code-container');
         var offset = codeContainer.offset();
         var clientRect = range.getBoundingClientRect();
 
-        var box = null;
-        if (range.getClientRects().length > 0) {
-            var box = {
+        //show selected text
+        //var sel = window.getSelection();
+        //sel.removeAllRanges();
+        //sel.addRange(range);
+
+        return (range.getClientRects().length > 0) ?
+            {
                 top: clientRect.top - offset.top + codeContainer.scrollTop() + 1,
                 left: range.getClientRects()[0].left - offset.left + codeContainer.scrollLeft(),
                 width: clientRect.width,
                 height: clientRect.height || 19
-            };
-        }
-        return box;
-    } else if (document.selection && document.body.createTextRange) {
-        var textRange = document.body.createTextRange();
-        textRange.moveToElementText(el);
-        textRange.collapse(true);
-        textRange.moveEnd("character", end);
-        textRange.moveStart("character", start);
-        textRange.select();
+            }: null;
+    } else {
+        console.warn("Range selection not supported. Comprehensions can not be shown.");
     }
 }
 
@@ -412,6 +412,8 @@ function filterParallelizeFunction(code) {
     codeStartIndex = code.indexOf('emma.parallelize');
 
     while (code[--codeStartIndex] != '\n') {}
+
+    codeStartIndex++;
 
     var bracesCount = 0;
     var start = false;
@@ -429,7 +431,7 @@ function filterParallelizeFunction(code) {
         index++;
     }
 
-    return code.substr(codeStartIndex + 1, index-codeStartIndex);
+    return code.substr(codeStartIndex, index-codeStartIndex);
 }
 
 function getTextNodesIn(node) {
