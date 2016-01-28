@@ -3,7 +3,7 @@
     "name": "IMDb",
     "class": "eu.stratosphere.emma.examples.imdb.IMDb",
     "parameter": {
-      "input": "src/main/resources/examples/cinema",
+      "input": "../emma-common/src/test/resources/cinema",
       "output": "/tmp/emma/examples/cinema/output"
     }
   },
@@ -11,7 +11,7 @@
     "name": "WordCount",
     "class": "eu.stratosphere.emma.examples.text.WordCount",
     "parameter": {
-      "input": "src/main/resources/examples/wordcount/hamlet.txt",
+      "input": "../emma-common/src/test/resources/lyrics/Jabberwocky.txt",
       "output": "/tmp/emma/examples/wordcount/output"
     }
   },
@@ -19,7 +19,7 @@
     "name": "AlternatingLeastSquares",
     "class": "eu.stratosphere.emma.examples.graphs.AlternatingLeastSquares2",
     "parameter": {
-      "input": "src/main/resources/examples/als/r.base",
+      "input": "../emma-examples/src/test/resources/graphs/als/r.base",
       "output": "/tmp/emma/examples/als/output",
       "lambda": 0.065,
       "features": 5,
@@ -30,7 +30,7 @@
     "name": "GraphColoring",
     "class": "eu.stratosphere.emma.examples.graphs.GraphColoring",
     "parameter": {
-      "input": "src/main/resources/examples/graphcoloring/edges.tsv",
+      "input": "../emma-examples/src/test/resources/graphs/graph-col/edges.tsv",
       "output": "/tmp/emma/examples/graphcoloring/vertex-colors"
     }
   },
@@ -38,14 +38,14 @@
     "name": "TriangleCount",
     "class": "eu.stratosphere.emma.examples.graphs.TriangleCount",
     "parameter": {
-      "input": "src/main/resources/examples/graphcoloring/edges.tsv"
+      "input": "../emma-examples/src/test/resources/graphs/graph-col/edges.tsv"
     }
   },
   {
     "name": "TransitiveClosure",
     "class": "eu.stratosphere.emma.examples.graphs.TransitiveClosure",
     "parameter": {
-      "input": "src/main/resources/examples/trans-closure/edges.tsv",
+      "input": "../emma-examples/src/test/resources/graphs/trans-closure/edges.tsv",
       "output": "/tmp/emma/examples/trans-closure/output"
     }
   },
@@ -53,7 +53,7 @@
     "name": "LabelRank",
     "class": "eu.stratosphere.emma.examples.graphs.LabelRank",
     "parameter": {
-      "input": "src/main/resources/examples/labelrank/edges.tsv",
+      "input": "../emma-examples/src/test/resources/graphs/label-rank/edges.tsv",
       "output": "/tmp/emma/examples/labelrank/labels",
       "max-oscillations": 5,
       "inflation": 2.0,
@@ -65,7 +65,7 @@
     "name": "SparseMatrixVectorMultiplication",
     "class": "eu.stratosphere.emma.examples.graphs.SparseMatrixVectorMultiplication",
     "parameter": {
-      "input": "src/main/resources/examples/spmv",
+      "input": "../emma-examples/src/test/resources/graphs/spmv",
       "output": "/tmp/emma/examples/spmv/product",
       "exponent": 5
     }
@@ -74,7 +74,7 @@
     "name": "NaiveBayes",
     "class": "eu.stratosphere.emma.examples.datamining.classification.NaiveBayes",
     "parameter": {
-      "training": "src/main/resources/examples/naivebayes/vote.csv",
+      "training": "../emma-examples/src/test/resources/classification/naivebayes/vote.csv",
       "lambda": 1.0,
       "model_type": "bernoulli"
     }
@@ -86,7 +86,7 @@
       "K": 8,
       "epsilon": 0.000000001,
       "iterations": 5,
-      "input-file": "src/main/resources/examples/kmeans/points.tsv",
+      "input-file": "../emma-examples/src/test/resources/clustering/kmeans/points.tsv",
       "output-file": "/tmp/emma/examples/kmeans/clusters"
     }
   },
@@ -94,7 +94,7 @@
     "name": "BeliefPropagation",
     "class": "eu.stratosphere.emma.examples.graphs.BeliefPropagation",
     "parameter": {
-      "input": "src/main/resources/examples/belief-prop",
+      "input": "../emma-examples/src/test/resources/graphs/belief-prop",
       "output": "/tmp/emma/examples/belief-prop/marginals",
       "epsilon": 0.001,
       "max-iterations": 10
@@ -112,7 +112,7 @@
     "name": "TPCH-Query01",
     "class": "eu.stratosphere.emma.examples.tpch.Query01",
     "parameter": {
-      "input": "src/main/resources/examples/tpch",
+      "input": "../emma-common/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q1.tbl",
       "delta": 30
     }
@@ -121,7 +121,7 @@
     "name": "TPCH-Query03",
     "class": "eu.stratosphere.emma.examples.tpch.Query03",
     "parameter": {
-      "input": "src/main/resources/examples/tpch",
+      "input": "../emma-common/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q3.tbl",
       "segment": "AUTOMOBILE",
       "date": "1996-06-30"
@@ -131,7 +131,7 @@
     "name": "TPCH-Query05",
     "class": "eu.stratosphere.emma.examples.tpch.Query05",
     "parameter": {
-      "input": "src/main/resources/examples/tpch",
+      "input": "../emma-common/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q5.tbl",
       "region": "AMERICA",
       "date": "1994-01-01"
@@ -141,7 +141,7 @@
     "name": "TPCH-Query06",
     "class": "eu.stratosphere.emma.examples.tpch.Query06",
     "parameter": {
-      "input": "src/main/resources/examples/tpch",
+      "input": "../emma-common/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q6.tbl",
       "date": "1994-01-01",
       "discount": 0.06,
@@ -152,7 +152,7 @@
     "name": "TPCH-Query07",
     "class": "eu.stratosphere.emma.examples.tpch.Query07",
     "parameter": {
-      "input": "src/main/resources/examples/tpch",
+      "input": "../emma-common/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q7.tbl",
       "nation1": "ARGENTINA",
       "nation2": "GERMANY"
@@ -162,7 +162,7 @@
     "name": "TPCH-Query08",
     "class": "eu.stratosphere.emma.examples.tpch.Query08",
     "parameter": {
-      "input": "src/main/resources/examples/tpch",
+      "input": "../emma-common/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q8.tbl",
       "nation": "ETHIOPIA",
       "region": "AMERICA",
@@ -173,7 +173,7 @@
     "name": "TPCH-Query09",
     "class": "eu.stratosphere.emma.examples.tpch.Query09",
     "parameter": {
-      "input": "src/main/resources/examples/tpch",
+      "input": "../emma-common/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q9.tbl",
       "color": "green"
     }
@@ -182,7 +182,7 @@
     "name": "TPCH-Query10",
     "class": "eu.stratosphere.emma.examples.tpch.Query10",
     "parameter": {
-      "input": "src/main/resources/examples/tpch",
+      "input": "../emma-common/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q10.tbl",
       "begin_date": "1993-10-01",
       "end_date": "1994-01-01"
