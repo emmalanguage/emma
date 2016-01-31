@@ -77,7 +77,7 @@ val max = xs.fold(Int.MinValue)(identity, Math.max(_,_))
 val sum = xs.fold(0, x => 1, _ + _)
 ```
 
-*Emma* offers [pre-defined aliases for common `fold` operators](./blob/master/emma-common/src/main/scala/eu/stratosphere/emma/macros/Folds.scala):
+*Emma* offers [pre-defined aliases for common `fold` operators](emma-common/src/main/scala/eu/stratosphere/emma/macros/Folds.scala):
 
 Fold Alias                     | Purpose
 -------------------------------|-----------------------------
@@ -135,7 +135,7 @@ for {
 
 #### DSL Compiler
 
-The presented API is not abstract: The semantics of each operator are given directly by the corresponding [`DataBag[A]`-method definitions](./blob/master/emma-common/src/main/scala/eu/stratosphere/emma/api/DataBag.scala). This allows you to incrementally develop, test, and debug data analysis algorithms at small scale locally as a pure Scala programs.
+The presented API is not abstract: The semantics of each operator are given directly by the corresponding [`DataBag[A]`-method definitions](emma-common/src/main/scala/eu/stratosphere/emma/api/DataBag.scala). This allows you to incrementally develop, test, and debug data analysis algorithms at small scale locally as a pure Scala programs.
 
 For example, the following code-snippet that counts words runs out-of-the-box. 
 
@@ -220,12 +220,12 @@ $ mvn clean package -DskipTests
 
 to build *Emma* without running any tests. 
 
-For more advanced build options including integration tests for the target runtimes please see https://github.com/stratosphere/emma/wiki/Building-Emma . 
+For more advanced build options including integration tests for the target runtimes please see the ["Building Emma" section in the Wiki](../../wiki/Building-Emma). 
 
 ## Examples
 
-The [emma-examples](./blob/master/emma-examples/src/main/scala/eu/stratosphere/emma/examples) module contains examples from various fields.
+The [emma-examples](emma-examples/src/main/scala/eu/stratosphere/emma/examples) module contains examples from various fields.
 
-- [Data Mining](./blob/master/emma-examples/src/main/scala/eu/stratosphere/emma/examples/datamining)
-- [Relational Databases](./blob/master/emma-examples/src/main/scala/eu/stratosphere/emma/examples/tpch)
-- [Graph Analysis](./blob/master/emma-examples/src/main/scala/eu/stratosphere/emma/examples/graphs)
+- [Data Mining](emma-examples/src/main/scala/eu/stratosphere/emma/examples/datamining)
+- [Relational Databases](emma-examples/src/main/scala/eu/stratosphere/emma/examples/tpch)
+- [Graph Analysis](emma-examples/src/main/scala/eu/stratosphere/emma/examples/graphs)
