@@ -47,6 +47,10 @@
     border: 1px solid black;
 }
 
+#code-tab-wrapper .tabs-content .content {
+    background-color: #e8e8e8;
+}
+
 #log-wrapper {
     background-color: #e8e8e8;
     border-left: 1px solid black;
@@ -110,4 +114,8 @@ a:hover, a:focus{
     border: 1px solid black;
     font-size: 18px;
     font-family: 'Courier New';
+}
+
+#parameter-container label{
+    color: black;
 }

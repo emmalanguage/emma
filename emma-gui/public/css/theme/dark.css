@@ -47,6 +47,10 @@
     border: 1px solid black;
 }
 
+#code-tab-wrapper .tabs-content .content {
+    background-color: #333;
+}
+
 #log-wrapper {
     background-color: #333;
     border-left: 1px solid black;
@@ -110,4 +114,8 @@ a:hover {
     border: 1px solid #F55B11;
     font-size: 18px;
     font-family: 'Courier New';
+}
+
+#parameter-container label{
+    color: white;
 }

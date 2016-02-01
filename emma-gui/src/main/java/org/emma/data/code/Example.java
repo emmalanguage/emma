@@ -1,18 +1,25 @@
 package org.emma.data.code;
 
 import com.google.gson.JsonObject;
+import net.sourceforge.argparse4j.inf.Namespace;
 
 public class Example {
     String code = "";
     JsonObject comprehensions = new JsonObject();
+    Namespace parameters;
 
     public Example(String code) {
         this.code = code;
     }
 
     public Example(String code, JsonObject comprehensions) {
-        this.code = code;
+        this(code);
         this.comprehensions = comprehensions;
+    }
+
+    public Example(String code, JsonObject comprehensions, Namespace parameters) {
+        this(code,comprehensions);
+        this.setParameters(parameters);
     }
 
     public String getCode() {
@@ -26,5 +33,13 @@ public class Example {
 
     public JsonObject getComprehensions() {
         return comprehensions;
+    }
+
+    public Namespace getParameters() {
+        return parameters;
+    }
+
+    public void setParameters(Namespace parameters) {
+        this.parameters = parameters;
     }
 }
