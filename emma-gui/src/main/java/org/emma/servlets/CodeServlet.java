@@ -79,7 +79,7 @@ public class CodeServlet extends HttpServlet {
         }
 
         if (!sourceCode.isEmpty())
-            return new Example(sourceCode, exampleLoader.loadComprehensionBoxes(exampleName));
+            return new Example(sourceCode, exampleLoader.loadComprehensionBoxes(exampleName), exampleLoader.getParameters(exampleName));
 
         return null;
     }

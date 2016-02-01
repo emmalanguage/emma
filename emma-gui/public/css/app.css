@@ -1,3 +1,7 @@
+.top-bar {
+    overflow: visible;
+}
+
 #example-name {
     position: relative;
     overflow: hidden;
@@ -60,9 +64,11 @@
     overflow-y: auto;
 }
 
+code {
+    border: 0;
+}
+
 #code-container {
-    height: 500px;
-    overflow: auto;
     position: relative;
     z-index: 1;
     font-size: 16px;
@@ -71,7 +77,6 @@
 #code-container code {
     min-height: 48px;
     width: auto !important;
-    border: 0;
     background: transparent !important;
 }
 
@@ -81,8 +86,8 @@
 
 #code-canvas {
     position: absolute;
-    top: 0px;
-    left: 0px;
+    top: 0;
+    left: 0;
     z-index: -1;
 }
 
@@ -101,7 +106,7 @@
 .ui-resizable-e {
     cursor: e-resize;
     width: 7px;
-    right: 0px;
+    right: 0;
     top: 0;
     height: 100%;
 }
@@ -109,14 +114,13 @@
 .ui-resizable-s {
     cursor: s-resize;
     height: 7px;
-    right: 0px;
+    right: 0;
     bottom: 0;
     width: 100%;
 }
 
 .ui-resizable-handle {
     position: absolute;
-    font-size: 0.1px;
     display: block;
     -ms-touch-action: none;
     touch-action: none;
@@ -160,8 +164,16 @@
     overflow: initial;
 }
 
+#code-tabs {
+    list-style: none;
+}
+
 #code-tab-wrapper {
     padding-bottom: 7px;
+}
+
+#code-tab-wrapper .tabs-content .content{
+    overflow: auto;
 }
 
 #log-container {

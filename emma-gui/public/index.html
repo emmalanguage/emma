@@ -69,9 +69,12 @@
 <section id="main-section">
     <div class="code-wrapper">
         <div id="code-tab-wrapper">
-            <ul id="code-tabs" class="tabs">
+            <ul id="code-tabs" class="tabs" data-tab>
                 <li class="tab-title active">
-                    <a href="#code-panel0">Code</a>
+                    <a href="#code-container">Code</a>
+                </li>
+                <li class="tab-title">
+                    <a href="#code-panel1">Input Parameter</a>
                 </li>
                 <li id="code-options">
                     <a>
@@ -83,10 +86,15 @@
                 </li>
             </ul>
             <div class="tabs-content">
-                <div class="content active" id="code-panel0">
-                    <div id="code-container" class="hljs">
-                        <canvas id="code-canvas"></canvas>
-                        <pre><code class="scala"></code></pre>
+                <div class="content hljs active" id="code-container">
+                    <canvas id="code-canvas"></canvas>
+                    <pre><code class="scala"></code></pre>
+                </div>
+                <div class="content" id="code-panel1">
+                    <div id="parameter-container">
+                        <form>
+
+                        </form>
                     </div>
                 </div>
             </div>

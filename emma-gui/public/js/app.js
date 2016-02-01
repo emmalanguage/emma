@@ -68,7 +68,7 @@ function init() {
     $('#plan-tabs').html("");
     $('#plan-tab-content').html("No example selected");
     $('#log-container').html("");
-    $('a[href="#code-panel0"]').click();
+    $('a[href="#code-container"]').click();
     $('#code-container').scrollTop(0);
 
     setInitState();
@@ -159,6 +159,9 @@ function loadCode(name) {
                 code.parent().width(contentWidth+20);
 
                 currentComprehensions = {};
+                if (data.parameters) {
+                    buildParameterForm(data.parameters.attrs_);
+                }
             } else {
                 console.error("No sources available. Did you compile the sources of emma-examples?");
                 code.html("No sources available.");
@@ -263,6 +266,27 @@ function addToExecutionOrder(currentExecution, newName) {
     }
 }
 
+function buildParameterForm(parameters) {
+    if (parameters) {
+        var form = $('#parameter-container').find("form");
+        form.html("");
+        for (var param in parameters) {
+            var parameter = parameters[param];
+            var row = $('<div></div>').addClass("row");
+            var column = $('<div></div>').addClass("small-12 columns");
+            var label = $('<label></label>').html(param+":");
+            var input = $('<input>').attr("type","text").val(parameter);
+            label.append(input);
+            column.append(label);
+            row.append(column);
+            form.append(row);
+        }
+
+    } else {
+        console.error("no input parameters");
+    }
+}
+
 function addTab(plan) {
     var shortName = plan.name.substr(0, plan.name.indexOf('$'));
 
@@ -295,6 +319,8 @@ function updateTabLabel(planTab, name, planMetaData) {
 
     if (planMetaData.executed > 1)
         planTab.html(shortName+"("+(planMetaData.executed)+")");
+    else
+        planTab.html(shortName);
 }
 
 function setupCodeCanvas() {
@@ -448,6 +474,7 @@ function getTextNodesIn(node) {
 }
 
 function resizeContainers() {
+    resizeExampleName();
     resizeLeftView();
     resizeRightView();
 }
@@ -480,23 +507,20 @@ function resizeLeftView() {
     });
 
     var wrapper = $("#code-tab-wrapper");
+    var handleHeight = wrapper.find('.ui-resizable-handle').height();
 
     var codeTabs = $('#code-tabs');
 
     var maxHeight = $("html").height()
         - wrapper.offset().top
         - codeTabs.height()
-        - wrapper.find('.ui-resizable-handle').height()
+        - handleHeight
         - $('#log-options').height()
         - 14;   //margin bottom
 
-    if (codeTabs.find('li').css('borderBottomWidth').replace('px','') == 0) {
-        //firefox fix
-        maxHeight += 2
-    }
-
-    if (wrapper.find('.ui-resizable-handle').height() == null) {
-        maxHeight -= 7;
+    if (!handleHeight) {
+        maxHeight -= 7; //inconsistent ui-resizable-handle height
+        maxHeight += 1; //inconsistent log-options height
     }
 
     var wrapperHeight = parseInt(wrapper.css("height").replace("px",""));
@@ -512,12 +536,19 @@ function resizeLeftView() {
 
     var codeHeight = wrapper.height() - codeTabs.height();
     var logHeight = maxHeight - codeHeight;
-    var codeContainer = $("#code-container");
 
-    if (codeContainer.css('paddingBottom').replace('px','') == "0") {
-        codeHeight -=3;
-    }
-    codeContainer.css("height", codeHeight);
+    var codeTabContents = wrapper.find('.tabs-content .content');
+
+    codeTabContents.each(function(i,e){
+        var container = $(e);
+        if (codeTabs.find('li').css('borderBottomWidth').replace('px','') == 0) {
+            //firefox fix
+            container.css("height", codeHeight - 3);
+        } else {
+            container.css("height", codeHeight);
+        }
+    });
+
     $('#log-container').css("height", logHeight);
 
     wrapper.resizable({
@@ -527,12 +558,27 @@ function resizeLeftView() {
     });
 }
 
+function resizeExampleName() {
+    var nav = $('nav');
+    var width = nav.width();
+
+    nav.children().each(function(i,e){
+        var e = $(e);
+        if (e.attr('id') != 'example-name') {
+            width -= e.width();
+        }
+    });
+
+    $('#example-name').width(width);
+}
+
 function updateCodeCanvasSize() {
-    var codeContainer = $('#code-container')[0];
+
+    var codeContainer = $('#code-tab-wrapper').find(".tabs-content .active");
     $('#code-canvas').css("width", 1)
         .css("height", 1)
-        .css("width", codeContainer.scrollWidth)
-        .css("height", codeContainer.scrollHeight);
+        .css("width", codeContainer.prop("scrollWidth"))
+        .css("height", codeContainer.prop("scrollHeight"));
 }
 
 function run(async, callback) {
@@ -592,6 +638,9 @@ function prepareRerun() {
     $('a[href="#panel0"]').click();
     for (var name in planNames) {
         planNames[name].executed = 0;
+        var planIndex = planNames[name].index;
+        var planTab = $('a[href="#panel'+planIndex+'"]');
+        updateTabLabel(planTab, name, planNames[name]);
     }
 
     setReadyState();
@@ -771,14 +820,7 @@ function registerListeners() {
 
     //code tab click
     $('#code-tabs').on('toggled', function (event, tab) {
-        if (tab.find('a').attr('href') == '#code-panel1') {
-            logScrollBottom();
-            $(this).find('li a[href="#code-panel1"]').html("Log");
-            $('#log-options').show();
-            $('#code-options').hide();
-        } else {
-            $('#log-options').hide();
-            $('#code-options').show();
+        if (tab.find('a').attr('href') == '#code-container') {
             updateComprehensionBoxes();
         }
     });
