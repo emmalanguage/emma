@@ -73,6 +73,7 @@ function init() {
 
     setInitState();
     $('#example-name').find('div').html("");
+    $('#submit-parameters').hide();
 
     if (codeCanvas != null) {
         codeCanvas.project.activeLayer.removeChildren();
@@ -176,6 +177,7 @@ function loadPlan(name) {
         method: "GET",
         url: requestBase+"plan/loadGraph?name="+name,
         success: function(data) {
+            addLogHtml("<div>Init Runtime with default parameters</div>");
             if (data.graph != null) {
                 loadedExample = name;
                 $('#plan-tab-content').html("");
@@ -219,11 +221,24 @@ function loadPlanFromCache(name, cache) {
     $('a[href="#panel0"]').click();
 }
 
-function initRuntime(name) {
+function initRuntime(name, parameters) {
     executionOrder = [];
     $.ajax({
-        method: "GET",
+        method: "POST",
         url: requestBase+"plan/initRuntime?name="+name,
+        data: JSON.stringify(parameters),
+        contentType:"application/json; charset=utf-8",
+        success: function() {
+            if (!parameters) {
+                addLogHtml("<div>Init Runtime with default parameters</div>");
+            } else {
+                var message = "Init Runtime with following parameters:";
+                for( var i in parameters) {
+                    message += "<br>"+i+": "+parameters[i];
+                }
+                //addLogHtml("<div>"+message+"</div>");
+            }
+        },
         error: handleError
     });
 }
@@ -268,19 +283,24 @@ function addToExecutionOrder(currentExecution, newName) {
 
 function buildParameterForm(parameters) {
     if (parameters) {
-        var form = $('#parameter-container').find("form");
-        form.html("");
+        var parameterContainer = $('#parameters');
+        parameterContainer.html("");
         for (var param in parameters) {
             var parameter = parameters[param];
             var row = $('<div></div>').addClass("row");
             var column = $('<div></div>').addClass("small-12 columns");
             var label = $('<label></label>').html(param+":");
-            var input = $('<input>').attr("type","text").val(parameter);
+            var input = $('<input>')
+                .attr("type","text")
+                .attr("name",param)
+                .val(parameter);
             label.append(input);
             column.append(label);
             row.append(column);
-            form.append(row);
+            parameterContainer.append(row);
         }
+
+        $('#submit-parameters').show();
 
     } else {
         console.error("no input parameters");
@@ -314,7 +334,6 @@ function scrollToTab(tab) {
 }
 
 function updateTabLabel(planTab, name, planMetaData) {
-    planMetaData.executed += 1;
     var shortName = name.substr(0, name.indexOf('$'));
 
     if (planMetaData.executed > 1)
@@ -597,15 +616,18 @@ function run(async, callback) {
             async: async,
             success: function(data) {
                 if (data.graph != null) {
-                    var planIndex = planNames[currentExecution].index;
+                    var planName = planNames[currentExecution];
+                    var planIndex = planName.index;
+                    planName.executed += 1;
                     var planTab = $('a[href="#panel'+planIndex+'"]');
-                    updateTabLabel(planTab, currentExecution, planNames[currentExecution]);
+
+                    updateTabLabel(planTab, currentExecution, planName);
                     buildPlan(data);
 
                     detectIterations();
                     markIterations(fullExampleName);
 
-                    planIndex = planNames[currentExecution].index;
+                    planIndex = planName.index;
                     planTab = $('a[href="#panel'+planIndex+'"]');
                     planTab.click();
 
@@ -632,8 +654,8 @@ function run(async, callback) {
     }
 }
 
-function prepareRerun() {
-    initRuntime(fullExampleName);
+function prepareRerun(parameters) {
+    initRuntime(fullExampleName, parameters);
     currentExecution = planCache[0].graph.name;
     $('a[href="#panel0"]').click();
     for (var name in planNames) {
@@ -865,5 +887,17 @@ function registerListeners() {
         var fontSize = parseInt(codeContainer.css('font-size').replace('px',''));
         codeContainer.css('font-size',(fontSize-fontSizeStep)+"px");
         updateComprehensionBoxes();
+    });
+
+    //parameter rerun button
+    $('#submit-parameters').click(function(){
+        var parameters = {};
+        var paramaeterElements = $('#parameters').find("input");
+        paramaeterElements.each(function(i, e){
+            var element = $(e);
+            parameters[element.attr("name")] = element.val();
+        });
+        prepareRerun(parameters);
+        return false;
     });
 }

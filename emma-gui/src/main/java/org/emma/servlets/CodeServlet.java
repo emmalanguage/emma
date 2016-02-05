@@ -1,6 +1,7 @@
 package org.emma.servlets;
 
 import com.google.gson.Gson;
+import net.sourceforge.argparse4j.inf.Namespace;
 import org.emma.data.code.Example;
 import org.emma.data.code.ExampleFileLoader;
 import org.emma.data.code.ExampleLoader;
@@ -78,9 +79,22 @@ public class CodeServlet extends HttpServlet {
             e.printStackTrace();
         }
 
-        if (!sourceCode.isEmpty())
-            return new Example(sourceCode, exampleLoader.loadComprehensionBoxes(exampleName), exampleLoader.getParameters(exampleName));
+        if (!sourceCode.isEmpty()) {
+            Namespace parameters = convertParametersToString(exampleName);
+            return new Example(sourceCode, exampleLoader.loadComprehensionBoxes(exampleName), parameters);
+        }
 
         return null;
+    }
+
+    private Namespace convertParametersToString(String exampleName) {
+        Namespace ns = exampleLoader.getParameters(exampleName);
+
+        HashMap<String, Object> newMap = new HashMap<>();
+        Map<String, Object> attrs = ns.getAttrs();
+        for (String key : attrs.keySet()) {
+            newMap.put(key, attrs.get(key).toString());
+        }
+        return new Namespace(newMap);
     }
 }
