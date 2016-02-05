@@ -219,3 +219,7 @@ code {
     padding-right: 15px;
     padding-bottom: 0px;
 }
+
+#submit-parameters {
+    display: none;
+}

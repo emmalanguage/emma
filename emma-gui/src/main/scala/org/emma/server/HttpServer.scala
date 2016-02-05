@@ -16,6 +16,7 @@ object HttpServer {
   @throws(classOf[Exception])
   def main(args: Array[String]) {
     System.setOut(createLoggingProxy(System.out))
+    System.setErr(createLoggingProxy(System.err))
     val server: HttpServer.type = HttpServer
     server.start()
   }

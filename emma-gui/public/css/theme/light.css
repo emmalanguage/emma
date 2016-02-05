@@ -119,3 +119,11 @@ a:hover, a:focus{
 #parameter-container label{
     color: black;
 }
+
+.button {
+    background-color: #2F74D0;
+}
+
+.button:hover, .button:active, .button:focus {
+    background-color: black;
+}
