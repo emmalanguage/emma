@@ -80,8 +80,8 @@ package object testutil {
    * @tparam T The type of the returned value.
    * @return The result of `f` applied to the initialized `rt`.
    */
-  def withRuntime[T](rt: runtime.Engine = runtime.default())(f: runtime.Engine => T): T =
-    try f(rt) finally rt.closeSession()
+  def withRuntime[T](rt: runtime.Engine = runtime.testing())(f: runtime.Engine => T): T =
+    try f(rt) finally rt.close()
 
   /** Syntax sugar for testing [[Algorithm]]s. */
   implicit class AlgorithmVerification[A](val alg: Algorithm[A]) extends AnyVal {

@@ -54,7 +54,7 @@ object Algorithm {
      */
     def instantiate(ns: Namespace): Algorithm = {
       // instantiate runtime
-      val rt = runtime.factory(ns.get[String](Command.KEY_RT_TYPE))
+      val rt = runtime.factory(ns.get[String](Command.KEY_RT_TYPE)).default()
       // instantiate and return algorithm
       val constructor = m.runtimeClass.getConstructor(classOf[Namespace], classOf[runtime.Engine])
       constructor.newInstance(ns, rt).asInstanceOf[Algorithm]
