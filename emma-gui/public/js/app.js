@@ -328,7 +328,7 @@ function scrollToTab(tab) {
     var planTabs = $('#plan-tabs');
     var middlePoint = planTabs.width() / 2 - tab.width() / 2;
     var scrollPosition = tab.offset().left - tab.parent().offset().left + tab.parent().scrollLeft() - middlePoint;
-    planTabs.animate({
+    planTabs.finish().animate({
         scrollLeft: scrollPosition
     }, 400, "easeOutCirc");
 }
@@ -353,9 +353,19 @@ function drawComprehensionBoxes(name) {
     codeCanvas = new paper.PaperScope().setup($('#code-canvas')[0]);
 
     if (boxes != null && boxes.length > 0) {
+        var minStart = Number.MAX_VALUE;
         boxes.forEach(function(box){
-            drawComprehensionBox(box[0] - codeStartIndex, box[1] - codeStartIndex);
+            var boxPos = drawComprehensionBox(box[0] - codeStartIndex, box[1] - codeStartIndex);
+            if (boxPos.top < minStart) {
+                minStart = boxPos.top;
+            }
         });
+
+        if (minStart != Number.MAX_VALUE) {
+            $('#code-container').finish().animate({
+                scrollTop: minStart - 20
+            }, 400, "easeOutCirc");
+        }
     }
 
     if (iterationMarker.length > 0) {
@@ -391,7 +401,15 @@ function drawComprehensionBox(begin, end) {
             clientRect.height + margin
         );
         rectangle.fillColor = comprehensionHighlightColor;
+        return {
+            left: margin,
+            top: clientRect.top - margin,
+            width: maxWidth - 2*margin,
+            height: clientRect.height + margin
+        };
     }
+
+    return null;
 }
 
 function updateComprehensionBoxes() {
@@ -627,6 +645,7 @@ function run(async, callback) {
                     detectIterations();
                     markIterations(fullExampleName);
 
+                    planName = planNames[currentExecution];
                     planIndex = planName.index;
                     planTab = $('a[href="#panel'+planIndex+'"]');
                     planTab.click();
