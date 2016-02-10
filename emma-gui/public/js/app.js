@@ -236,7 +236,7 @@ function initRuntime(name, parameters) {
                 for( var i in parameters) {
                     message += "<br>"+i+": "+parameters[i];
                 }
-                //addLogHtml("<div>"+message+"</div>");
+                addLogHtml("<div>"+message+"</div>");
             }
         },
         error: handleError

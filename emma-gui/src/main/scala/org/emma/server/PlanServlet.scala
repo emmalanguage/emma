@@ -42,7 +42,6 @@ class PlanServlet extends HttpServlet {
     }
   }
 
-
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
     val action = req.getPathInfo.tail
     val parameters = parseParametersFromBody(req)
@@ -61,7 +60,7 @@ class PlanServlet extends HttpServlet {
     }
   }
 
-  private def respond(resp: HttpServletResponse) = {
+  private def respond(resp: HttpServletResponse, errorMessage:String = "") = {
     val json = new java.util.HashMap[String, Any]
     for (plan <- waitForPlan()) {
       json.put("graph", new Graph(plan))
@@ -69,6 +68,14 @@ class PlanServlet extends HttpServlet {
     }
 
     json.put("isLast", !runner.isAlive)
+
+    if (errorMessage.isEmpty) {
+      json.put("error", false)
+    } else {
+      json.put("error", true)
+      json.put("errorMessage", errorMessage)
+    }
+
     resp.setHeader("Content-Type", "application/json")
     resp.setStatus(HttpServletResponse.SC_OK)
     resp.getWriter.println(new Gson().toJson(json))
