@@ -61,9 +61,9 @@ Formally, the above procedure can be specified as the following second-order fun
 
 ```scala
 def fold[B](e: B)(s: A => B, u: (B, B) => B): B = this match {
-   case Empty         => e
-   case Sng(x)        => s(x)
-   case Union(xs, ys) => u(xs.fold(e)(s, u), ys.fold(e)(s, u))
+  case Empty         => e
+  case Sng(x)        => s(x)
+  case Union(xs, ys) => u(xs.fold(e)(s, u), ys.fold(e)(s, u))
 }
 ```
 
@@ -125,11 +125,11 @@ To compute the average size of email messages by sender, for example, one can si
 
 ```scala 
 for {
-    (sender, mails) <- emails.groupBy(_.from) 
+  (sender, mails) <- emails.groupBy(_.from) 
 } yield {
-    val sum = mails.map.(_.msg.length).sum()
-    val cnt = mails.count()
-    sum / cnt
+  val sum = mails.map.(_.msg.length).sum()
+  val cnt = mails.count()
+  sum / cnt
 }
 ```
 
@@ -141,13 +141,13 @@ For example, the following code-snippet that counts words runs out-of-the-box.
 
 ```scala 
 val words = for {
-    line <- read(inPath, new TextInputFormat[String]('\n'))
-    word <- DataBag[String](line.toLowerCase.split("\\W+"))
+  line <- read(inPath, new TextInputFormat[String]('\n'))
+  word <- DataBag[String](line.toLowerCase.split("\\W+"))
 } yield word
 
 // group the words by their identity and count the occurrence of each word
 val counts = for {
-    group <- words.groupBy[String] { identity }
+  group <- words.groupBy[String] { identity }
 } yield (group.key, group.values.size)
 
 // write the results into a CSV file
