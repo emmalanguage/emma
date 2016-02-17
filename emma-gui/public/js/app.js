@@ -1,5 +1,6 @@
 'use strict';
 
+var logger = new Logger("log-container");
 var codeCanvas = null;
 var codeStartIndex = 0;
 var codeHasCarriageReturns = false;
@@ -14,16 +15,13 @@ var currentState = 'init';
 var executionOrder = [];
 var loadedExample = "";
 var planCaching = true;
-var scrollLock = true;
 var currentComprehensions = {};
 var comprehensionHighlightColor = 'rgba(255,0,0,0.4)';
 var fadeSpeed = 1000;
 var fontSizeStep = 2;
 var codeHeightMinFactor = 0.2;
 var codeHeightMaxFactor = 0.9;
-var logBufferSize = 500;
 var fastForwardRun = true;
-var checkLogSizeIteration = 0;
 var iterationMarker = [];
 var iterationColors = [
     '#24E0FB',
@@ -34,6 +32,7 @@ var iterationColors = [
     '#80B584'
 ];
 
+logger.start();
 registerListeners();
 
 $("#code-tab-wrapper").resize(function(){
@@ -67,13 +66,13 @@ function init() {
 
     $('#plan-tabs').html("");
     $('#plan-tab-content').html("No example selected");
-    $('#log-container').html("");
     $('a[href="#code-container"]').click();
     $('#code-container').scrollTop(0);
 
     setInitState();
     $('#example-name').find('div').html("");
     $('#submit-parameters').hide();
+    logger.clear();
 
     if (codeCanvas != null) {
         codeCanvas.project.activeLayer.removeChildren();
@@ -84,7 +83,7 @@ function init() {
 var handleError = function(jqXHR, textStatus, errorThrown) {
     console.error(textStatus, errorThrown, jqXHR);
     setReadyState();
-    addLogHtml("<div class='log-error'>ERROR: status: '"+textStatus+"', errorThrown: '"+errorThrown+"'</div>");
+    logger.log("<div class='log-error'>ERROR: status: '"+textStatus+"', errorThrown: '"+errorThrown+"'</div>");
     alert("An error occurred! Detailed information in the log.");
 };
 
@@ -177,7 +176,7 @@ function loadPlan(name) {
         method: "GET",
         url: requestBase+"plan/loadGraph?name="+name,
         success: function(data) {
-            addLogHtml("<div>Init Runtime with default parameters</div>");
+            logger.log("<div>Init Runtime with default parameters</div>");
             if (data.graph != null) {
                 loadedExample = name;
                 $('#plan-tab-content').html("");
@@ -230,13 +229,13 @@ function initRuntime(name, parameters) {
         contentType:"application/json; charset=utf-8",
         success: function() {
             if (!parameters) {
-                addLogHtml("<div>Init Runtime with default parameters</div>");
+                logger.log("<div>Init Runtime with default parameters</div>");
             } else {
                 var message = "Init Runtime with following parameters:";
                 for( var i in parameters) {
                     message += "<br>"+i+": "+parameters[i];
                 }
-                addLogHtml("<div>"+message+"</div>");
+                logger.log("<div>"+message+"</div>");
             }
         },
         error: handleError
@@ -356,7 +355,7 @@ function drawComprehensionBoxes(name) {
         var minStart = Number.MAX_VALUE;
         boxes.forEach(function(box){
             var boxPos = drawComprehensionBox(box[0] - codeStartIndex, box[1] - codeStartIndex);
-            if (boxPos.top < minStart) {
+            if (boxPos != null && boxPos.top < minStart) {
                 minStart = boxPos.top;
             }
         });
@@ -439,7 +438,7 @@ function setSelectionRange(el, start, end) {
 
             to = charCount;
 
-            if (!foundStart && start >= from && start <= to) {
+            if (!foundStart && start >= from && start <= to && start - from <= textNode.length) {
                 range.setStart(textNode, start - from);
                 foundStart = true;
             }
@@ -627,7 +626,7 @@ function run(async, callback) {
 
     if (currentState == 'ready') {
         setRunningState();
-        addLogHtml("<div class='log-entry'>running: "+currentExecution+"</div>");
+        logger.log("<div class='log-entry'>running: "+currentExecution+"</div>");
         $.ajax({
             method: "GET",
             url: requestBase+"plan/run",
@@ -757,23 +756,6 @@ function markIterations(name){
     }
 }
 
-function addLogHtml(html) {
-    $('#log-container').append(html);
-    trimLog();
-    logScrollBottom();
-}
-
-function trimLog() {
-    if (checkLogSizeIteration++ % 20 == 0) {
-        var logContainer = $('#log-container');
-        var lineCount = logContainer.find('div').length;
-        if (lineCount > logBufferSize) {
-            logContainer.find("div:lt("+(lineCount - logBufferSize)+")").remove();
-        }
-        checkLogSizeIteration = 1;
-    }
-}
-
 function setInitState() {
     currentState = 'init';
     $("#play-button").html('');
@@ -808,13 +790,6 @@ function setStoppingState() {
     $('#status').html('<i class="gear"/> stopping...');
 }
 
-function logScrollBottom() {
-    if (scrollLock) {
-        var log = document.getElementById('log-container');
-        log.scrollTop = log.scrollHeight;
-    }
-}
-
 function clearCache() {
     for(var key in localStorage)
     {
@@ -827,19 +802,6 @@ function clearCache() {
 
 function registerListeners() {
     $(window).resize(resizeContainers);
-
-    //log listener
-    var eventSource = new EventSource(requestBase+"log");
-    eventSource.onmessage = function(event) {
-        addLogHtml("<div>"+event.data+"</div>");
-    };
-
-    eventSource.onerror = function(e) {
-        addLogHtml("<div class='log-error'>ERROR: Lost connection to Log server. Reload to try again!</div>");
-        alert("An error occurred! Detailed information in the log.");
-        console.error(e);
-        eventSource.close();
-    };
 
     //key listener
     window.onkeydown = function(e) {
@@ -877,19 +839,6 @@ function registerListeners() {
             scrollToTab(tab);
         }
         updateComprehensionBoxes();
-    });
-
-    //clear log button click
-    $('#clear-log-button').click(function(){
-        $('#log-container').html("");
-    });
-
-    //click scroll lock switch
-    $('#scroll-lock').change(function(){
-        scrollLock = this.checked;
-        if (scrollLock) {
-            logScrollBottom();
-        }
     });
 
     //zoom button click
