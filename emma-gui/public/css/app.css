@@ -2,6 +2,10 @@
     overflow: visible;
 }
 
+#exampleList li.active {
+    background-color: #ccc;
+}
+
 #example-name {
     position: relative;
     overflow: hidden;

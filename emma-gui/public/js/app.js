@@ -131,6 +131,8 @@ function loadExample(name) {
     } else {
         loadPlan(name);
     }
+
+    highlightCurrentExample(name);
 }
 
 function loadCode(name) {
@@ -432,18 +434,27 @@ function setSelectionRange(el, start, end) {
 
             charCount += text.length;
 
+            var newLineCount = 0;
             if (codeHasCarriageReturns) {
-                charCount += text.split("\n").length - 1;
+                newLineCount = text.split("\n").length - 1;
+                charCount += newLineCount;
             }
 
             to = charCount;
 
-            if (!foundStart && start >= from && start <= to && start - from <= textNode.length) {
-                range.setStart(textNode, start - from);
-                foundStart = true;
+            if (!foundStart && start >= from && start <= to) {
+                if (start - from - newLineCount <= textNode.length) {
+                    range.setStart(textNode, start - from - newLineCount);
+                    foundStart = true;
+                } else {
+                    console.warn("Text selection out of range. Node length: ",textNode.length, "Index: ",start - from, "Start: ", start, "End: ", end, "CodeStartIndex: ", codeStartIndex);
+                }
             }
 
             if (foundStart && end >= from && end <= to) {
+                while (end - from > textNode.length) {
+                    from++;
+                }
                 range.setEnd(textNode, end - from);
                 break;
             }
@@ -798,6 +809,12 @@ function clearCache() {
         }
     }
     clearPage();
+}
+
+function highlightCurrentExample(name) {
+    var exampleList = $('#exampleList');
+    exampleList.find("li.active").removeClass("active");
+    exampleList.find("a[title='"+name+"']").parent().addClass("active");
 }
 
 function registerListeners() {
