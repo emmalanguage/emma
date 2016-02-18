@@ -466,8 +466,8 @@ abstract class BaseCodegenTest(rtName: String)
     }
 
     "of local functions" in emma.parallelize {
-      def double(x: Int) = 2 * x
-      def add(x: Int, y: Int) = x + y
+      val double = (x: Int) => 2 * x
+      val add = (x: Int, y: Int) => x + y
 
       val times2 = for { x <- DataBag(1 to 100) } yield double(x)
       val increment5 = for { x <- DataBag(1 to 100) } yield add(x, 5)
