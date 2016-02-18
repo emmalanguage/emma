@@ -63,38 +63,39 @@ class Query09(inPath: String, outPath: String, color: String, rt: Engine, val tr
 
     val alg = emma.parallelize {
 
-      // cannot directly reference the parameter
-      val _truncate = truncate
-      val _color = color
+      val tr = (v: Double) =>
+        if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble
+        else v
 
       val df = new SimpleDateFormat("yyyy-MM-dd")
       val calendar = Calendar.getInstance()
 
-      val subquery = for (
-        p <- read(s"$inPath/part.tbl", new CSVInputFormat[Part]('|'));  if p.name.indexOf(_color) != -1;
-        s <- read(s"$inPath/supplier.tbl", new CSVInputFormat[Supplier]('|'));
-        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|')); if s.suppKey == l.suppKey; if p.partKey == l.partKey;
-        ps <- read(s"$inPath/partsupp.tbl", new CSVInputFormat[PartSupp]('|')); if ps.suppKey == l.suppKey; if ps.partKey == l.partKey;
-        o <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]('|')); if o.orderKey == l.orderKey;
-        n <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|')); if s.nationKey == n.nationKey
-      )
-      yield {
+      val subquery = for {
+        p <- read(s"$inPath/part.tbl", new CSVInputFormat[Part]('|'))
+        if p.name.indexOf(color) != -1
+        s <- read(s"$inPath/supplier.tbl", new CSVInputFormat[Supplier]('|'))
+        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'))
+        if s.suppKey == l.suppKey
+        if p.partKey == l.partKey;
+        ps <- read(s"$inPath/partsupp.tbl", new CSVInputFormat[PartSupp]('|'))
+        if ps.suppKey == l.suppKey
+        if ps.partKey == l.partKey;
+        o <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]('|'))
+        if o.orderKey == l.orderKey;
+        n <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|'))
+        if s.nationKey == n.nationKey
+      } yield {
         calendar.setTime(df.parse(o.orderDate))
-        new Subquery(n.name, calendar.get(Calendar.YEAR), amount = l.extendedPrice * (1 - l.discount) - ps.supplyCost * l.quantity)
+        Subquery(n.name, calendar.get(Calendar.YEAR), amount = l.extendedPrice * (1 - l.discount) - ps.supplyCost * l.quantity)
       }
 
       // aggregate and compute the final result
-      val rslt = for (
-        g <- subquery.groupBy(x => new GrpKey(x.nation, x.year)))
-      yield {
-        def tr(v: Double) = if (_truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
-
-        new Result(
-          g.key.nation,
-          g.key.year,
-          tr(g.values.map(x => x.amount).sum)
-        )
-      }
+      val rslt = for {
+        g <- subquery.groupBy(x => new GrpKey(x.nation, x.year))
+      } yield Result(
+        g.key.nation,
+        g.key.year,
+        tr(g.values.map(x => x.amount).sum))
 
       // write out the result
       write(outPath, new CSVOutputFormat[Result]('|'))(rslt)

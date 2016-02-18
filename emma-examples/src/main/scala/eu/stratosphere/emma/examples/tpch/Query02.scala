@@ -80,14 +80,14 @@ class Query02(inPath: String, outPath: String, size: Int, tpe: String, region: S
 
       // join tables + filter by region
       val join = for {
-        ps <- read(s"$inPath/partsupp.tbl", new CSVInputFormat[PartSupp]('|'));
-        s  <- read(s"$inPath/supplier.tbl", new CSVInputFormat[Supplier]('|'));
-        n  <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|'));
-        r  <- read(s"$inPath/region.tbl", new CSVInputFormat[Region]('|'));
+        ps <- read(s"$inPath/partsupp.tbl", new CSVInputFormat[PartSupp]('|'))
+        s  <- read(s"$inPath/supplier.tbl", new CSVInputFormat[Supplier]('|'))
         if s.suppKey == ps.suppKey
+        n  <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|'))
         if s.nationKey == n.nationKey
-        if n.regionKey == r.regionKey
+        r  <- read(s"$inPath/region.tbl", new CSVInputFormat[Region]('|'))
         if r.name == region
+        if n.regionKey == r.regionKey
       } yield (ps, s, n, r)
 
       // minimal supplier cost for region
@@ -95,21 +95,21 @@ class Query02(inPath: String, outPath: String, size: Int, tpe: String, region: S
 
       // apply filter on size, tpe and name + minimal supplier cost
       val result = for {
-        (p          ) <- read(s"$inPath/part.tbl", new CSVInputFormat[Part]('|'));
+        (p          ) <- read(s"$inPath/part.tbl", new CSVInputFormat[Part]('|'))
         (ps, s, n, r) <- join
         if ps.supplyCost == minSupplierCost
         if p.partKey == ps.partKey
         if p.size == size
         if p.ptype.endsWith(tpe)
       } yield Result(
-          s.accBal,
-          s.name,
-          n.name,
-          p.partKey,
-          p.mfgr,
-          s.address,
-          s.phone,
-          s.comment)
+        s.accBal,
+        s.name,
+        n.name,
+        p.partKey,
+        p.mfgr,
+        s.address,
+        s.phone,
+        s.comment)
 
       // write out the result
       write(outPath, new CSVOutputFormat[Result]('|'))(result)

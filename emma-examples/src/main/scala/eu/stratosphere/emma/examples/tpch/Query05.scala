@@ -58,34 +58,41 @@ class Query05(inPath: String, outPath: String, region: String, date: String, rt:
 
     val alg = emma.parallelize {
 
+      val tr = (v: Double) =>
+        if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble
+        else v
+
       val dfm = new SimpleDateFormat("yyyy-MM-dd")
-      val cal = Calendar.getInstance();
-      cal.setTime(dfm.parse(date));
-      cal.add(Calendar.YEAR, 1);
+      val cal = Calendar.getInstance()
+      cal.setTime(dfm.parse(date))
+      cal.add(Calendar.YEAR, 1)
       val nextYear = dfm.format(cal.getTime)
 
       // compute join part of the query
-      val join = for (
-        c <- read(s"$inPath/customer.tbl", new CSVInputFormat[Customer]('|'));
-        o <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]('|')); if c.custKey == o.custKey; if o.orderDate >= date; if o.orderDate < nextYear;
-        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|')); if l.orderKey == o.orderKey;
-        s <- read(s"$inPath/supplier.tbl", new CSVInputFormat[Supplier]('|')); if l.suppKey == s.suppKey; if c.nationKey == s.nationKey;
-        n <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|')); if s.nationKey == n.nationKey;
-        r <- read(s"$inPath/region.tbl", new CSVInputFormat[Region]('|')); if n.regionKey == r.regionKey; if r.name == region)
-      yield
-        new Join(n.name, l.extendedPrice, l.discount)
+      val join = for {
+        c <- read(s"$inPath/customer.tbl", new CSVInputFormat[Customer]('|'))
+        o <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]('|'))
+        if o.orderDate >= date
+        if o.orderDate < nextYear
+        if c.custKey == o.custKey
+        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'))
+        if l.orderKey == o.orderKey
+        s <- read(s"$inPath/supplier.tbl", new CSVInputFormat[Supplier]('|'))
+        if l.suppKey == s.suppKey
+        n <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|'))
+        if c.nationKey == s.nationKey
+        if s.nationKey == n.nationKey
+        r <- read(s"$inPath/region.tbl", new CSVInputFormat[Region]('|'))
+        if r.name == region
+        if n.regionKey == r.regionKey
+      } yield Join(n.name, l.extendedPrice, l.discount)
 
       // aggregate and compute the final result
-      val rslt = for (
-        g <- join.groupBy(x => new GrpKey(x.name)))
-      yield {
-
-        def tr(v: Double) = if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
-
-        new Result(
-          g.key.name,
-          tr(g.values.map(x => x.extendedPrice * (1 - x.discount)).sum))
-      }
+      val rslt = for {
+        g <- join.groupBy(x => new GrpKey(x.name))
+      } yield Result(
+        g.key.name,
+        tr(g.values.map(x => x.extendedPrice * (1 - x.discount)).sum))
 
       // write out the result
       write(outPath, new CSVOutputFormat[Result]('|'))(rslt)

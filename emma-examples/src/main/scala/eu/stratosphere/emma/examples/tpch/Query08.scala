@@ -73,41 +73,45 @@ class Query08(inPath: String, outPath: String, nation: String, region: String, t
 
     val alg = emma.parallelize {
 
-      // cannot directly reference the parameter
-      val _truncate = truncate
-      val _nation = nation
-      val _region = region
-      val _type = typeString
+      val tr = (v: Double) =>
+        if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble
+        else v
 
       val df = new SimpleDateFormat("yyyy-MM-dd")
       val calendar = Calendar.getInstance()
 
-      val subquery = for (
-        p <- read(s"$inPath/part.tbl", new CSVInputFormat[Part]('|')); if p.ptype == _type;
-        s <- read(s"$inPath/supplier.tbl", new CSVInputFormat[Supplier]('|'));
-        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|')); if p.partKey == l.partKey; if s.suppKey == l.suppKey;
-        o <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]('|')); if l.orderKey == o.orderKey; if o.orderDate >= "1995-01-01"; if o.orderDate <= "1996-12-31";
-        c <- read(s"$inPath/customer.tbl", new CSVInputFormat[Customer]('|')); if o.custKey == c.custKey;
-        n1 <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|')); if c.nationKey == n1.nationKey;
-        n2 <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|')); if s.nationKey == n2.nationKey;
-        r <- read(s"$inPath/region.tbl", new CSVInputFormat[Region]('|')) if r.name == _region; if n1.regionKey == r.regionKey
-      )
-      yield {
+      val subquery = for {
+        p  <- read(s"$inPath/part.tbl", new CSVInputFormat[Part]('|'))
+        if p.ptype == typeString
+        s  <- read(s"$inPath/supplier.tbl", new CSVInputFormat[Supplier]('|'))
+        l  <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'))
+        if s.suppKey == l.suppKey
+        if p.partKey == l.partKey
+        o  <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]('|'))
+        if o.orderDate >= "1995-01-01"
+        if o.orderDate <= "1996-12-31"
+        if l.orderKey == o.orderKey
+        c  <- read(s"$inPath/customer.tbl", new CSVInputFormat[Customer]('|'))
+        if o.custKey == c.custKey
+        n1 <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|'))
+        if c.nationKey == n1.nationKey
+        n2 <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|'))
+        if s.nationKey == n2.nationKey
+        r  <- read(s"$inPath/region.tbl", new CSVInputFormat[Region]('|'))
+        if r.name == region
+        if n1.regionKey == r.regionKey
+      } yield {
         calendar.setTime(df.parse(o.orderDate))
-        new Subquery(calendar.get(Calendar.YEAR), l.extendedPrice * (1 - l.discount), n2.name, _nation)
+        Subquery(calendar.get(Calendar.YEAR), l.extendedPrice * (1 - l.discount), n2.name, nation)
       }
+
       // aggregate and compute the final result
-
-      val rslt = for (
-        g <- subquery.groupBy(x => new GrpKey(x.year)))
-      yield {
-        def tr(v: Double) = if (_truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
-
-        new Result(
-          g.key.year,
-          tr(g.values.map(x => if (x.nation == x.nationVariable) x.volume else 0).sum /
-              g.values.map(x => x.volume).sum))
-      }
+      val rslt = for {
+        g <- subquery.groupBy(x => new GrpKey(x.year))
+      } yield Result(
+        g.key.year,
+        tr(g.values.map(x => if (x.nation == x.nationVariable) x.volume else 0).sum /
+            g.values.map(x => x.volume).sum))
 
       // write out the result
       write(outPath, new CSVOutputFormat[Result]('|'))(rslt)

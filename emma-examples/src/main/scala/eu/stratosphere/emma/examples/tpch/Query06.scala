@@ -45,29 +45,28 @@ class Query06(inPath: String, outPath: String, date: String, discount: Double, q
 
     val alg = emma.parallelize {
 
-      // cannot directly reference the parameter
-      val _truncate = truncate
-      val _date = date
-      val _discount = discount
-      val _quantity = quantity
+      val tr = (v: Double) =>
+        if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble
+        else v
 
       val df = new SimpleDateFormat("yyyy-MM-dd")
-      val nextYear = df.format(DateUtils.addYears(df.parse(_date), 1))
+      val nextYear = df.format(DateUtils.addYears(df.parse(date), 1))
 
-      val select = for (
+      val select = for {
         l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'))
-        if l.shipDate >= _date; if l.shipDate < nextYear; if l.discount >= (_discount-0.01); if l.discount <= (_discount+0.01); if l.quantity < _quantity)
-      yield
+        if l.shipDate >= date
+        if l.shipDate < nextYear
+        if l.discount >= (discount - 0.01)
+        if l.discount <= (discount + 0.01)
+        if l.quantity < quantity
+      } yield
         new Select(l.extendedPrice, l.discount)
 
       // aggregate and compute the final result
-      val rslt = for (
-        g <- select.groupBy(x => new GrpKey("*")))
-      yield {
-        def tr(v: Double) = if (_truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
-        new Result(
-          tr(g.values.map(x => x.extendedPrice * x.discount).sum))
-      }
+      val rslt = for {
+        g <- select.groupBy(x => new GrpKey("*"))
+      } yield Result(
+        tr(g.values.map(x => x.extendedPrice * x.discount).sum))
 
       // write out the result
       write(outPath, new CSVOutputFormat[Result]('|'))(rslt)

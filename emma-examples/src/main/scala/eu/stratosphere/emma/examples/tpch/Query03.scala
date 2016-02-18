@@ -53,21 +53,26 @@ class Query03(inPath: String, outPath: String, segment: String, date: String, rt
 
     val alg = emma.parallelize {
 
+      val tr = (v: Double) =>
+        if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble
+        else v
+
       // compute join part of the query
-      val join = for (
-        c <- read(s"$inPath/customer.tbl", new CSVInputFormat[Customer]('|')); if c.mktSegment == segment;
-        o <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]('|')); if o.orderDate < date; if c.custKey == o.custKey;
-        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|')); if l.shipDate > date; if l.orderKey == o.orderKey)
-      yield
-        new Join(l.orderKey, l.extendedPrice, l.discount, o.orderDate, o.shipPriority)
+      val join = for {
+        c <- read(s"$inPath/customer.tbl", new CSVInputFormat[Customer]('|'));
+        if c.mktSegment == segment;
+        o <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]('|'));
+        if o.orderDate < date;
+        if c.custKey == o.custKey;
+        l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'));
+        if l.shipDate > date;
+        if l.orderKey == o.orderKey
+      } yield Join(l.orderKey, l.extendedPrice, l.discount, o.orderDate, o.shipPriority)
 
       // aggregate and compute the final result
       val rslt = for (
         g <- join.groupBy(x => new GrpKey(x.orderKey, x.orderDate, x.shipPriority)))
       yield {
-
-        def tr(v: Double) = if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
-
         new Result(
           g.key.orderKey,
           tr(g.values.map(x => x.extendedPrice * (1 - x.discount)).sum),

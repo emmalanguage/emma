@@ -51,6 +51,10 @@ class Query01(inPath: String, outPath: String, delta: Int, rt: Engine, truncate:
 
     val alg = emma.parallelize {
 
+      val tr = (v: Double) =>
+        if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble
+        else v
+
       // compute join part of the query
       val l = for {
         l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'))
@@ -61,9 +65,6 @@ class Query01(inPath: String, outPath: String, delta: Int, rt: Engine, truncate:
       val r = for {
         g <- l.groupBy(l => new GrpKey(l.returnFlag, l.lineStatus))
       } yield {
-
-          def tr(v: Double) = if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
-
           // compute base aggregates
           val sumQty = g.values.map(_.quantity).sum
           val sumBasePrice = g.values.map(_.extendedPrice).sum
@@ -71,7 +72,7 @@ class Query01(inPath: String, outPath: String, delta: Int, rt: Engine, truncate:
           val sumCharge = g.values.map(l => l.extendedPrice * (1 - l.discount) * (1 + l.tax)).sum
           val countOrder = g.values.size
           // compute result
-          new Result(
+          Result(
             g.key.returnFlag,
             g.key.lineStatus,
             sumQty,

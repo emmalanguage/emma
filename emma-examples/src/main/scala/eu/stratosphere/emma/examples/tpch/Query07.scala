@@ -71,15 +71,12 @@ class Query07(inPath: String, outPath: String, nation1: String, nation2: String,
 
     val alg = emma.parallelize {
 
-      // cannot directly reference the parameter
-      val _truncate = truncate
-      val _nation1 = nation1
-      val _nation2 = nation2
-
       val df = new SimpleDateFormat("yyyy-MM-dd")
       val calendar = Calendar.getInstance()
 
-
+      val tr = (v: Double) =>
+        if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble
+        else v
 
       val subquery = for (
         s <- read(s"$inPath/supplier.tbl", new CSVInputFormat[Supplier]('|'));
@@ -88,7 +85,7 @@ class Query07(inPath: String, outPath: String, nation1: String, nation2: String,
         c <- read(s"$inPath/customer.tbl", new CSVInputFormat[Customer]('|')); if c.custKey == o.custKey;
         n1 <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|')); if s.nationKey == n1.nationKey;
         n2 <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|')); if c.nationKey == n2.nationKey;
-        if ((n1.name == _nation1 && n2.name == _nation2) || (n1.name == _nation2 && n2.name == _nation1))
+        if (n1.name == nation1 && n2.name == nation2) || (n1.name == nation2 && n2.name == nation1)
       )
       yield {
         calendar.setTime(df.parse(l.shipDate))
@@ -96,17 +93,13 @@ class Query07(inPath: String, outPath: String, nation1: String, nation2: String,
       }
       // aggregate and compute the final result
 
-      val rslt = for (
-        g <- subquery.groupBy(x => new GrpKey(x.suppNation, x.custNation, x.year)))
-      yield {
-        def tr(v: Double) = if (_truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
-
-        new Result(
-          g.key.suppNation,
-          g.key.custNation,
-          g.key.year,
-          tr(g.values.map(x => x.volume).sum))
-      }
+      val rslt = for {
+        g <- subquery.groupBy(x => new GrpKey(x.suppNation, x.custNation, x.year))
+      } yield Result(
+        g.key.suppNation,
+        g.key.custNation,
+        g.key.year,
+        tr(g.values.map(x => x.volume).sum))
 
       // write out the result
       write(outPath, new CSVOutputFormat[Result]('|'))(rslt)

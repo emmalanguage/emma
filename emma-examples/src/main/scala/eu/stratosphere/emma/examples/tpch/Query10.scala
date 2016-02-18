@@ -45,7 +45,7 @@ import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
   *   revenue desc;
   */
 
-class Query10(inPath: String, outPath: String, begin_date: String, end_date: String, rt: Engine, val truncate: Boolean = false) extends Algorithm(rt) {
+class Query10(inPath: String, outPath: String, beginDate: String, endDate: String, rt: Engine, val truncate: Boolean = false) extends Algorithm(rt) {
 
   import eu.stratosphere.emma.examples.tpch.Query10.Schema._
 
@@ -60,37 +60,35 @@ class Query10(inPath: String, outPath: String, begin_date: String, end_date: Str
 
     val alg = emma.parallelize {
 
+      val tr = (v: Double) =>
+        if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble
+        else v
+
       // compute join part of the query
-      val join = for (
+      val join = for {
         o <- read(s"$inPath/orders.tbl", new CSVInputFormat[Order]('|'))
-        if begin_date <= o.orderDate && o.orderDate < end_date;
+        if beginDate <= o.orderDate && o.orderDate < endDate;
         c <- read(s"$inPath/customer.tbl", new CSVInputFormat[Customer]('|'))
-        if c.custKey == o.custKey;
+        if c.custKey == o.custKey
         l <- read(s"$inPath/lineitem.tbl", new CSVInputFormat[Lineitem]('|'))
-        if l.returnFlag == "R" && o.orderKey == l.orderKey;
+        if l.returnFlag == "R"
+        if o.orderKey == l.orderKey
         n <- read(s"$inPath/nation.tbl", new CSVInputFormat[Nation]('|'))
         if c.nationKey == n.nationKey
-      )
-        yield new Join(c.custKey, c.name, l.extendedPrice, c.accBal, l.discount, n.name, c.address, c.phone, c.comment)
+      } yield Join(c.custKey, c.name, l.extendedPrice, c.accBal, l.discount, n.name, c.address, c.phone, c.comment)
 
       // aggregate and compute the final result
-      val res = for (
-        g <- join.groupBy(j => new GrpKey(j.c_custkey, j.c_name, j.c_acctbal, j.customerPhone, j.n_name, j.customerAddress, j.customerComment))
-      )
-        yield {
-          def tr(v: Double) = if (truncate) BigDecimal(v).setScale(4, BigDecimal.RoundingMode.HALF_UP).toDouble else v
-
-          new Result(
-            g.key.c_custkey,
-            g.key.c_name,
-            tr(g.values.map(x => x.extendedPrice * (1 - x.l_discount)).sum),
-            g.key.c_acctbal,
-            g.key.n_name,
-            g.key.c_address,
-            g.key.c_phone,
-            g.key.c_comment
-          )
-        }
+      val res = for {
+        g <- join.groupBy(j => GrpKey(j.c_custkey, j.c_name, j.c_acctbal, j.customerPhone, j.n_name, j.customerAddress, j.customerComment))
+      } yield Result(
+        g.key.c_custkey,
+        g.key.c_name,
+        tr(g.values.map(x => x.extendedPrice * (1 - x.l_discount)).sum),
+        g.key.c_acctbal,
+        g.key.n_name,
+        g.key.c_address,
+        g.key.c_phone,
+        g.key.c_comment)
 
       // write out the result
       write(outPath, new CSVOutputFormat[Result]('|'))(res)
