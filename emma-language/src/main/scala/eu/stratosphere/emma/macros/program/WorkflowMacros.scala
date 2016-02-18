@@ -1,6 +1,7 @@
 package eu.stratosphere.emma.macros.program
 
 import eu.stratosphere.emma.api.Algorithm
+import eu.stratosphere.emma.compiler.MacroCompiler
 import eu.stratosphere.emma.macros.program.comprehension.Comprehension
 import eu.stratosphere.emma.macros.program.controlflow.ControlFlow
 import eu.stratosphere.emma.runtime.{Engine, Native}
@@ -8,8 +9,7 @@ import scala.language.existentials
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
-class WorkflowMacros(val c: blackbox.Context)
-    extends ControlFlow with Comprehension with SemanticChecks {
+class WorkflowMacros(val c: blackbox.Context) extends ControlFlow with Comprehension with SemanticChecks {
 
   import universe._
   import syntax._
@@ -20,6 +20,10 @@ class WorkflowMacros(val c: blackbox.Context)
   /** Translate an Emma expression to an [[Algorithm]]. */
   // TODO: Add more comprehensive ScalaDoc
   def parallelize[T: c.WeakTypeTag](e: Expr[T]) = {
+
+    val compiler = new MacroCompiler(c)
+
+    compiler.Core.validate(e.tree.typeChecked.asInstanceOf[compiler.universe.Tree])
 
     doSemanticChecks(e.tree)
 
