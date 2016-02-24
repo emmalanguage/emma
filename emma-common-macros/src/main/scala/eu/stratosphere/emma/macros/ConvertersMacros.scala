@@ -1,78 +1,86 @@
-package eu.stratosphere.emma.macros
+package eu.stratosphere
+package emma.macros
+
+import emma.compiler
 
 import scala.reflect.macros.blackbox
 
+/** Automatic derivation of CSV encoding / decoding for primitives and [[Product]] types. */
 // TODO: add DateTime support
-class ConvertersMacros(val c: blackbox.Context) extends BlackBoxUtil {
+class ConvertersMacros(val c: blackbox.Context) extends compiler.MacroUtil {
+
   import universe._
-  import syntax._
+  import Emma._
+  import Tree._
+  import Type._
 
-  val nextIndex = $"nextIndex"
-  val builder = $"builder"
+  private val builder =
+    Term.fresh("builder")
 
-  /** Entry macro for emma algorithms. */
-  def materializeCSVConverters[T: c.WeakTypeTag] = {
-    val tpe = weakTypeOf[T]
-    val $(v, i, sep) = $("value", "i", "separator")
+  def materializeCSVConverters[T: c.WeakTypeTag] = Type.check {
+    val T = Type.weak[T]
+    val value = Term.fresh("value")
+    val index = Term.fresh("index")
+    val sep = Term.fresh("sep")
 
-    val fromStringFun = q"""
-      def fromCSV($v: ${ARRAY(STRING)}): $tpe = {
-        var $i = -1
-        def $nextIndex = { $i += 1; $i }
-        ${fromString[T](tpe, q"$v")}
+    val from = q"""
+      ($value: ${array(string)}) => {
+        var $index = -1
+        ${fromCSV(T, q"$value", q"{ $index += 1; $index }")}
       }"""
 
-    val toStringFun = q"""
-      def toCSV($v: $tpe, $sep: $CHAR): ${ARRAY(STRING)} = {
+    val to = q"""
+      ($value: $T, $sep: $char) => {
         $builder.clear()
-        ${toString[T](tpe, q"$v")}
+        ${toCSV(T, q"$value")}
         $builder.result()
       }"""
 
-    q"""new _root_.eu.stratosphere.emma.api.CSVConverters[$tpe] {
-      val $builder = _root_.scala.collection.mutable.ArrayBuilder.make[$STRING]
-      $fromStringFun
-      $toStringFun
+    q"""{
+      val $builder = $Scala.collection.mutable.ArrayBuilder.make[$string]
+      $emma.api.CSVConverters[$T]($from)($to)
     }"""
   }
 
-  def fromString[T: c.WeakTypeTag](tpe: Type, value: Tree): Tree =
-    if (tpe <:< typeOf[Product]) {
-      val method = tpe.decl(termNames.CONSTRUCTOR).alternatives.head.asMethod
-      val params = method.typeSignatureIn(tpe).paramLists.head
-      val args   = for (p <- params) yield fromString(p.info, value)
-      q"new $tpe(..$args)"
+  def fromCSV(T: Type, value: Tree, index: Tree): Tree =
+    if (T <:< Type[Product]) {
+      val method = T.decl(Term.init).alternatives.head.asMethod
+      val params = method.typeSignatureIn(T).paramLists.head
+      val args = for (p <- params) yield fromCSV(Type.of(p), value, index)
+      q"new $T(..$args)"
+    } else {
+      if (T =:= Type.unit || T =:= void) Tree.unit
+      else if (T =:= bool || T =:= jBool) q"$value($index).toBoolean"
+      else if (T =:= char || T =:= jChar) q"$value($index).head"
+      else if (T =:= byte || T =:= jByte) q"$value($index).toByte"
+      else if (T =:= short || T =:= jShort) q"$value($index).toShort"
+      else if (T =:= int || T =:= jInt) q"$value($index).toInt"
+      else if (T =:= long || T =:= jLong) q"$value($index).toLong"
+      else if (T =:= float || T =:= jFloat) q"$value($index).toFloat"
+      else if (T =:= double || T =:= jDouble) q"$value($index).toDouble"
+      else if (T =:= bigInt) q"$Scala.BigInt($value($index))"
+      else if (T =:= bigDec) q"$Scala.BigDecimal($value($index))"
+      else if (T =:= jBigInt) q"new $Java.math.BigInteger($value($index))"
+      else if (T =:= jBigDec) q"new $Java.math.BigDecimal($value($index))"
+      else if (T =:= string) q"$value($index)"
+      else q"{ $index; ${nil(T)} }"
     }
 
-    else if (tpe =:= UNIT   || tpe =:= VOID)     q"()"
-    else if (tpe =:= BOOL   || tpe =:= J_BOOL)   q"$value($nextIndex).toBoolean"
-    else if (tpe =:= CHAR   || tpe =:= J_CHAR)   q"$value($nextIndex).head"
-    else if (tpe =:= BYTE   || tpe =:= J_BYTE)   q"$value($nextIndex).toByte"
-    else if (tpe =:= SHORT  || tpe =:= J_SHORT)  q"$value($nextIndex).toShort"
-    else if (tpe =:= INT    || tpe =:= J_INT)    q"$value($nextIndex).toInt"
-    else if (tpe =:= LONG   || tpe =:= J_LONG)   q"$value($nextIndex).toLong"
-    else if (tpe =:= FLOAT  || tpe =:= J_FLOAT)  q"$value($nextIndex).toFloat"
-    else if (tpe =:= DOUBLE || tpe =:= J_DOUBLE) q"$value($nextIndex).toDouble"
-    else if (tpe =:= BIG_INT)   q"_root_.scala.BigInt($value($nextIndex))"
-    else if (tpe =:= BIG_DEC)   q"_root_.scala.BigDecimal($value($nextIndex))"
-    else if (tpe =:= J_BIG_INT) q"new _root_.java.math.BigInteger($value($nextIndex))"
-    else if (tpe =:= J_BIG_DEC) q"new _root_.java.math.BigDecimal($value($nextIndex))"
-    else if (tpe =:= STRING)    q"$value($nextIndex)"
-    else q"{ $nextIndex; null.asInstanceOf[$tpe] }"
-
-  def toString[T: c.WeakTypeTag](tpe: Type, value: Tree): Tree = {
-    if (tpe <:< typeOf[Product]) {
-      val method = tpe.decl(termNames.CONSTRUCTOR).alternatives.head.asMethod
-      val params = method.typeSignatureIn(tpe).paramLists.head
+  def toCSV(T: Type, value: Tree): Tree = {
+    if (T <:< Type[Product]) {
+      val method = T.decl(Term.init).alternatives.head.asMethod
+      val params = method.typeSignatureIn(T).paramLists.head
       val fields = for {
-        param  <- params
-        method <- tpe.members
+        param <- params
+        method <- T.members
         if method.isMethod
         if method.asMethod.isGetter
         if method.toString == param.toString
-      } yield toString(method.infoIn(tpe).resultType, q"$value.$method")
+      } yield toCSV(result(method.infoIn(T)), q"$value.$method")
 
       q"..$fields"
-    } else q"$builder += $value.toString"
+    } else {
+      q"$builder += $value.toString"
+    }
   }
 }
