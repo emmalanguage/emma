@@ -73,7 +73,7 @@
  <check level="error" class="org.scalastyle.scalariform.NoFinalizeChecker" enabled="true"/>
  <check level="error" class="org.scalastyle.scalariform.CovariantEqualsChecker" enabled="true"/>
  <check level="warning" class="org.scalastyle.scalariform.StructuralTypeChecker" enabled="true"/>
- <check level="warning" class="org.scalastyle.file.RegexChecker" enabled="true">
+ <check level="warning" class="org.scalastyle.file.RegexChecker" enabled="false">
   <parameters>
    <parameter name="regex"><![CDATA[println]]></parameter>
   </parameters>
@@ -103,12 +103,12 @@
  </check>
  <check level="warning" class="org.scalastyle.scalariform.MethodNamesChecker" enabled="true">
   <parameters>
-   <parameter name="regex"><![CDATA[^[a-z][A-Za-z0-9]*$]]></parameter>
+   <parameter name="regex"><![CDATA[^[a-z_][A-Za-z0-9_]*$]]></parameter>
   </parameters>
  </check>
  <check level="warning" class="org.scalastyle.scalariform.NumberOfMethodsInTypeChecker" enabled="true">
   <parameters>
-   <parameter name="maxMethods"><![CDATA[30]]></parameter>
+   <parameter name="maxMethods"><![CDATA[50]]></parameter>
   </parameters>
  </check>
  <check level="warning" class="org.scalastyle.scalariform.PublicMethodsHaveTypeChecker" enabled="true"/>
@@ -132,16 +132,16 @@
  </check>
  <check level="warning" class="org.scalastyle.scalariform.UnderscoreImportChecker" enabled="false"/>
  <check level="warning" class="org.scalastyle.scalariform.LowercasePatternMatchChecker" enabled="false"/>
- <check level="warning" class="org.scalastyle.scalariform.MultipleStringLiteralsChecker" enabled="true">
+ <check level="warning" class="org.scalastyle.scalariform.MultipleStringLiteralsChecker" enabled="false">
   <parameters>
    <parameter name="allowed"><![CDATA[2]]></parameter>
    <parameter name="ignoreRegex"><![CDATA[^""$]]></parameter>
   </parameters>
  </check>
  <check level="warning" class="org.scalastyle.scalariform.ImportGroupingChecker" enabled="false"/>
- <check enabled="true" class="org.scalastyle.scalariform.FieldNamesChecker" level="warning">
+ <check enabled="false" class="org.scalastyle.scalariform.FieldNamesChecker" level="warning">
   <parameters>
-   <parameter name="regex">^[A-Za-z][A-Za-z0-9]*$</parameter>
+   <parameter name="regex">^[A-Za-z_][A-Za-z0-9_]*$</parameter>
   </parameters>
  </check>
  <check enabled="true" class="org.scalastyle.scalariform.ProcedureDeclarationChecker" level="error"/>
