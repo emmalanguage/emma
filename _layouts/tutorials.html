@@ -4,7 +4,7 @@ layout: default
 
 {% assign tutorials = site.tutorials | sort: 'date' %}
 
-<div class="row">
+<div class="row" style="position: relative;">
     <div class="large-9 columns">
         <section class="post-content">
             <header class="post-header">
@@ -25,3 +25,34 @@ layout: default
         </ul>
     </div>
 </div>
+
+<script>
+    function followTo(selector) {
+        var $this = $(selector),
+                $window = $(window);
+
+        var sectionHeight = $('.wrapper').height();
+        var pos = 0;
+        var tocHeight = $this.height();
+        if (sectionHeight > tocHeight) {
+            pos = sectionHeight - $this.height();
+        }
+
+        $window.scroll(function (e) {
+            if ($window.scrollTop() > pos) {
+                $this.css({
+                    position: 'absolute',
+                    top: pos
+                });
+            } else {
+                $this.css({
+                    position: 'fixed',
+                    top: 'auto'
+                });
+            }
+        });
+    };
+    $(function(){
+        followTo('.toc');
+    });
+</script>
