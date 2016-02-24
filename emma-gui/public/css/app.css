@@ -95,6 +95,12 @@ code {
     z-index: -1;
 }
 
+#scroll-code-wrapper {
+    display: inline-block;
+    margin-right: 50px;
+    float:right;
+}
+
 .ui-resizable-handle.ui-resizable-e {
     background-image: url('/img/handle-v.png');
     background-position: -3px center;

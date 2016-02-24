@@ -23,9 +23,6 @@
                 <h1><a href="/">Emma-Gui</a></h1>
             </li>
             <li class="icon">
-                <a href="javascript:clearPage();" title="new"><i class="fi-page"></i></a>
-            </li>
-            <li class="icon">
                 <a href="#" data-options="align:bottom" data-dropdown="drop" title="load example">
                     <i class="fi-page-filled"></i>
                 </a>
@@ -77,6 +74,11 @@
                     <a href="#code-panel1">Input Parameter</a>
                 </li>
                 <li id="code-options">
+                    <div id="scroll-code-wrapper" class="switch tiny">
+                        <span>auto scroll</span>
+                        <input id="scroll-code" type="checkbox" checked="">
+                        <label id="scroll-code-label" for="scroll-code">&nbsp;</label>
+                    </div>
                     <a>
                         <i id="code-zoom-in" class="text-zoom fi-zoom-in"></i>
                     </a>
@@ -143,9 +145,10 @@
 <script src="js/highlight.pack.js"></script>
 <script src="js/paper-full-v0.9.23.min.js"></script>
 <script src="js/drawing.helpers.js"></script>
-<script src="js/plan-canvas.js"></script>
 <script src="js/graph.js"></script>
 <script src="js/log.js"></script>
+<script src="js/plan-view.js"></script>
+<script src="js/code-view.js"></script>
 <script src="js/app.js"></script>
 <script src="js/dagre.min.js"></script>
 <script>hljs.initHighlightingOnLoad();</script>
