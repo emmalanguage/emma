@@ -1,67 +1,73 @@
-package eu.stratosphere.emma.macros
+package eu.stratosphere
+package emma.macros
 
+import scala.language.dynamics
+import scala.language.implicitConversions
 import scala.language.experimental.macros
-import scala.language.{dynamics, implicitConversions}
 import scala.reflect.macros.blackbox
 
-// Adapted from https://github.com/retronym/macrocosm/blob/master/src/main/scala/com/github/retronym/macrocosm/Macrocosm.scala
-// Changes:
-//  - changed Context to blackbox.Context
-//  - added option to have spaces in the literal (for arbitrary digit grouping)
-//  - added return type to enrichStringContext
-
+/**
+ * Adapted from
+ * https://github.com/retronym/macrocosm/blob/master/src/main/scala/com/github/retronym/macrocosm/Macrocosm.scala
+ */
 object BinaryLiterals {
 
-  implicit def enrichStringContext(sc: StringContext) : RichStringContext = new RichStringContext(sc)
+  implicit def from(sc: StringContext): Binary =
+    new Binary(sc)
 
-  class RichStringContext(sc: StringContext) {
-    // This is how a non-macro version would be implemented.
+  class Binary(sc: StringContext) {
+    // This is how a non-macro version would be implemented:
     // def b() = {
-    //   val s = sc.parts.mkString
-    //   parseBinary(s).getOrElse(sys.error("invalid binary literal: " + s))
+    //   val lit = sc.parts.mkString
+    //   parseBin(lit).getOrElse(sys.error(s"Invalid binary literal: $lit"))
     // }
 
-    /** Binary literal integer
-      *
-      *  {{{
-      *  scala> b"101010"
-      *  res0: Int = 42
-      *  }}}
-      */
-    def b(): Int = macro bImpl
+    /**
+     * Binary literal integer.
+     *
+     * {{{
+     * scala> b"101010"
+     * res0: Int = 42
+     * }}}
+     */
+    def b(): Int = macro binary
   }
 
-  def bImpl(c: blackbox.Context)(): c.Expr[Int] = {
-    def parseBinary(s: String): Int = {
-      var i = s.length - 1
+  def binary(c: blackbox.Context)() = {
+    import c.universe._
+
+    def parseBin(lit: String): Int = {
+      var i = lit.length - 1
       var sum = 0
-      var mult = 1
+      var ord = 1
       while (i >= 0) {
-        s.charAt(i) match {
+        lit.charAt(i) match {
           case '1' =>
-            sum += mult
-            mult *= 2
+            sum += ord
+            ord *= 2
           case '0' =>
-            mult *= 2
+            ord *= 2
           case ' ' =>
-          case x =>
-            c.abort(c.enclosingPosition, "invalid binary literal")
+          case _ =>
+            val pos = c.enclosingPosition
+            val err = s"Invalid binary literal: $lit"
+            c.abort(pos, err)
         }
+
         i -= 1
       }
+
       sum
     }
 
-    import c.universe._
-
-    val i = c.prefix.tree match {
-      // e.g: `c.g.r.m.Macrocosm.enrichStringContext(scala.StringContext.apply("1111"))`
-      case Apply(_, List(Apply(_, List(Literal(Constant(const: String)))))) =>
-        parseBinary(const)
-      case x =>
-        c.abort(c.enclosingPosition, "unexpected tree: " + show(x))
+    c.prefix.tree match {
+      // e.g: `emma.macros.BinaryLiterals.from(scala.StringContext.apply("1111"))`
+      case q"$_(scala.StringContext.apply(${lit: String}))" =>
+        q"${parseBin(lit)}"
+      case tree =>
+        val pos = c.enclosingPosition
+        val err = s"Unexpected tree: ${showCode(tree)}"
+        c.abort(pos, err)
     }
-    c.Expr[Int](Literal(Constant(i)))
   }
 }
-
