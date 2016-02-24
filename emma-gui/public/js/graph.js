@@ -24,8 +24,8 @@ var Node = function(obj, planCanvas){
 
         draw: function() {
             if (this.shape == null) {
-                this.xOffset = globalXOffset;
-                this.yOffset = globalYOffset;
+                this.xOffset = GraphStyle.globalXOffset;
+                this.yOffset = GraphStyle.globalYOffset;
 
                 switch (this.type) {
                     case "INPUT": drawInput(planCanvas, this); break;
@@ -41,10 +41,9 @@ var Node = function(obj, planCanvas){
         setLabel: function(label) {
             if (this.text != null) {
                 label = label+"";
-                if (label.length <= 1) {
-                    var maxLength = 1;
-                } else {
-                    var maxLength = Math.ceil(Math.sqrt(label.length) * 2) + 5;
+                var maxLength = 1;
+                if (label.length > 1) {
+                    maxLength = Math.ceil(Math.sqrt(label.length) * 2) + 5;
                     if (maxLength < 10) {
                         maxLength = 10;
                     }
@@ -55,7 +54,7 @@ var Node = function(obj, planCanvas){
                 this.width = this.text.bounds.width + this.padding[1] + this.padding[3];
                 this.height = this.text.bounds.height + this.padding[0] + this.padding[2];
             }
-        },
+        }
     });
 
     //init
@@ -83,17 +82,15 @@ var Edge = function(obj) {
 
         draw: function() {
             var segments = [];
-            xOffset = this.xOffset;
-            yOffset = this.yOffset;
-
-            xOffset += globalXOffset;
-            yOffset += globalYOffset;
+            this.xOffset += GraphStyle.globalXOffset;
+            this.yOffset += GraphStyle.globalYOffset;
 
             var startArrow = null;
             var endArrow = null;
 
+            var self = this;
             this.points.forEach(function(point){
-                segments.push([point.x + xOffset, point.y + yOffset]);
+                segments.push([point.x + self.xOffset, point.y + self.yOffset]);
             });
 
             if (this.type == "BROADCAST") {
@@ -113,7 +110,7 @@ var Edge = function(obj) {
                 endArrow = "arrow";
             }
 
-            var path = arrow({
+            roundPath(arrow({
                 label: this.label,
                 segments: segments,
                 strokeColor: this.strokeColor || GraphStyle.strokeColor,
@@ -124,9 +121,7 @@ var Edge = function(obj) {
                 textColor: this.textColor,
                 startArrow: startArrow,
                 endArrow: endArrow
-            });
-
-            path = roundPath(path, 5);
+            }), 5);
         }
     });
 };
@@ -134,7 +129,7 @@ var Edge = function(obj) {
 var nodes = [];
 var edges = [];
 
-function initGraph(plan, id) {
+function initGraph(plan, id, planCanvas) {
     if (!GraphStyle.initialized)
         loadStylesFromCss();
 
@@ -147,9 +142,7 @@ function initGraph(plan, id) {
     if (graphData == null)
         return;
 
-    var planCanvas = canvases['#plan-canvas'+id];
-
-    graphData.nodes.forEach(function(node, i){
+    graphData.nodes.forEach(function(node){
         g.setNode(node.id, new Node(node, planCanvas));
     });
 
@@ -166,8 +159,8 @@ function initGraph(plan, id) {
 
     var dimensions = getGraphDimensions(g);
 
-    globalXOffset = middlePoint[0] - dimensions[0] / 2;
-    globalYOffset = middlePoint[1] - dimensions[1] / 2;
+    GraphStyle.globalXOffset = middlePoint[0] - dimensions[0] / 2;
+    GraphStyle.globalYOffset = middlePoint[1] - dimensions[1] / 2;
 
     g.edges().forEach(function(e) {
         var edge = new Edge(g.edge(e));

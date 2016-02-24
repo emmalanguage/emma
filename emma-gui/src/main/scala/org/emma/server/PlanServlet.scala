@@ -132,7 +132,7 @@ class PlanServlet extends HttpServlet {
     var map: Predef.Map[String, _] = null
     JSON.parseFull(json) match {
       case Some(m: Predef.Map[String, _]) => map = m
-      case None => ;
+      case _ => ;
     }
 
     if (map != null) {
