@@ -4,20 +4,18 @@ import java.lang.reflect.{InvocationTargetException, Constructor}
 import java.security.InvalidParameterException
 
 import eu.stratosphere.emma.examples.Algorithm
-import eu.stratosphere.emma.runtime.{RuntimePlugin, Flink}
+import eu.stratosphere.emma.runtime.{Flink, Engine, RuntimePlugin}
 
 import net.sourceforge.argparse4j.inf.Namespace
 
-class FlinkExampleRunner(constructor: Constructor[Algorithm], args: Namespace,
-    plugins: Seq[RuntimePlugin] = Nil) extends Thread {
+class ExampleRunner(constructor: Constructor[Algorithm], args: Namespace,
+                    plugins: Seq[RuntimePlugin] = Nil, runtime: Engine = new Flink) extends Thread {
 
   override def run() {
-    val runtime = new Flink
     runtime.plugins = plugins
     try constructor.newInstance(args, runtime).run() catch {
-      case _: InterruptedException => System.err.println("Execution stopped")
       case e: InvocationTargetException if e.getCause.isInstanceOf[ClassCastException] => throw new InvalidParameterException("Given parameter types do not match the example constructor.")
-      case ex: Exception => ex.printStackTrace()
+      case e: Exception => e.printStackTrace()
     }
   }
 }

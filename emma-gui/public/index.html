@@ -57,8 +57,10 @@
             <li class="name">
                 <h1><a id="status"></a></h1>
             </li>
-            <li id="theme-container" class="has-form">
-
+            <li class="icon">
+                <a href="#" data-reveal-id="settings-modal">
+                    <i class="fi-widget"></i>
+                </a>
             </li>
         </ul>
     </nav>
@@ -74,11 +76,6 @@
                     <a href="#code-panel1">Input Parameter</a>
                 </li>
                 <li id="code-options">
-                    <div id="scroll-code-wrapper" class="switch tiny">
-                        <span>auto scroll</span>
-                        <input id="scroll-code" type="checkbox" checked="">
-                        <label id="scroll-code-label" for="scroll-code">&nbsp;</label>
-                    </div>
                     <a>
                         <i id="code-zoom-in" class="text-zoom fi-zoom-in"></i>
                     </a>
@@ -111,11 +108,6 @@
         <div id="log-wrapper">
             <div id="log-options">
                 <span id="clear-log-button" class="label"><i class="fi-prohibited"></i> clear</span>
-                <div class="switch tiny" style="display: inline-block; margin: 0;">
-                    <input id="scroll-lock" type="checkbox" checked="">
-                    <label id="scroll-lock-label" for="scroll-lock">&nbsp;</label>
-                    <span>scroll lock</span>
-                </div>
             </div>
             <div id="log-container">
 
@@ -137,10 +129,68 @@
 
     </div>
 </section>
+
+<div id="settings-modal" class="reveal-modal" data-reveal aria-labelledby="modalTitle" aria-hidden="true" role="dialog">
+    <h2>Settings</h2>
+    <form>
+        <div class="form">
+            <div class="row">
+                <div class="small-3 columns">
+                    <label>Theme</label>
+                </div>
+                <div class="small-9 columns">
+                    <div id="theme-container" class="has-form"></div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="small-3 columns">
+                    <label>Runtime</label>
+                </div>
+                <div class="small-9 columns">
+                    <select id="runtime">
+                        <option>Flink</option>
+                        <option>Spark</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="small-3 columns">
+                    <label>Autoscroll code view</label>
+                </div>
+                <div class="small-9 columns">
+                    <div id="scroll-code-wrapper" class="switch tiny">
+                        <input id="scroll-code" type="checkbox" checked="">
+                        <label id="scroll-code-label" for="scroll-code">&nbsp;</label>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="small-3 columns">
+                    <label>Scroll log</label>
+                </div>
+                <div class="small-9 columns">
+                    <div class="switch tiny" style="display: inline-block; margin: 0;">
+                        <input id="scroll-lock" type="checkbox" checked="">
+                        <label id="scroll-lock-label" for="scroll-lock">&nbsp;</label>
+                    </div>
+                </div>
+            </div>
+            <div class="row">
+                <div class="small-12 columns">
+
+                </div>
+            </div>
+        </div>
+    </form>
+    <a class="close-reveal-modal" aria-label="Close">&#215;</a>
+</div>
+
+
 <footer></footer>
 </body>
 <script src="js/jquery-ui.min.js"></script>
 <script src="js/foundation/foundation.min.js"></script>
+<script src="js/foundation/foundation.reveal.js"></script>
 <script src="js/foundation/foundation.dropdown.js"></script>
 <script src="js/highlight.pack.js"></script>
 <script src="js/paper-full-v0.9.23.min.js"></script>
@@ -157,16 +207,9 @@
 <script>
     $(document).ready(function(){
         constructThemeChooser("theme-container");
-
         $(document).foundation();
         resizeContainers();
-
         loadExamples();
-        //loadExample('eu.stratosphere.emma.examples.graphs.LabelRank');
-        //eu.stratosphere.emma.examples.graphs.TriangleCount
-        //eu.stratosphere.emma.examples.graphs.GraphColoring
-        //eu.stratosphere.emma.examples.text.WordCount
     });
-
 </script>
 </html>

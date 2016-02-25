@@ -93,7 +93,8 @@ function loadExample(name) {
 
     var exampleName = $("a[title='"+name+"']").text();
     if (exampleName) {
-        $('#example-name').find('div').html(exampleName+((planCaching && cache != null)?' (cached)':''));
+        var runtime = $('#runtime').val();
+        $('#example-name').find('div').html("<span>"+runtime+":</span> "+exampleName+((planCaching && cache != null)?' (cached)':''));
     } else {
         $('#example-name').find('div').html("");
     }
@@ -133,9 +134,10 @@ function loadCode(name) {
 }
 
 function loadPlan(name) {
+    var runtime = $('#runtime').val();
     $.ajax({
         method: "GET",
-        url: requestBase+"plan/loadGraph?name="+name,
+        url: requestBase+"plan/loadGraph?name="+name+"&runtime="+runtime,
         success: function(data) {
             logger.log("<div>Init Runtime with default parameters</div>");
             if (data.graph != null) {
@@ -155,7 +157,7 @@ function loadPlan(name) {
                 }
 
             } else {
-                console.error("Requested plan data is null! Request: "+requestBase+"plan/loadGraph?name="+name);
+                console.error("Requested plan data is null! Request: "+this.url);
                 $('#plan-tab-content').html("Requested plan cannot be loaded.");
                 $('#status').html('');
             }
@@ -189,9 +191,10 @@ function loadPlanFromCache(name, cache) {
 
 function initRuntime(name, parameters) {
     executionOrder = [];
+    var runtime = $('#runtime').val();
     $.ajax({
         method: "POST",
-        url: requestBase+"plan/initRuntime?name="+name,
+        url: requestBase+"plan/initRuntime?name="+name+"&runtime="+runtime,
         data: JSON.stringify(parameters),
         contentType:"application/json; charset=utf-8",
         success: function() {
@@ -427,4 +430,18 @@ function registerListeners() {
     scrollCode = localStorage.getItem("scrollCode") == "true";
 
     $('#scroll-code').prop("checked", scrollCode);
+
+    $('#runtime').change(function(e){
+        localStorage.setItem("runtime",$(e.target).val());
+    });
+
+    var runtime = localStorage.getItem("runtime");
+    if (runtime != null) {
+        $('#runtime').find('option').each(function(i,e){
+            var elem = $(e);
+            if (elem.text() == runtime) {
+                elem.attr("selected","selected");
+            }
+        })
+    }
 }
