@@ -84,7 +84,7 @@ Fold Alias                     | Purpose
 `min`, `max`, `sum`, `count` … | Aggregation
 `exists`, `forall`, …          | Existential Qualifiers
 
-#### Declarative Data-flows
+#### Declarative Dataflows
 
 Joins and cross products in *Emma* can be declared using `for`-comprehension syntax in a manner akin to *Select-From-Where* expressions known from SQL. 
 
