@@ -1,67 +1,108 @@
-package eu.stratosphere.emma.runtime
+package eu.stratosphere
+package emma.runtime
 
-import eu.stratosphere.emma.api.DataBag
-import eu.stratosphere.emma.api.model.Identity
-import eu.stratosphere.emma.codegen.flink.{DataflowGenerator, TempResultsManager}
-import eu.stratosphere.emma.codegen.utils.DataflowCompiler
-import eu.stratosphere.emma.ir._
-import org.apache.flink.api.scala.ExecutionEnvironment
+import emma.api.DataBag
+import emma.api.model.Identity
+import emma.codegen.flink.{DataflowGenerator, TempResultsManager}
+import emma.codegen.utils.DataflowCompiler
+import emma.ir._
 
-import scala.reflect.runtime.universe._
+import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
+import org.apache.flink.configuration.Configuration
 
+import scala.reflect.runtime.currentMirror
+
+/**
+ * Proxy runtime for Apache Flink.
+ *
+ * In this runtime [[DataBag]]s are backed by [[DataSet]]s. Comprehensions are compiled to
+ * dataflow programs and executed in parallel. Both local and remote environments are supported.
+ *
+ * @param env The backing Flink execution environment.
+ */
 class Flink(val env: ExecutionEnvironment) extends Engine {
 
-  import org.apache.flink.api.scala._
-
   logger.info(s"Initializing Flink execution environment")
+  sys.addShutdownHook(close())
 
-  def this() = this(ExecutionEnvironment.getExecutionEnvironment)
+  private val compiler = new DataflowCompiler(currentMirror)
+  private val generator = new DataflowGenerator(compiler, sessionId)
+  private val manager = new TempResultsManager(compiler.tb, sessionId)
+  override lazy val defaultDoP = env.getParallelism
 
-  sys addShutdownHook {
-    closeSession()
+  def this() =
+    this(ExecutionEnvironment.getExecutionEnvironment)
+
+  override def executeFold[A, B](
+    fold: Fold[A, B],
+    name: String,
+    ctx: Context,
+    closure: Any*): A = {
+
+    for (p <- plugins) p.handleLogicalPlan(fold, name, ctx, closure: _*)
+    val dataFlow = generator.generateDataflowDef(fold, name)
+    val args = env +: manager +: closure ++: localInputs(fold)
+    val result = compiler.execute[A](dataFlow, args.toArray)
+    manager.gc()
+    result
   }
 
-  override lazy val defaultDOP = env.getParallelism
+  override def executeTempSink[A](
+    sink: TempSink[A],
+    name: String,
+    ctx: Context,
+    closure: Any*): DataBag[A] = {
 
-  val dataflowCompiler = new DataflowCompiler(runtimeMirror(getClass.getClassLoader))
-
-  val dataflowGenerator = new DataflowGenerator(dataflowCompiler, envSessionID)
-
-  val resMgr = new TempResultsManager(dataflowCompiler.tb, envSessionID)
-
-  override def executeFold[A: TypeTag, B: TypeTag]
-      (root: Fold[A, B], name: String, ctx: Context, closure: Any*): A = {
-    for (p <- plugins) p.handleLogicalPlan(root, name, ctx, closure: _*)
-    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    val res = dataflowCompiler.execute[A](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
-    resMgr.gc()
-    res
+    for (p <- plugins) p.handleLogicalPlan(sink, name, ctx, closure: _*)
+    val dataFlow = generator.generateDataflowDef(sink, name)
+    val args = env +: manager +: closure ++: localInputs(sink)
+    val dataSet = compiler.execute[DataSet[A]](dataFlow, args.toArray)
+    manager.gc()
+    DataBag(sink.name, dataSet, dataSet.collect())
   }
 
-  override def executeTempSink[A: TypeTag]
-      (root: TempSink[A], name: String, ctx: Context, closure: Any*): DataBag[A] = {
-    for (p <- plugins) p.handleLogicalPlan(root, name, ctx, closure: _*)
-    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    val expr = dataflowCompiler.execute[DataSet[A]](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
-    resMgr.gc()
-    DataBag(root.name, expr, expr.collect())
+  override def executeWrite[A](
+    write: Write[A],
+    name: String,
+    ctx: Context,
+    closure: Any*): Unit = {
+
+    for (p <- plugins) p.handleLogicalPlan(write, name, ctx, closure: _*)
+    val dataFlow = generator.generateDataflowDef(write, name)
+    val args = env +: manager +: closure ++: localInputs(write)
+    compiler.execute[Unit](dataFlow, args.toArray)
+    manager.gc()
   }
 
-  override def executeWrite[A: TypeTag]
-      (root: Write[A], name: String, ctx: Context, closure: Any*): Unit = {
-    for (p <- plugins) p.handleLogicalPlan(root, name, ctx, closure: _*)
-    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    dataflowCompiler.execute[Unit](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
-    resMgr.gc()
-  }
+  override def executeStatefulCreate[S <: Identity[K], K](
+    stateful: StatefulCreate[S, K],
+    name: String,
+    ctx: Context,
+    closure: Any*): AbstractStatefulBackend[S, K] = {
 
-  override def executeStatefulCreate[S <: Identity[K]: TypeTag, K: TypeTag]
-      (root: StatefulCreate[S, K], name: String, ctx: Context, closure: Any*)
-      : AbstractStatefulBackend[S, K] = {
-    for (p <- plugins) p.handleLogicalPlan(root, name, ctx, closure: _*)
-    val dataflowSymbol = dataflowGenerator.generateDataflowDef(root, name)
-    val res = dataflowCompiler.execute[AbstractStatefulBackend[S, K]](dataflowSymbol, Array[Any](env, resMgr) ++ closure ++ localInputs(root))
-    resMgr.gc()
-    res
+    for (p <- plugins) p.handleLogicalPlan(stateful, name, ctx, closure: _*)
+    val dataFlow = generator.generateDataflowDef(stateful, name)
+    val args = env +: manager +: closure ++: localInputs(stateful)
+    val result = compiler.execute[AbstractStatefulBackend[S, K]](dataFlow, args.toArray)
+    manager.gc()
+    result
+  }
+}
+
+object Flink extends Engine.Factory {
+
+  def apply(env: ExecutionEnvironment): Flink =
+    new Flink(env)
+
+  override def default(): Flink =
+    new Flink
+
+  override def testing(): Flink = {
+    val conf = new Configuration
+    val netBuffers = 4096
+    conf.setInteger("taskmanager.network.numberOfBuffers", netBuffers)
+    val env = ExecutionEnvironment.createLocalEnvironment(conf)
+    env.getConfig.disableSysoutLogging()
+    apply(env)
   }
 }

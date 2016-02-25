@@ -1,8 +1,11 @@
-package eu.stratosphere.emma.codegen.spark
+package eu.stratosphere
+package emma.codegen.spark
 
-import eu.stratosphere.emma.codegen.BaseCodegenTest
-import eu.stratosphere.emma.runtime.Spark
+import emma.codegen.BaseCodegenTest
+import emma.runtime.Spark
 
 class CodegenTest extends BaseCodegenTest("spark") {
-  override def runtimeUnderTest = new Spark()
+
+  override def runtimeUnderTest: Spark =
+    Spark.testing()
 }

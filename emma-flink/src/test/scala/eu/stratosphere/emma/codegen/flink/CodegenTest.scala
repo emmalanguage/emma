@@ -1,8 +1,11 @@
-package eu.stratosphere.emma.codegen.flink
+package eu.stratosphere
+package emma.codegen.flink
 
-import eu.stratosphere.emma.codegen.BaseCodegenTest
-import eu.stratosphere.emma.runtime.Flink
+import emma.codegen.BaseCodegenTest
+import emma.runtime.Flink
 
 class CodegenTest extends BaseCodegenTest("flink") {
-  override def runtimeUnderTest = new Flink()
+
+  override def runtimeUnderTest: Flink =
+    Flink.testing()
 }
