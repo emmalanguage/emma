@@ -9,7 +9,7 @@ import javax.servlet.http.{HttpServlet, HttpServletRequest, HttpServletResponse}
 
 import com.google.gson.Gson
 import eu.stratosphere.emma.examples.Algorithm
-import eu.stratosphere.emma.runtime.Engine
+import eu.stratosphere.emma.runtime.{Native, Spark, Flink, Engine}
 import net.sourceforge.argparse4j.inf.Namespace
 import org.emma.data.code.ExampleFileLoader
 import org.emma.data.plan.{Graph, Plan}
@@ -18,7 +18,7 @@ import org.emma.runtime._
 import scala.util.parsing.json.JSON
 
 class PlanServlet extends HttpServlet {
-  var runner: FlinkExampleRunner = _
+  var runner: ExampleRunner = _
   val plugin = new GuiPlugin
   val loader = new ExampleFileLoader
 
@@ -31,8 +31,14 @@ class PlanServlet extends HttpServlet {
 
       case "loadGraph" =>
         val name: String = req.getParameter("name")
+        val runtime: String = req.getParameter("runtime")
         if (name != null && name.nonEmpty) {
-          runExample(name)
+          if (runtime != null && runtime.nonEmpty) {
+            runExample(name, null, runtime)
+          } else {
+            runExample(name)
+          }
+
           respond(resp)
         }
 
@@ -49,8 +55,13 @@ class PlanServlet extends HttpServlet {
     action match {
       case "initRuntime" =>
         val name: String = req.getParameter("name")
+        val runtime: String = req.getParameter("runtime")
         if (name != null && name.nonEmpty) {
-          runExample(name, parameters)
+          if (runtime != null && runtime.nonEmpty) {
+            runExample(name, parameters, runtime)
+          } else {
+            runExample(name, parameters)
+          }
           respond(resp)
         }
 
@@ -81,7 +92,7 @@ class PlanServlet extends HttpServlet {
     resp.getWriter.println(new Gson().toJson(json))
   }
 
-  private def runExample(name: String, params: Namespace = null) = {
+  private def runExample(name: String, params: Namespace = null, runtime:String = "Flink") = {
     val constructor = findConstructorOf(name)
     var parameters:Namespace = null
     if (params != null) {
@@ -91,7 +102,14 @@ class PlanServlet extends HttpServlet {
     }
 
     if (runner != null && runner.isAlive) runner.interrupt()
-    runner = new FlinkExampleRunner(constructor, parameters, plugin :: Nil)
+
+    val engine = runtime match {
+      case "Flink" => new Flink
+      case "Spark" => new Spark
+      case _ => new Native
+    }
+
+    runner = new ExampleRunner(constructor, parameters, plugin :: Nil, engine)
     runner.start()
   }
 

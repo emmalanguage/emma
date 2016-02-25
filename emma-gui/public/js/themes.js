@@ -21,7 +21,7 @@ function constructThemeChooser(containerId) {
 
     for(var i = 0; i < themes.length; i++) {
         var theme = themes[i];
-        select.append("<option value='"+theme+"'>"+theme+"</option>");
+        select.append("<option value='"+theme+"'>"+theme.charAt(0).toUpperCase() + theme.slice(1)+"</option>");
     }
 
     theme = localStorage.getItem("theme");

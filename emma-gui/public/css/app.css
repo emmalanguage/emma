@@ -23,6 +23,10 @@
     width: 2000px;
 }
 
+#example-name div span{
+    font-weight: normal;
+}
+
 .title-area li{
     float: left;
     margin-right: 20px;
@@ -35,6 +39,7 @@
 .title-area.right{
     position: absolute;
     right: 0;
+    height:44px;
 }
 
 #main-section {
@@ -93,12 +98,6 @@ code {
     top: 0;
     left: 0;
     z-index: -1;
-}
-
-#scroll-code-wrapper {
-    display: inline-block;
-    margin-right: 50px;
-    float:right;
 }
 
 .ui-resizable-handle.ui-resizable-e {

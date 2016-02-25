@@ -3,16 +3,18 @@ var Logger = function(elementId){
     var logger = {
         connected: false,
         scrollLock: true,
-        logBufferSize: 500,
+        logBufferSize: 1000,
         ringbuffer: [],
         bufferIndex: 0,
         lastUpdateIndex: null,
         checkLogSizeIteration: 0,
+        reconnectInterval: null,
+
         start: function () {
             if (!this.connected) {
                 var self = this;
 
-                var updateInterval = setInterval(function(){
+                setInterval(function(){
                     if (self.lastUpdateIndex != self.bufferIndex) {
                         self.update();
                         self.logScrollBottom();
@@ -20,22 +22,11 @@ var Logger = function(elementId){
                     }
                 }, 1000);
 
-                var eventSource = new EventSource(requestBase + "log");
-
-                eventSource.onmessage = function (event) {
-                    self.log("<div>" + event.data + "</div>");
-                };
-
-                eventSource.onerror = function(e) {
-                    self.log("<div class='log-error'>ERROR: Lost connection to Log server. Reload to try again!</div>");
-                    alert("An error occurred! Detailed information in the log.");
-                    console.error(e);
-                    eventSource.close();
-                };
+                this.createEventSource();
 
                 //clear log button click
                 $('#clear-log-button').click(function(){
-                    jqueryElement.html("");
+                    self.clear();
                 });
 
                 //click scroll lock switch
@@ -52,10 +43,26 @@ var Logger = function(elementId){
             }
         },
 
+        createEventSource: function() {
+            var self = this;
+            var eventSource = new EventSource(requestBase + "log");
+
+
+            eventSource.onmessage = function (event) {
+                self.log("<div>" + event.data + "</div>");
+            };
+
+            eventSource.onerror = function(e) {
+                eventSource.close();
+                console.warn(e);
+                self.reconnectInterval = setInterval(function() {self.reconnect()}, 500);
+            };
+        },
+
         update: function() {
             var lastIndex = this.bufferIndex % this.logBufferSize;
             var currentIndex = this.bufferIndex % this.logBufferSize;
-            this.clear();
+            jqueryElement.html("");
             do {
                 if (this.ringbuffer[currentIndex]) {
                     jqueryElement.append(this.ringbuffer[currentIndex]);
@@ -76,7 +83,18 @@ var Logger = function(elementId){
         },
 
         clear: function() {
+            this.ringbuffer = [];
+            this.bufferIndex = 0;
+            this.lastUpdateIndex = null;
             jqueryElement.html("");
+        },
+
+        reconnect: function() {
+            console.log("reconnecting to log server...");
+            this.createEventSource();
+            if (this.reconnectInterval != null) {
+                clearInterval(this.reconnectInterval);
+            }
         }
     };
     return logger;
