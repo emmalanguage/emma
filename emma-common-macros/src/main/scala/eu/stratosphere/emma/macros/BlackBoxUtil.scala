@@ -5,6 +5,7 @@ package eu.stratosphere.emma.macros
  * macros APIs, e.g. non- idempotent type checking, lack of hygiene, capture-avoiding substitution,
  * fully-qualified names, fresh name generation, identifying closures, etc.
  */
+@deprecated("Use `emma.compiler.BlackBoxUtil` instead", "24.02.2016")
 trait BlackBoxUtil extends BlackBox with ReflectUtil {
   import universe._
   import c.internal._

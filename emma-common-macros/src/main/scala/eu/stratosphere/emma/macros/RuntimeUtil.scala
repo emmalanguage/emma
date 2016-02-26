@@ -9,6 +9,7 @@ import scala.tools.reflect.ToolBox
  * macros APIs, e.g. non- idempotent type checking, lack of hygiene, capture-avoiding substitution,
  * fully-qualified names, fresh name generation, identifying closures, etc.
  */
+@deprecated("Use `emma.compiler.RuntimeUtil` instead", "24.02.2016")
 trait RuntimeUtil extends ReflectUtil {
   val universe: runtime.universe.type = runtime.universe
   val tb: ToolBox[universe.type]
