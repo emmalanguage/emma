@@ -3,11 +3,11 @@ package compiler
 
 import java.net.URLClassLoader
 import java.nio.file.{Files, Paths}
-
+import eu.stratosphere.emma.compiler.ir.library.Inline
 import scala.tools.reflect.ToolBoxFactory
 
 /** A reflection-based [[eu.stratosphere.emma.compiler.Compiler]]. */
-class RuntimeCompiler extends Compiler with RuntimeUtil {
+class RuntimeCompiler extends Compiler with Inline with RuntimeUtil {
 
   import RuntimeCompiler._
   import universe._
