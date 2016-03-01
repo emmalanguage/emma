@@ -95,51 +95,97 @@ trait Trees extends Util { this: Types with Symbols =>
       }: _*)
 
     /** Returns a reference to `term`. */
-    def ref(term: TermSymbol): Ident =
-      With(term)(Ident(term.name)).asInstanceOf[Ident]
+    def ref(term: TermSymbol): Ident = {
+      // Pre-conditions
+      Symbol.verify(term)
+
+      val id = Ident(term.name)
+      // Fix symbol and type
+      setSymbol(id, term)
+      setType(id, Type.of(term))
+    }
 
     /** Returns a binding of `lhs` to use when pattern matching. */
     def bind(lhs: TermSymbol,
       pattern: Tree = Ident(Term.wildcard)): Bind = {
 
-      With(lhs)(Bind(lhs.name, pattern)).asInstanceOf[Bind]
+      // Pre-conditions
+      Symbol.verify(lhs)
+
+      val bd = Bind(lhs.name, pattern)
+      // Fix symbol and type
+      setSymbol(bd, lhs)
+      setType(bd, Type.of(lhs))
     }
 
     /** Returns a new value / variable definition. */
-    def val_(lhs: TermSymbol, rhs: Tree = EmptyTree): ValDef =
-      With(lhs)(internal.valDef(lhs, rhs)).asInstanceOf[ValDef]
+    def val_(lhs: TermSymbol, rhs: Tree = EmptyTree): ValDef = {
+      // Pre-conditions
+      Symbol.verify(lhs)
+
+      val vd = valDef(lhs, rhs)
+      // Fix symbol and type
+      setSymbol(vd, lhs)
+      setType(vd, Type.of(lhs))
+    }
 
     /** Returns a new [[Block]] with the supplied content. */
     def block(body: Tree*): Block = {
+      // Pre-conditions
+      body.foreach(Tree.verify)
+
       val (statements, expr) =
         if (body.isEmpty) (Nil, unit)
         else (body.init.toList, body.last)
 
-      With.tpe(expr.tpe) {
-        Block(statements, expr)
-      }.asInstanceOf[Block]
+      val block = Block(statements, expr)
+      // Fix type
+      setType(block, Type.of(expr))
     }
 
     /** Returns a new field access ([[Select]]). */
-    def sel(target: Tree, member: TermName): Select =
-      With(Term.decl(target, member)) {
-        Select(target, member)
-      }.asInstanceOf[Select]
+    def sel(target: Tree, member: TermName): Select = {
+      // Pre-conditions
+      Tree.verify(target)
+      Term.verify(member)
+
+      val term = Term.decl(target, member)
+      val sel = Select(target, member)
+      // Fix symbol and type
+      setSymbol(sel, term)
+      setType(sel, Type.of(term))
+    }
 
     /** Returns a new type `member` access ([[Select]]). */
-    def sel(target: Tree, member: TypeName): Select =
-      With(Type.decl(target, member)) {
-        Select(target, member)
-      }.asInstanceOf[Select]
+    def sel(target: Tree, member: TypeName): Select = {
+      // Pre-conditions
+      Tree.verify(target)
+      Type.verify(member)
+
+      val sym = Type.decl(target, member)
+      val sel = Select(target, member)
+      // Fix symbol and type
+      setSymbol(sel, sym)
+      setType(sel, Type.of(sym))
+    }
 
     /** Returns `target` applied to the ([[Type]]) arguments. */
     @tailrec
-    def app(target: Tree, types: Type*)(args: Tree*): Tree =
-      if (types.isEmpty) With.tpe(Type.result(target)) {
-        Apply(target, args.toList)
-      } else app(With.tpe(Type(target.tpe, types: _*)) {
-        TypeApply(target, types.map(Type.quote(_)).toList)
-      })(args: _*)
+    def app(target: Tree, types: Type*)(args: Tree*): Tree = {
+      // Pre-conditions
+      Tree.verify(target)
+      types.foreach(Type.verify)
+      args.foreach(Tree.verify)
+
+      if (types.isEmpty) {
+        val app = Apply(target, args.toList)
+        setType(app, Type.result(target))
+      } else {
+        val typeApp = TypeApply(target, types.map(Type.quote(_)).toList)
+        setType(typeApp, Type(target.tpe, types: _*))
+        app(typeApp)(args: _*)
+      }
+    }
 
     /** Returns a new method invocation. */
     def call(target: Tree, method: TermSymbol, types: Type*)(args: Tree*): Tree =
@@ -155,15 +201,22 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns a new class instantiation. */
     def inst(target: TypeSymbol, types: Type*)(args: Tree*): Tree = {
-      val clazz = Type.of(target)
+      // Pre-conditions
+      Symbol.verify(target)
+      types.foreach(Type.verify)
+      args.foreach(Tree.verify)
+
       // TODO: Handle alternatives properly
+      val clazz = Type.of(target)
+      val sym = clazz.decl(Term.init)
       val tpe =
         if (types.isEmpty) clazz
         else Type(clazz, types: _*)
 
-      With(clazz.decl(Term.init), tpe) {
-        q"new ${resolve(target)}[..$types](..$args)"
-      }
+      val inst = q"new ${resolve(target)}[..$types](..$args)"
+      // Fix symbol and type
+      setSymbol(inst, sym)
+      setType(inst, tpe)
     }
 
     /** Returns a new class instantiation. */
@@ -198,17 +251,26 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns a new anonymous [[Function]]. */
     def lambda(args: TermSymbol*)(body: Tree*): Function = {
-      val content = if (body.size == 1) body.head else block(body: _*)
-      val types = args.map(Type.of).toList
-      val tpe = Type.fun(types: _*)(Type.of(content))
-      val sym = Term.free(Term.lambda.toString, tpe)
-      val params = for ((arg, tpe) <- args zip types)
-        yield val_(Term.sym(sym, arg.name, tpe, Flag.SYNTHETIC | Flag.PARAM))
+      // Pre-conditions
+      args.foreach(Symbol.verify)
+      body.foreach(Tree.verify)
 
-      With(sym) {
-        val aliases = args zip params.map(Term.of)
-        Function(params.toList, rename(content, aliases: _*))
-      }.asInstanceOf[Function]
+      val bodyBlock =
+        if (body.size == 1) body.head
+        else block(body: _*)
+
+      val types = args.map(Type.of)
+      val tpe = Type.fun(types: _*)(Type.of(bodyBlock))
+      val term = Term.free(Term.lambda.toString, tpe)
+      val params = for ((arg, tpe) <- args zip types) yield
+        Term.sym(term, arg.name, tpe, Flag.SYNTHETIC | Flag.PARAM)
+
+      val paramList = params.map(val_(_)).toList
+      val rhs = rename(bodyBlock, args zip params: _*)
+      val fn = Function(paramList, rhs)
+      // Fix symbol and type
+      setSymbol(fn, term)
+      setType(fn, tpe)
     }
 
     /**

@@ -9,45 +9,6 @@ trait Symbols extends Util { this: Trees with Types =>
   import universe._
   import internal.reificationSupport._
 
-  /** Utility for attributing [[Tree]]s. */
-  object With {
-
-    /** Equivalent to `Type.as(tpe)(tree)`. */
-    def apply(tpe: Type)(tree: Tree): Tree =
-      this.tpe(tpe)(tree)
-
-    /** Equivalent to `Symbol.ann(sym)(tree)`. */
-    def apply(sym: Symbol)(tree: Tree): Tree =
-      Symbol.ann(sym)(tree)
-
-    /** Equivalent to `Symbol.ann(sym, tpe)(tree)`. */
-    def apply(sym: Symbol, tpe: Type)(tree: Tree): Tree =
-      Symbol.ann(sym, tpe)(tree)
-
-    /** Equivalent to `Symbol.ann(sym, tpe, pos)(tree)`. */
-    def apply(sym: Symbol, tpe: Type, pos: Position)(tree: Tree): Tree =
-      Symbol.ann(sym, tpe, pos)(tree)
-
-    /** Equivalent to `Type.as(tpe)(tree)`. */
-    def tpe(tpe: Type)(tree: Tree): Tree =
-      Type.as(tpe)(tree)
-
-    /** Equivalent to `Symbol.set(tree, sym, useType, usePos)`. */
-    def sym(sym: Symbol,
-      useType: Boolean = false,
-      usePos: Boolean = false)
-      (tree: Tree): Tree = {
-
-      Symbol.set(tree, sym,
-        useType = useType,
-        usePos = usePos)
-    }
-
-    /** Equivalent to `Pos.at(pos)(tree)`. */
-    def pos(pos: Position)(tree: Tree): Tree =
-      Pos.at(pos)(tree)
-  }
-
   /** Utility for [[Symbol]]s. */
   object Symbol {
 
@@ -72,32 +33,9 @@ trait Symbols extends Util { this: Trees with Types =>
       sym == rootMirror.RootClass ||
         sym == rootMirror.RootPackage
 
-    /** Annotates `tree` with `sym`, optionally reusing its [[Type]] and [[Position]]. */
-    def set(tree: Tree, sym: Symbol,
-      useType: Boolean = false,
-      usePos: Boolean = false): Tree = {
-
-      require(isDefined(sym), "Undefined Symbol")
-      val withSym = setSymbol(tree, sym)
-      val withType = if (useType) Type.set(withSym, sym) else withSym
-      if (usePos) Pos.set(withType, sym) else withType
-    }
-
     /** Returns `true` if `sym` is not degenerate. */
     def isDefined(sym: Symbol): Boolean =
       sym != null && sym != NoSymbol
-
-    /** Equivalent to `Symbol.set(tree, sym, useType=true)`. */
-    def ann(sym: Symbol)(tree: Tree): Tree =
-      set(tree, sym, useType = true)
-
-    /** Equivalent to `Type.as(tpe)(Symbol.set(tree, sym))`. */
-    def ann(sym: Symbol, tpe: Type)(tree: Tree): Tree =
-      Type.as(tpe)(set(tree, sym))
-
-    /** Equivalent to `Pos.at(pos)(ann(sym, tpe)(tree))`. */
-    def ann(sym: Symbol, tpe: Type, pos: Position)(tree: Tree): Tree =
-      Pos.at(pos)(ann(sym, tpe)(tree))
 
     /** Checks common pre-conditions for type-checked [[Symbol]]s. */
     @inline
@@ -138,11 +76,13 @@ trait Symbols extends Util { this: Trees with Types =>
         }
 
         dict ++= (old +: args.map(Term.of)) zip (term +: params)
-        With(term, tpe) {
-          Method.simple(term, mods.flags)(params: _*) {
-            at(term, dict)(rhs)
-          }
+        val method = Method.simple(term, mods.flags)(params: _*) {
+          at(term, dict)(rhs)
         }
+
+        // Fix symbol and type
+        setSymbol(method, term)
+        setType(method, tpe)
 
       case fn @ Function(args, body) =>
         val old = Term.of(fn)
@@ -154,11 +94,13 @@ trait Symbols extends Util { this: Trees with Types =>
         }
 
         dict ++= args.map(Term.of) zip params
-        With(term, fn.tpe) {
-          Tree.lambda(params: _*) {
-            at(term, dict)(body)
-          }
+        val lambda = Tree.lambda(params: _*) {
+          at(term, dict)(body)
         }
+
+        // Fix symbol and type
+        setSymbol(lambda, term)
+        setType(lambda, Type.of(fn))
 
       case vd @ ValDef(mods, name, tpt, rhs) =>
         val old = Term.of(vd)
@@ -191,13 +133,17 @@ trait Symbols extends Util { this: Trees with Types =>
 
     /** Returns the name of `sym`. */
     def name(sym: Symbol): TermName = {
-      require(Symbol.isDefined(sym), "Undefined Symbol")
+      // Pre-conditions
+      Symbol.verify(sym)
+
       sym.name.toTermName
     }
 
     /** Returns a new [[TermName]]. */
     def name(name: String): TermName = {
-      require(name.nonEmpty, "Empty TermName")
+      // Pre-conditions
+      verify(name)
+
       TermName(name)
     }
 
@@ -210,8 +156,12 @@ trait Symbols extends Util { this: Trees with Types =>
       flags: FlagSet = Flag.SYNTHETIC,
       origin: String = null): FreeTermSymbol = {
 
-      Type.set(newFreeTerm(name, null, flags, origin), tpe)
-        .asInstanceOf[FreeTermSymbol]
+      // Pre-conditions
+      verify(name)
+      Type.verify(tpe)
+
+      val term = newFreeTerm(name, null, flags, origin)
+      setInfo(term, Type.fix(tpe))
     }
 
     /** Returns a new term with the specified properties. */
@@ -219,26 +169,47 @@ trait Symbols extends Util { this: Trees with Types =>
       flags: FlagSet = Flag.SYNTHETIC,
       pos: Position = NoPosition): TermSymbol = {
 
-      Type.set(termSymbol(owner, name, flags, pos), tpe).asTerm
+      // Pre-conditions
+      Symbol.verify(owner)
+      verify(name)
+      Type.verify(tpe)
+
+      val term = termSymbol(owner, name, flags, pos)
+      // Fix type
+      setInfo(term, Type.fix(tpe))
     }
 
     /** Returns the term of `tree`. */
     def of(tree: Tree): TermSymbol = {
-      lazy val err = s"Untyped tree: ${Tree.debug(tree)}"
-      require(Has.term(tree), err)
+      // Pre-conditions
+      Tree.verify(tree)
+
       tree.symbol.asTerm
     }
 
     /** Finds `member` declared in `target` and returns its term. */
-    def decl(target: Symbol, member: TermName): TermSymbol =
+    def decl(target: Symbol, member: TermName): TermSymbol = {
+      // Pre-conditions
+      Symbol.verify(target)
+      verify(member)
+
       Type.of(target).decl(member).asTerm
+    }
 
     /** Finds `member` declared in `target` and returns its term. */
-    def decl(target: Tree, member: TermName): TermSymbol =
+    def decl(target: Tree, member: TermName): TermSymbol = {
+      // Pre-conditions
+      Tree.verify(target)
+      verify(member)
+
       Type.of(target).decl(member).asTerm
+    }
 
     /** Fixes the [[Type]] of terms in `tree`. */
     def check(tree: Tree): Tree = {
+      // Pre-conditions
+      Tree.verify(tree)
+
       val aliases = tree.collect {
         case vd @ ValDef(mods, name, tpt, _)
           if Has.term(vd) && !Has.tpe(vd.symbol) =>
@@ -269,8 +240,15 @@ trait Symbols extends Util { this: Trees with Types =>
       imp(from, this.name(name))
 
     /** Imports a term from a [[Tree]] by name. */
-    def imp(from: Tree, name: TermName): Import =
-      Type.check(q"import $from.$name").asInstanceOf[Import]
+    def imp(from: Tree, name: TermName): Import = {
+      // Pre-conditions
+      Tree.verify(from)
+      verify(name)
+
+      Type.check {
+        q"import $from.$name"
+      }.asInstanceOf[Import]
+    }
 
     /** "eta" [[TermName]] extractor (cf. eta-expansion). */
     object eta {
@@ -293,34 +271,5 @@ trait Symbols extends Util { this: Trees with Types =>
     @inline
     def verify(name: String): Unit =
       require(name.nonEmpty, "Empty term name")
-  }
-
-  /** Utility for [[Position]]s. */
-  object Pos {
-
-    /** Returns `true` if `pos` is not degenerate. */
-    def isDefined(pos: Position): Boolean =
-      pos != null && pos != NoPosition
-
-    /** Positions a [[Tree]] explicitly. */
-    def set(tree: Tree, pos: Position): Tree = {
-      require(isDefined(pos), "Undefined Position")
-      atPos(pos.makeTransparent)(tree)
-    }
-
-    /** Positions a [[Tree]] according to a [[Symbol]]. */
-    def set(tree: Tree, sym: Symbol): Tree = {
-      lazy val err = s"Symbol `$sym` has no position"
-      require(Has.pos(sym), err)
-      set(tree, sym.pos)
-    }
-
-    /** Equivalent to `Pos.set(tree, pos)`. */
-    def at(pos: Position)(tree: Tree): Tree =
-      set(tree, pos)
-
-    /** Equivalent to `Pos.set(tree, sym)`. */
-    def at(sym: Symbol)(tree: Tree): Tree =
-      set(tree, sym)
   }
 }
