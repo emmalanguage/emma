@@ -8,6 +8,8 @@ import scala.reflect.ClassTag
 trait Trees extends Util { this: Types with Symbols =>
 
   import universe._
+  import internal._
+  import reificationSupport._
 
   object Tree {
 
@@ -58,7 +60,7 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns the [[Set]] of terms defined in `tree`. */
     def defs(tree: Tree): Set[TermSymbol] = tree.collect {
-      case dt @ (_: ValDef | _: Bind | _: Function) => dt
+      case dt @ (_: ValDef | _: Bind | _: Function | _: DefDef) => dt
     }.map(Term.of).toSet
 
     /** Returns the [[Set]] of terms referenced in `tree`. */
@@ -290,6 +292,11 @@ trait Trees extends Util { this: Types with Symbols =>
           case id: Ident if dict.contains(id.symbol) => dict(id.symbol)
         }
       }
+
+    /** Checks common pre-conditions for type-checked [[Tree]]s. */
+    @inline
+    def verify(tree: Tree): Unit =
+      require(Has.tpe(tree), s"Untyped tree:\n${debug(tree)}")
   }
 
   /** Some useful constants. */
@@ -297,5 +304,105 @@ trait Trees extends Util { this: Types with Symbols =>
 
     val maxFunArgs = 22
     val maxTupleElems = 22
+  }
+
+  /** Utility for methods ([[DefDef]]s). */
+  object Method {
+
+    import Tree._
+
+    /** Returns a free [[MethodSymbol]] (i.e. without owner). */
+    def free(name: String, tpe: Type,
+      flags: FlagSet = Flag.SYNTHETIC,
+      pos: Position = NoPosition): MethodSymbol = {
+
+      // Pre-conditions
+      Term.verify(name)
+      Type.verify(tpe)
+
+      val sym = newMethodSymbol(NoSymbol, Term.name(name), pos, flags)
+      setInfo(sym, Type.fix(tpe))
+    }
+
+    /** Returns a new [[MethodSymbol]] with provided specification. */
+    def sym(owner: Symbol, name: TermName, tpe: Type,
+      flags: FlagSet = Flag.SYNTHETIC,
+      pos: Position = NoPosition): MethodSymbol = {
+
+      // Pre-conditions
+      Symbol.verify(owner)
+      Term.verify(name)
+      Type.verify(tpe)
+
+      val sym = newMethodSymbol(owner, name, pos, flags)
+      setInfo(sym, Type.fix(tpe))
+    }
+
+    /** Returns a new [[MethodType]] (possibly generic with multiple arg lists). */
+    def tpe(typeArgs: TypeSymbol*)
+      (argLists: Seq[TermSymbol]*)
+      (body: Type): Type = {
+
+      // Pre-conditions
+      typeArgs.foreach(Symbol.verify)
+      argLists.flatten.foreach(Symbol.verify)
+      Type.verify(body)
+
+      val result = Type.fix(body)
+      val tpe = if (argLists.isEmpty) {
+        nullaryMethodType(result)
+      } else argLists.foldRight(result) { (args, result) =>
+        methodType(args.toList, result)
+      }
+
+      if (typeArgs.isEmpty) tpe
+      else polyType(typeArgs.toList, tpe)
+    }
+
+    /** Returns a new simple method (i.e. with single arg list and no generics). */
+    def simple(sym: MethodSymbol,
+      flags: FlagSet = Flag.SYNTHETIC)
+      (args: TermSymbol*)
+      (body: Tree*): DefDef = {
+
+      // Pre-conditions
+      Symbol.verify(sym)
+      args.foreach(Symbol.verify)
+      body.foreach(Tree.verify)
+
+      val bodyBlock =
+        if (body.size == 1) body.head
+        else block(body: _*)
+
+      val tpe = this.tpe()(args)(bodyBlock.tpe)
+      val params = for (arg <- args) yield
+        Term.sym(sym, arg.name, Type.of(arg), Flag.SYNTHETIC | Flag.PARAM)
+
+      val paramLists = params.map(val_(_)).toList :: Nil
+      val rhs = rename(bodyBlock, args zip params: _*)
+      val dd = defDef(sym, Modifiers(flags), paramLists, rhs)
+      // Fix symbol and type
+      setSymbol(dd, sym)
+      setType(dd, tpe)
+    }
+
+    /** Returns a new lambda [[Function]] wrapping `method`. */
+    def curry(method: MethodSymbol): Function = {
+      // Pre-conditions
+      Symbol.verify(method)
+
+      val tpe = Type.of(method)
+      val args = tpe match {
+        case _: NullaryMethodType => Nil
+        case mt: MethodType if mt.typeArgs.isEmpty =>
+          mt.paramLists.flatten.map(_.asTerm)
+        case _ => abort(method.pos,
+          s"Cannot curry method with generic type `$tpe`")
+      }
+
+      lambda(args: _*) {
+        app(ref(method))(args.map(ref): _*)
+      }
+    }
   }
 }

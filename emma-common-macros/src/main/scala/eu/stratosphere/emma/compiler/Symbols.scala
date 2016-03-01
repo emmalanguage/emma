@@ -98,6 +98,13 @@ trait Symbols extends Util { this: Trees with Types =>
     /** Equivalent to `Pos.at(pos)(ann(sym, tpe)(tree))`. */
     def ann(sym: Symbol, tpe: Type, pos: Position)(tree: Tree): Tree =
       Pos.at(pos)(ann(sym, tpe)(tree))
+
+    /** Checks common pre-conditions for type-checked [[Symbol]]s. */
+    @inline
+    def verify(sym: Symbol): Unit = {
+      require(isDefined(sym), "Undefined symbol")
+      require(Has.tpe(sym), s"Untyped symbol `$sym`")
+    }
   }
 
   /** Utility for [[Symbol]] owners. */
@@ -120,6 +127,22 @@ trait Symbols extends Util { this: Trees with Types =>
     def at(owner: Symbol,
       dict: mutable.Map[TermSymbol, TermSymbol] = mutable.Map.empty)
       (tree: Tree): Tree = preWalk(tree) {
+
+      case dd @ DefDef(mods, name, Nil, args :: Nil, tpt, rhs) =>
+        val old = Term.of(dd).asMethod
+        val tpe = Type.oneOf(old.info, dd.tpe, tpt.tpe)
+        val term = Method.sym(owner, name, tpe, mods.flags, dd.pos)
+        val params = args.map { case vd @ ValDef(mods, name, tpt, _) =>
+          val tpe = Type.oneOf(vd.tpe, vd.symbol.info, tpt.tpe)
+          Term.sym(term, name, tpe, mods.flags, vd.pos)
+        }
+
+        dict ++= (old +: args.map(Term.of)) zip (term +: params)
+        With(term, tpe) {
+          Method.simple(term, mods.flags)(params: _*) {
+            at(term, dict)(rhs)
+          }
+        }
 
       case fn @ Function(args, body) =>
         val old = Term.of(fn)
@@ -260,6 +283,16 @@ trait Symbols extends Util { this: Trees with Types =>
         else None
       }
     }
+
+    /** Checks common pre-conditions for [[TermName]]s. */
+    @inline
+    def verify(name: TermName): Unit =
+      verify(name.toString)
+
+    /** Checks common pre-conditions for [[TermName]]s. */
+    @inline
+    def verify(name: String): Unit =
+      require(name.nonEmpty, "Empty term name")
   }
 
   /** Utility for [[Position]]s. */

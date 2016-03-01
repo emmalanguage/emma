@@ -23,10 +23,10 @@ trait RuntimeUtil extends ReflectUtil {
   import universe._
   import internal._
 
-  def warning(pos: Position, msg: String) =
+  override def warning(pos: Position, msg: String): Unit =
     logger.warn(s"warning at position $pos: $msg")
 
-  def abort(pos: Position, msg: String) =
+  override def abort(pos: Position, msg: String): Nothing =
     throw new RuntimeException(s"error at position $pos: $msg")
 
   override def parse(code: String): Tree =

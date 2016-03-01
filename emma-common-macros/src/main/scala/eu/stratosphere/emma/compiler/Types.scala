@@ -263,5 +263,10 @@ trait Types extends Util { this: Trees with Symbols =>
     /** Imports a [[Type]] from a [[Tree]] by name. */
     def imp(from: Tree, name: TypeName): Import =
       check(q"import $from.$name").asInstanceOf[Import]
+
+    /** Checks common pre-conditions for [[Type]]s. */
+    @inline
+    def verify(tpe: Type): Unit =
+      require(isDefined(tpe), "Undefined type")
   }
 }

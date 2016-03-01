@@ -24,7 +24,7 @@ trait Util {
   def warning(pos: Position, msg: String): Unit
 
   /** Raise an error. */
-  def abort(pos: Position, msg: String): Unit
+  def abort(pos: Position, msg: String): Nothing
 
   /** Parses a snippet of source code and returns the AST. */
   def parse(code: String): Tree

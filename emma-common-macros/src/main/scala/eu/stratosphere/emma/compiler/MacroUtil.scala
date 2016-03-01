@@ -19,7 +19,7 @@ trait MacroUtil extends ReflectUtil {
   override def warning(pos: Position, msg: String): Unit =
     c.warning(pos, msg)
 
-  override def abort(pos: Position, msg: String): Unit =
+  override def abort(pos: Position, msg: String): Nothing =
     c.abort(pos, msg)
 
   override def parse(code: String): Tree =
