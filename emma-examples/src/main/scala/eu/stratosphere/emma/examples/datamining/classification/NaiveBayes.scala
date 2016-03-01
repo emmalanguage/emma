@@ -3,15 +3,16 @@ package eu.stratosphere.emma.examples.datamining.classification
 import breeze.linalg._
 import eu.stratosphere.emma.api._
 import eu.stratosphere.emma.examples.Algorithm
+import eu.stratosphere.emma.examples.datamining.classification.NaiveBayes.ModelType
 import eu.stratosphere.emma.runtime.Engine
 import net.sourceforge.argparse4j.inf.{Namespace, Subparser}
 
 /**
-  * Trains a Naive Bayes Classifier.
-  *
-  * Currently, two model types - `bernoulli` and `multinomial` - are supported.
-  */
-class NaiveBayes(input: String, lambda: Double, modelType: String, rt: Engine)
+ * Trains a Naive Bayes Classifier.
+ *
+ * Currently, two model types - `bernoulli` and `multinomial` - are supported.
+ */
+class NaiveBayes(input: String, lambda: Double, modelType: ModelType, rt: Engine)
   extends Algorithm(rt) {
 
   import eu.stratosphere.emma.examples.datamining.classification.NaiveBayes.Schema._
@@ -20,7 +21,7 @@ class NaiveBayes(input: String, lambda: Double, modelType: String, rt: Engine)
   def this(ns: Namespace, rt: Engine) = this(
     ns.get[String](NaiveBayes.Command.TRAINING),
     ns.get[Double](NaiveBayes.Command.LAMBDA),
-    ns.get[String](NaiveBayes.Command.MODEL_TYPE),
+    ModelType(ns.get[String](NaiveBayes.Command.MODEL_TYPE)),
     rt)
 
   val algorithm = emma.parallelize {
@@ -45,12 +46,10 @@ class NaiveBayes(input: String, lambda: Double, modelType: String, rt: Engine)
     val model = for ((label, count, vecSum) <- aggregated) yield {
       val priors = math.log(count + lambda) - priorDenom
       val evidenceDenom = modelType match {
-        case MULTINOMIAL =>
+        case Multinomial =>
           math.log(sum(vecSum) + lambda * dimension)
-        case BERNOULLI =>
+        case Bernoulli =>
           math.log(count + 2.0 * lambda)
-        case _ =>
-          throw new UnknownError(s"Invalid modelType: $modelType.")
       }
       val evidences = vecSum.map(x => math.log(x + lambda) - evidenceDenom)
       (label, priors, evidences)
@@ -64,8 +63,19 @@ class NaiveBayes(input: String, lambda: Double, modelType: String, rt: Engine)
 }
 
 object NaiveBayes {
-  final val MULTINOMIAL: String = "multinomial"
-  final val BERNOULLI: String = "bernoulli"
+
+  sealed abstract class ModelType
+
+  object ModelType {
+    def apply(value: String): ModelType = value.toLowerCase match {
+      case "multinomial" => Multinomial
+      case "bernoulli" => Bernoulli
+    }
+  }
+
+  case object Multinomial extends ModelType
+
+  case object Bernoulli extends ModelType
 
   object Command {
     // argument names
@@ -89,7 +99,7 @@ object NaiveBayes {
       parser.addArgument(Command.LAMBDA)
         .`type`[Double](classOf[Double])
         .dest(Command.LAMBDA)
-        .metavar("EPSILON")
+        .metavar("LAMBDA")
         .help("termination threshold")
 
       parser.addArgument(Command.TRAINING)
@@ -100,8 +110,9 @@ object NaiveBayes {
 
       parser.addArgument(Command.MODEL_TYPE)
         .`type`[String](classOf[String])
+        .choices("multinomial", "bernoulli")
         .dest(Command.MODEL_TYPE)
-        .metavar("MODEL TYPE")
+        .metavar("MODEL_TYPE")
         .help("model type (bernoulli, multinomial)")
 
     }

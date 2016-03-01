@@ -3,6 +3,7 @@ package eu.stratosphere.emma.examples.datamining.classification
 import java.io.File
 
 import breeze.linalg.DenseVector
+import eu.stratosphere.emma.examples.datamining.classification.NaiveBayes.Bernoulli
 import eu.stratosphere.emma.testutil._
 import org.junit.experimental.categories.Category
 import org.junit.runner.RunWith
@@ -27,7 +28,6 @@ class NaiveBayesTest extends FlatSpec with Matchers with BeforeAndAfter {
     deleteRecursive(new File(path))
   }
 
-
   "NaiveBayes" should "create the correct model on Bernoulli house-votes-84 data set" in withRuntime() { rt =>
     val expectedModel = Source
       .fromFile(s"$path/model.txt")
@@ -36,7 +36,7 @@ class NaiveBayesTest extends FlatSpec with Matchers with BeforeAndAfter {
       (values.head, values(1), new DenseVector[Double](values.slice(2, values.size).toArray))
     }.toSeq
 
-    val solution = new NaiveBayes(s"$path/vote.csv", 1.0, "bernoulli", rt).algorithm.run(rt).fetch()
+    val solution = new NaiveBayes(s"$path/vote.csv", 1.0, Bernoulli, rt).algorithm.run(rt).fetch()
 
     solution should contain theSameElementsAs expectedModel
   }

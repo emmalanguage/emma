@@ -1,3 +1,4 @@
+eu.stratosphere.emma.examples.datamining.classification.NaiveBayes$Command
 eu.stratosphere.emma.examples.datamining.clustering.KMeans$Command
 eu.stratosphere.emma.examples.graphs.AlternatingLeastSquares$Command
 eu.stratosphere.emma.examples.graphs.AlternatingLeastSquares2$Command
