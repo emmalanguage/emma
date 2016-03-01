@@ -56,68 +56,70 @@ trait Symbols extends Util { this: Trees with Types =>
     /**
      * Fixes the [[Symbol]] owner chain of `tree` at `owner`.
      *
-     * Note: Currently doesn't support class and object definitions (including anonymous classes),
-     * method definitions and type declarations.
+     * WARN:
+     *  - Mutates `tree` in place.
+     *  - No support for type definitions (including anonymous classes).
+     *  - No support for type references (generics).
      *
      * @param owner The [[Symbol]] to set as the new owner of `tree`.
      * @param dict A [[Map]] with terms that have been fixed so far.
      */
-    def at(owner: Symbol,
-      dict: mutable.Map[TermSymbol, TermSymbol] = mutable.Map.empty)
-      (tree: Tree): Tree = preWalk(tree) {
+    def repair(owner: Symbol,
+      dict: mutable.Map[Symbol, Symbol] = mutable.Map.empty)
+      (tree: Tree): Unit = topDown(tree) {
 
-      case dd @ DefDef(mods, name, Nil, args :: Nil, tpt, rhs) =>
-        val old = Term.of(dd).asMethod
+      // def method(...)(...)... = { body }
+      case dd @ DefDef(mods, name, Nil, argLists, tpt, rhs) =>
+        val old = dd.symbol.asMethod
         val tpe = Type.oneOf(old.info, dd.tpe, tpt.tpe)
         val term = Method.sym(owner, name, tpe, mods.flags, dd.pos)
-        val params = args.map { case vd @ ValDef(mods, name, tpt, _) =>
-          val tpe = Type.oneOf(vd.tpe, vd.symbol.info, tpt.tpe)
-          Term.sym(term, name, tpe, mods.flags, vd.pos)
-        }
-
-        dict ++= (old +: args.map(Term.of)) zip (term +: params)
-        val method = Method.simple(term, mods.flags)(params: _*) {
-          at(term, dict)(rhs)
-        }
-
+        dict += old -> term
+        argLists.flatten.foreach(repair(term, dict))
+        repair(term, dict)(rhs)
         // Fix symbol and type
-        setSymbol(method, term)
-        setType(method, tpe)
+        setSymbol(dd, term)
+        setType(dd, tpe)
 
+      // (...args) => { body }
       case fn @ Function(args, body) =>
-        val old = Term.of(fn)
+        val old = fn.symbol
         val tpe = Type.oneOf(old.info, fn.tpe)
         val term = Term.sym(owner, Term.lambda, tpe, pos = fn.pos)
-        val params = args.map { case vd @ ValDef(mods, name, tpt, _) =>
-          val tpe = Type.oneOf(vd.tpe, vd.symbol.info, tpt.tpe)
-          Term.sym(term, name, tpe, mods.flags, vd.pos)
-        }
-
-        dict ++= args.map(Term.of) zip params
-        val lambda = Tree.lambda(params: _*) {
-          at(term, dict)(body)
-        }
-
+        dict += old -> term
+        args.foreach(repair(term, dict))
+        repair(term, dict)(body)
         // Fix symbol and type
-        setSymbol(lambda, term)
-        setType(lambda, Type.of(fn))
+        setSymbol(fn, term)
+        setType(fn, Type.of(fn))
 
+      // ...mods val name: tpt = { rhs }
       case vd @ ValDef(mods, name, tpt, rhs) =>
-        val old = Term.of(vd)
+        val old = vd.symbol
         val tpe = Type.oneOf(old.info, vd.tpe, tpt.tpe)
         val lhs = Term.sym(owner, name, tpe, mods.flags, vd.pos)
         dict += old -> lhs
-        Tree.val_(lhs, at(lhs, dict)(rhs))
+        repair(lhs, dict)(rhs)
+        // Fix symbol and type
+        setSymbol(vd, lhs)
+        setType(vd, tpe)
 
+      // case x @ pattern => { ... }
       case bd @ Bind(_, pattern) =>
         val old = Term.of(bd)
         val tpe = Type.oneOf(old.info, bd.tpe)
         val lhs = Term.sym(owner, old.name, tpe, pos = bd.pos)
         dict += old -> lhs
-        Tree.bind(lhs, at(owner, dict)(pattern))
+        repair(owner, dict)(pattern)
+        // Fix symbol and type
+        setSymbol(bd, lhs)
+        setType(bd, tpe)
 
-      case id: Ident if Has.term(id) && dict.contains(Term.of(id)) =>
-        Tree.ref(dict(Term.of(id)))
+      case id: Ident if Has.term(id) &&
+        dict.contains(id.symbol) =>
+        val term = dict(id.symbol)
+        // Fix symbol and type
+        setSymbol(id, term)
+        setType(id, Type.of(term))
     }
   }
 
