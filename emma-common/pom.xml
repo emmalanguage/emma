@@ -43,30 +43,6 @@
             <artifactId>hadoop-hdfs</artifactId>
         </dependency>
 
-        <!-- CSV -->
-        <dependency>
-            <groupId>net.sf.opencsv</groupId>
-            <artifactId>opencsv</artifactId>
-        </dependency>
-
-        <!-- Logging -->
-        <dependency>
-            <groupId>log4j</groupId>
-            <artifactId>log4j</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-api</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.slf4j</groupId>
-            <artifactId>slf4j-log4j12</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.typesafe.scala-logging</groupId>
-            <artifactId>scala-logging-slf4j_${scala.tools.version}</artifactId>
-        </dependency>
-
         <!-- Serialization -->
         <dependency>
             <groupId>com.twitter</groupId>
