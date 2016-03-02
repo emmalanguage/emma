@@ -22,7 +22,7 @@ class PlanServlet extends HttpServlet {
   val plugin = new GuiPlugin
   val loader = new ExampleFileLoader
 
-  protected override def doGet(req: HttpServletRequest, resp: HttpServletResponse) {
+  protected override def doGet(req: HttpServletRequest, resp: HttpServletResponse) : Unit = {
     val action = req.getPathInfo.tail
     action match {
       case "run" =>
@@ -48,7 +48,10 @@ class PlanServlet extends HttpServlet {
     }
   }
 
-  override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
+  /**
+    * Receive POST request with input parameters for execution.
+    */
+  override def doPost(req: HttpServletRequest, resp: HttpServletResponse) : Unit = {
     val action = req.getPathInfo.tail
     val parameters = parseParametersFromBody(req)
 
@@ -115,17 +118,19 @@ class PlanServlet extends HttpServlet {
 
   private def waitForPlan() = {
     var plan: Plan = null
-    if (runner != null) while (runner.isAlive && plan == null)
+    if (runner != null) while (runner.isAlive && plan == null) {
       // TODO: Replace with `.take()` and use sentinels to mark completion
       plan = plugin.executionPlanQueue.poll(500, TimeUnit.MILLISECONDS)
+    }
 
     Option(plan)
   }
 
   private def findConstructorOf(algorithm: String) = {
     val clazz = Class.forName(algorithm)
-    if (!clazz.getClass.isInstance(classOf[Algorithm]))
+    if (!clazz.getClass.isInstance(classOf[Algorithm])) {
       throw new Exception(s"Unsupported class type '$clazz'")
+    }
 
     clazz.getDeclaredConstructors.find { constructor =>
       val parameters = constructor.getParameterTypes
@@ -147,26 +152,27 @@ class PlanServlet extends HttpServlet {
       line = bufferedReader.readLine()
     } while (line != null)
 
-    var map: Predef.Map[String, _] = null
-    JSON.parseFull(json) match {
-      case Some(m: Predef.Map[String, _]) => map = m
-      case _ => ;
-    }
+    class CC[T] { def unapply(a:Any):Option[T] = Some(a.asInstanceOf[T]) }
+    object M extends CC[Map[String, Any]]
 
-    if (map != null) {
+    var parameters : Namespace = new Namespace(new util.HashMap[String, AnyRef])
+
+    for {
+      Some(M(map)) <- List(JSON.parseFull(json)) if map.nonEmpty
+    } yield {
       val attributes: util.HashMap[String, Any] = new util.HashMap[String, Any]()
       for (key <- map.keys) {
         val Some(value) = map.get(key)
         extractParameter(attributes, key, value.toString)
       }
 
-      new Namespace(attributes.asInstanceOf[util.HashMap[String, AnyRef]])
-    } else {
-      null
+      parameters = new Namespace(attributes.asInstanceOf[util.HashMap[String, AnyRef]])
     }
+
+    parameters
   }
 
-  private def extractParameter(attributes: util.HashMap[String, Any], key: String, value: String) {
+  private def extractParameter(attributes: util.HashMap[String, Any], key: String, value: String) : Unit = {
     var p: Pattern = Pattern.compile("^\\d+$")
     var m: Matcher = p.matcher(value)
     if (m.matches) {
