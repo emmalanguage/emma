@@ -16,6 +16,7 @@ class ExampleRunner(constructor: Constructor[Algorithm], args: Namespace,
     try constructor.newInstance(args, runtime).run() catch {
       case e: InvocationTargetException if e.getCause.isInstanceOf[ClassCastException] =>
         throw new InvalidParameterException("Given parameter types do not match the example constructor.")
+      case e: InterruptedException => ; //expected
       case e: Exception => e.printStackTrace()
     }
   }

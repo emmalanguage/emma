@@ -34,7 +34,7 @@ class PlanServlet extends HttpServlet {
         val runtime: String = req.getParameter("runtime")
         if (name != null && name.nonEmpty) {
           if (runtime != null && runtime.nonEmpty) {
-            runExample(name, null, runtime)
+            runExample(name, None, runtime)
           } else {
             runExample(name)
           }
@@ -95,14 +95,9 @@ class PlanServlet extends HttpServlet {
     resp.getWriter.println(new Gson().toJson(json))
   }
 
-  private def runExample(name: String, params: Namespace = null, runtime:String = "Flink") = {
+  private def runExample(name: String, params: Option[Namespace] = None, runtime:String = "Flink") = {
     val constructor = findConstructorOf(name)
-    var parameters:Namespace = null
-    if (params != null) {
-      parameters = params
-    } else {
-      parameters = loader.getParameters(name)
-    }
+    val parameters = params.getOrElse(loader.getParameters(name))
 
     if (runner != null && runner.isAlive) runner.interrupt()
 
@@ -142,7 +137,7 @@ class PlanServlet extends HttpServlet {
     }.asInstanceOf[Constructor[Algorithm]]
   }
 
-  def parseParametersFromBody(req:HttpServletRequest): Namespace = {
+  def parseParametersFromBody(req:HttpServletRequest): Option[Namespace] = {
     val bufferedReader = new BufferedReader(new InputStreamReader(req.getInputStream))
     var line = ""
 
@@ -169,7 +164,7 @@ class PlanServlet extends HttpServlet {
       parameters = new Namespace(attributes.asInstanceOf[util.HashMap[String, AnyRef]])
     }
 
-    parameters
+    if(parameters.getAttrs.isEmpty) None else Some(parameters)
   }
 
   private def extractParameter(attributes: util.HashMap[String, Any], key: String, value: String) : Unit = {
