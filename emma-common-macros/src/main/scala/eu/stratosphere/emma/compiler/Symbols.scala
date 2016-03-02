@@ -69,44 +69,44 @@ trait Symbols extends Util { this: Trees with Types =>
       (tree: Tree): Unit = topDown(tree) {
 
       // def method(...)(...)... = { body }
-      case dd @ DefDef(mods, name, Nil, argLists, tpt, rhs) =>
+      case dd @ DefDef(mods, name, Nil, argLists, _, rhs) =>
         val old = dd.symbol.asMethod
-        val tpe = Type.oneOf(old.info, dd.tpe, tpt.tpe)
+        val tpe = Type.of(old)
         val term = Method.sym(owner, name, tpe, mods.flags, dd.pos)
         dict += old -> term
         argLists.flatten.foreach(repair(term, dict))
         repair(term, dict)(rhs)
         // Fix symbol and type
         setSymbol(dd, term)
-        setType(dd, tpe)
+        setType(dd, NoType)
 
       // (...args) => { body }
       case fn @ Function(args, body) =>
         val old = fn.symbol
-        val tpe = Type.oneOf(old.info, fn.tpe)
+        val tpe = Type.of(fn)
         val term = Term.sym(owner, Term.lambda, tpe, pos = fn.pos)
         dict += old -> term
         args.foreach(repair(term, dict))
         repair(term, dict)(body)
         // Fix symbol and type
         setSymbol(fn, term)
-        setType(fn, Type.of(fn))
+        setType(fn, tpe)
 
       // ...mods val name: tpt = { rhs }
-      case vd @ ValDef(mods, name, tpt, rhs) =>
+      case vd @ ValDef(mods, name, _, rhs) =>
         val old = vd.symbol
-        val tpe = Type.oneOf(old.info, vd.tpe, tpt.tpe)
+        val tpe = Type.of(old)
         val lhs = Term.sym(owner, name, tpe, mods.flags, vd.pos)
         dict += old -> lhs
         repair(lhs, dict)(rhs)
         // Fix symbol and type
         setSymbol(vd, lhs)
-        setType(vd, tpe)
+        setType(vd, NoType)
 
       // case x @ pattern => { ... }
       case bd @ Bind(_, pattern) =>
         val old = Term.of(bd)
-        val tpe = Type.oneOf(old.info, bd.tpe)
+        val tpe = Type.of(old)
         val lhs = Term.sym(owner, old.name, tpe, pos = bd.pos)
         dict += old -> lhs
         repair(owner, dict)(pattern)
@@ -172,7 +172,6 @@ trait Symbols extends Util { this: Trees with Types =>
       pos: Position = NoPosition): TermSymbol = {
 
       // Pre-conditions
-      Symbol.verify(owner)
       verify(name)
       Type.verify(tpe)
 
@@ -184,7 +183,8 @@ trait Symbols extends Util { this: Trees with Types =>
     /** Returns the term of `tree`. */
     def of(tree: Tree): TermSymbol = {
       // Pre-conditions
-      Tree.verify(tree)
+      require(Has.term(tree),
+        s"Tree has no term:\n${Tree.debug(tree)}")
 
       tree.symbol.asTerm
     }
@@ -205,32 +205,6 @@ trait Symbols extends Util { this: Trees with Types =>
       verify(member)
 
       Type.of(target).decl(member).asTerm
-    }
-
-    /** Fixes the [[Type]] of terms in `tree`. */
-    def check(tree: Tree): Tree = {
-      // Pre-conditions
-      Tree.verify(tree)
-
-      val aliases = tree.collect {
-        case vd @ ValDef(mods, name, tpt, _)
-          if Has.term(vd) && !Has.tpe(vd.symbol) =>
-            val old = of(vd)
-            val tpe = Type.oneOf(vd.tpe, tpt.tpe)
-            old -> sym(old.owner, name, tpe, mods.flags, vd.pos)
-
-        case bd @ Bind(name: TermName, _)
-          if Has.term(bd) && !Has.tpe(bd.symbol) =>
-            val old = of(bd)
-            old -> sym(old.owner, name, bd.tpe, pos = bd.pos)
-
-        case fn: Function
-          if Has.term(fn) && !Has.tpe(fn.symbol) =>
-            val old = of(fn)
-            old -> sym(old.owner, lambda, fn.tpe, pos = fn.pos)
-      }
-
-      Tree.rename(tree, aliases: _*)
     }
 
     /** Imports a term from a [[Tree]]. */

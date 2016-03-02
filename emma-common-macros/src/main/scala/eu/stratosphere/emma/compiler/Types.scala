@@ -122,7 +122,6 @@ trait Types extends Util { this: Trees with Symbols =>
       pos: Position = NoPosition): TypeSymbol = {
 
       // Pre-conditions
-      Symbol.verify(owner)
       verify(name)
 
       typeSymbol(owner, name, flags, pos)
@@ -262,13 +261,6 @@ trait Types extends Util { this: Trees with Symbols =>
     /** Returns a [[Tree]] representation of `T`. */
     def quote[T: TypeTag]: TypeTree =
       quote(Type[T])
-
-    /** Fixes the first defined [[Type]] among the arguments. */
-    def oneOf(tpe: Type, types: Type*): Type = {
-      val one = (tpe +: types).find(isDefined)
-      require(one.isDefined)
-      fix(one.get)
-    }
 
     /** Imports a [[Type]] from a [[Tree]]. */
     def imp(from: Tree, sym: TypeSymbol): Import =

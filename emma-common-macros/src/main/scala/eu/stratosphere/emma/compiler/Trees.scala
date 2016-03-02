@@ -40,8 +40,11 @@ trait Trees extends Util { this: Types with Symbols =>
       Type.check(Literal(Constant(const)))
 
     /** Imports everything from a [[Tree]]. */
-    def impAll(from: Tree): Import =
-      Import(from, ImportSelector(Term.wildcard, -1, null, -1) :: Nil)
+    def impAll(from: Tree): Import = {
+      val sel = ImportSelector(Term.wildcard, -1, null, -1)
+      val imp = Import(from, sel :: Nil)
+      setType(imp, NoType)
+    }
 
     /** Returns a parseable [[String]] representation of `tree`. */
     def show(tree: Tree): String =
@@ -126,7 +129,7 @@ trait Trees extends Util { this: Types with Symbols =>
       val vd = valDef(lhs, rhs)
       // Fix symbol and type
       setSymbol(vd, lhs)
-      setType(vd, Type.of(lhs))
+      setType(vd, NoType)
     }
 
     /** Returns a new [[Block]] with the supplied content. */
@@ -358,7 +361,8 @@ trait Trees extends Util { this: Types with Symbols =>
     /** Checks common pre-conditions for type-checked [[Tree]]s. */
     @inline
     def verify(tree: Tree): Unit =
-      require(Has.tpe(tree), s"Untyped tree:\n${debug(tree)}")
+      require(tree.tpe != null,
+        s"Untyped tree:\n${debug(tree)}")
   }
 
   /** Some useful constants. */
@@ -392,7 +396,6 @@ trait Trees extends Util { this: Types with Symbols =>
       pos: Position = NoPosition): MethodSymbol = {
 
       // Pre-conditions
-      Symbol.verify(owner)
       Term.verify(name)
       Type.verify(tpe)
 
@@ -436,7 +439,6 @@ trait Trees extends Util { this: Types with Symbols =>
         if (body.size == 1) body.head
         else block(body: _*)
 
-      val tpe = this.tpe()(args)(bodyBlock.tpe)
       val params = for (arg <- args) yield
         Term.sym(sym, arg.name, Type.of(arg), Flag.SYNTHETIC | Flag.PARAM)
 
@@ -445,7 +447,7 @@ trait Trees extends Util { this: Types with Symbols =>
       val dd = defDef(sym, Modifiers(flags), paramLists, rhs)
       // Fix symbol and type
       setSymbol(dd, sym)
-      setType(dd, tpe)
+      setType(dd, NoType)
     }
 
     /** Returns a new lambda [[Function]] wrapping `method`. */
