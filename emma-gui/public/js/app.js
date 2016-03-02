@@ -90,14 +90,7 @@ function loadExample(name) {
     init();
 
     var cache = localStorage.getItem(name);
-
-    var exampleName = $("a[title='"+name+"']").text();
-    if (exampleName) {
-        var runtime = $('#runtime').val();
-        $('#example-name').find('div').html("<span>"+runtime+":</span> "+exampleName+((planCaching && cache != null)?' (cached)':''));
-    } else {
-        $('#example-name').find('div').html("");
-    }
+    updateExampleName(cache);
 
     $('#status').html('<i class="gear"/> loading plan...');
 
@@ -110,6 +103,18 @@ function loadExample(name) {
     }
 
     highlightCurrentExample(name);
+}
+
+function updateExampleName(cache) {
+    var name = fullExampleName;
+
+    var exampleName = $("a[title='" + name + "']").text();
+    if (exampleName) {
+        var runtime = $('#runtime').val();
+        $('#example-name').find('div').html("<span>" + runtime + ":</span> " + exampleName + ((planCaching && cache != null) ? ' (cached)' : ''));
+    } else {
+        $('#example-name').find('div').html("");
+    }
 }
 
 function loadCode(name) {
@@ -304,6 +309,16 @@ function run(async, callback) {
     }
 }
 
+function parseParameters() {
+    var parameters = {};
+    var parameterElements = $('#parameters').find("input");
+    parameterElements.each(function(i, e){
+        var element = $(e);
+        parameters[element.attr("name")] = element.val();
+    });
+    return parameters;
+}
+
 function prepareRerun(parameters) {
     initRuntime(fullExampleName, parameters);
     currentExecution = planCache[0].graph.name;
@@ -432,6 +447,11 @@ function registerListeners() {
     $('#scroll-code').prop("checked", scrollCode);
 
     $('#runtime').change(function(e){
+        var cache = localStorage.getItem(fullExampleName);
+        updateExampleName(cache);
+        if (planCache.length > 0) {
+            prepareRerun(parseParameters());
+        }
         localStorage.setItem("runtime",$(e.target).val());
     });
 

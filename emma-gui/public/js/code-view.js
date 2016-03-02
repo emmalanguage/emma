@@ -280,13 +280,7 @@ var CodeView = function() {
 
             //parameter rerun button
             $('#submit-parameters').click(function(){
-                var parameters = {};
-                var paramaeterElements = $('#parameters').find("input");
-                paramaeterElements.each(function(i, e){
-                    var element = $(e);
-                    parameters[element.attr("name")] = element.val();
-                });
-                prepareRerun(parameters);
+                prepareRerun(parseParameters());
                 return false;
             });
 
