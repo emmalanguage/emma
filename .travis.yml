@@ -30,5 +30,7 @@ cache:
     $HOME/.m2
 
 script:
+  # Enable exit code propagation through pipes
+  - set -o pipefail
   # Use pipe view (`pv`) to work around command line output timeout
   - mvn test ${TEST_ARGS[@]} | pv -t -b -l -i 10
