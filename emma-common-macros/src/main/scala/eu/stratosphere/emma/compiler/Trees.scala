@@ -184,9 +184,19 @@ trait Trees extends Util { this: Types with Symbols =>
         val app = Apply(target, args.toList)
         setType(app, Type.result(target))
       } else {
+        app(typeApp(target, types: _*))(args: _*)
+      }
+    }
+
+    def typeApp(target: Tree, types: Type*): Tree = {
+      // Pre-conditions
+      Tree.verify(target)
+      types.foreach(Type.verify)
+
+      if (types.isEmpty) target else {
         val typeApp = TypeApply(target, types.map(Type.quote(_)).toList)
         setType(typeApp, Type(target.tpe, types: _*))
-        app(typeApp)(args: _*)
+        typeApp
       }
     }
 
