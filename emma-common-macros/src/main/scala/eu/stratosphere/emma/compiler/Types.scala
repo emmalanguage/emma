@@ -43,11 +43,8 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Returns a new tuple [[Type]] with specified elements. */
     def tuple(arg: Type, args: Type*): Type = {
-      // Pre-conditions
       val n = args.size + 1
-      require(n <= maxTupleElems,
-        s"Tuples can't have $n > $maxTupleElems elements")
-
+      assert(n <= maxTupleElems)
       val constructor = Symbol.tuple(n).toTypeConstructor
       apply(constructor, arg +: args: _*)
     }
@@ -58,11 +55,8 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Returns a new [[Function]] [[Type]] with specified arguments and result. */
     def fun(args: Type*)(result: Type): Type = {
-      // Pre-conditions
       val n = args.size
-      require(n <= maxFunArgs,
-        s"Functions can't have $n > $maxFunArgs arguments")
-
+      assert(n <= maxFunArgs)
       val constructor = Symbol.fun(n).toTypeConstructor
       apply(constructor, args :+ result: _*)
     }
@@ -87,17 +81,13 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Returns the [[TypeName]] of `sym`. */
     def name(sym: Symbol): TypeName = {
-      // Pre-conditions
-      Symbol.verify(sym)
-
+      assert(Symbol.verify(sym))
       sym.name.toTypeName
     }
 
     /** Returns a new [[TypeName]]. */
     def name(name: String): TypeName = {
-      // Pre-conditions
-      verify(name)
-
+      assert(name.nonEmpty)
       TypeName(name)
     }
 
@@ -110,9 +100,7 @@ trait Types extends Util { this: Trees with Symbols =>
       flags: FlagSet = Flag.SYNTHETIC,
       origin: String = null): FreeTypeSymbol = {
 
-      // Pre-conditions
-      verify(name)
-
+      assert(name.nonEmpty)
       newFreeType(name, flags, origin)
     }
 
@@ -121,20 +109,15 @@ trait Types extends Util { this: Trees with Symbols =>
       flags: FlagSet = Flag.SYNTHETIC,
       pos: Position = NoPosition): TypeSymbol = {
 
-      // Pre-conditions
-      verify(name)
-
+      assert(name.toString.nonEmpty)
       typeSymbol(owner, name, flags, pos)
     }
 
     /** Applies a [[Type]] constructor. */
     def apply(constructor: Type, args: Type*): Type = {
-      // Pre-conditions
-      Type.verify(constructor)
-      args.foreach(Type.verify)
-      require(constructor.takesTypeArgs,
-        s"Type `$constructor` is not a type constructor")
-
+      assert(isDefined(constructor))
+      assert(args.forall(isDefined))
+      assert(constructor.takesTypeArgs)
       appliedType(fix(constructor), args.map(fix): _*)
     }
 
@@ -147,35 +130,22 @@ trait Types extends Util { this: Trees with Symbols =>
       fix(weakTypeOf[T])
 
     /** Returns the [[Type]] of `tree` (must be type-checked). */
-    def of(tree: Tree): Type = {
-      // Pre-conditions
-      Tree.verify(tree)
-
+    def of(tree: Tree): Type =
       fix(tree.tpe)
-    }
 
     /** Returns the [[Type]] of `sym` (must be type-checked). */
-    def of(sym: Symbol): Type = {
-      // Pre-conditions
-      Symbol.verify(sym)
-
+    def of(sym: Symbol): Type =
       fix(sym.info)
-    }
 
     /** Returns the [[TypeSymbol]] of `tree` (must be type-checked). */
     def symOf(tree: Tree): TypeSymbol = {
-      // Pre-conditions
-      Tree.verify(tree)
-      require(Has.typeSym(tree))
-
+      assert(Has.typeSym(tree))
       tree.symbol.asType
     }
 
     /** Equivalent to `tpe.dealias.widen`. */
     def fix(tpe: Type): Type = {
-      // Pre-conditions
-      verify(tpe)
-
+      assert(isDefined(tpe))
       tpe.dealias.widen
     }
 
@@ -185,11 +155,8 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Returns the `i`-th [[Type]] argument of `tpe`. */
     def arg(i: Int, tpe: Type): Type = {
-      // Pre-conditions
-      verify(tpe)
-      require(tpe.typeArgs.size >= i,
-        s"Type `$tpe` doesn't have type argument $i")
-
+      assert(isDefined(tpe))
+      assert(tpe.typeArgs.size >= i)
       fix(tpe.typeArgs(i - 1))
     }
 
@@ -216,19 +183,15 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Finds `member` declared in `target` and returns it's [[TypeSymbol]]. */
     def decl(target: Symbol, member: TypeName): TypeSymbol = {
-      // Pre-conditions
-      Symbol.verify(target)
-      verify(member)
-
+      assert(Symbol.verify(target))
+      assert(member.toString.nonEmpty)
       of(target).decl(member).asType
     }
 
     /** Finds `member` declared in `target` and returns it's [[TypeSymbol]]. */
     def decl(target: Tree, member: TypeName): TypeSymbol = {
-      // Pre-conditions
-      Tree.verify(target)
-      verify(member)
-
+      assert(Has.tpe(target))
+      assert(member.toString.nonEmpty)
       of(target).decl(member).asType
     }
 
@@ -272,28 +235,26 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Imports a [[Type]] from a [[Tree]] by name. */
     def imp(from: Tree, name: TypeName): Import = {
-      // Pre-conditions
-      Tree.verify(from)
-      verify(name)
-
+      assert(Tree.verify(from))
+      assert(name.toString.nonEmpty)
       check {
         q"import $from.$name"
       }.asInstanceOf[Import]
     }
 
-    /** Checks common pre-conditions for [[Type]]s. */
-    @inline
-    def verify(tpe: Type): Unit =
-      require(isDefined(tpe), "Undefined type")
+    /** Returns a new type `member` access ([[Select]]). */
+    def sel(target: Tree, member: TypeSymbol,
+      tpe: Type = NoType): Select = {
 
-    /** Checks common pre-conditions for [[TypeName]]s. */
-    @inline
-    def verify(name: TypeName): Unit =
-      verify(name.toString)
+      assert(Has.tpe(target))
+      assert(member.toString.nonEmpty)
+      val sel = Select(target, member)
+      val result =
+        if (isDefined(tpe)) tpe
+        else member.infoIn(of(target))
 
-    /** Checks common pre-conditions for [[Type]]s. */
-    @inline
-    def verify(name: String): Unit =
-      require(name.nonEmpty, "Empty type type")
+      setSymbol(sel, member)
+      setType(sel, result)
+    }
   }
 }

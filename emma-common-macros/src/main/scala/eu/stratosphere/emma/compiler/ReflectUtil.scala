@@ -15,4 +15,14 @@ trait ReflectUtil extends Util with Trees with Types with Symbols {
     lazy val DataBag = Type.check(q"$emma.api.DataBag")
     lazy val Group = Type.check(q"$emma.api.Group")
   }
+
+  /** Extractor for the last element of a [[Seq]]. */
+  // scalastyle:off
+  object :+ {
+    // scalastyle:on
+
+    def unapply[A](seq: Seq[A]): Option[(Seq[A], A)] =
+      if (seq.isEmpty) None
+      else Some(seq.init, seq.last)
+  }
 }
