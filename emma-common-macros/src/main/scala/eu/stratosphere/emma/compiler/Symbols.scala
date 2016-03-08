@@ -38,11 +38,8 @@ trait Symbols extends Util { this: Trees with Types =>
       sym != null && sym != NoSymbol
 
     /** Checks common pre-conditions for type-checked [[Symbol]]s. */
-    @inline
-    def verify(sym: Symbol): Unit = {
-      require(isDefined(sym), "Undefined symbol")
-      require(Has.tpe(sym), s"Untyped symbol `$sym`")
-    }
+    def verify(sym: Symbol): Boolean =
+      isDefined(sym) && Has.tpe(sym)
   }
 
   /** Utility for [[Symbol]] owners. */
@@ -76,7 +73,6 @@ trait Symbols extends Util { this: Trees with Types =>
         dict += old -> term
         argLists.flatten.foreach(repair(term, dict))
         repair(term, dict)(rhs)
-        // Fix symbol and type
         setSymbol(dd, term)
         setType(dd, NoType)
 
@@ -88,7 +84,6 @@ trait Symbols extends Util { this: Trees with Types =>
         dict += old -> term
         args.foreach(repair(term, dict))
         repair(term, dict)(body)
-        // Fix symbol and type
         setSymbol(fn, term)
         setType(fn, tpe)
 
@@ -99,7 +94,6 @@ trait Symbols extends Util { this: Trees with Types =>
         val lhs = Term.sym(owner, name, tpe, mods.flags, vd.pos)
         dict += old -> lhs
         repair(lhs, dict)(rhs)
-        // Fix symbol and type
         setSymbol(vd, lhs)
         setType(vd, NoType)
 
@@ -110,14 +104,12 @@ trait Symbols extends Util { this: Trees with Types =>
         val lhs = Term.sym(owner, old.name, tpe, pos = bd.pos)
         dict += old -> lhs
         repair(owner, dict)(pattern)
-        // Fix symbol and type
         setSymbol(bd, lhs)
         setType(bd, tpe)
 
       case id: Ident if Has.term(id) &&
         dict.contains(id.symbol) =>
         val term = dict(id.symbol)
-        // Fix symbol and type
         setSymbol(id, term)
         setType(id, Type.of(term))
     }
@@ -135,19 +127,19 @@ trait Symbols extends Util { this: Trees with Types =>
 
     /** Returns the name of `sym`. */
     def name(sym: Symbol): TermName = {
-      // Pre-conditions
-      Symbol.verify(sym)
-
+      assert(Symbol.verify(sym))
       sym.name.toTermName
     }
 
     /** Returns a new [[TermName]]. */
     def name(name: String): TermName = {
-      // Pre-conditions
-      verify(name)
-
+      assert(name.nonEmpty)
       TermName(name)
     }
+
+    /** Returns a fresh [[TermName]] starting with `prefix`. */
+    def fresh(prefix: TermName): TermName =
+      fresh(prefix.toString)
 
     /** Returns a fresh [[TermName]] starting with `prefix`. */
     def fresh(prefix: String): TermName =
@@ -158,10 +150,8 @@ trait Symbols extends Util { this: Trees with Types =>
       flags: FlagSet = Flag.SYNTHETIC,
       origin: String = null): FreeTermSymbol = {
 
-      // Pre-conditions
-      verify(name)
-      Type.verify(tpe)
-
+      assert(name.nonEmpty)
+      assert(Type.isDefined(tpe))
       val term = newFreeTerm(name, null, flags, origin)
       setInfo(term, Type.fix(tpe))
     }
@@ -171,39 +161,29 @@ trait Symbols extends Util { this: Trees with Types =>
       flags: FlagSet = Flag.SYNTHETIC,
       pos: Position = NoPosition): TermSymbol = {
 
-      // Pre-conditions
-      verify(name)
-      Type.verify(tpe)
-
+      assert(name.toString.nonEmpty)
+      assert(Type.isDefined(tpe))
       val term = termSymbol(owner, name, flags, pos)
-      // Fix type
       setInfo(term, Type.fix(tpe))
     }
 
     /** Returns the term of `tree`. */
     def of(tree: Tree): TermSymbol = {
-      // Pre-conditions
-      require(Has.term(tree),
-        s"Tree has no term:\n${Tree.debug(tree)}")
-
+      assert(Has.term(tree))
       tree.symbol.asTerm
     }
 
     /** Finds `member` declared in `target` and returns its term. */
     def decl(target: Symbol, member: TermName): TermSymbol = {
-      // Pre-conditions
-      Symbol.verify(target)
-      verify(member)
-
+      assert(Symbol.verify(target))
+      assert(member.toString.nonEmpty)
       Type.of(target).decl(member).asTerm
     }
 
     /** Finds `member` declared in `target` and returns its term. */
     def decl(target: Tree, member: TermName): TermSymbol = {
-      // Pre-conditions
-      Tree.verify(target)
-      verify(member)
-
+      assert(Has.tpe(target))
+      assert(member.toString.nonEmpty)
       Type.of(target).decl(member).asTerm
     }
 
@@ -217,13 +197,26 @@ trait Symbols extends Util { this: Trees with Types =>
 
     /** Imports a term from a [[Tree]] by name. */
     def imp(from: Tree, name: TermName): Import = {
-      // Pre-conditions
-      Tree.verify(from)
-      verify(name)
-
+      assert(Tree.verify(from))
+      assert(name.toString.nonEmpty)
       Type.check {
         q"import $from.$name"
       }.asInstanceOf[Import]
+    }
+
+    /** Returns a new field access ([[Select]]). */
+    def sel(target: Tree, member: TermSymbol,
+      tpe: Type = NoType): Select = {
+
+      assert(Has.tpe(target))
+      assert(member.toString.nonEmpty)
+      val sel = Select(target, member)
+      val result =
+        if (Type.isDefined(tpe)) tpe
+        else member.infoIn(Type.of(target))
+
+      setSymbol(sel, member)
+      setType(sel, result)
     }
 
     /** "eta" [[TermName]] extractor (cf. eta-expansion). */
@@ -237,15 +230,5 @@ trait Symbols extends Util { this: Trees with Types =>
         else None
       }
     }
-
-    /** Checks common pre-conditions for [[TermName]]s. */
-    @inline
-    def verify(name: TermName): Unit =
-      verify(name.toString)
-
-    /** Checks common pre-conditions for [[TermName]]s. */
-    @inline
-    def verify(name: String): Unit =
-      require(name.nonEmpty, "Empty term name")
   }
 }

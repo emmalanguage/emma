@@ -32,8 +32,10 @@ trait Trees extends Util { this: Types with Symbols =>
       nil(Type[T])
 
     /** Returns `null` of [[Type]] `tpe`. */
-    def nil(tpe: Type): Tree =
+    def nil(tpe: Type): Tree = {
+      assert(Type.isDefined(tpe))
       Type.check(q"null.asInstanceOf[$tpe]")
+    }
 
     /** Returns a new [[Literal]] containing `const`. */
     def lit[A](const: A): Tree =
@@ -69,6 +71,7 @@ trait Trees extends Util { this: Types with Symbols =>
     /** Returns the [[Set]] of terms referenced in `tree`. */
     def refs(tree: Tree): Set[TermSymbol] =
       tree.collect {
+        // Could be a type ref
         case id: Ident if Has.term(id) && {
           val term = Term.of(id)
           term.isVal || term.isVar || term.isMethod
@@ -78,6 +81,15 @@ trait Trees extends Util { this: Types with Symbols =>
     /** Returns the [[Set]] of references to the outer scope of `tree`. */
     def closure(tree: Tree): Set[TermSymbol] =
       refs(tree) diff defs(tree)
+
+    /** Casts `tree` up to `tpe` (i.e. `tree: tpe`). */
+    def ascribe(tree: Tree, tpe: Type): Typed = {
+      assert(Has.tpe(tree))
+      assert(Type.isDefined(tpe))
+      assert(Type.of(tree) weak_<:< tpe)
+      val typed = Typed(tree, Type.quote(tpe))
+      setType(typed, tpe)
+    }
 
     /** Returns `tree` without [[Type]] ascriptions (ie. `x: Ascription`). */
     @tailrec
@@ -99,11 +111,8 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns a reference to `term`. */
     def ref(term: TermSymbol): Ident = {
-      // Pre-conditions
-      Symbol.verify(term)
-
+      assert(Symbol.verify(term))
       val id = Ident(term.name)
-      // Fix symbol and type
       setSymbol(id, term)
       setType(id, Type.of(term))
     }
@@ -112,113 +121,79 @@ trait Trees extends Util { this: Types with Symbols =>
     def bind(lhs: TermSymbol,
       pattern: Tree = Ident(Term.wildcard)): Bind = {
 
-      // Pre-conditions
-      Symbol.verify(lhs)
-
+      assert(Symbol.verify(lhs))
       val bd = Bind(lhs.name, pattern)
-      // Fix symbol and type
       setSymbol(bd, lhs)
       setType(bd, Type.of(lhs))
     }
 
     /** Returns a new value / variable definition. */
-    def val_(lhs: TermSymbol, rhs: Tree = EmptyTree): ValDef = {
-      // Pre-conditions
-      Symbol.verify(lhs)
+    def val_(lhs: TermSymbol,
+      rhs: Tree = EmptyTree,
+      flags: FlagSet = Flag.SYNTHETIC): ValDef = {
 
-      val vd = valDef(lhs, rhs)
-      // Fix symbol and type
+      assert(Symbol.verify(lhs))
+      assert(rhs.isEmpty || (Has.tpe(rhs) &&
+        Type.of(rhs).weak_<:<(Type.of(lhs))))
+
+      val mods = Modifiers(flags)
+      val tpt = Type.quote(Type.of(lhs))
+      val vd = ValDef(mods, lhs.name, tpt, rhs)
       setSymbol(vd, lhs)
       setType(vd, NoType)
     }
 
     /** Returns a new [[Block]] with the supplied content. */
     def block(body: Tree*): Block = {
-      // Pre-conditions
-      body.foreach(Tree.verify)
-
+      assert(body.forall(verify))
+      assert(Has.tpe(body.last))
       val (statements, expr) =
         if (body.isEmpty) (Nil, unit)
         else (body.init.toList, body.last)
 
       val block = Block(statements, expr)
-      // Fix type
       setType(block, Type.of(expr))
     }
 
-    /** Returns a new field access ([[Select]]). */
-    def sel(target: Tree, member: TermName): Select = {
-      // Pre-conditions
-      Tree.verify(target)
-      Term.verify(member)
-
-      val term = Term.decl(target, member)
-      val sel = Select(target, member)
-      // Fix symbol and type
-      setSymbol(sel, term)
-      setType(sel, Type.of(term))
-    }
-
-    /** Returns a new type `member` access ([[Select]]). */
-    def sel(target: Tree, member: TypeName): Select = {
-      // Pre-conditions
-      Tree.verify(target)
-      Type.verify(member)
-
-      val sym = Type.decl(target, member)
-      val sel = Select(target, member)
-      // Fix symbol and type
-      setSymbol(sel, sym)
-      setType(sel, Type.of(sym))
-    }
+    /** Returns a new [[Block]] with the supplied content. */
+    def block(init: Seq[Tree], rest: Tree*): Block =
+      block(init ++ rest: _*)
 
     /** Returns `target` applied to the ([[Type]]) arguments. */
     @tailrec
     def app(target: Tree, types: Type*)(args: Tree*): Tree = {
-      // Pre-conditions
-      Tree.verify(target)
-      types.foreach(Type.verify)
-      args.foreach(Tree.verify)
-
+      assert(Has.tpe(target))
+      assert(types.forall(Type.isDefined))
+      assert(args.forall(Has.tpe))
       if (types.isEmpty) {
         val app = Apply(target, args.toList)
         setType(app, Type.result(target))
       } else {
-        app(typeApp(target, types: _*))(args: _*)
+        val typeApp = this.typeApp(target, types: _*)
+        app(typeApp)(args: _*)
       }
     }
 
+    /** Returns `target` instantiated with the [[Type]] arguments. */
     def typeApp(target: Tree, types: Type*): Tree = {
-      // Pre-conditions
-      Tree.verify(target)
-      types.foreach(Type.verify)
-
+      assert(Has.tpe(target))
+      assert(types.forall(Type.isDefined))
       if (types.isEmpty) target else {
-        val typeApp = TypeApply(target, types.map(Type.quote(_)).toList)
+        val typeArgs =  types.map(Type.quote(_)).toList
+        val typeApp = TypeApply(target, typeArgs)
         setType(typeApp, Type(target.tpe, types: _*))
-        typeApp
       }
     }
 
     /** Returns a new method invocation. */
     def call(target: Tree, method: TermSymbol, types: Type*)(args: Tree*): Tree =
-      call(target, Term.name(method), types: _*)(args: _*)
-
-    /** Returns a new method invocation. */
-    def call(target: Tree, method: TermName, types: Type*)(args: Tree*): Tree =
-      app(sel(target, method), types: _*)(args: _*)
-
-    /** Returns a new method invocation. */
-    def call(target: Tree, method: String, types: Type*)(args: Tree*): Tree =
-      call(target, Term.name(method), types: _*)(args: _*)
+      app(Term.sel(target, method), types: _*)(args: _*)
 
     /** Returns a new class instantiation. */
     def inst(target: TypeSymbol, types: Type*)(args: Tree*): Tree = {
-      // Pre-conditions
-      Symbol.verify(target)
-      types.foreach(Type.verify)
-      args.foreach(Tree.verify)
-
+      assert(Symbol.verify(target))
+      assert(types.forall(Type.isDefined))
+      assert(args.forall(Has.tpe))
       // TODO: Handle alternatives properly
       val clazz = Type.of(target)
       val sym = clazz.decl(Term.init)
@@ -227,7 +202,6 @@ trait Trees extends Util { this: Types with Symbols =>
         else Type(clazz, types: _*)
 
       val inst = q"new ${resolve(target)}[..$types](..$args)"
-      // Fix symbol and type
       setSymbol(inst, sym)
       setType(inst, tpe)
     }
@@ -244,17 +218,17 @@ trait Trees extends Util { this: Types with Symbols =>
             if (Has.owner(target)) resolve(target.owner)
             else ref(rootMirror.RootPackage)
 
-          sel(owner, Term.name(target))
+          Term.sel(owner, target.asTerm)
         } else if (target.isClass) {
           val owner =
             if (Has.owner(target)) resolve(target.owner)
             else ref(rootMirror.RootPackage)
 
-          sel(owner, Type.name(target))
+          Type.sel(owner, target.asType)
         } else if (target.isType) {
-          sel(resolve(target.owner), Type.name(target))
+          Type.sel(resolve(target.owner), target.asType)
         } else {
-          sel(resolve(target.owner), Term.name(target))
+          Term.sel(resolve(target.owner), target.asTerm)
         }
       } else if (target.isType) {
         Type.quote(target)
@@ -264,10 +238,9 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns a new anonymous [[Function]]. */
     def lambda(args: TermSymbol*)(body: Tree*): Function = {
-      // Pre-conditions
-      args.foreach(Symbol.verify)
-      body.foreach(Tree.verify)
-
+      assert(args.forall(Symbol.verify))
+      assert(body.forall(verify))
+      assert(Has.tpe(body.last))
       val bodyBlock =
         if (body.size == 1) body.head
         else block(body: _*)
@@ -275,13 +248,13 @@ trait Trees extends Util { this: Types with Symbols =>
       val types = args.map(Type.of)
       val tpe = Type.fun(types: _*)(Type.of(bodyBlock))
       val term = Term.free(Term.lambda.toString, tpe)
+      val argFlags = Flag.SYNTHETIC | Flag.PARAM
       val params = for ((arg, tpe) <- args zip types) yield
-        Term.sym(term, arg.name, tpe, Flag.SYNTHETIC | Flag.PARAM)
+        Term.sym(term, arg.name, tpe, argFlags)
 
-      val paramList = params.map(val_(_)).toList
+      val paramList = params.map(val_(_, flags = argFlags)).toList
       val rhs = rename(bodyBlock, args zip params: _*)
       val fn = Function(paramList, rhs)
-      // Fix symbol and type
       setSymbol(fn, term)
       setType(fn, tpe)
     }
@@ -372,10 +345,13 @@ trait Trees extends Util { this: Types with Symbols =>
       }
 
     /** Checks common pre-conditions for type-checked [[Tree]]s. */
-    @inline
-    def verify(tree: Tree): Unit =
-      require(tree.tpe != null,
-        s"Untyped tree:\n${debug(tree)}")
+    def verify(tree: Tree): Boolean =
+      tree.tpe != null
+
+    /** Is `vd` a method or lambda parameter? */
+    def isParam(vd: ValDef): Boolean =
+      Term.of(vd).isParameter ||
+        vd.mods.hasFlag(Flag.PARAM)
   }
 
   /** Some useful constants. */
@@ -395,10 +371,8 @@ trait Trees extends Util { this: Types with Symbols =>
       flags: FlagSet = Flag.SYNTHETIC,
       pos: Position = NoPosition): MethodSymbol = {
 
-      // Pre-conditions
-      Term.verify(name)
-      Type.verify(tpe)
-
+      assert(name.nonEmpty)
+      assert(Type.isDefined(tpe))
       val sym = newMethodSymbol(NoSymbol, Term.name(name), pos, flags)
       setInfo(sym, Type.fix(tpe))
     }
@@ -408,10 +382,8 @@ trait Trees extends Util { this: Types with Symbols =>
       flags: FlagSet = Flag.SYNTHETIC,
       pos: Position = NoPosition): MethodSymbol = {
 
-      // Pre-conditions
-      Term.verify(name)
-      Type.verify(tpe)
-
+      assert(name.toString.nonEmpty)
+      assert(Type.isDefined(tpe))
       val sym = newMethodSymbol(owner, name, pos, flags)
       setInfo(sym, Type.fix(tpe))
     }
@@ -421,11 +393,9 @@ trait Trees extends Util { this: Types with Symbols =>
       (argLists: Seq[TermSymbol]*)
       (body: Type): Type = {
 
-      // Pre-conditions
-      typeArgs.foreach(Symbol.verify)
-      argLists.flatten.foreach(Symbol.verify)
-      Type.verify(body)
-
+      assert(typeArgs.forall(Symbol.verify))
+      assert(argLists.flatten.forall(Symbol.verify))
+      assert(Type.isDefined(body))
       val result = Type.fix(body)
       val tpe = if (argLists.isEmpty) {
         nullaryMethodType(result)
@@ -443,31 +413,28 @@ trait Trees extends Util { this: Types with Symbols =>
       (args: TermSymbol*)
       (body: Tree*): DefDef = {
 
-      // Pre-conditions
-      Symbol.verify(sym)
-      args.foreach(Symbol.verify)
-      body.foreach(Tree.verify)
-
+      assert(Symbol.verify(sym))
+      assert(args.forall(Symbol.verify))
+      assert(body.forall(verify))
+      assert(Has.tpe(body.last))
       val bodyBlock =
         if (body.size == 1) body.head
         else block(body: _*)
 
+      val argFlags = Flag.SYNTHETIC | Flag.PARAM
       val params = for (arg <- args) yield
-        Term.sym(sym, arg.name, Type.of(arg), Flag.SYNTHETIC | Flag.PARAM)
+        Term.sym(sym, arg.name, Type.of(arg), argFlags)
 
-      val paramLists = params.map(val_(_)).toList :: Nil
+      val paramLists = params.map(val_(_, flags = argFlags)).toList :: Nil
       val rhs = rename(bodyBlock, args zip params: _*)
       val dd = defDef(sym, Modifiers(flags), paramLists, rhs)
-      // Fix symbol and type
       setSymbol(dd, sym)
       setType(dd, NoType)
     }
 
     /** Returns a new lambda [[Function]] wrapping `method`. */
     def curry(method: MethodSymbol): Function = {
-      // Pre-conditions
-      Symbol.verify(method)
-
+      assert(Symbol.verify(method))
       val tpe = Type.of(method)
       val args = tpe match {
         case _: NullaryMethodType => Nil
