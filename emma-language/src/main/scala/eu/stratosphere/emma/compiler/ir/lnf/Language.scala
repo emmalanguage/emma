@@ -3,10 +3,13 @@ package compiler.ir.lnf
 
 import eu.stratosphere.emma.compiler.ir.CommonIR
 
+import scala.annotation.tailrec
+
 /** Let-normal form language. */
 trait Language extends CommonIR {
 
   import universe._
+  import Tree._
 
   object LNF {
 
@@ -117,7 +120,7 @@ trait Language extends CommonIR {
         statsSizeEq && statsEq
 
       case (ValDef(mods$x, _, tpt$x, rhs$x), ValDef(mods$y, _, tpt$y, rhs$y)) =>
-        val modsEq = mods$x.flags == mods$y.flags
+        val modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
         val tptEq = eq(tpt$x, tpt$y)
         val rhsEq = eq(rhs$x, rhs$y)
         modsEq && tptEq && rhsEq
@@ -128,7 +131,7 @@ trait Language extends CommonIR {
             (x.symbol, y.symbol)
         }
 
-        val modsEq = mods$x.flags == mods$y.flags
+        val modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
         val tpsSizeEq = tps$x.size == tps$y.size
         val tpsEq = (tps$x zip tps$y) forall { case (l, r) => eq(l, r) }
         val vpssSizeEq = vpss$x.size == vpss$y.size && ((vpss$x zip vpss$y) forall { case (l, r) => l.size == r.size })
@@ -218,8 +221,129 @@ trait Language extends CommonIR {
      * @param tree The [[Tree]] to be converted.
      * @return An ANF version of the input [[Tree]].
      */
-    private[emma] def anf(tree: Tree): Tree = {
-      tree
+    // FIXME: What happens if there are methods with by-name parameters?
+    private[emma] def anf(tree: Tree, prefix: String = "x"): Tree = {
+      // Pre-conditions
+      assert(nameClashes(tree).isEmpty)
+
+      postWalk(tree) {
+        // Already in ANF
+        case EmptyTree => EmptyTree
+        case lit: Literal => block(lit)
+        case id: Ident => block(id)
+        case branch: If => block(branch)
+        case vd: ValDef if isParam(vd) => vd
+
+        case Typed(Block(stats, expr), tpt) =>
+          val tpe = Type.of(tpt)
+          val name = Term.fresh(nameOf(expr, prefix))
+          val term = Term.free(name.toString, tpe)
+          block(stats,
+            val_(term, ascribe(expr, tpe)),
+            ref(term))
+
+        case sel @ Select(Block(stats, target), member: TypeName) =>
+          block(stats,
+            Type.sel(target, Type.symOf(sel), Type.of(sel)))
+
+        case sel @ Select(Block(stats, target), member: TermName) =>
+          val term = Term.of(sel)
+          val tpe = Type.of(sel)
+          val expr = Term.sel(target, term, tpe)
+          if (term.isPackage || {
+            term.isMethod && !term.isAccessor
+          }) {
+            block(stats, expr)
+          } else {
+            val name = Term.fresh(member).toString
+            val lhs = Term.free(name, tpe)
+            block(stats,
+              val_(lhs, expr),
+              ref(lhs))
+          }
+
+        case TypeApply(Block(stats, target), types) =>
+          block(stats,
+            typeApp(target, types.map(Type.of): _*))
+
+        case app @ Apply(Block(stats, target), args) =>
+          val name = Term.fresh(nameOf(target, prefix))
+          val term = Term.free(name.toString, Type.of(app))
+          val init = stats ::: args.flatMap {
+            case Block(nested, _) => nested
+            case _ => Nil
+          }
+
+          val params = args.map {
+            case Block(_, expr) => expr
+            case arg => arg
+          }
+
+          block(init,
+            val_(term, Tree.app(target)(params: _*)),
+            ref(term))
+
+        // Only if contains nested blocks
+        case bl: Block
+          if bl.children.exists {
+            case _: Block => true
+            case _ => false
+          } =>
+            val body = bl.children.flatMap {
+              case nested: Block => nested.children
+              case child => child :: Nil
+            }
+
+            // Remove intermediate units
+            block(body.init.filter {
+              case Literal(Constant(())) => false
+              case _ => true
+            }, body.last)
+
+        // Avoid duplication of intermediates
+        case vd @ ValDef(mods, _, _, Block(stats :+ (int: ValDef), rhs: Ident))
+          if int.symbol == rhs.symbol =>
+            block(stats,
+              val_(Term.of(vd), int.rhs, mods.flags),
+              unit)
+
+        case vd @ ValDef(mods, _, _, Block(stats, rhs)) =>
+          block(stats,
+            val_(Term.of(vd), rhs, mods.flags),
+            unit)
+      }
+    }
+
+    /** Returns the set of [[Term]]s in `tree` that have clashing names. */
+    private def nameClashes(tree: Tree): Seq[TermSymbol] =
+      defs(tree).groupBy(_.name.toString)
+        .filter(_._2.size > 1)
+        .flatMap(_._2).toSeq
+
+    private def resolveClashes(tree: Tree): Tree =
+      refresh(tree, nameClashes(tree): _*)
+
+
+    private def nameOf(tree: Tree,
+      default: String = "x"): String = {
+
+      @tailrec
+      def loop(tree: Tree): String = tree match {
+        case id: Ident => id.name.toString
+        case vd: ValDef => vd.name.toString
+        case dd: DefDef => dd.name.toString
+        case _: Function => Term.lambda.toString
+        case Select(_, member) => member.toString
+        case Typed(expr, _) => loop(expr)
+        case Block(_, expr) => loop(expr)
+        case Apply(target, _) => loop(target)
+        case TypeApply(target, _) => loop(target)
+        case _ => default
+      }
+
+      val name = loop(tree)
+      if (name matches """[_a-zA-Z]\w*""") name
+      else default
     }
   }
 

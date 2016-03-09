@@ -32,8 +32,10 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
       })
 
       val t2 = typeCheck(reify {
-        val x$01 = t._1
-        15 * x$01
+        val x$1 = AdministrativeNormalFormSpec.this.t
+        val x$2 = x$1._1
+        val x$3 = 15 * x$2
+        x$3
       })
 
       compiler.LNF.eq(t1, t2) shouldBe true
@@ -45,8 +47,10 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
       })
 
       val t2 = typeCheck(reify {
-        val x$01 = t._1
-        x$01 * 15
+        val x$1 = AdministrativeNormalFormSpec.this.t
+        val x$2 = x$1._1
+        val x$3 = x$2 * 15
+        x$3
       })
 
       compiler.LNF.eq(t1, t2) shouldBe true
@@ -59,9 +63,11 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
       })
 
       val t2 = typeCheck(reify {
-        val x$01 = Seq(1, 2, 3)
-        val bag = eu.stratosphere.emma.api.DataBag(x$01)
-        scala.Predef.println(bag.fetch())
+        val x$1 = Seq(1, 2, 3)
+        val bag = eu.stratosphere.emma.api.DataBag(x$1)
+        val x$2 = bag.fetch()
+        val x$3 = scala.Predef.println(x$2)
+        x$3
       })
 
       compiler.LNF.eq(t1, t2) shouldBe true
@@ -75,9 +81,12 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
       })
 
       val t2 = typeCheckAndNormalize(reify {
-        val x$01 = y.indexOf('l')
-        val x$02 = x$01 + 1
-        y.substring(x$02)
+        val y$1 = AdministrativeNormalFormSpec.this.y
+        val y$2 = AdministrativeNormalFormSpec.this.y
+        val x$1 = y$2.indexOf('l')
+        val x$2 = x$1 + 1
+        val x$3 = y$1.substring(x$2)
+        x$3
       })
 
       compiler.LNF.eq(t1, t2) shouldBe true
