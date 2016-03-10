@@ -236,17 +236,17 @@ trait Language extends CommonIR {
 
         case Typed(Block(stats, expr), tpt) =>
           val tpe = Type.of(tpt)
-          val name = Term.fresh(nameOf(expr, prefix))
+          val name = Term.fresh(nameOf(expr))
           val term = Term.free(name.toString, tpe)
           block(stats,
             val_(term, ascribe(expr, tpe)),
             ref(term))
 
-        case sel @ Select(Block(stats, target), member: TypeName) =>
+        case sel@Select(Block(stats, target), member: TypeName) =>
           block(stats,
             Type.sel(target, Type.symOf(sel), Type.of(sel)))
 
-        case sel @ Select(Block(stats, target), member: TermName) =>
+        case sel@Select(Block(stats, target), member: TermName) =>
           val term = Term.of(sel)
           val tpe = Type.of(sel)
           val expr = Term.sel(target, term, tpe)
@@ -266,8 +266,8 @@ trait Language extends CommonIR {
           block(stats,
             typeApp(target, types.map(Type.of): _*))
 
-        case app @ Apply(Block(stats, target), args) =>
-          val name = Term.fresh(nameOf(target, prefix))
+        case app@Apply(Block(stats, target), args) =>
+          val name = Term.fresh(nameOf(target))
           val term = Term.free(name.toString, Type.of(app))
           val init = stats ::: args.flatMap {
             case Block(nested, _) => nested
@@ -289,61 +289,61 @@ trait Language extends CommonIR {
             case _: Block => true
             case _ => false
           } =>
-            val body = bl.children.flatMap {
-              case nested: Block => nested.children
-              case child => child :: Nil
-            }
+          val body = bl.children.flatMap {
+            case nested: Block => nested.children
+            case child => child :: Nil
+          }
 
-            // Remove intermediate units
-            block(body.init.filter {
-              case Literal(Constant(())) => false
-              case _ => true
-            }, body.last)
+          // Remove intermediate units
+          block(body.init.filter {
+            case Literal(Constant(())) => false
+            case _ => true
+          }, body.last)
 
         // Avoid duplication of intermediates
-        case vd @ ValDef(mods, _, _, Block(stats :+ (int: ValDef), rhs: Ident))
+        case vd@ValDef(mods, _, _, Block(stats :+ (int: ValDef), rhs: Ident))
           if int.symbol == rhs.symbol =>
-            block(stats,
-              val_(Term.of(vd), int.rhs, mods.flags),
-              unit)
+          block(stats,
+            val_(Term.of(vd), int.rhs, mods.flags),
+            unit)
 
-        case vd @ ValDef(mods, _, _, Block(stats, rhs)) =>
+        case vd@ValDef(mods, _, _, Block(stats, rhs)) =>
           block(stats,
             val_(Term.of(vd), rhs, mods.flags),
             unit)
       }
     }
 
-    /** Returns the set of [[Term]]s in `tree` that have clashing names. */
-    private def nameClashes(tree: Tree): Seq[TermSymbol] =
-      defs(tree).groupBy(_.name.toString)
-        .filter(_._2.size > 1)
-        .flatMap(_._2).toSeq
-
-    private def resolveClashes(tree: Tree): Tree =
+    /** Ensures that all definitions within the `tree` have unique names. */
+    private[emma] def resolveNameClashes(tree: Tree): Tree =
       refresh(tree, nameClashes(tree): _*)
 
+    /** Returns the set of [[Term]]s in `tree` that have clashing names. */
+    private def nameClashes(tree: Tree): Seq[TermSymbol] =
+      defs(tree).groupBy(_.name)
+        .filter { case (name, defs) => defs.size > 1 }
+        .flatMap(_._2).toSeq
 
-    private def nameOf(tree: Tree,
-      default: String = "x"): String = {
+    /**
+     * Returns the encoded name associated with this subtree.
+     */
+    private def nameOf(tree: Tree): String = {
 
       @tailrec
-      def loop(tree: Tree): String = tree match {
-        case id: Ident => id.name.toString
-        case vd: ValDef => vd.name.toString
-        case dd: DefDef => dd.name.toString
-        case _: Function => Term.lambda.toString
-        case Select(_, member) => member.toString
+      def loop(tree: Tree): Name = tree match {
+        case id: Ident => id.name
+        case vd: ValDef => vd.name
+        case dd: DefDef => dd.name
+        case _: Function => Term.lambda
+        case Select(_, member) => member
         case Typed(expr, _) => loop(expr)
         case Block(_, expr) => loop(expr)
         case Apply(target, _) => loop(target)
         case TypeApply(target, _) => loop(target)
-        case _ => default
+        case _ => throw new RuntimeException("Unsupported tree")
       }
 
-      val name = loop(tree)
-      if (name matches """[_a-zA-Z]\w*""") name
-      else default
+      loop(tree).encodedName.toString
     }
   }
 
