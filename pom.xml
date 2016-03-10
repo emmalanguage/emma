@@ -142,6 +142,11 @@
                 <artifactId>emma-spark</artifactId>
                 <version>${project.version}</version>
             </dependency>
+            <dependency>
+                <groupId>eu.stratosphere</groupId>
+                <artifactId>emma-streaming</artifactId>
+                <version>${project.version}</version>
+            </dependency>
             <!-- Emma (test jars) -->
             <dependency>
                 <groupId>eu.stratosphere</groupId>
