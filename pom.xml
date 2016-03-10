@@ -515,6 +515,7 @@
         <module>emma-examples</module>
         <module>emma-gui</module>
         <module>emma-quickstart</module>
+        <module>emma-streaming</module>
     </modules>
 
 </project>
