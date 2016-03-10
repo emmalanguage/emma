@@ -12,7 +12,15 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
   import scala.reflect.runtime.universe._
 
   def typeCheckAndNormalize[T](expr: Expr[T]): Tree = {
-    compiler.LNF.anf(compiler.typeCheck(expr.tree))
+    val pipeline = {
+      compiler.typeCheck(_: Tree)
+    } andThen {
+      compiler.LNF.resolveNameClashes
+    } andThen {
+      compiler.LNF.anf(_)
+    }
+
+    pipeline(expr.tree)
   }
 
   def typeCheck[T](expr: Expr[T]): Tree = {
@@ -91,5 +99,29 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
 
       compiler.LNF.eq(t1, t2) shouldBe true
     }
+  }
+
+  "nested blocks" in {
+    val t1 = typeCheckAndNormalize(reify {
+      val a = {
+        val b = y.indexOf('T')
+        b + 15
+      }
+      val c = {
+        val b = y.indexOf('a')
+        b + 15
+      }
+    })
+
+    val t2 = typeCheck(reify {
+      val y$1 = y
+      val b$1 = y$1.indexOf(84)
+      val a = b$1 + 15
+      val y$2 = y
+      val b$2 = y$2.indexOf(97)
+      val c = b$2 + 15
+    })
+
+    compiler.LNF.eq(t1, t2) shouldBe true
   }
 }
