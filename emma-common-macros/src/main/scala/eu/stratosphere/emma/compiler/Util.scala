@@ -1,6 +1,7 @@
 package eu.stratosphere.emma
 package compiler
 
+import scala.annotation.tailrec
 import scala.reflect.api.Universe
 
 /**
@@ -78,16 +79,30 @@ trait Util {
   /** Traverses `tree` recursively in a top-down fashion. */
   def topDown[U](tree: Tree)(pf: Tree ~> U): Unit =
     new Traverser {
+      @tailrec
       override def traverse(tree: Tree) =
         if (pf.isDefinedAt(tree)) pf(tree)
-        else super.traverse(tree)
+        else tree match {
+          // NOTE: TypeTree.original is not traversed by default
+          case tt: TypeTree if tt.original != null =>
+            traverse(tt.original)
+          case _ =>
+            super.traverse(tree)
+        }
     }.traverse(tree)
 
   /** Traverses `tree` recursively in a bottom-up fashion. */
   def bottomUp[U](tree: Tree)(pf: Tree ~> U): Unit =
     new Traverser {
       override def traverse(tree: Tree) = {
-        super.traverse(tree)
+        tree match {
+          // NOTE: TypeTree.original is not traversed by default
+          case tt: TypeTree if tt.original != null =>
+            traverse(tt.original)
+          case _ =>
+            super.traverse(tree)
+        }
+
         if (pf.isDefinedAt(tree)) pf(tree)
       }
     }.traverse(tree)

@@ -305,7 +305,10 @@ trait Trees extends Util { this: Types with Symbols =>
      * @return A substituted version of the enclosing [[Tree]].
      */
     def replace(in: Tree, find: Tree, repl: Tree): Tree =
-      preWalk(in) { case `find` => repl }
+      preWalk(in) {
+        case tree if tree.equalsStructure(find) =>
+          repl
+      }
 
     /**
      * Replace a sequence of [[Symbol]]s with references to their aliases.
@@ -320,9 +323,9 @@ trait Trees extends Util { this: Types with Symbols =>
         postWalk(in) {
           case vd: ValDef if dict.contains(Term.of(vd)) =>
             val_(dict(Term.of(vd)), vd.rhs)
-          case id: Ident if Has.term(id) // could be a type ref
-            && dict.contains(Term.of(id)) =>
-              ref(dict(Term.of(id)))
+          // could be a type ref
+          case id: Ident if Has.term(id) && dict.contains(Term.of(id)) =>
+            ref(dict(Term.of(id)))
           case bd: Bind if dict.contains(Term.of(bd)) =>
             bind(dict(Term.of(bd)), bd.body)
         }

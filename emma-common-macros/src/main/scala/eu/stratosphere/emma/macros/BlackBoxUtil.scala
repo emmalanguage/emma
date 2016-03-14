@@ -24,12 +24,23 @@ trait BlackBoxUtil extends BlackBox with ReflectUtil {
   def typeSym(owner: Symbol, name: TypeName, flags: FlagSet, pos: Position) =
     newTypeSymbol(owner, name, pos, flags)
 
-  override def transform(tree: Tree)(pf: Tree ~> Tree) =
-    super.transform(tree)(pf orElse {
-      // NOTE:
-      // - `TypeTree.original` is not transformed by default
-      // - `setOriginal` is only available at compile-time
-      case tt: TypeTree if tt.original != null =>
-        setOriginal(tt, transform(tt.original)(pf))
-    })
+  override def transform(tree: Tree)(pf: Tree ~> Tree): Tree =
+    new Transformer {
+      override def transform(tree: Tree): Tree =
+        if (pf.isDefinedAt(tree)) pf(tree)
+        else tree match {
+          // NOTE:
+          // - TypeTree.original is not transformed by default
+          // - setOriginal is only available at compile-time
+          case tt: TypeTree if tt.original != null =>
+            val original = transform(tt.original)
+            if (original eq tt.original) tt else {
+              val tpt = if (tt.hasType) TypeTree(tt.preciseType) else TypeTree()
+              setOriginal(tpt, transform(tt.original))
+            }
+
+          case _ =>
+            super.transform(tree)
+        }
+    }.transform(tree)
 }

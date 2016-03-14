@@ -252,11 +252,13 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Returns a [[Tree]] representation of `tpe`. */
     def quote(tpe: Type): TypeTree =
-      tq"${fix(tpe)}".asInstanceOf[TypeTree]
+      if (isDefined(tpe)) TypeTree(fix(tpe))
+      else TypeTree()
 
     /** Returns a [[Tree]] representation of `sym`'s [[Type]]. */
     def quote(sym: Symbol): TypeTree =
-      quote(of(sym))
+      if (Has.tpe(sym)) quote(of(sym))
+      else TypeTree()
 
     /** Returns a [[Tree]] representation of `T`. */
     def quote[T: TypeTag]: TypeTree =

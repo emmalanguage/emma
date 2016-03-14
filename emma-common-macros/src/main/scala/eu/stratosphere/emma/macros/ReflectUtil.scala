@@ -112,11 +112,19 @@ trait ReflectUtil {
    * @param tree The [[Tree]] to traverse
    * @param pf A [[PartialFunction]] to traverse some of the [[Tree]] nodes
    */
-  def traverse(tree: Tree)(pf: Tree ~> Unit): Unit = new Traverser {
-    override def traverse(tree: Tree): Unit =
-      if (pf.isDefinedAt(tree)) pf(tree)
-      else super.traverse(tree)
-  }.traverse(tree)
+  def traverse(tree: Tree)(pf: Tree ~> Unit): Unit =
+    new Traverser {
+      @tailrec
+      override def traverse(tree: Tree): Unit =
+        if (pf.isDefinedAt(tree)) pf(tree)
+        else tree match {
+          // NOTE: TypeTree#original is not traversed by default
+          case tt: TypeTree if tt.original != null =>
+            traverse(tt.original)
+          case _ =>
+            super.traverse(tree)
+        }
+    }.traverse(tree)
 
   /**
    * Recursively remove all layers of type ascriptions from a [[Tree]].
@@ -159,14 +167,18 @@ trait ReflectUtil {
     }
 
   /**
-   * Replace occurrences of the `find` [[Tree]] with the `replacement` [[Tree]].
-   * @param in The [[Tree]] to substitute in
-   * @param find The [[Tree]] to look for
-   * @param replacement The [[Tree]] that should replace `find`
-   * @return A substituted version of the enclosing [[Tree]]
+   * Replaces all occurrences of `find` with `repl`.
+   *
+   * @param in The [[Tree]] to substitute in.
+   * @param find The [[Tree]] to look for.
+   * @param repl The [[Tree]] that should replace `find`.
+   * @return A substituted version of the enclosing [[Tree]].
    */
-  def replace(in: Tree)(find: Tree, replacement: Tree): Tree =
-    transform(in) { case `find` => replacement }
+  def replace(in: Tree)(find: Tree, repl: Tree): Tree =
+    transform(in) {
+      case tree if tree.equalsStructure(find) =>
+        repl
+    }
 
   /**
    * Replace a sequence of [[Symbol]]s in a [[Tree]] with fresh ones.
@@ -183,7 +195,7 @@ trait ReflectUtil {
    * Replace a dictionary of [[Symbol]]s with references to their aliases.
    * @param in The [[Tree]] to rename in
    * @param dict A [[Map]] of aliases to replace
-   * @return This [[Tree]] with the specified [[Symbol]]s replaced 
+   * @return This [[Tree]] with the specified [[Symbol]]s replaced
    */
   def rename(in: Tree, dict: Map[TermSymbol, TermSymbol]): Tree =
     if (dict.isEmpty) in else transform(in) {

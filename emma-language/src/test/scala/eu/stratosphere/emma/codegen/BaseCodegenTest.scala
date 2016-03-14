@@ -15,15 +15,15 @@ import scala.util.Random
 
 @RunWith(classOf[JUnitRunner])
 abstract class BaseCodegenTest(rtName: String)
-    extends FreeSpec  with Matchers with BeforeAndAfter {
+  extends FreeSpec  with Matchers with BeforeAndAfter {
 
   val inputDir = tempPath("test/input")
   val outputDir = tempPath("test/output")
   def runtimeUnderTest: runtime.Engine
-  
+
   object from {
     lazy val jabberwocky = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
-    
+
     lazy val imdb = read(materializeResource("/cinema/imdb.csv"),
       new CSVInputFormat[ImdbMovie]).fetch()
 
@@ -551,6 +551,23 @@ abstract class BaseCodegenTest(rtName: String)
       }
 
       positive plus negative
+    }.verifyWith(runtimeUnderTest)
+
+    "val destructuring" in emma.parallelize {
+      val resource = materializeResource("/cinema/imdb.csv")
+      val imdbTop100 = read(resource, new CSVInputFormat[ImdbMovie])
+      val ratingsPerDecade = for {
+        group <- imdbTop100.groupBy(mov => (mov.year / 10, mov.rating.round))
+      } yield {
+        val (year, rating) = group.key
+        (year, rating, group.values.size)
+      }
+
+      for {
+        r <- ratingsPerDecade
+        m <- imdbTop100
+        if r == (m.year, m.rating.round, 1L)
+      } yield (r, m)
     }.verifyWith(runtimeUnderTest)
   }
 }
