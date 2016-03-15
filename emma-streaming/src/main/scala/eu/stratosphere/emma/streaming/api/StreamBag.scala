@@ -82,7 +82,9 @@ sealed class StreamBag[+A](private val sb: Stream[DataBag[A]]) {
 
   override def toString: String = showFirstN(10)
 
-  def showFirstN(n: Int): String = sb.take(n).mkString("[\n\t", "\n\t", "\n...]")
+  def showFirstN(n: Int): String = sb.take(n)
+    .map((b: DataBag[A]) => b.fetch().mkString("{", ",", "}"))
+    .mkString("[\n\t", "\n\t", "\n...]")
 
   // --------------------------------------------------------
   // Further helper methods. These should be only used when necessary.
@@ -180,7 +182,7 @@ object StreamBag {
     StreamBag.alternativeStreamFlatten(ssb)
   }
 
-  def unit[A](a: => A): StreamBag[A] = Stream(DataBag.unit(a), Stream.unit(DataBag()))
+  def unit[A](a: => A): StreamBag[A] = Stream(DataBag(Seq(a)), Stream.unit(DataBag()))
 
   def empty[A]: StreamBag[A] = Stream.unit(DataBag())
 
@@ -189,7 +191,7 @@ object StreamBag {
   // Conversions.
   // --------------------------------------------------------
 
-  implicit def fromStream[A](xs: Stream[A]): StreamBag[A] = xs.map(DataBag.unit)
+  implicit def fromStream[A](xs: Stream[A]): StreamBag[A] = xs.map((x: A) => DataBag(Seq(x)))
 
   implicit def fromBag[A](b: DataBag[A]): StreamBag[A] = Stream(b, Stream.unit(DataBag()))
 
@@ -206,7 +208,7 @@ object StreamBag {
     case Stream(x, xs) => {
       val tail = fromStreamWithStrictlyIncTimestamp[A](t(_) - 1)(xs)
       if (t(x) == 0) {
-        Stream(DataBag.unit(x), tail)
+        Stream(DataBag(Seq(x)), tail)
       } else {
         tail
       }
@@ -252,4 +254,21 @@ object StreamBag {
     Stream(x, alternativeStreamFlatten(mss3))
   }
 
+//  def alternativeStreamFlatten1[A](xss: => Stream[Stream[DataBag[A]]]): Stream[DataBag[A]] = {
+//    def next(n: => DataBag[Stream[DataBag[A]]]): (DataBag[A], DataBag[Stream[DataBag[A]]]) = {
+//      val head: DataBag[A] = n.flatMap(_.head)
+//      val neighbours: DataBag[Stream[DataBag[A]]] = n.map(_.tail)
+//      (head, neighbours)
+//    }
+//
+//    val h = xss.head.head
+//
+//    val neigh1: Stream[DataBag[A]] = xss.map(_.head).tail
+//    val neigh2: Stream[DataBag[A]] = xss.head.tail
+//    lazy val neigh3: Stream[DataBag[A]] = alternativeStreamFlatten1(xss.tail.tail)
+//
+//    lazy val neighbours = DataBag(Seq(neigh1, neigh2, neigh3))
+//
+//    Stream(h, Stream.unfold(neighbours, next))
+//  }
 }

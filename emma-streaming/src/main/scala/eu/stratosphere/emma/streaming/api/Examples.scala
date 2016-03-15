@@ -5,6 +5,9 @@ import eu.stratosphere.emma.api.DataBag
 object Examples {
 
   def main(args: Array[String]): Unit = {
+
+    println(Stream.naturals)
+
     val x: Int = 42
     val xs: StreamBag[Int] = StreamBag.unit[Int](x)
 
@@ -28,13 +31,6 @@ object Examples {
     }
 
     println(b2)
-
-    val s = Stream.unit[Int](5)
-    val s2 = for {
-      (x: Int) <- s
-    } yield {
-      x + 1
-    }
 
     println(Stream.unit(Stream.naturals))
 

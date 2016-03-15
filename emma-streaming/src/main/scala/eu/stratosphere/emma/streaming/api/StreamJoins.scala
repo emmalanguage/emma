@@ -52,12 +52,12 @@ object StreamJoins {
     val b: DataBag[String] = DataBag(Seq("anna", "emma"))
 
     println(crossJoin(xs, ys))
-    println(joinOnPredicate((x: Int, z: Int) => x == z)(xs, zs))
-
-    println(StreamBag.fromBag(b))
-    println(joinWithBag(xs, b))
-    println(ys.groupBy[Char]((x: Char) => x))
-    println(ys.distinct())
-    println(StreamBag.flatten(ys.groupBy[Char]((x: Char) => x).map(_._2)))
+//    println(joinOnPredicate((x: Int, z: Int) => x == z)(xs, zs))
+//
+//    println(StreamBag.fromBag(b))
+//    println(joinWithBag(xs, b))
+//    println(ys.groupBy[Char]((x: Char) => x))
+//    println(ys.distinct())
+//    println(StreamBag.flatten(ys.groupBy[Char]((x: Char) => x).map(_._2)))
   }
 }
