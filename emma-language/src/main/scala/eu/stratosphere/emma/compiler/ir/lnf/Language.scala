@@ -1,7 +1,7 @@
 package eu.stratosphere.emma
 package compiler.ir.lnf
 
-import eu.stratosphere.emma.compiler.ir.CommonIR
+import compiler.ir.CommonIR
 
 import scala.annotation.tailrec
 
@@ -300,11 +300,8 @@ trait Language extends CommonIR {
             case child => child :: Nil
           }
 
-          // Remove intermediate units
-          block(body.init.filter {
-            case Literal(Constant(())) => false
-            case _ => true
-          }, body.last)
+          // Implicitly removes ()
+          block(body.init, body.last)
 
         // Avoid duplication of intermediates
         case vd@ValDef(mods, _, _, Block(stats :+ (int: ValDef), rhs: Ident))
@@ -317,6 +314,10 @@ trait Language extends CommonIR {
           block(stats,
             val_(Term.of(vd), rhs, mods.flags),
             unit)
+
+        // Avoid empty blocks
+        case Block(Nil, expr) =>
+          expr
       }
     }
 
@@ -326,18 +327,18 @@ trait Language extends CommonIR {
 
     /** Extracts control flow nodes from the given `tree`. */
     private def controlFlowNodes(tree: Tree): List[Tree] = tree collect {
-      case t: If => t
-      case t: Match => t
-      case t: DefDef => t
-      case t@WhileLoop(_, _) => t
-      case t@DoWhileLoop(_, _) => t
+      case branch: If => branch
+      case patMat: Match => patMat
+      case dd: DefDef => dd
+      case loop@WhileLoop(_, _) => loop
+      case loop@DoWhileLoop(_, _) => loop
     }
 
     /** Returns the set of [[Term]]s in `tree` that have clashing names. */
     private def nameClashes(tree: Tree): Seq[TermSymbol] =
       defs(tree).groupBy(_.name)
-        .filter { case (name, defs) => defs.size > 1 }
-        .flatMap(_._2).toSeq
+        .filter { case (_, defs) => defs.size > 1 }
+        .flatMap { case (_, defs) => defs }.toSeq
 
     /**
      * Returns the encoded name associated with this subtree.
@@ -355,10 +356,79 @@ trait Language extends CommonIR {
         case Block(_, expr) => loop(expr)
         case Apply(target, _) => loop(target)
         case TypeApply(target, _) => loop(target)
+        case _: Literal => Term.name("x")
         case _ => throw new RuntimeException("Unsupported tree")
       }
 
       loop(tree).encodedName.toString
+    }
+
+    /**
+     * Eliminates common subexpressions from a [[Tree]].
+     *
+     * == Preconditions ==
+     *  - The input `tree` is in ANF (see [[LNF.anf()]])
+     *  - No `lazy val`s are used.
+     *
+     *  == Postconditions ==
+     *   - All common subexpressions and corresponding intermediate values are pruned.
+     *
+     * @param tree The [[Tree]] to be pruned.
+     * @return A [[Tree]] with the same semantics but without common subexpressions.
+     */
+    def cse(tree: Tree): Tree = {
+      type Dict = Map[Symbol, Tree]
+      type Subst = (List[(TermSymbol, Tree)], Dict)
+
+      @tailrec
+      def loop(subst: Subst): Dict =
+        subst match {
+          case (Nil, aliases) => aliases
+          case ((lhs1, rhs1) :: rest, aliases) =>
+            val (eq, neq) = rest.partition { case (lhs2, rhs2) =>
+              Type.of(lhs1) =:= Type.of(lhs2) &&
+                rhs1.equalsStructure(rhs2)
+            }
+
+            val dict = {
+              val dict = aliases ++ eq.map(_._1 -> ref(lhs1))
+              rhs1 match {
+                case lit: Literal => dict + (lhs1 -> lit)
+                case _ => dict
+              }
+            }
+
+            val vals = neq.map { case (lhs, rhs) =>
+              lhs -> Tree.subst(rhs, dict)
+            }
+
+            loop(vals, dict)
+        }
+
+      val vals = tree.collect {
+        case vd: ValDef if !isParam(vd) && vd.rhs.nonEmpty =>
+          // NOTE: Lazy vals not supported
+          assert(!isLazy(vd))
+          Term.of(vd) -> vd.rhs
+      }
+
+      val dict = loop((vals, Map.empty))
+      postWalk(tree) {
+        case id: Ident if Has.term(id) &&
+          dict.contains(id.symbol) =>
+            dict(id.symbol)
+
+        case vd: ValDef
+          if dict.contains(vd.symbol) =>
+            unit
+
+        case Block(stats, expr) =>
+          // Implicitly removes ()
+          block(stats, expr)
+      } match { // Avoid empty blocks
+        case Block(Nil, expr) => expr
+        case t => t
+      }
     }
   }
 

@@ -147,11 +147,14 @@ trait Trees extends Util { this: Types with Symbols =>
     def block(body: Tree*): Block = {
       assert(body.forall(verify))
       assert(Has.tpe(body.last))
-      val (statements, expr) =
+      val (stats, expr) =
         if (body.isEmpty) (Nil, unit)
-        else (body.init.toList, body.last)
+        else (body.init.filter {
+          case q"()" => false
+          case _ => true
+        }.toList, body.last)
 
-      val block = Block(statements, expr)
+      val block = Block(stats, expr)
       setType(block, Type.of(expr))
     }
 
@@ -301,17 +304,24 @@ trait Trees extends Util { this: Types with Symbols =>
      * @return The [[Tree]] with the specified [[Symbol]]s replaced.
      */
     def rename(in: Tree, aliases: (TermSymbol, TermSymbol)*): Tree =
-      if (aliases.isEmpty) in else {
-        val dict = aliases.toMap
-        postWalk(in) {
-          case vd: ValDef if dict.contains(Term.of(vd)) =>
-            val_(dict(Term.of(vd)), vd.rhs)
-          // could be a type ref
-          case id: Ident if Has.term(id) && dict.contains(Term.of(id)) =>
-            ref(dict(Term.of(id)))
-          case bd: Bind if dict.contains(Term.of(bd)) =>
-            bind(dict(Term.of(bd)), bd.body)
-        }
+      rename(in, aliases.toMap)
+
+    /**
+     * Replace a sequence of [[Symbol]]s with references to their aliases.
+     *
+     * @param in The [[Tree]] to rename in.
+     * @param dict A dictionary of aliases to replace.
+     * @return The [[Tree]] with the specified [[Symbol]]s replaced.
+     */
+    def rename(in: Tree, dict: Map[TermSymbol, TermSymbol]): Tree =
+      if (dict.isEmpty) in else postWalk(in) {
+        case vd: ValDef if dict.contains(Term.of(vd)) =>
+          val_(dict(Term.of(vd)), vd.rhs)
+        // Could be a type ref
+        case id: Ident if Has.term(id) && dict.contains(Term.of(id)) =>
+          ref(dict(Term.of(id)))
+        case bd: Bind if dict.contains(Term.of(bd)) =>
+          bind(dict(Term.of(bd)), bd.body)
       }
 
     /**
@@ -352,6 +362,11 @@ trait Trees extends Util { this: Types with Symbols =>
     def isParam(vd: ValDef): Boolean =
       Term.of(vd).isParameter ||
         vd.mods.hasFlag(Flag.PARAM)
+
+    /** Is `vd` a lazy val? */
+    def isLazy(vd: ValDef): Boolean =
+      Term.of(vd).isLazy ||
+        vd.mods.hasFlag(Flag.LAZY)
   }
 
   /** Some useful constants. */

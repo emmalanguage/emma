@@ -1,5 +1,4 @@
-package eu.stratosphere.emma
-package compiler.ir.lnf
+package eu.stratosphere.emma.compiler.ir.lnf
 
 import eu.stratosphere.emma.compiler.BaseCompilerSpec
 import org.junit.runner.RunWith
@@ -7,7 +6,7 @@ import org.scalatest.junit.JUnitRunner
 
 /** A spec defining the core fragment of Scala supported by Emma. */
 @RunWith(classOf[JUnitRunner])
-class AdministrativeNormalFormSpec extends BaseCompilerSpec {
+class CSESpec extends BaseCompilerSpec {
 
   import scala.reflect.runtime.universe._
 
@@ -18,6 +17,8 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
       compiler.LNF.resolveNameClashes
     } andThen {
       compiler.LNF.anf
+    } andThen {
+      compiler.LNF.cse
     }
 
     pipeline(expr.tree)
@@ -90,8 +91,7 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
 
       val t2 = typeCheckAndNormalize(reify {
         val y$1 = y
-        val y$2 = y
-        val x$1 = y$2.indexOf('l')
+        val x$1 = y$1.indexOf('l')
         val x$2 = x$1 + 1
         val x$3 = y$1.substring(x$2)
         x$3
@@ -104,7 +104,7 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
   "nested blocks" in {
     val t1 = typeCheckAndNormalize(reify {
       val a = {
-        val b = y.indexOf('T')
+        val b = y.indexOf('a')
         b + 15
       }
       val c = {
@@ -115,28 +115,23 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
 
     val t2 = typeCheck(reify {
       val y$1 = y
-      val b$1 = y$1.indexOf('T')
+      val b$1 = y$1.indexOf('a')
       val a = b$1 + 15
-      val y$2 = y
-      val b$2 = y$2.indexOf('a')
-      val c = b$2 + 15
     })
 
     compiler.LNF.eq(t1, t2) shouldBe true
   }
 
-  "type ascriptions" in {
+  "constant propagation" in {
     val t1 = typeCheckAndNormalize(reify {
-      val a = x: Int
-      val b = a + 5
-      b
+      val a = 42
+      val b = a
+      val c = b
+      c
     })
 
     val t2 = typeCheck(reify {
-      val a$1 = x
-      val a$2 = a$1: Int
-      val b$1 = a$2 + 5
-      b$1
+      42
     })
 
     compiler.LNF.eq(t1, t2) shouldBe true
