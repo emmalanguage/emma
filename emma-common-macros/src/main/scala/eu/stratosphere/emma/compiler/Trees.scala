@@ -274,7 +274,7 @@ trait Trees extends Util { this: Types with Symbols =>
           .map(_.name).toSet
 
         val capture = defs(in).filter(term => closure(term.name))
-        preWalk(refresh(in, capture.toSeq: _*)) {
+        transform(refresh(in, capture.toSeq: _*)) {
           case id: Ident if dict.contains(id.symbol) => dict(id.symbol)
         }
       }
@@ -288,7 +288,7 @@ trait Trees extends Util { this: Types with Symbols =>
      * @return A substituted version of the enclosing [[Tree]].
      */
     def replace(in: Tree, find: Tree, repl: Tree): Tree =
-      preWalk(in) {
+      transform(in) {
         case tree if tree.equalsStructure(find) =>
           repl
       }
@@ -338,7 +338,7 @@ trait Trees extends Util { this: Types with Symbols =>
     def inline(in: Tree, defs: ValDef*): Tree =
       if (defs.isEmpty) in else {
         val dict = defs.map(vd => vd.symbol -> vd.rhs).toMap
-        preWalk(in) {
+        transform(in) {
           case vd: ValDef if dict.contains(vd.symbol) => unit
           case id: Ident if dict.contains(id.symbol) => dict(id.symbol)
         }

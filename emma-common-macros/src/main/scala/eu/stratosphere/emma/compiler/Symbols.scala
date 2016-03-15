@@ -63,7 +63,7 @@ trait Symbols extends Util { this: Trees with Types =>
      */
     def repair(owner: Symbol,
       dict: mutable.Map[Symbol, Symbol] = mutable.Map.empty)
-      (tree: Tree): Unit = topDown(tree) {
+      (tree: Tree): Unit = traverse(tree) {
 
       // def method(...)(...)... = { body }
       case dd @ DefDef(mods, name, Nil, argLists, _, rhs) =>
