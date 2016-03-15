@@ -47,9 +47,9 @@ trait MacroUtil extends ReflectUtil {
     newTypeSymbol(owner, name, pos, flags)
   }
 
-  override def preWalk(tree: Tree)(pf: Tree ~> Tree): Tree =
+  override def transform(pf: Tree ~> Tree): Tree => Tree =
     new Transformer {
-      override def transform(tree: Tree): Tree = {
+      override def transform(tree: Tree): Tree =
         if (pf.isDefinedAt(tree)) pf(tree)
         else tree match {
           // NOTE:
@@ -62,10 +62,27 @@ trait MacroUtil extends ReflectUtil {
           case _ =>
             super.transform(tree)
         }
-      }
-    }.transform(tree)
+    }.transform
 
-  override def postWalk(tree: Tree)(pf: Tree ~> Tree): Tree =
+  override def preWalk(pf: Tree ~> Tree): Tree => Tree =
+    new Transformer {
+      override def transform(tree: Tree): Tree = {
+        val result = if (pf.isDefinedAt(tree)) pf(tree) else tree
+        result match {
+          // NOTE:
+          // - TypeTree.original is not transformed by default
+          // - setOriginal is only available at compile-time
+          case tt: TypeTree if tt.original != null =>
+            val original = transform(tt.original)
+            if (original eq tt.original) tt
+            else setOriginal(Type.quote(tt.tpe), original)
+          case _ =>
+            super.transform(result)
+        }
+      }
+    }.transform
+
+  override def postWalk(pf: Tree ~> Tree): Tree => Tree =
     new Transformer {
       override def transform(tree: Tree): Tree = {
         val result = tree match {
@@ -83,5 +100,5 @@ trait MacroUtil extends ReflectUtil {
         if (pf.isDefinedAt(result)) pf(result)
         else result
       }
-    }.transform(tree)
+    }.transform
 }
