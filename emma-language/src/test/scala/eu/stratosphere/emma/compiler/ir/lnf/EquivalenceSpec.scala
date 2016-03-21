@@ -11,7 +11,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class EquivalenceSpec extends BaseCompilerSpec {
 
-  import scala.reflect.runtime.universe._
+  import compiler.universe._
 
   def typeCheck[T](expr: Expr[T]): Tree = {
     compiler.typeCheck(expr.tree)

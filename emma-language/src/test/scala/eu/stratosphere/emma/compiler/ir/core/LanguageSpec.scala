@@ -9,7 +9,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class LanguageSpec extends BaseCompilerSpec {
 
-  import scala.reflect.runtime.universe._
+  import compiler.universe._
 
   def typecheckAndValidate[T](expr: Expr[T]): Boolean = {
     compiler.Core.validate(compiler.typeCheck(expr.tree))

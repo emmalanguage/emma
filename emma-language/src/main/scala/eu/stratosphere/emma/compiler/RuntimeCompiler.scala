@@ -4,48 +4,50 @@ package compiler
 import java.net.URLClassLoader
 import java.nio.file.{Files, Paths}
 
-import scala.language.implicitConversions
-import scala.reflect.runtime
-import scala.reflect.runtime.universe._
-import scala.tools.reflect.ToolBox
+import scala.tools.reflect.ToolBoxFactory
 
-/** A reflection-based [[Compiler]]. */
+/** A reflection-based [[eu.stratosphere.emma.compiler.Compiler]]. */
 class RuntimeCompiler extends Compiler with RuntimeUtil {
 
   import RuntimeCompiler._
+  import universe._
 
-  /** The directory where the toolbox will store runtime-generated code */
+  /** The directory where the toolbox will store runtime-generated code. */
   val codeGenDir = {
-    val path = Paths.get(System.getProperty("emma.codegen.dir", CODEGEN_DIR_DEFAULT))
-    // make sure that generated class directory exists
+    val path = Paths.get(sys.props.getOrElse("emma.codegen.dir", default.codeGenDir))
+    // Make sure that generated class directory exists
     Files.createDirectories(path)
     path.toAbsolutePath.toString
   }
 
-  val mirror = runtime.currentMirror
-
-  /** The underlying universe object. */
-  override val universe = mirror.universe
-
-  // FIXME: as constructor parameter
-  /** The generating Scala toolbox */
+  // FIXME: As constructor parameter.
+  /** The generating Scala toolbox. */
   override val tb = {
     val cl = getClass.getClassLoader
+    val factory = new ToolBoxFactory[universe.type](universe) {
+      val mirror = runtimeMirror(cl)
+    }
 
     cl match {
       case urlCL: URLClassLoader =>
-        // append current classpath to the toolbox in case of a URL classloader (fixes a bug in Spark)
-        val cp = urlCL.getURLs.map(_.getFile).mkString(System.getProperty("path.separator"))
-        mirror.mkToolBox(options = s"-d $codeGenDir -cp $cp")
+        // Append current classpath to the toolbox in case of a URL classloader
+        // (fixes a bug in Spark)
+        val cp = urlCL.getURLs.map(_.getFile).mkString(sys.props("path.separator"))
+        factory.mkToolBox(options = s"-d $codeGenDir -cp $cp")
       case _ =>
-        // use toolbox without extra classpath entries otherwise
-        mirror.mkToolBox(options = s"-d $codeGenDir")
+        // Use toolbox without extra classpath entries otherwise
+        factory.mkToolBox(options = s"-d $codeGenDir")
     }
   }
 }
 
 object RuntimeCompiler {
-  val RUN_METHOD = TermName("run")
-  val CODEGEN_DIR_DEFAULT =
-    Paths.get(System.getProperty("java.io.tmpdir"), "emma", "codegen").toAbsolutePath.toString
+
+  object default {
+
+    val runMethod = "run"
+    lazy val codeGenDir =
+      Paths.get(sys.props("java.io.tmpdir"), "emma", "codegen")
+        .toAbsolutePath.toString
+  }
 }

@@ -5,7 +5,7 @@ import com.typesafe.scalalogging.slf4j.Logger
 import org.slf4j.LoggerFactory
 
 import scala.language.implicitConversions
-import scala.reflect.runtime
+import scala.reflect.runtime.JavaUniverse
 import scala.tools.reflect.ToolBox
 
 /**
@@ -15,13 +15,14 @@ import scala.tools.reflect.ToolBox
  */
 trait RuntimeUtil extends ReflectUtil {
 
-  val universe: runtime.universe.type = runtime.universe
+  val universe: JavaUniverse = new JavaUniverse
   val tb: ToolBox[universe.type]
-
-  val logger = Logger(LoggerFactory.getLogger(classOf[RuntimeUtil]))
 
   import universe._
   import internal._
+
+  private val logger =
+    Logger(LoggerFactory.getLogger(classOf[RuntimeUtil]))
 
   override def warning(pos: Position, msg: String): Unit =
     logger.warn(s"warning at position $pos: $msg")

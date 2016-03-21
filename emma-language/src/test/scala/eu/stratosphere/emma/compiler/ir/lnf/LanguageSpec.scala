@@ -11,7 +11,7 @@ import scala.annotation.tailrec
 @RunWith(classOf[JUnitRunner])
 class LanguageSpec extends BaseCompilerSpec {
 
-  import scala.reflect.runtime.universe._
+  import compiler.universe._
 
   def typecheckAndValidate[T](expr: Expr[T]): Boolean = {
     compiler.LNF.validate(compiler.typeCheck(expr.tree))
