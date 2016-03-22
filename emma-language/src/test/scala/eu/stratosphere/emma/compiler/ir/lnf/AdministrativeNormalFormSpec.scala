@@ -9,11 +9,14 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class AdministrativeNormalFormSpec extends BaseCompilerSpec {
 
-  import scala.reflect.runtime.universe._
+  import compiler.universe._
+  import AdministrativeNormalFormSpec._
 
   def typeCheckAndNormalize[T](expr: Expr[T]): Tree = {
     val pipeline = {
       compiler.typeCheck(_: Tree)
+    } andThen {
+      compiler.LNF.destructPatternMatches
     } andThen {
       compiler.LNF.resolveNameClashes
     } andThen {
@@ -141,4 +144,76 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
 
     compiler.LNF.eq(t1, t2) shouldBe true
   }
+
+  "irrefutable pattern matching" - {
+    "of tuples" in {
+      val t1 = typeCheckAndNormalize(reify {
+        ("life", 42) match {
+          case (s: String, i: Int) =>
+            s + i
+        }
+      })
+
+      val t2 = typeCheck(reify {
+        val x$1 = ("life", 42)
+        val s = x$1._1
+        val i = x$1._2
+        val x$2 = s + i
+        x$2
+      })
+
+      compiler.LNF.eq(t1, t2) shouldBe true
+    }
+
+    "of case classes" in {
+      val t1 = typeCheckAndNormalize(reify {
+        Point(1, 2) match {
+          case Point(i, j) =>
+            i + j
+        }
+      })
+
+      val t2 = typeCheck(reify {
+        val p$1 = Point
+        val x$1 = p$1(1, 2)
+        val i = x$1.x
+        val j = x$1.y
+        val x$2 = i + j
+        x$2
+      })
+
+      compiler.LNF.eq(t1, t2) shouldBe true
+    }
+
+    "of nested product types" in {
+      val t1 = typeCheckAndNormalize(reify {
+        (Point(1, 2), (3, 4)) match {
+          case (a@Point(i, j), b@(k, _)) =>
+            i + j + k
+        }
+      })
+
+      val t2 = typeCheck(reify {
+        val p$1 = Point
+        val x$1 = p$1(1, 2)
+        val x$2 = (3, 4)
+        val x$3 = (x$1, x$2)
+        val a = x$3._1
+        val i = a.x
+        val j = a.y
+        val b = x$3._2
+        val k = b._1
+        val x$4 = i + j
+        val x$5 = x$4 + k
+        x$5
+      })
+
+      compiler.LNF.eq(t1, t2) shouldBe true
+    }
+  }
+}
+
+object AdministrativeNormalFormSpec {
+
+  case class Point(x: Int, y: Int)
 }

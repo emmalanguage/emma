@@ -110,10 +110,12 @@ trait Trees extends Util { this: Types with Symbols =>
       }: _*)
 
     /** Returns a reference to `term`. */
-    def ref(term: TermSymbol): Ident = {
+    def ref(term: TermSymbol, quoted: Boolean = false): Ident = {
       assert(Symbol.verify(term))
-      val id = Ident(term.name)
-      setSymbol(id, term)
+      val id =
+        if (quoted) q"`$term`".asInstanceOf[Ident]
+        else Ident(term)
+
       setType(id, Type.of(term))
     }
 
@@ -460,7 +462,7 @@ trait Trees extends Util { this: Types with Symbols =>
       }
 
       lambda(args: _*) {
-        app(ref(method))(args.map(ref): _*)
+        app(ref(method))(args.map(ref(_)): _*)
       }
     }
   }
