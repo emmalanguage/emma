@@ -197,7 +197,7 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Is `tree` type-checked? */
     def isChecked(tree: Tree): Boolean =
-      tree.forAll(t => !Has.term(t) || Has.tpe(t.symbol))
+      tree.forAll(t => !Has.termSym(t) || Has.tpe(t.symbol))
 
     /** Type-checks `tree` (use `typeMode=true` for [[TypeTree]]s). */
     def check(tree: Tree, typeMode: Boolean = false): Tree =

@@ -3,6 +3,7 @@ package compiler
 
 import scala.annotation.tailrec
 import scala.reflect.api.Universe
+import scala.reflect.macros.Attachments
 
 /**
  * Implements various utility functions that mitigate and/or workaround deficiencies in Scala's
@@ -10,8 +11,8 @@ import scala.reflect.api.Universe
  * capture-avoiding substitution, fully-qualified names, fresh name generation, identifying
  * closures, etc.
  *
- * This trait has to be instantiated with a [[Universe]] type and works for both runtime and
- * compile time reflection.
+ * This trait has to be instantiated with a [[scala.reflect.api.Universe]] type and works for both
+ * runtime and compile time reflection.
  */
 trait Util {
 
@@ -21,42 +22,11 @@ trait Util {
   import universe._
   import internal.reificationSupport._
 
-  /** Raise a warning. */
+  /** Raises a warning. */
   def warning(pos: Position, msg: String): Unit
 
-  /** Raise an error. */
+  /** Raises an error and terminates compilation. */
   def abort(pos: Position, msg: String): Nothing
-
-  /** Parses a snippet of source code and returns the AST. */
-  def parse(code: String): Tree
-
-  /** Type-checks a [[Tree]] (use `typeMode=true` for [[TypeTree]]s). */
-  def typeCheck(tree: Tree, typeMode: Boolean = false): Tree
-
-  /** Returns a new [[TermSymbol]]. */
-  def termSymbol(owner: Symbol, name: TermName,
-    flags: FlagSet = Flag.SYNTHETIC,
-    pos: Position = NoPosition): TermSymbol
-
-  /** Returns a new [[TypeSymbol]]. */
-  def typeSymbol(owner: Symbol, name: TypeName,
-    flags: FlagSet = Flag.SYNTHETIC,
-    pos: Position = NoPosition): TypeSymbol
-
-  /** Returns a fresh [[TermName]] starting with `prefix`. */
-  def freshTerm(prefix: String): TermName =
-    if (prefix.nonEmpty && prefix.last == '$') freshTermName(prefix)
-    else freshTermName(s"$prefix$$")
-
-  /** Returns a fresh [[TypeName]] starting with `prefix`. */
-  def freshType(prefix: String): TypeName =
-    if (prefix.nonEmpty && prefix.last == '$') freshTypeName(prefix)
-    else freshTypeName(s"$prefix$$")
-
-  /** Removes all [[Type]] and [[Symbol]] attributes from a [[Tree]]. */
-  // FIXME: Replace with `c.untypecheck` once SI-5464 is resolved.
-  def unTypeCheck(tree: Tree): Tree =
-    parse(showCode(tree, printRootPkg = true))
 
   /** Shorthand for one-shot `transform(pf).apply(tree)`. */
   def transform(tree: Tree)(pf: Tree ~> Tree): Tree =
@@ -96,7 +66,19 @@ trait Util {
     new Transformer {
       override def transform(tree: Tree): Tree =
         if (pf.isDefinedAt(tree)) pf(tree)
-        else super.transform(tree)
+        else tree match {
+          // NOTE: TypeTree.original is not transformed by default
+          case tt: TypeTree if tt.original != null =>
+            val original = transform(tt.original)
+            if (original eq tt.original) tt else {
+              val copy = treeCopy.TypeTree(tt)
+              setOriginal(copy, original)
+              copy
+            }
+
+          case _ =>
+            super.transform(tree)
+        }
     }.transform
 
   /** Shorthand for one-shot `preWalk(pf).apply(tree)`. */
@@ -137,11 +119,22 @@ trait Util {
    */
   def preWalk(pf: Tree ~> Tree): Tree => Tree =
     new Transformer {
-      override def transform(tree: Tree): Tree =
-        super.transform {
-          if (pf.isDefinedAt(tree)) pf(tree)
-          else tree
+      override def transform(tree: Tree): Tree = {
+        val result = if (pf.isDefinedAt(tree)) pf(tree) else tree
+        result match {
+          // NOTE: TypeTree.original is not transformed by default
+          case tt: TypeTree if tt.original != null =>
+            val original = transform(tt.original)
+            if (original eq tt.original) tt else {
+              val copy = treeCopy.TypeTree(tt)
+              setOriginal(copy, original)
+              copy
+            }
+
+          case _ =>
+            super.transform(result)
         }
+      }
     }.transform
 
   /** Shorthand for one-shot `postWalk(pf).apply(tree)`. */
@@ -181,8 +174,22 @@ trait Util {
   def postWalk(pf: Tree ~> Tree): Tree => Tree =
     new Transformer {
       override def transform(tree: Tree): Tree = {
-        val result = super.transform(tree)
-        if (pf.isDefinedAt(result)) pf(result) else result
+        val result = tree match {
+          // NOTE: TypeTree.original is not transformed by default
+          case tt: TypeTree if tt.original != null =>
+            val original = transform(tt.original)
+            if (original eq tt.original) tt else {
+              val copy = treeCopy.TypeTree(tt)
+              setOriginal(copy, original)
+              copy
+            }
+
+          case _ =>
+            super.transform(tree)
+        }
+
+        if (pf.isDefinedAt(result)) pf(result)
+        else result
       }
     }.transform
 
@@ -287,7 +294,7 @@ trait Util {
     }
 
     /** Does `tree` have a [[TermSymbol]]? */
-    def term(tree: Tree): Boolean =
+    def termSym(tree: Tree): Boolean =
       Has.sym(tree) && tree.symbol.isTerm
 
     /** Does `tree` have a [[TypeSymbol]]? */
@@ -314,4 +321,55 @@ trait Util {
       pos != null && pos != NoPosition
     }
   }
+
+  // ------------------------
+  // Abstract wrapper methods
+  // ------------------------
+
+  private[compiler] def getFlags(sym: Symbol): FlagSet
+  private[compiler] def setFlags(sym: Symbol, flags: FlagSet): Unit
+  private[compiler] def setName(sym: Symbol, name: Name): Unit
+  private[compiler] def setOwner(sym: Symbol, owner: Symbol): Unit
+  private[compiler] def setPos(tree: Tree, pos: Position): Unit
+  private[compiler] def setOriginal(tt: TypeTree, original: Tree): Unit
+  private[compiler] def annotate(sym: Symbol, ans: Annotation*): Unit
+  private[compiler] def attachments(sym: Symbol): Attachments
+  private[compiler] def attachments(tree: Tree): Attachments
+
+  /** Parses a snippet of source code and returns the AST. */
+  private[compiler] def parse(code: String): Tree
+
+  /** Type-checks a [[Tree]] (use `typeMode=true` for [[TypeTree]]s). */
+  private[compiler] def typeCheck(
+    tree: Tree,
+    typeMode: Boolean = false): Tree
+
+  /** Returns a new [[TermSymbol]]. */
+  private[compiler] def termSymbol(
+    owner: Symbol,
+    name: TermName,
+    flags: FlagSet = Flag.SYNTHETIC,
+    pos: Position = NoPosition): TermSymbol
+
+  /** Returns a new [[TypeSymbol]]. */
+  private[compiler] def typeSymbol(
+    owner: Symbol,
+    name: TypeName,
+    flags: FlagSet = Flag.SYNTHETIC,
+    pos: Position = NoPosition): TypeSymbol
+
+  /** Returns a fresh [[TermName]] starting with `prefix`. */
+  private[compiler] def freshTerm(prefix: String): TermName =
+    if (prefix.nonEmpty && prefix.last == '$') freshTermName(prefix)
+    else freshTermName(s"$prefix$$")
+
+  /** Returns a fresh [[TypeName]] starting with `prefix`. */
+  private[compiler] def freshType(prefix: String): TypeName =
+    if (prefix.nonEmpty && prefix.last == '$') freshTypeName(prefix)
+    else freshTypeName(s"$prefix$$")
+
+  /** Removes all [[Type]] and [[Symbol]] attributes from a [[Tree]]. */
+  // FIXME: Replace with `c.untypecheck` once SI-5464 is resolved.
+  private[compiler] def unTypeCheck(tree: Tree): Tree =
+    parse(showCode(tree, printRootPkg = true))
 }

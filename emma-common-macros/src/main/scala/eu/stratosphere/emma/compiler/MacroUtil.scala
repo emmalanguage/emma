@@ -1,7 +1,7 @@
 package eu.stratosphere.emma
 package compiler
 
-import scala.reflect.macros.blackbox
+import scala.reflect.macros.{Attachments, blackbox}
 
 /**
  * Implements various utility functions that mitigate and/or workaround deficiencies in Scala's
@@ -12,9 +12,7 @@ trait MacroUtil extends ReflectUtil {
 
   val c: blackbox.Context
   val universe: c.universe.type = c.universe
-
   import universe._
-  import c.internal._
 
   override def warning(pos: Position, msg: String): Unit =
     c.warning(pos, msg)
@@ -22,83 +20,59 @@ trait MacroUtil extends ReflectUtil {
   override def abort(pos: Position, msg: String): Nothing =
     c.abort(pos, msg)
 
-  override def parse(code: String): Tree =
+  private[compiler] override def getFlags(sym: Symbol): FlagSet =
+    internal.flags(sym)
+
+  private[compiler] override def setFlags(sym: Symbol, flags: FlagSet): Unit =
+    internal.setFlag(sym, flags)
+
+  private[compiler] override def setName(sym: Symbol, name: Name): Unit =
+    internal.setName(sym, name)
+
+  private[compiler] override def setOwner(sym: Symbol, owner: Symbol): Unit =
+    internal.setOwner(sym, owner)
+
+  private[compiler] override def setPos(tree: Tree, pos: Position): Unit =
+    internal.setPos(tree, pos)
+
+  private[compiler] override def setOriginal(tt: TypeTree, original: Tree): Unit =
+    internal.setOriginal(tt, original)
+
+  private[compiler] override def annotate(sym: Symbol, ans: Annotation*): Unit =
+    internal.setAnnotations(sym, ans: _*)
+
+  private[compiler] override def attachments(sym: Symbol): Attachments =
+    internal.attachments(sym)
+
+  private[compiler] override def attachments(tree: Tree): Attachments =
+    internal.attachments(tree)
+
+  private[compiler] override def parse(code: String): Tree =
     c.parse(code)
 
-  override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
+  private[compiler] override def typeCheck(
+    tree: Tree,
+    typeMode: Boolean = false): Tree = {
+
     if (typeMode) c.typecheck(tree, c.TYPEmode)
     else c.typecheck(tree)
+  }
 
-  override def termSymbol(
+  private[compiler] override def termSymbol(
     owner: Symbol,
     name: TermName,
     flags: FlagSet,
     pos: Position): TermSymbol = {
 
-    newTermSymbol(owner, name, pos, flags)
+    internal.newTermSymbol(owner, name, pos, flags)
   }
 
-  override def typeSymbol(
+  private[compiler] override def typeSymbol(
     owner: Symbol,
     name: TypeName,
     flags: FlagSet,
     pos: Position): TypeSymbol = {
 
-    newTypeSymbol(owner, name, pos, flags)
+    internal.newTypeSymbol(owner, name, pos, flags)
   }
-
-  override def transform(pf: Tree ~> Tree): Tree => Tree =
-    new Transformer {
-      override def transform(tree: Tree): Tree =
-        if (pf.isDefinedAt(tree)) pf(tree)
-        else tree match {
-          // NOTE:
-          // - TypeTree.original is not transformed by default
-          // - setOriginal is only available at compile-time
-          case tt: TypeTree if tt.original != null =>
-            val original = transform(tt.original)
-            if (original eq tt.original) tt
-            else setOriginal(Type.quote(tt.tpe), original)
-          case _ =>
-            super.transform(tree)
-        }
-    }.transform
-
-  override def preWalk(pf: Tree ~> Tree): Tree => Tree =
-    new Transformer {
-      override def transform(tree: Tree): Tree = {
-        val result = if (pf.isDefinedAt(tree)) pf(tree) else tree
-        result match {
-          // NOTE:
-          // - TypeTree.original is not transformed by default
-          // - setOriginal is only available at compile-time
-          case tt: TypeTree if tt.original != null =>
-            val original = transform(tt.original)
-            if (original eq tt.original) tt
-            else setOriginal(Type.quote(tt.tpe), original)
-          case _ =>
-            super.transform(result)
-        }
-      }
-    }.transform
-
-  override def postWalk(pf: Tree ~> Tree): Tree => Tree =
-    new Transformer {
-      override def transform(tree: Tree): Tree = {
-        val result = tree match {
-          // NOTE:
-          // - TypeTree.original is not transformed by default
-          // - setOriginal is only available at compile-time
-          case tt: TypeTree if tt.original != null =>
-            val original = transform(tt.original)
-            if (original eq tt.original) tt
-            else setOriginal(Type.quote(tt.tpe), original)
-          case _ =>
-            super.transform(tree)
-        }
-
-        if (pf.isDefinedAt(result)) pf(result)
-        else result
-      }
-    }.transform
 }
