@@ -10,10 +10,13 @@ import org.scalatest.junit.JUnitRunner
 class AdministrativeNormalFormSpec extends BaseCompilerSpec {
 
   import compiler.universe._
+  import AdministrativeNormalFormSpec._
 
   def typeCheckAndNormalize[T](expr: Expr[T]): Tree = {
     val pipeline = {
       compiler.typeCheck(_: Tree)
+    } andThen {
+      compiler.LNF.destruct
     } andThen {
       compiler.LNF.resolveNameClashes
     } andThen {
@@ -124,4 +127,50 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
 
     compiler.LNF.eq(t1, t2) shouldBe true
   }
+
+  "irrefutable pattern matching" - {
+    "of tuples" in {
+      val t1 = typeCheckAndNormalize(reify {
+        ("life", 42) match {
+          case (s: String, i: Int) =>
+            s + i
+        }
+      })
+
+      val t2 = typeCheck(reify {
+        val x$1 = ("life", 42)
+        val s = x$1._1
+        val i = x$1._2
+        val x$2 = s + i
+        x$2
+      })
+
+      compiler.LNF.eq(t1, t2) shouldBe true
+    }
+
+    "of case classes" in {
+      val t1 = typeCheckAndNormalize(reify {
+        Point(1, 2) match {
+          case Point(i, j) =>
+            i + j
+        }
+      })
+
+      val t2 = typeCheck(reify {
+        val p$1 = Point
+        val x$1 = p$1(1, 2)
+        val i = x$1.x
+        val j = x$1.y
+        val x$2 = i + j
+        x$2
+      })
+
+      compiler.LNF.eq(t1, t2) shouldBe true
+    }
+  }
+}
+
+object AdministrativeNormalFormSpec {
+
+  case class Point(x: Int, y: Int)
 }
