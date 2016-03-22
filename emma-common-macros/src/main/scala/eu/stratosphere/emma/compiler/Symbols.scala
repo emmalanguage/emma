@@ -2,6 +2,7 @@ package eu.stratosphere.emma
 package compiler
 
 import scala.collection.mutable
+import scala.reflect.macros.Attachments
 
 /** Utility for symbols (depends on [[Trees]] and [[Types]]). */
 trait Symbols extends Util { this: Trees with Types =>
@@ -40,6 +41,10 @@ trait Symbols extends Util { this: Trees with Types =>
     /** Checks common pre-conditions for type-checked [[Symbol]]s. */
     def verify(sym: Symbol): Boolean =
       isDefined(sym) && Has.tpe(sym)
+
+    /** Returns a mutable metadata container for `sym`. */
+    def meta(sym: Symbol): Attachments =
+      attachments(sym)
   }
 
   /** Utility for [[Symbol]] owners. */

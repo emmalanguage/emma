@@ -3,6 +3,7 @@ package compiler
 
 import scala.annotation.tailrec
 import scala.reflect.ClassTag
+import scala.reflect.macros.Attachments
 
 /** Utility for trees (depends on [[Types]] and [[Symbols]]). */
 trait Trees extends Util { this: Types with Symbols =>
@@ -352,6 +353,10 @@ trait Trees extends Util { this: Types with Symbols =>
     def isParam(vd: ValDef): Boolean =
       Term.of(vd).isParameter ||
         vd.mods.hasFlag(Flag.PARAM)
+
+    /** Returns a mutable metadata container for `tree`. */
+    def meta(tree: Tree): Attachments =
+      attachments(tree)
   }
 
   /** Some useful constants. */
