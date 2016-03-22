@@ -1,7 +1,9 @@
 package eu.stratosphere.emma
 package compiler
 
-import scala.reflect.macros.{Attachments, blackbox}
+import scala.reflect.macros.Attachments
+import scala.reflect.macros.blackbox
+import scala.tools.nsc.Global
 
 /**
  * Implements various utility functions that mitigate and/or workaround deficiencies in Scala's
@@ -13,6 +15,19 @@ trait MacroUtil extends ReflectUtil {
   val c: blackbox.Context
   val universe: c.universe.type = c.universe
   import universe._
+
+  /** Shows `tree` in a Swing AST browser. */
+  def browse(tree: Tree): Unit = universe match {
+    case global: Global =>
+      val gt = tree.asInstanceOf[global.Tree]
+      import global.treeBrowsers._
+      val frame = new BrowserFrame("macro-expand")
+      val lock = new concurrent.Lock
+      frame.setTreeModel(new ASTTreeModel(gt))
+      frame.createFrame(lock)
+      lock.acquire()
+    case _ =>
+  }
 
   override def warning(pos: Position, msg: String): Unit =
     c.warning(pos, msg)
