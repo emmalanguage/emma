@@ -107,7 +107,7 @@ trait Symbols extends Util { this: Trees with Types =>
         setSymbol(bd, lhs)
         setType(bd, tpe)
 
-      case id: Ident if Has.term(id) &&
+      case id: Ident if Has.termSym(id) &&
         dict.contains(id.symbol) =>
         val term = dict(id.symbol)
         setSymbol(id, term)
@@ -169,7 +169,7 @@ trait Symbols extends Util { this: Trees with Types =>
 
     /** Returns the term of `tree`. */
     def of(tree: Tree): TermSymbol = {
-      assert(Has.term(tree))
+      assert(Has.termSym(tree))
       tree.symbol.asTerm
     }
 

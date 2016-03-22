@@ -4,7 +4,7 @@ package compiler
 import com.typesafe.scalalogging.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-import scala.language.implicitConversions
+import scala.reflect.macros.Attachments
 import scala.reflect.runtime.JavaUniverse
 import scala.tools.reflect.ToolBox
 
@@ -17,9 +17,7 @@ trait RuntimeUtil extends ReflectUtil {
 
   val universe: JavaUniverse = new JavaUniverse
   val tb: ToolBox[universe.type]
-
   import universe._
-  import internal._
 
   private val logger =
     Logger(LoggerFactory.getLogger(classOf[RuntimeUtil]))
@@ -30,28 +28,59 @@ trait RuntimeUtil extends ReflectUtil {
   override def abort(pos: Position, msg: String): Nothing =
     throw new RuntimeException(s"error at position $pos: $msg")
 
-  override def parse(code: String): Tree =
+  private[compiler] override def getFlags(sym: Symbol): FlagSet =
+    internal.flags(sym)
+
+  private[compiler] override def setFlags(sym: Symbol, flags: FlagSet): Unit =
+    internal.setFlag(sym, flags)
+
+  private[compiler] override def setName(sym: Symbol, name: Name): Unit =
+    sym.name = name
+
+  private[compiler] override def setOwner(sym: Symbol, owner: Symbol): Unit =
+    sym.owner = owner
+
+  private[compiler] override def setPos(tree: Tree, pos: Position): Unit =
+    tree.pos = pos
+
+  private[compiler] override def setOriginal(tt: TypeTree, original: Tree): Unit =
+    tt.setOriginal(original)
+
+  private[compiler] override def annotate(sym: Symbol, ans: Annotation*): Unit =
+    sym.setAnnotations(ans.toList)
+
+  private[compiler] override def attachments(sym: Symbol): Attachments =
+    sym.attachments
+
+  private[compiler] override def attachments(tree: Tree): Attachments =
+    tree.attachments
+
+  private[compiler] override def parse(code: String): Tree =
     tb.parse(code)
 
-  override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
+  private[compiler] override def typeCheck(
+    tree: Tree,
+    typeMode: Boolean = false): Tree = {
+
     if (typeMode) tb.typecheck(tree, tb.TYPEmode)
     else tb.typecheck(tree)
+  }
 
-  override def termSymbol(
+  private[compiler] override def termSymbol(
     owner: Symbol,
     name: TermName,
     flags: FlagSet,
     pos: Position): TermSymbol = {
 
-    newTermSymbol(owner, name, pos, flags)
+    internal.newTermSymbol(owner, name, pos, flags)
   }
 
-  override def typeSymbol(
+  private[compiler] override def typeSymbol(
     owner: Symbol,
     name: TypeName,
     flags: FlagSet,
     pos: Position): TypeSymbol = {
 
-    newTypeSymbol(owner, name, pos, flags)
+    internal.newTypeSymbol(owner, name, pos, flags)
   }
 }

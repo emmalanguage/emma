@@ -72,7 +72,7 @@ trait Trees extends Util { this: Types with Symbols =>
     def refs(tree: Tree): Set[TermSymbol] =
       tree.collect {
         // Could be a type ref
-        case id: Ident if Has.term(id) && {
+        case id: Ident if Has.termSym(id) && {
           val term = Term.of(id)
           term.isVal || term.isVar || term.isMethod
         } => Term.of(id)
@@ -307,7 +307,7 @@ trait Trees extends Util { this: Types with Symbols =>
           case vd: ValDef if dict.contains(Term.of(vd)) =>
             val_(dict(Term.of(vd)), vd.rhs)
           // could be a type ref
-          case id: Ident if Has.term(id) && dict.contains(Term.of(id)) =>
+          case id: Ident if Has.termSym(id) && dict.contains(Term.of(id)) =>
             ref(dict(Term.of(id)))
           case bd: Bind if dict.contains(Term.of(bd)) =>
             bind(dict(Term.of(bd)), bd.body)
