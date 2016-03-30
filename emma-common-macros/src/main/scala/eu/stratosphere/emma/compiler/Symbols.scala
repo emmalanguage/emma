@@ -49,6 +49,14 @@ trait Symbols extends Util { this: Trees with Types =>
     /** Returns the flags associated with `sym`. */
     def flags(sym: Symbol): FlagSet =
       getFlags(sym)
+
+    /** Wraps `flags` as modifiers. */
+    def mods(flags: FlagSet): Modifiers =
+      Modifiers(flags)
+
+    /** Returns the modifiers associated with `sym`. */
+    def mods(sym: Symbol): Modifiers =
+      mods(flags(sym))
   }
 
   /** Utility for [[Symbol]] owners. */
