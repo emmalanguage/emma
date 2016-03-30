@@ -130,20 +130,28 @@ trait Trees extends Util { this: Types with Symbols =>
       setType(bd, Type.of(lhs))
     }
 
-    /** Returns a new value / variable definition. */
-    def val_(lhs: TermSymbol,
-      rhs: Tree = EmptyTree,
-      flags: FlagSet = Flag.SYNTHETIC): ValDef = {
+    /** `val` constructors and extractors. No support for lazy vals. */
+    object val_ {
+      import Flag._
 
-      assert(Symbol.verify(lhs))
-      assert(rhs.isEmpty || (Has.tpe(rhs) &&
-        Type.of(rhs).weak_<:<(Type.of(lhs))))
+      /** Returns a new value / variable definition. */
+      def apply(lhs: TermSymbol, rhs: Tree = EmptyTree): ValDef = {
+        assert(Symbol.verify(lhs), s"Invalid symbol $lhs")
+        val tpe = Type.of(lhs)
+        assert(rhs.isEmpty || (Has.tpe(rhs) && Type.of(rhs).weak_<:<(tpe)),
+          s"Right hand side of val $lhs does not match declared type $tpe")
+        val mods = Symbol.mods(lhs)
+        assert(!mods.hasFlag(LAZY), s"Lazy val not supported: $lhs")
+        val tpt = Type.quote(tpe)
+        val x = ValDef(mods, lhs.name, tpt, rhs)
+        setSymbol(x, lhs)
+        setType(x, NoType)
+      }
 
-      val mods = Modifiers(flags)
-      val tpt = Type.quote(Type.of(lhs))
-      val vd = ValDef(mods, lhs.name, tpt, rhs)
-      setSymbol(vd, lhs)
-      setType(vd, NoType)
+      def unapply(tree: Tree): Option[(TermSymbol, Tree)] = tree match {
+        case x@ValDef(_, _, _, rhs) => Some(Term.of(x), rhs)
+        case _ => None
+      }
     }
 
     /** Returns a new [[Block]] with the supplied content. */
@@ -258,7 +266,7 @@ trait Trees extends Util { this: Types with Symbols =>
       val params = for ((arg, tpe) <- args zip types) yield
         Term.sym(term, arg.name, tpe, argFlags)
 
-      val paramList = params.map(val_(_, flags = argFlags)).toList
+      val paramList = params.map(val_(_)).toList
       val rhs = rename(bodyBlock, args zip params: _*)
       val fn = Function(paramList, rhs)
       setSymbol(fn, term)
@@ -447,7 +455,7 @@ trait Trees extends Util { this: Types with Symbols =>
       val params = for (arg <- args) yield
         Term.sym(sym, arg.name, Type.of(arg), argFlags)
 
-      val paramLists = params.map(val_(_, flags = argFlags)).toList :: Nil
+      val paramLists = params.map(val_(_)).toList :: Nil
       val rhs = rename(bodyBlock, args zip params: _*)
       val dd = defDef(sym, Modifiers(flags), paramLists, rhs)
       setSymbol(dd, sym)
