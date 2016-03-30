@@ -154,13 +154,15 @@ trait Symbols extends Util { this: Trees with Types =>
       TermName(name)
     }
 
-    /** Returns a fresh [[TermName]] starting with `prefix`. */
-    def fresh(prefix: TermName): TermName =
+    /** Returns a fresh term name starting with `prefix$`. */
+    def fresh(prefix: Name): TermName =
       fresh(prefix.toString)
 
-    /** Returns a fresh [[TermName]] starting with `prefix`. */
-    def fresh(prefix: String): TermName =
-      freshTerm(prefix)
+    /** Returns a fresh term name starting with `prefix$`. */
+    def fresh(prefix: String): TermName = {
+      if (prefix.nonEmpty && prefix.last == '$') freshTermName(prefix)
+      else freshTermName(s"$prefix$$")
+    }.encodedName.toTermName
 
     /** Returns a free term with the specified properties. */
     def free(name: String, tpe: Type,

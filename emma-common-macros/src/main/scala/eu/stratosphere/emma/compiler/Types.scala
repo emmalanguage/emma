@@ -91,9 +91,15 @@ trait Types extends Util { this: Trees with Symbols =>
       TypeName(name)
     }
 
-    /** Returns a fresh [[TypeName]] starting with `prefix`. */
-    def fresh(prefix: String): TypeName =
-      freshType(prefix)
+    /** Returns a fresh type name starting with `prefix$`. */
+    def fresh(prefix: Name): TypeName =
+      fresh(prefix.toString)
+
+    /** Returns a fresh type name starting with `prefix$`. */
+    def fresh(prefix: String): TypeName = {
+      if (prefix.nonEmpty && prefix.last == '$') freshTypeName(prefix)
+      else freshTypeName(s"$prefix$$")
+    }.encodedName.toTypeName
 
     /** Returns a free [[TypeSymbol]] with specified attributes. */
     def free(name: String,

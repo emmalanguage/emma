@@ -358,16 +358,6 @@ trait Util {
     flags: FlagSet = Flag.SYNTHETIC,
     pos: Position = NoPosition): TypeSymbol
 
-  /** Returns a fresh [[TermName]] starting with `prefix`. */
-  private[compiler] def freshTerm(prefix: String): TermName =
-    if (prefix.nonEmpty && prefix.last == '$') freshTermName(prefix)
-    else freshTermName(s"$prefix$$")
-
-  /** Returns a fresh [[TypeName]] starting with `prefix`. */
-  private[compiler] def freshType(prefix: String): TypeName =
-    if (prefix.nonEmpty && prefix.last == '$') freshTypeName(prefix)
-    else freshTypeName(s"$prefix$$")
-
   /** Removes all [[Type]] and [[Symbol]] attributes from a [[Tree]]. */
   // FIXME: Replace with `c.untypecheck` once SI-5464 is resolved.
   private[compiler] def unTypeCheck(tree: Tree): Tree =
