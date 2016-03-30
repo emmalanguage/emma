@@ -8,7 +8,7 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class CSESpec extends BaseCompilerSpec {
 
-  import scala.reflect.runtime.universe._
+  import compiler.universe._
 
   def typeCheckAndNormalize[T](expr: Expr[T]): Tree = {
     val pipeline = {

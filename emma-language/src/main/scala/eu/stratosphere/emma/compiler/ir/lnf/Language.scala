@@ -413,7 +413,7 @@ trait Language extends CommonIR {
 
       val dict = loop((vals, Map.empty))
       postWalk(tree) {
-        case id: Ident if Has.term(id) &&
+        case id: Ident if Has.termSym(id) &&
           dict.contains(id.symbol) =>
             dict(id.symbol)
 

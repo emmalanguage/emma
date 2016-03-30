@@ -120,14 +120,21 @@ trait Trees extends Util { this: Types with Symbols =>
       setType(id, Type.of(term))
     }
 
-    /** Returns a binding of `lhs` to use when pattern matching. */
-    def bind(lhs: TermSymbol,
-      pattern: Tree = Ident(Term.wildcard)): Bind = {
+    /** Binding constructors and extractors. */
+    object bind {
 
-      assert(Symbol.verify(lhs))
-      val bd = Bind(lhs.name, pattern)
-      setSymbol(bd, lhs)
-      setType(bd, Type.of(lhs))
+      /** Returns a binding of `lhs` to use when pattern matching. */
+      def apply(lhs: TermSymbol, pat: Tree = Ident(Term.wildcard)): Bind = {
+        assert(Symbol.verify(lhs), s"Invalid symbol $lhs")
+        val x = Bind(lhs.name, pat)
+        setSymbol(x, lhs)
+        setType(x, Type.of(lhs))
+      }
+
+      def unapply(tree: Tree): Option[(TermSymbol, Tree)] = tree match {
+        case x@Bind(_, pat) => Some(Term.of(x), pat)
+        case _ => None
+      }
     }
 
     /** `val` constructors and extractors. No support for lazy vals. */
