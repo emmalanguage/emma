@@ -45,6 +45,10 @@ trait Symbols extends Util { this: Trees with Types =>
     /** Returns a mutable metadata container for `sym`. */
     def meta(sym: Symbol): Attachments =
       attachments(sym)
+
+    /** Returns the flags associated with `sym`. */
+    def flags(sym: Symbol): FlagSet =
+      getFlags(sym)
   }
 
   /** Utility for [[Symbol]] owners. */
