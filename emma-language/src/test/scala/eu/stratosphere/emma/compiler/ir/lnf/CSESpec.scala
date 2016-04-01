@@ -103,20 +103,24 @@ class CSESpec extends BaseCompilerSpec {
 
   "nested blocks" in {
     val t1 = typeCheckAndNormalize(reify {
+      val z = y
       val a = {
         val b = y.indexOf('a')
         b + 15
       }
       val c = {
-        val b = y.indexOf('a')
+        val b = z.indexOf('a')
         b + 15
       }
+      a + c
     })
 
     val t2 = typeCheck(reify {
       val y$1 = y
       val b$1 = y$1.indexOf('a')
       val a = b$1 + 15
+      val r = a + a
+      r
     })
 
     compiler.LNF.eq(t1, t2) shouldBe true
