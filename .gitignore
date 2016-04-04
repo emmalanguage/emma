@@ -10,3 +10,4 @@ target
 *.class
 *.iml
 dependency-reduced-pom.xml
+docs/.ipynb_checkpoints
