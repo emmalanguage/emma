@@ -13,4 +13,6 @@ package object ir {
   def comprehension[A](block: A) = ???
 
   def guard(expr: Boolean) = ???
+
+  def head[A](expr: A): A = ???
 }

@@ -228,51 +228,57 @@ trait Language extends CommonIR {
      */
     // FIXME: What happens if there are methods with by-name parameters?
     private[emma] def anf(tree: Tree): Tree = {
-      // Pre-conditions
       assert(nameClashes(tree).isEmpty)
       assert(controlFlowNodes(tree).isEmpty)
+      // Avoid empty blocks
+      anfTransform(tree) match {
+        case Block(Nil, expr) => expr
+        case block => block
+      }
+    }
 
-      postWalk(tree) {
-        // Already in ANF
-        case EmptyTree => EmptyTree
-        case lit: Literal => block(lit)
-        case id: Ident => block(id)
-        case branch: If => block(branch)
-        case vd: ValDef if isParam(vd) => vd
+    private val anfTransform: Tree => Tree = postWalk {
+      // Already in ANF
+      case EmptyTree => EmptyTree
+      case lit: Literal => block(lit)
+      case id: Ident => block(id)
+      case branch: If => block(branch)
+      case vd: ValDef if isParam(vd) => vd
 
-        case Typed(Block(stats, expr), tpt) =>
-          val tpe = Type.of(tpt)
-          val name = Term.fresh(nameOf(expr))
-          val term = Term.free(name.toString, tpe)
+      case Typed(Block(stats, expr), tpt) =>
+        val tpe = Type.of(tpt)
+        val name = Term.fresh(nameOf(expr))
+        val term = Term.free(name.toString, tpe)
+        block(stats,
+          val_(term, ascribe(expr, tpe)),
+          ref(term))
+
+      case sel@Select(Block(stats, target), member: TypeName) =>
+        block(stats, Type.sel(target, Type.symOf(sel), Type.of(sel)))
+
+      case sel@Select(Block(stats, target), member: TermName) =>
+        val term = Term.of(sel)
+        val tpe = Type.of(sel)
+        val expr = Term.sel(target, term, tpe)
+        if (term.isPackage ||
+          (term.isMethod && !term.isAccessor) ||
+          IR.comprehensionOps.contains(term)) {
+          block(stats, expr)
+        } else {
+          val name = Term.fresh(member).toString
+          val lhs = Term.free(name, tpe)
           block(stats,
-            val_(term, ascribe(expr, tpe)),
-            ref(term))
+            val_(lhs, expr),
+            ref(lhs))
+        }
 
-        case sel@Select(Block(stats, target), member: TypeName) =>
-          block(stats,
-            Type.sel(target, Type.symOf(sel), Type.of(sel)))
+      case TypeApply(Block(stats, target), types) =>
+        block(stats, typeApp(target, types.map(Type.of): _*))
 
-        case sel@Select(Block(stats, target), member: TermName) =>
-          val term = Term.of(sel)
-          val tpe = Type.of(sel)
-          val expr = Term.sel(target, term, tpe)
-          if (term.isPackage || {
-            term.isMethod && !term.isAccessor
-          }) {
-            block(stats, expr)
-          } else {
-            val name = Term.fresh(member).toString
-            val lhs = Term.free(name, tpe)
-            block(stats,
-              val_(lhs, expr),
-              ref(lhs))
-          }
-
-        case TypeApply(Block(stats, target), types) =>
-          block(stats,
-            typeApp(target, types.map(Type.of): _*))
-
-        case app@Apply(Block(stats, target), args) =>
+      case app@Apply(Block(stats, target), args) =>
+        if (IR.comprehensionOps contains Term.of(target)) {
+          block(stats, Tree.app(target)(args: _*))
+        } else {
           val name = Term.fresh(nameOf(target))
           val term = Term.free(name.toString, Type.of(app))
           val init = stats ::: args.flatMap {
@@ -288,36 +294,32 @@ trait Language extends CommonIR {
           block(init,
             val_(term, Tree.app(target)(params: _*)),
             ref(term))
+        }
 
-        // Only if contains nested blocks
-        case bl: Block if bl.children.exists {
-          case _: Block => true
-          case _ => false
-        } =>
-          val body = bl.children.flatMap {
-            case nested: Block => nested.children
-            case child => child :: Nil
-          }
+      // Only if contains nested blocks
+      case bl: Block if bl.children.exists {
+        case _: Block => true
+        case _ => false
+      } =>
+        val body = bl.children.flatMap {
+          case nested: Block => nested.children
+          case child => child :: Nil
+        }
 
-          // Implicitly removes ()
-          block(body.init, body.last)
+        // Implicitly removes ()
+        block(body.init, body.last)
 
-        // Avoid duplication of intermediates
-        case vd@ValDef(mods, _, _, Block(stats :+ (int: ValDef), rhs: Ident))
-          if int.symbol == rhs.symbol =>
-          block(stats,
-            val_(Term.of(vd), int.rhs, mods.flags),
-            unit)
+      // Avoid duplication of intermediates
+      case vd@ValDef(mods, _, _, Block(stats :+ (int: ValDef), rhs: Ident))
+        if int.symbol == rhs.symbol =>
+        block(stats,
+          val_(Term.of(vd), int.rhs, mods.flags),
+          unit)
 
-        case vd@ValDef(mods, _, _, Block(stats, rhs)) =>
-          block(stats,
-            val_(Term.of(vd), rhs, mods.flags),
-            unit)
-
-        // Avoid empty blocks
-        case Block(Nil, expr) =>
-          expr
-      }
+      case vd@ValDef(mods, _, _, Block(stats, rhs)) =>
+        block(stats,
+          val_(Term.of(vd), rhs, mods.flags),
+          unit)
     }
 
     /** Ensures that all definitions within the `tree` have unique names. */
