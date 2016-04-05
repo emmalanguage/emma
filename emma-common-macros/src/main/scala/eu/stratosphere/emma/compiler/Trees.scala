@@ -65,7 +65,7 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns the [[Set]] of terms defined in `tree`. */
     def defs(tree: Tree): Set[TermSymbol] = tree.collect {
-      case dt @ (_: ValDef | _: Bind | _: Function | _: DefDef) => dt
+      case dt @ (_: ValDef | _: Bind | _: DefDef) => dt
     }.map(Term.of).toSet
 
     /** Returns the [[Set]] of terms referenced in `tree`. */
