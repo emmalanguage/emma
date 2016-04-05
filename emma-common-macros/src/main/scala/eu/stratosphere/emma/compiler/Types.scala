@@ -187,18 +187,18 @@ trait Types extends Util { this: Trees with Symbols =>
     def result(tree: Tree): Type =
       result(of(tree))
 
-    /** Finds `member` declared in `target` and returns it's [[TypeSymbol]]. */
-    def decl(target: Symbol, member: TypeName): TypeSymbol = {
+    /** Finds type `member` accessible in `target` and returns its symbol. */
+    def member(target: Symbol, member: TypeName): TypeSymbol = {
       assert(Symbol.verify(target))
       assert(member.toString.nonEmpty)
-      of(target).decl(member).asType
+      of(target).member(member).asType
     }
 
-    /** Finds `member` declared in `target` and returns it's [[TypeSymbol]]. */
-    def decl(target: Tree, member: TypeName): TypeSymbol = {
+    /** Finds type `member` accessible in `target` and returns its symbol. */
+    def member(target: Tree, member: TypeName): TypeSymbol = {
       assert(Has.tpe(target))
       assert(member.toString.nonEmpty)
-      of(target).decl(member).asType
+      of(target).member(member).asType
     }
 
     /** Is `tree` type-checked? */

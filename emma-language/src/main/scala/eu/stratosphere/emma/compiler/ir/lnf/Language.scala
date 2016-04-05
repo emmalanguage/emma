@@ -485,7 +485,7 @@ trait Language extends CommonIR {
           val inst = clazz.primaryConstructor
           val params = inst.infoIn(tpe).paramLists.head
           val selects = params.map { param =>
-            val field = tpe.decl(param.name).asTerm
+            val field = tpe.member(param.name).asTerm
             Term.sel(sel, field, Type.of(param))
           }
 

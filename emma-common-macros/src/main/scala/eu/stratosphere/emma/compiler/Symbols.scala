@@ -192,18 +192,18 @@ trait Symbols extends Util { this: Trees with Types =>
       tree.symbol.asTerm
     }
 
-    /** Finds `member` declared in `target` and returns its term. */
-    def decl(target: Symbol, member: TermName): TermSymbol = {
+    /** Finds field / method `member` accessible in `target` and returns its symbol. */
+    def member(target: Symbol, member: TermName): TermSymbol = {
       assert(Symbol.verify(target))
       assert(member.toString.nonEmpty)
-      Type.of(target).decl(member).asTerm
+      Type.of(target).member(member).asTerm
     }
 
-    /** Finds `member` declared in `target` and returns its term. */
-    def decl(target: Tree, member: TermName): TermSymbol = {
+    /** Finds field / method `member` accessible in `target` and returns its symbol. */
+    def member(target: Tree, member: TermName): TermSymbol = {
       assert(Has.tpe(target))
       assert(member.toString.nonEmpty)
-      Type.of(target).decl(member).asTerm
+      Type.of(target).member(member).asTerm
     }
 
     /** Imports a term from a [[Tree]]. */
