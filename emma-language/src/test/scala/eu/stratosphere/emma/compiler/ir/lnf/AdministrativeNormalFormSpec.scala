@@ -9,8 +9,10 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class AdministrativeNormalFormSpec extends BaseCompilerSpec {
 
-  import compiler.universe._
   import AdministrativeNormalFormSpec._
+  import compiler.universe._
+  import eu.stratosphere.emma.compiler.ir._
+  import eu.stratosphere.emma.testschema.Marketing._
 
   def typeCheckAndNormalize[T](expr: Expr[T]): Tree = {
     val pipeline = {
@@ -145,6 +147,57 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
     compiler.LNF.eq(t1, t2) shouldBe true
   }
 
+  "bypass mock comprehensions" in {
+
+    val t1 = typeCheckAndNormalize(reify {
+      comprehension {
+        val u = generator(users)
+        val a = generator(ads)
+        val c = generator(clicks)
+        guard(u.id == c.userID)
+        guard(a.id == c.adID)
+        head(c.time, a.`class`)
+      }
+    })
+
+    val t2 = typeCheck(reify {
+      comprehension {
+        val u = generator {
+          val u$1 = users
+          u$1
+        }
+        val a = generator {
+          val a$1 = ads
+          a$1
+        }
+        val c = generator {
+          val c$1 = clicks
+          c$1
+        }
+        guard {
+          val x$1 = u.id
+          val x$2 = c.userID
+          val x$3 = x$1 == x$2
+          x$3
+        }
+        guard {
+          val x$4 = a.id
+          val x$5 = c.adID
+          val x$6 = x$4 == x$5
+          x$6
+        }
+        head {
+          val x$7 = c.time
+          val x$8 = a.`class`
+          val x$9 = (x$7, x$8)
+          x$9
+        }
+      }
+    })
+
+    compiler.LNF.eq(t1, t2) shouldBe true
+  }
+
   "irrefutable pattern matching" - {
     "of tuples" in {
       val t1 = typeCheckAndNormalize(reify {
@@ -216,4 +269,5 @@ class AdministrativeNormalFormSpec extends BaseCompilerSpec {
 object AdministrativeNormalFormSpec {
 
   case class Point(x: Int, y: Int)
+
 }
