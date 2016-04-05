@@ -1,6 +1,9 @@
-package eu.stratosphere.emma.streaming.api
+package eu.stratosphere.emma.streaming.examples
 
 import eu.stratosphere.emma.api.DataBag
+import eu.stratosphere.emma.streaming.api.{Stream, StreamBag}
+
+import eu.stratosphere.emma.streaming.extended.ExtendedStreamBag._
 
 object StreamJoins {
 

@@ -1,6 +1,9 @@
-package eu.stratosphere.emma.streaming.api
+package eu.stratosphere.emma.streaming.examples
 
 import eu.stratosphere.emma.api.DataBag
+import eu.stratosphere.emma.streaming.api._
+
+import eu.stratosphere.emma.streaming.extended.ExtendedStreamBag._
 
 /**
   * Sketch of expressing event time computation with StreamBag.
@@ -58,7 +61,7 @@ object EventTime {
     // (This is needed e.g. for not to have duplicate windows when we
     // flatten the stream.)
     for {
-      Timed(procTime, processedSB) <- accEventTimeSB.map(fs).withTimestamp
+      Timed(procTime, processedSB) <- StreamBag.fromStream(accEventTimeSB.map[StreamBag[B]](fs)).withTimestamp
     } yield {
       for {
         Timed(eventTime, x) <- processedSB.withTimestamp

@@ -1,6 +1,7 @@
-package eu.stratosphere.emma.streaming.api
+package eu.stratosphere.emma.streaming.examples
 
 import eu.stratosphere.emma.api.DataBag
+import eu.stratosphere.emma.streaming.api.{Stream, StreamBag}
 
 object Examples {
 
@@ -37,14 +38,6 @@ object Examples {
     val sb2: StreamBag[Int] = Seq(DataBag(Seq(1, 2)), DataBag(Seq(3)), DataBag(), DataBag(Seq(4, 5, 6)))
     println(sb2)
 
-    val sb3: StreamBag[Int] = for {
-      x <- sb2.withTimestamp
-      if x.t > 1
-    } yield {
-      x.v
-    }
-
-    println(sb3)
   }
 
 }

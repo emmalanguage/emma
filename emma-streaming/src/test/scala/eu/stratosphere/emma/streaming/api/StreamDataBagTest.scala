@@ -3,6 +3,8 @@ package eu.stratosphere.emma.streaming.api
 import eu.stratosphere.emma.api.DataBag
 import org.scalatest._
 
+import eu.stratosphere.emma.streaming.extended.ExtendedStreamBag._
+
 class StreamDataBagTest extends FlatSpec with Matchers {
   "Stateful computation" should "can count records" in {
     val xs: StreamBag[(Int, Int)] = Seq(

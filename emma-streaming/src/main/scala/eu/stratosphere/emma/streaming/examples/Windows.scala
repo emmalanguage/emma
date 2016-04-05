@@ -1,6 +1,10 @@
-package eu.stratosphere.emma.streaming.api
+package eu.stratosphere.emma.streaming.examples
 
 import eu.stratosphere.emma.api.DataBag
+
+import eu.stratosphere.emma.streaming.api._
+
+import eu.stratosphere.emma.streaming.extended.ExtendedStreamBag._
 
 /*
   It might be advisable to define window streams with a separate end and start.

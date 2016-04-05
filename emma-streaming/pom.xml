@@ -32,6 +32,14 @@
             <groupId>eu.stratosphere</groupId>
             <artifactId>emma-common</artifactId>
         </dependency>
+        <dependency>
+            <groupId>eu.stratosphere</groupId>
+            <artifactId>emma-common-macros</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>eu.stratosphere</groupId>
+            <artifactId>emma-language</artifactId>
+        </dependency>
 
         <!-- Test -->
         <dependency>
