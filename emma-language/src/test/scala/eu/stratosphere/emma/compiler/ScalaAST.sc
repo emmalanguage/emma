@@ -332,3 +332,11 @@ supr.tpe
 supr.symbol
 supr.mix
 supr.qual
+
+val Block(_, assign: Assign) =
+  tc(q"var x = 0; x = 42")
+
+assign.symbol
+assign.tpe
+assign.lhs
+assign.rhs
