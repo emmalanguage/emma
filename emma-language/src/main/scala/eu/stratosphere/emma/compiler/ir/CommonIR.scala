@@ -12,7 +12,7 @@ trait CommonIR extends ReflectUtil {
   // --------------------------------------------------------------------------
 
   /** A set of API method symbols to be comprehended. */
-  protected object API {
+  protected[emma] object API {
     val moduleSymbol /*    */ = rootMirror.staticModule("eu.stratosphere.emma.api.package")
     val bagSymbol /*       */ = rootMirror.staticClass("eu.stratosphere.emma.api.DataBag")
     val groupSymbol /*     */ = rootMirror.staticClass("eu.stratosphere.emma.api.Group")
@@ -54,14 +54,14 @@ trait CommonIR extends ReflectUtil {
     val GROUP /*           */ = typeOf[eu.stratosphere.emma.api.Group[Nothing, Nothing]].typeConstructor
   }
 
-  protected object IR {
-    val moduleSymbol /*    */ = rootMirror.staticModule("eu.stratosphere.emma.compiler.ir.package")
+  protected[emma] object IR {
+    val module /*          */ = rootMirror.staticModule("eu.stratosphere.emma.compiler.ir.package").asModule
 
-    val flatten /*         */ = moduleSymbol.info.decl(TermName("flatten"))
-    val generator /*       */ = moduleSymbol.info.decl(TermName("generator"))
-    val comprehension /*   */ = moduleSymbol.info.decl(TermName("comprehension"))
-    val guard /*           */ = moduleSymbol.info.decl(TermName("guard"))
-    val head /*            */ = moduleSymbol.info.decl(TermName("head"))
+    val flatten /*         */ = module.info.decl(TermName("flatten")).asTerm
+    val generator /*       */ = module.info.decl(TermName("generator")).asTerm
+    val comprehension /*   */ = module.info.decl(TermName("comprehension")).asTerm
+    val guard /*           */ = module.info.decl(TermName("guard")).asTerm
+    val head /*            */ = module.info.decl(TermName("head")).asTerm
 
     val comprehensionOps /**/ = Set(flatten, generator, comprehension, guard, head)
   }
