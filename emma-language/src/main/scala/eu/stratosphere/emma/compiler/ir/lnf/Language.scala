@@ -306,12 +306,12 @@ trait Language extends CommonIR {
         case vd@ValDef(mods, _, _, Block(stats :+ (int: ValDef), rhs: Ident))
           if int.symbol == rhs.symbol =>
           block(stats,
-            val_(Term.of(vd), int.rhs),
+            val_(Term.of(vd), int.rhs, mods.flags),
             unit)
 
         case vd@ValDef(mods, _, _, Block(stats, rhs)) =>
           block(stats,
-            val_(Term.of(vd), rhs),
+            val_(Term.of(vd), rhs, mods.flags),
             unit)
 
         // Avoid empty blocks

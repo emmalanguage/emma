@@ -142,21 +142,23 @@ trait Trees extends Util { this: Types with Symbols =>
       import Flag._
 
       /** Returns a new value / variable definition. */
-      def apply(lhs: TermSymbol, rhs: Tree = EmptyTree): ValDef = {
-        assert(Symbol.verify(lhs), s"Invalid symbol $lhs")
-        val tpe = Type.of(lhs)
-        assert(rhs.isEmpty || (Has.tpe(rhs) && Type.of(rhs).weak_<:<(tpe)),
-          s"Right hand side of val $lhs does not match declared type $tpe")
-        val mods = Symbol.mods(lhs)
-        assert(!mods.hasFlag(LAZY), s"Lazy val not supported: $lhs")
-        val tpt = Type.quote(tpe)
-        val x = ValDef(mods, lhs.name, tpt, rhs)
-        setSymbol(x, lhs)
-        setType(x, NoType)
+      def apply(lhs: TermSymbol,
+        rhs: Tree = EmptyTree,
+        flags: FlagSet = Flag.SYNTHETIC): ValDef = {
+
+        assert(Symbol.verify(lhs))
+        assert(rhs.isEmpty || (Has.tpe(rhs) &&
+          Type.of(rhs).weak_<:<(Type.of(lhs))))
+
+        val mods = Modifiers(flags)
+        val tpt = Type.quote(Type.of(lhs))
+        val vd = ValDef(mods, lhs.name, tpt, rhs)
+        setSymbol(vd, lhs)
+        setType(vd, NoType)
       }
 
-      def unapply(tree: Tree): Option[(TermSymbol, Tree)] = tree match {
-        case x@ValDef(_, _, _, rhs) => Some(Term.of(x), rhs)
+      def unapply(tree: Tree): Option[(TermSymbol, Tree, FlagSet)] = tree match {
+        case x@ValDef(mods, _, _, rhs) => Some(Term.of(x), rhs, mods.flags)
         case _ => None
       }
     }
