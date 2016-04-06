@@ -6,7 +6,8 @@ import compiler.ir.CommonIR
 import scala.annotation.tailrec
 
 /** Let-normal form language. */
-trait Language extends CommonIR {
+trait Language extends CommonIR
+  /*           */ with Comprehensions {
 
   import universe._
   import Tree._
