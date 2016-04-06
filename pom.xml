@@ -39,7 +39,7 @@
         <!-- Hadoop -->
         <hadoop.version>2.2.0</hadoop.version>
         <!-- Flink -->
-        <flink.version>0.10.0</flink.version>
+        <flink.version>1.0.1</flink.version>
         <!-- Spark -->
         <spark.version>1.5.1</spark.version>
 
@@ -181,7 +181,7 @@
             </dependency>
             <dependency>
                 <groupId>org.apache.flink</groupId>
-                <artifactId>flink-java_${scala.tools.version}</artifactId>
+                <artifactId>flink-java</artifactId>
                 <version>${flink.version}</version>
                 <scope>provided</scope>
             </dependency>
@@ -275,6 +275,12 @@
                 <groupId>com.jsuereth</groupId>
                 <artifactId>scala-arm_${scala.tools.version}</artifactId>
                 <version>${scala-arm.version}</version>
+            </dependency>
+
+            <dependency>
+                <groupId>de.javakaffee</groupId>
+                <artifactId>kryo-serializers</artifactId>
+                <version>0.28</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

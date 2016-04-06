@@ -163,7 +163,7 @@ class DataflowGenerator(val compiler: DataflowCompiler, val sessionID: UUID = UU
 
         q"""{
           val $inFmt =
-            new _root_.org.apache.flink.api.scala.operators.ScalaCsvInputFormat[$T](
+            new _root_.org.apache.flink.api.java.io.TupleCsvInputFormat[$T](
               new _root_.org.apache.flink.core.fs.Path(${op.location}),
               _root_.org.apache.flink.api.scala.createTypeInformation[$T])
 
