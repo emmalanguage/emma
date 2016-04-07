@@ -11,6 +11,18 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks {
 
   val compiler = new RuntimeCompiler()
 
+  import compiler.universe._
+
+  // ---------------------------------------------------------------------------
+  // Common transformation pipelines
+  // ---------------------------------------------------------------------------
+
+  def typeCheck[T]: Expr[T] => Tree = {
+    (_: Expr[T]).tree
+  } andThen {
+    compiler.typeCheck(_: Tree)
+  }
+
   // ---------------------------------------------------------------------------
   // Common value definitions used in compiler tests
   // ---------------------------------------------------------------------------
@@ -25,10 +37,10 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks {
   // Utility functions
   // ---------------------------------------------------------------------------
 
-  def time[A](f: => A) = {
+  def time[A](f: => A, name: String = "") = {
     val s = System.nanoTime
     val ret = f
-    println(s"time: ${(System.nanoTime - s) / 1e6}ms")
+    println(s"$name time: ${(System.nanoTime - s) / 1e6}ms".trim)
     ret
   }
 }

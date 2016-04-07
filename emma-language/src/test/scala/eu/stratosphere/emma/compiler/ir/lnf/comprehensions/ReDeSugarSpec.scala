@@ -8,7 +8,7 @@ import eu.stratosphere.emma.testschema.Marketing._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-/** A spec for resugaring comprehensions. */
+/** A spec for the `Comprehension.{re|de}sugar` transformations. */
 @RunWith(classOf[JUnitRunner])
 class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
 
@@ -19,22 +19,20 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
   // ---------------------------------------------------------------------------
 
   /** Pipeline for this spec. */
-  def typeCheckAndANF[T](expr: Expr[T]): Tree = {
-    val pipeline = {
-      compiler.typeCheck(_: Tree)
-    } andThen {
-      compiler.LNF.resolveNameClashes
-    } andThen {
-      compiler.LNF.anf
-    } andThen {
-      compiler.LNF.simplify
-    }
-
-    pipeline(expr.tree)
+  def typeCheckAndANF[T]: Expr[T] => Tree = {
+    (_: Expr[T]).tree
+  } andThen {
+    compiler.typeCheck(_: Tree)
+  } andThen {
+    compiler.LNF.resolveNameClashes
+  } andThen {
+    compiler.LNF.anf
+  } andThen {
+    compiler.LNF.simplify
   }
 
   /** Normalize mock-comprehension selection chains. */
-  private def fix(tree: Tree): Tree = {
+  def fix: Tree => Tree = tree => {
     val moduleSel = compiler.Tree.resolve(compiler.IR.module)
     compiler.preWalk(tree) {
       case s@Select(_, name) if compiler.IR.comprehensionOps contains s.symbol.asTerm =>
@@ -42,12 +40,12 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
     }
   }
 
-  private def resugar(tree: Tree): Tree = {
-    time(compiler.Comprehension.resugar(compiler.API.bagSymbol)(tree), "resugar")
+  def resugar: Tree => Tree = {
+    time(compiler.Comprehension.resugar(compiler.API.bagSymbol)(_), "resugar")
   }
 
-  private def desugar(tree: Tree): Tree = {
-    time(compiler.Comprehension.desugar(compiler.API.bagSymbol)(tree), "desugar")
+  def desugar: Tree => Tree = {
+    time(compiler.Comprehension.desugar(compiler.API.bagSymbol)(_), "desugar")
   }
 
   // ---------------------------------------------------------------------------
@@ -63,7 +61,7 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
       names
     })
 
-    val res = (typeCheckAndANF _ andThen fix _) (reify {
+    val res = (typeCheckAndANF andThen fix) (reify {
       val users$1 = users
       comprehension[(String, String), DataBag] {
         val u = generator(users$1)
@@ -85,7 +83,7 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
       names
     })
 
-    val res = (typeCheckAndANF _ andThen fix _) (reify {
+    val res = (typeCheckAndANF andThen fix) (reify {
       val users$1 = users
       flatten[String, DataBag] {
         comprehension[DataBag[String], DataBag] {
@@ -109,7 +107,7 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
       names
     })
 
-    val res = (typeCheckAndANF _ andThen fix _) (reify {
+    val res = (typeCheckAndANF andThen fix) (reify {
       val users$1 = users
       comprehension[User, DataBag] {
         val u = generator(users$1)
@@ -138,7 +136,7 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
       names
     })
 
-    val res = (typeCheckAndANF _ andThen fix _) (reify {
+    val res = (typeCheckAndANF andThen fix) (reify {
       val users$1 = users
       flatten[(User, Click), DataBag] {
         comprehension[DataBag[(User, Click)], DataBag] {
@@ -170,7 +168,7 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
       names
     })
 
-    val res = (typeCheckAndANF _ andThen fix _) (reify {
+    val res = (typeCheckAndANF andThen fix) (reify {
       val users$1 = users
       val names = flatten[(Ad, User, Click), DataBag] {
         comprehension[DataBag[(Ad, User, Click)], DataBag] {
@@ -213,7 +211,7 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
       names
     })
 
-    val res = (typeCheckAndANF _ andThen fix _) (reify {
+    val res = (typeCheckAndANF andThen fix) (reify {
       val users$1 = users
       val names = flatten[(Ad, User, Click), DataBag] {
         comprehension[DataBag[(Ad, User, Click)], DataBag] {

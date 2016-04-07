@@ -4,28 +4,24 @@ import eu.stratosphere.emma.compiler.BaseCompilerSpec
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-/** A spec defining the core fragment of Scala supported by Emma. */
+/** A spec for the `LNF.cse` transformation. */
 @RunWith(classOf[JUnitRunner])
 class CSESpec extends BaseCompilerSpec with TreeEquality {
 
   import compiler.universe._
 
-  def typeCheckAndNormalize[T](expr: Expr[T]): Tree = {
-    val pipeline = {
-      compiler.typeCheck(_: Tree)
-    } andThen {
-      compiler.LNF.resolveNameClashes
-    } andThen {
-      compiler.LNF.anf
-    } andThen {
-      compiler.LNF.cse
-    }
-
-    pipeline(expr.tree)
-  }
-
-  def typeCheck[T](expr: Expr[T]): Tree = {
-    compiler.typeCheck(expr.tree)
+  def typeCheckAndNormalize[T]: Expr[T] => Tree = {
+    (_: Expr[T]).tree
+  } andThen {
+    compiler.typeCheck(_: Tree)
+  } andThen {
+    compiler.LNF.destructPatternMatches
+  } andThen {
+    compiler.LNF.resolveNameClashes
+  } andThen {
+    compiler.LNF.anf
+  } andThen {
+    time(compiler.LNF.cse(_), "cse")
   }
 
   "field selections" - {

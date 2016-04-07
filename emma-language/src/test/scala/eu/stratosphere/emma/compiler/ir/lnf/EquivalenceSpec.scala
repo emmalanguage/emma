@@ -4,15 +4,11 @@ import eu.stratosphere.emma.compiler.BaseCompilerSpec
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-/** A spec for alpha-equivalence on trees. */
+/** A spec for alpha-equivalence on LNF rees. */
 @RunWith(classOf[JUnitRunner])
 class EquivalenceSpec extends BaseCompilerSpec with TreeEquality {
 
   import compiler.universe._
-
-  def typeCheck[T](expr: Expr[T]): Tree = {
-    compiler.typeCheck(expr.tree)
-  }
 
   "simple valdefs and expressions" in {
     val lhs = typeCheck(reify {
