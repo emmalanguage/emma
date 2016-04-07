@@ -264,5 +264,24 @@ trait Types extends Util { this: Trees with Symbols =>
       setSymbol(sel, member)
       setType(sel, result)
     }
+
+    /** Returns the least upper bound of all types. */
+    def lub(tpe: Type, types: Type*): Type =
+      if (types.isEmpty) tpe
+      else universe.lub(tpe :: types.toList)
+
+    /** Returns the least upper bound of the argument types. */
+    def lub(tree: Tree, trees: Tree*): Type = {
+      assert(Has tpe tree)
+      assert(trees forall Has.tpe)
+      lub(Type of tree, trees map Type.of: _*)
+    }
+
+    /** Returns the least upper bound of the argument types. */
+    def lub(sym: Symbol, symbols: Symbol*): Type = {
+      assert(Has tpe sym)
+      assert(symbols forall Has.tpe)
+      lub(Type of sym, symbols map Type.of: _*)
+    }
   }
 }
