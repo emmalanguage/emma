@@ -236,18 +236,16 @@ trait Trees extends Util { this: Types with Symbols =>
     /** Returns a fully-qualified reference to `target` (must be static). */
     def resolve(target: Symbol): Tree =
       if (target.isStatic) {
-        if (target.isPackage || target.isModule) {
-          val owner =
-            if (Has.owner(target)) resolve(target.owner)
-            else ref(rootMirror.RootPackage)
+        val owner =
+          if (Has.owner(target)) resolve(target.owner)
+          else ref(rootMirror.RootPackage)
 
-          Term.sel(owner, target.asTerm)
+        if (target.isModule) {
+          Term.sel(owner, rootMirror.staticModule(target.fullName))
+        } else if (target.isPackage) {
+          Term.sel(owner, rootMirror.staticPackage(target.fullName))
         } else if (target.isClass) {
-          val owner =
-            if (Has.owner(target)) resolve(target.owner)
-            else ref(rootMirror.RootPackage)
-
-          Type.sel(owner, target.asType)
+          Type.sel(owner, rootMirror.staticClass(target.fullName))
         } else if (target.isType) {
           Type.sel(resolve(target.owner), target.asType)
         } else {
