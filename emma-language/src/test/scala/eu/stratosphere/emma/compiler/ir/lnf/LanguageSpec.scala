@@ -5,8 +5,6 @@ import eu.stratosphere.emma.compiler.BaseCompilerSpec
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-import scala.annotation.tailrec
-
 /** A spec defining the core fragment of Scala supported by Emma. */
 @RunWith(classOf[JUnitRunner])
 class LanguageSpec extends BaseCompilerSpec {
@@ -14,15 +12,14 @@ class LanguageSpec extends BaseCompilerSpec {
   import compiler.universe._
 
   def typecheckAndValidate[T](expr: Expr[T]): Boolean = {
-    compiler.LNF.validate(compiler.typeCheck(expr.tree))
-  }
+    val pipeline = {
+      compiler.typeCheck(_: Tree)
+    } andThen {
+      compiler.Core.validate _
+    }
 
-  // common value definitions used below
-  val x = 42
-  val y = "The answer to life, the universe and everything"
-  val t = (x, y)
-  val xs = DataBag(Seq(1, 2, 3))
-  val ys = DataBag(Seq(1, 2, 3))
+    pipeline(expr.tree)
+  }
 
   // modeled by `Literal(Constant(value))` nodes
   "literals" in {

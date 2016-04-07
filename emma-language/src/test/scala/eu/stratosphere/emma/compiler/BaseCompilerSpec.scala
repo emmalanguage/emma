@@ -1,5 +1,6 @@
 package eu.stratosphere.emma.compiler
 
+import eu.stratosphere.emma.api.DataBag
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -8,16 +9,21 @@ import org.scalatest.{FreeSpec, Matchers}
  */
 trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks {
 
-  import scala.reflect.runtime.universe._
-
   val compiler = new RuntimeCompiler()
 
-  implicit object TreeEquality extends org.scalactic.Equality[Tree] {
-    override def areEqual(a: Tree, b: Any): Boolean = b match {
-      case b: Tree if a equalsStructure b => true
-      case _ => false
-    }
-  }
+  // ---------------------------------------------------------------------------
+  // Common value definitions used in compiler tests
+  // ---------------------------------------------------------------------------
+
+  val x = 42
+  val y = "The answer to life, the universe and everything"
+  val t = (x, y)
+  val xs = DataBag(Seq(1, 2, 3))
+  val ys = DataBag(Seq(1, 2, 3))
+
+  // ---------------------------------------------------------------------------
+  // Utility functions
+  // ---------------------------------------------------------------------------
 
   def time[A](f: => A) = {
     val s = System.nanoTime
