@@ -389,6 +389,15 @@ trait Trees extends Util { this: Types with Symbols =>
     /** Returns a mutable metadata container for `tree`. */
     def meta(tree: Tree): Attachments =
       attachments(tree)
+
+    /** Returns a new `if` branch. */
+    def branch(cond: Tree, thn: Tree, els: Tree): Tree = {
+      assert(Has.tpe(cond) && Type.of(cond) =:= Type.bool)
+      assert(Has.tpe(thn))
+      assert(Has.tpe(els))
+      val branch = If(cond, thn, els)
+      setType(branch, Type.weakLub(thn, els))
+    }
   }
 
   /** Some useful constants. */
