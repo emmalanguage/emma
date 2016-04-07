@@ -257,19 +257,18 @@ trait Language extends CommonIR {
         block(stats, Type.sel(target, Type.symOf(sel), Type.of(sel)))
 
       case sel@Select(Block(stats, target), member: TermName) =>
-        val term = Term.of(sel)
+        val sym = Term.of(sel)
         val tpe = Type.of(sel)
-        val expr = Term.sel(target, term, tpe)
-        if (term.isPackage ||
-          (term.isMethod && !term.isAccessor) ||
-          IR.comprehensionOps.contains(term)) {
-          block(stats, expr)
+        val rhs = Term.sel(target, sym, tpe)
+        if (sym.isPackage || // Parameter lists follow
+          (sym.isMethod && sym.asMethod.paramLists.nonEmpty) ||
+          IR.comprehensionOps.contains(sym)) {
+
+          block(stats, rhs)
         } else {
           val name = Term.fresh(member).toString
           val lhs = Term.free(name, tpe)
-          block(stats,
-            val_(lhs, expr),
-            ref(lhs))
+          block(stats, val_(lhs, rhs), ref(lhs))
         }
 
       case TypeApply(Block(stats, target), types) =>

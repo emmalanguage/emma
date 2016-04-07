@@ -51,14 +51,15 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
 
     "as selection" in {
       val act = typeCheckAndANF(reify {
-        t._1 * 15
+        (t._1 * 15).toDouble
       })
 
       val exp = typeCheck(reify {
-        val x$1 = t
-        val x$2 = x$1._1
-        val x$3 = x$2 * 15
-        x$3
+        val t$1 = t
+        val t_1$1 = t$1._1
+        val prod$1 = t_1$1 * 15
+        val d$1 = prod$1.toDouble
+        d$1
       })
 
       act shouldEqual exp
