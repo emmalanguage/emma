@@ -283,5 +283,27 @@ trait Types extends Util { this: Trees with Symbols =>
       assert(symbols forall Has.tpe)
       lub(Type of sym, symbols map Type.of: _*)
     }
+
+    /** Returns the weak least upper bound of all types. */
+    def weakLub(tpe: Type, types: Type*): Type =
+      types.fold(tpe) { (T, U) =>
+        if (T weak_<:< U) U
+        else if (U weak_<:< T) T
+        else lub(T, U)
+      }
+
+    /** Returns the weak least upper bound of the argument types. */
+    def weakLub(tree: Tree, trees: Tree*): Type = {
+      assert(Has tpe tree)
+      assert(trees forall Has.tpe)
+      weakLub(Type of tree, trees map Type.of: _*)
+    }
+
+    /** Returns the weak least upper bound of the argument types. */
+    def weakLub(sym: Symbol, symbols: Symbol*): Type = {
+      assert(Has tpe sym)
+      assert(symbols forall Has.tpe)
+      weakLub(Type of sym, symbols map Type.of: _*)
+    }
   }
 }
