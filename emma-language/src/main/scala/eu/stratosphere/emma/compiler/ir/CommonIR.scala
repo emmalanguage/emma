@@ -54,6 +54,18 @@ trait CommonIR extends ReflectUtil {
     val GROUP /*           */ = typeOf[eu.stratosphere.emma.api.Group[Nothing, Nothing]].typeConstructor
   }
 
+  protected object IR {
+    val moduleSymbol /*    */ = rootMirror.staticModule("eu.stratosphere.emma.compiler.ir.package")
+
+    val flatten /*         */ = moduleSymbol.info.decl(TermName("flatten"))
+    val generator /*       */ = moduleSymbol.info.decl(TermName("generator"))
+    val comprehension /*   */ = moduleSymbol.info.decl(TermName("comprehension"))
+    val guard /*           */ = moduleSymbol.info.decl(TermName("guard"))
+    val head /*            */ = moduleSymbol.info.decl(TermName("head"))
+
+    val comprehensionOps /**/ = Set(flatten, generator, comprehension, guard, head)
+  }
+
   // ---------------------------------------------------------------------------
   // Helper Patterns
   // ---------------------------------------------------------------------------

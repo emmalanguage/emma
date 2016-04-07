@@ -256,9 +256,9 @@ trait Language extends CommonIR {
           val term = Term.of(sel)
           val tpe = Type.of(sel)
           val expr = Term.sel(target, term, tpe)
-          if (term.isPackage || {
-            term.isMethod && !term.isAccessor
-          }) {
+          if (IR.comprehensionOps contains term) {
+            expr
+          } else if (term.isPackage || (term.isMethod && !term.isAccessor)) {
             block(stats, expr)
           } else {
             val name = Term.fresh(member).toString
@@ -271,6 +271,9 @@ trait Language extends CommonIR {
         case TypeApply(Block(stats, target), types) =>
           block(stats,
             typeApp(target, types.map(Type.of): _*))
+
+        case app@Apply(Block(stats, target), args) if IR.comprehensionOps contains Term.of(target) =>
+          app
 
         case app@Apply(Block(stats, target), args) =>
           val name = Term.fresh(nameOf(target))
