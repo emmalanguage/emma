@@ -25,10 +25,10 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks {
   // Utility functions
   // ---------------------------------------------------------------------------
 
-  def time[A](f: => A) = {
+  def time[A](f: => A, name: String = "") = {
     val s = System.nanoTime
     val ret = f
-    println(s"time: ${(System.nanoTime - s) / 1e6}ms")
+    println(s"$name time: ${(System.nanoTime - s) / 1e6}ms".trim)
     ret
   }
 }
