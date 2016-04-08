@@ -273,7 +273,7 @@ trait Trees extends Util { this: Types with Symbols =>
       val params = for ((arg, tpe) <- args zip types) yield
         Term.sym(term, arg.name, tpe, argFlags)
 
-      val paramList = params.map(val_(_)).toList
+      val paramList = params.map(val_(_, flags = argFlags)).toList
       val rhs = rename(bodyBlock, args zip params: _*)
       val fn = Function(paramList, rhs)
       setSymbol(fn, term)
