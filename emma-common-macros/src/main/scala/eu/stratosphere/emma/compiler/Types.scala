@@ -171,17 +171,15 @@ trait Types extends Util { this: Trees with Symbols =>
       arg(i, of(tree))
 
     /** Returns the return [[Type]] of `tpe` if it's a method or function. */
-    def result(tpe: Type): Type = fix {
-      tpe match {
-        case _: PolyType | _: MethodType | _: NullaryMethodType =>
-          tpe.finalResultType
-        case _ if tpe.typeArgs.nonEmpty =>
-          tpe.typeArgs.last
-        case _ =>
-          warning(NoPosition, s"`$tpe` doesn't have a return type")
-          tpe
-      }
-    }
+    def result(tpe: Type): Type = fix(tpe match {
+      case _: PolyType | _: MethodType | _: NullaryMethodType =>
+        tpe.resultType
+      case _ if tpe.typeArgs.nonEmpty =>
+        tpe.typeArgs.last
+      case _ =>
+        warning(NoPosition, s"`$tpe` doesn't have a return type")
+        tpe
+    })
 
     /** Returns the return [[Type]] of `tree` if it's a method or function. */
     def result(tree: Tree): Type =
