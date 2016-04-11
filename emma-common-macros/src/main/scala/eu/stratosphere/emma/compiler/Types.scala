@@ -303,5 +303,13 @@ trait Types extends Util { this: Trees with Symbols =>
       assert(symbols forall Has.tpe)
       weakLub(Type of sym, symbols map Type.of: _*)
     }
+
+    /** Is `tpe` a method type, e.g. `+ : (Int, Int)Int`? */
+    def isMethod(tpe: Type): Boolean = tpe match {
+      case _: NullaryMethodType => true
+      case _: MethodType => true
+      case _: PolyType => true
+      case _ => false
+    }
   }
 }
