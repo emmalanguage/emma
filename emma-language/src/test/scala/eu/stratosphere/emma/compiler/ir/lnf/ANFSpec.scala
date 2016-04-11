@@ -100,6 +100,24 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
 
       act shouldEqual exp
     }
+
+    "with multiple parameter lists" in {
+      val act = typeCheckAndANF(reify {
+        List(1, 2, 3).foldLeft(0)(_ * _)
+      })
+
+      val exp = typeCheckAndANF(reify {
+        val list$1 = List(1, 2, 3)
+        val mult$1 = (x: Int, y: Int) => {
+          val prod$1 = x * y
+          prod$1
+        }
+        val prod$2 = list$1.foldLeft(0)(mult$1)
+        prod$2
+      })
+
+      act shouldEqual exp
+    }
   }
 
   "nested blocks" in {

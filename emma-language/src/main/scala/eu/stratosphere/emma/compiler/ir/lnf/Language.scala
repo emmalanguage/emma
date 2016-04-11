@@ -231,30 +231,33 @@ trait Language extends CommonIR {
       assert(nameClashes(tree).isEmpty)
       assert(controlFlowNodes(tree).isEmpty)
       // Avoid empty blocks
-      anfTransform(tree) match {
-        case Block(Nil, expr) => expr
-        case block => block
-      }
+      expr(anfTransform(tree))
     }
 
     private val anfTransform: Tree => Tree = postWalk {
       // Already in ANF
       case EmptyTree => EmptyTree
       case lit: Literal => block(lit)
-      case id: Ident => block(id)
-      case branch: If => block(branch)
-      case vd: ValDef if isParam(vd) => vd
+      case id: Ident if id.isTerm => block(id)
+      case value: ValDef if isParam(value) => value
+
+      case fun: Function =>
+        val name = Term.fresh(nameOf(fun))
+        val tpe = Type.of(fun)
+        val sym = Term.free(name.toString, tpe)
+        block(val_(sym, fun), ref(sym))
 
       case Typed(Block(stats, expr), tpt) =>
         val tpe = Type.of(tpt)
         val name = Term.fresh(nameOf(expr))
-        val term = Term.free(name.toString, tpe)
-        block(stats,
-          val_(term, ascribe(expr, tpe)),
-          ref(term))
+        val lhs = Term.free(name.toString, tpe)
+        val rhs = ascribe(expr, tpe)
+        block(stats, val_(lhs, rhs), ref(lhs))
 
-      case sel@Select(Block(stats, target), member: TypeName) =>
-        block(stats, Type.sel(target, Type.symOf(sel), Type.of(sel)))
+      case sel@Select(Block(stats, target), _: TypeName) =>
+        val sym = Type.symOf(sel)
+        val tpe = Type.of(sel)
+        block(stats, Type.sel(target, sym, tpe))
 
       case sel@Select(Block(stats, target), member: TermName) =>
         val sym = Term.of(sel)
@@ -272,14 +275,16 @@ trait Language extends CommonIR {
         }
 
       case TypeApply(Block(stats, target), types) =>
-        block(stats, typeApp(target, types.map(Type.of): _*))
+        val expr = typeApp(target, types.map(Type.of): _*)
+        block(stats, expr)
 
       case app@Apply(Block(stats, target), args) =>
-        if (IR.comprehensionOps contains Term.of(target)) {
-          block(stats, Tree.app(target)(args: _*))
+        if (IR.comprehensionOps.contains(Term.of(target))) {
+          val expr = Tree.app(target)(args.map(this.expr): _*)
+          block(stats, expr)
         } else {
           val name = Term.fresh(nameOf(target))
-          val term = Term.free(name.toString, Type.of(app))
+          val lhs = Term.free(name.toString, Type.of(app))
           val init = stats ::: args.flatMap {
             case Block(nested, _) => nested
             case _ => Nil
@@ -290,35 +295,34 @@ trait Language extends CommonIR {
             case arg => arg
           }
 
-          block(init,
-            val_(term, Tree.app(target)(params: _*)),
-            ref(term))
+          val rhs = Tree.app(target)(params: _*)
+          // Partially applied multi-arg-list method
+          if (Type.isMethod(Type of app)) block(init, rhs)
+          else block(init, val_(lhs, rhs), ref(lhs))
         }
 
       // Only if contains nested blocks
-      case bl: Block if bl.children.exists {
+      case block: Block if block.children.exists {
         case _: Block => true
         case _ => false
       } =>
-        val body = bl.children.flatMap {
+        val body = block.children.flatMap {
           case nested: Block => nested.children
           case child => child :: Nil
         }
 
         // Implicitly removes ()
-        block(body.init, body.last)
+        Tree.block(body.init, body.last)
 
       // Avoid duplication of intermediates
-      case vd@ValDef(mods, _, _, Block(stats :+ (int: ValDef), rhs: Ident))
+      case value@ValDef(mods, _, _, Block(stats :+ (int: ValDef), rhs: Ident))
         if int.symbol == rhs.symbol =>
-        block(stats,
-          val_(Term.of(vd), int.rhs, mods.flags),
-          unit)
+        val lhs = Term.of(value)
+        block(stats, val_(lhs, int.rhs, mods.flags), unit)
 
-      case vd@ValDef(mods, _, _, Block(stats, rhs)) =>
-        block(stats,
-          val_(Term.of(vd), rhs, mods.flags),
-          unit)
+      case value@ValDef(mods, _, _, Block(stats, rhs)) =>
+        val lhs = Term.of(value)
+        block(stats, val_(lhs, rhs, mods.flags), unit)
     }
 
     /** Ensures that all definitions within the `tree` have unique names. */
@@ -348,14 +352,14 @@ trait Language extends CommonIR {
       @tailrec
       def loop(tree: Tree): Name = tree match {
         case id: Ident => id.name
-        case vd: ValDef => vd.name
-        case dd: DefDef => dd.name
-        case _: Function => Term.lambda
+        case value: ValDef => value.name
+        case method: DefDef => method.name
         case Select(_, member) => member
         case Typed(expr, _) => loop(expr)
         case Block(_, expr) => loop(expr)
         case Apply(target, _) => loop(target)
         case TypeApply(target, _) => loop(target)
+        case _: Function => Term.lambda
         case _: Literal => Term.name("x")
         case _ => throw new RuntimeException("Unsupported tree")
       }
@@ -413,7 +417,7 @@ trait Language extends CommonIR {
       }
 
       val dict = loop((vals, Map.empty))
-      postWalk(tree) {
+      expr(postWalk(tree) {
         case id: Ident if Has.termSym(id) &&
           dict.contains(id.symbol) =>
             dict(id.symbol)
@@ -425,10 +429,7 @@ trait Language extends CommonIR {
         case Block(stats, expr) =>
           // Implicitly removes ()
           block(stats, expr)
-      } match { // Avoid empty blocks
-        case Block(Nil, expr) => expr
-        case t => t
-      }
+      })
     }
 
     /**
@@ -534,6 +535,12 @@ trait Language extends CommonIR {
         val binds = irrefutable(ref(x), pat)
         assert(binds.isDefined)
         block(val_(x, sel) :: binds.get, body)
+    }
+
+    // Avoids blocks without statements
+    private def expr(tree: Tree) = tree match {
+      case Block(Nil, expr) => expr
+      case _ => tree
     }
   }
 }
