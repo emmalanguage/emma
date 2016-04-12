@@ -139,7 +139,6 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** `val` constructors and extractors. No support for lazy vals. */
     object val_ {
-      import Flag._
 
       /** Returns a new value / variable definition. */
       def apply(lhs: TermSymbol,
@@ -398,6 +397,11 @@ trait Trees extends Util { this: Types with Symbols =>
       val branch = If(cond, thn, els)
       setType(branch, Type.weakLub(thn, els))
     }
+
+    /** Returns a [[scala.collection.Set]] of all var mutations in `tree`. */
+    def assignments(tree: Tree): Set[TermSymbol] = tree.collect {
+      case assign: Assign => Term.of(assign)
+    }.toSet
   }
 
   /** Some useful constants. */
