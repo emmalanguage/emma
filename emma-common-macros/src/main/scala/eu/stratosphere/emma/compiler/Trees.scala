@@ -2,7 +2,6 @@ package eu.stratosphere.emma
 package compiler
 
 import scala.annotation.tailrec
-import scala.reflect.ClassTag
 import scala.reflect.macros.Attachments
 
 /** Utility for trees (depends on [[Types]] and [[Symbols]]). */
@@ -20,13 +19,6 @@ trait Trees extends Util { this: Types with Symbols =>
     lazy val Java = q"$Root.java"
     lazy val Scala = q"$Root.scala"
     lazy val predef = Type.check(q"$Scala.Predef")
-
-    /** Is `tree` of [[Type]] `T`? */
-    def is[T: ClassTag](tree: Tree): Boolean =
-      tree match {
-        case _: T => true
-        case _ => false
-      }
 
     /** Returns `null` of [[Type]] `T`. */
     def nil[T: TypeTag]: Tree =
