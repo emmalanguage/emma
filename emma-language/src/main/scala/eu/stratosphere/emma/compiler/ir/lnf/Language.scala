@@ -11,10 +11,10 @@ trait Language extends CommonIR {
   import universe._
   import Tree._
 
-  object LNF {
+  private[emma] object LNF {
 
     /** Validate that a Scala [[Tree]] belongs to the supported LNF language. */
-    private[emma] def validate(root: Tree): Boolean = root match {
+    def validate(root: Tree): Boolean = root match {
       case EmptyTree =>
         true
       case This(qual) =>
@@ -57,8 +57,8 @@ trait Language extends CommonIR {
     }
 
     /** Check alpha-equivalence of trees. */
-    private[emma] def eq(x: Tree, y: Tree)
-      (implicit map: Map[Symbol, Symbol] = Map.empty[Symbol, Symbol]): Boolean = (x, y) match {
+    def eq(x: Tree, y: Tree)
+          (implicit map: Map[Symbol, Symbol] = Map.empty[Symbol, Symbol]): Boolean = (x, y) match {
 
       case (NewIOFormat(apply$x, implicitArgs$x), NewIOFormat(apply$y, implicitArgs$y)) =>
         eq(apply$x, apply$y)
@@ -196,7 +196,7 @@ trait Language extends CommonIR {
      * @param tree The core language [[Tree]] to be lifted.
      * @return A direct-style let-normal form variant of the input [[Tree]].
      */
-    private[emma] def lift(tree: Tree): Tree = {
+    def lift(tree: Tree): Tree = {
       tree
     }
 
@@ -206,7 +206,7 @@ trait Language extends CommonIR {
      * @param tree A direct-style let-nomal form [[Tree]].
      * @return A Scala [[Tree]] derived by deconstructing the IR tree.
      */
-    private[emma] def lower(tree: Tree): Tree = {
+    def lower(tree: Tree): Tree = {
       tree
     }
 
@@ -227,7 +227,7 @@ trait Language extends CommonIR {
      * @return An ANF version of the input [[Tree]].
      */
     // FIXME: What happens if there are methods with by-name parameters?
-    private[emma] def anf(tree: Tree): Tree = {
+    def anf(tree: Tree): Tree = {
       assert(nameClashes(tree).isEmpty)
       assert(controlFlowNodes(tree).isEmpty)
       // Avoid empty blocks
@@ -326,7 +326,7 @@ trait Language extends CommonIR {
     }
 
     /** Ensures that all definitions within the `tree` have unique names. */
-    private[emma] def resolveNameClashes(tree: Tree): Tree =
+    def resolveNameClashes(tree: Tree): Tree =
       refresh(tree, nameClashes(tree): _*)
 
     /** Extracts control flow nodes from the given `tree`. */
@@ -368,14 +368,39 @@ trait Language extends CommonIR {
     }
 
     /**
+     * Eliminates unused valdefs (dead code) from a [[Tree]].
+     *
+     * == Preconditions ==
+     * - The input `tree` is in ANF (see [[LNF.anf()]]).
+     *
+     * == Postconditions ==
+     * - All unused valdefs are pruned.
+     *
+     * @param tree The [[Tree]] to be pruned.
+     * @return A [[Tree]] with the same semantics but without unused valdefs.
+     */
+    def dce(tree: Tree): Tree = {
+
+      val meta = new LNF.Meta(tree)
+
+      postWalk(tree) {
+        case Block(stats, expr) => Block(
+          stats filter {
+            case vd: ValDef => meta.valuses(vd.symbol) > 0
+            case _ => true
+          },
+          expr)
+      }
+    }
+
+    /**
      * Eliminates common subexpressions from a [[Tree]].
      *
      * == Preconditions ==
-     *  - The input `tree` is in ANF (see [[LNF.anf()]])
-     *  - No `lazy val`s are used.
+     * - The input `tree` is in ANF (see [[LNF.anf()]]).
      *
-     *  == Postconditions ==
-     *   - All common subexpressions and corresponding intermediate values are pruned.
+     * == Postconditions ==
+     * - All common subexpressions and corresponding intermediate values are pruned.
      *
      * @param tree The [[Tree]] to be pruned.
      * @return A [[Tree]] with the same semantics but without common subexpressions.
@@ -420,11 +445,11 @@ trait Language extends CommonIR {
       expr(postWalk(tree) {
         case id: Ident if Has.termSym(id) &&
           dict.contains(id.symbol) =>
-            dict(id.symbol)
+          dict(id.symbol)
 
         case vd: ValDef
           if dict.contains(vd.symbol) =>
-            unit
+          unit
 
         case Block(stats, expr) =>
           // Implicitly removes ()
@@ -433,17 +458,50 @@ trait Language extends CommonIR {
     }
 
     /**
+     * Unnests nested blocks [[Tree]].
+     *
+     * == Preconditions ==
+     * - Except the nested blocks, the input `tree` is in ANF (see [[LNF.anf()]]).
+     *
+     * == Postconditions ==
+     * - Nested blocks have been flattened.
+     *
+     * @param tree The [[Tree]] to be pruned.
+     * @return A [[Tree]] with the same semantics but without common subexpressions.
+     */
+    def flatten(tree: Tree): Tree = postWalk(tree) {
+      case parent: Block if parent.stats.exists {
+        case ValDef(_, _, _, _: Block) => true
+        case _ => false
+      } =>
+        // flatten nested stats
+        val flatStats = parent.stats.flatMap {
+          case stat@ValDef(mods, name, tpt, child: Block) =>
+            child.stats.last match {
+              case n@ValDef(_, _, _, rhs) =>
+                child.stats.init :+ val_(Term.of(stat), rhs, mods.flags)
+              case _ =>
+                List(stat)
+            }
+          case t =>
+            List(t)
+        }
+
+        block(flatStats, parent.expr)
+    }
+
+    /**
      * Tests if `pattern` is irrefutable for the given selector, i.e. if it always matches. If it
      * is, returns a sequence of value definitions equivalent to the bindings in `pattern`.
      * Otherwise returns [[scala.None]].
      *
      * A pattern `p` is irrefutable for type `T` when:
-     *  - `p` is the wildcard pattern (_);
-     *  - `p` is a variable pattern;
-     *  - `p` is a typed pattern `x: U` and `T` is a subtype of `U`;
-     *  - `p` is an alternative pattern `p1 | ... | pn` and at least one `pi` is irrefutable;
-     *  - `p` is a case class pattern `c(p1, ..., pn)`, `T` is an instance of `c`, the primary
-     *    constructor of `c` has argument types `T1, ..., Tn` and each `pi` is irrefutable for `Ti`.
+     * - `p` is the wildcard pattern (_);
+     * - `p` is a variable pattern;
+     * - `p` is a typed pattern `x: U` and `T` is a subtype of `U`;
+     * - `p` is an alternative pattern `p1 | ... | pn` and at least one `pi` is irrefutable;
+     * - `p` is a case class pattern `c(p1, ..., pn)`, `T` is an instance of `c`, the primary
+     * constructor of `c` has argument types `T1, ..., Tn` and each `pi` is irrefutable for `Ti`.
      *
      * Caution: Does not consider `null` refutable in contrast to the standard Scala compiler. This
      * might cause [[java.lang.NullPointerException]]s.
@@ -476,7 +534,7 @@ trait Language extends CommonIR {
         case Alternative(patterns) =>
           patterns.flatMap(irrefutable(sel, _)).headOption
 
-        case extractor @ (_: Apply | _: UnApply) if isCaseClass(extractor) =>
+        case extractor@(_: Apply | _: UnApply) if isCaseClass(extractor) =>
           val args = extractor match {
             case app: Apply => app.args
             case un: UnApply => un.args
@@ -505,9 +563,9 @@ trait Language extends CommonIR {
      * to bindings and field accesses corresponding to case class extractors.
      *
      * == Assumptions ==
-     *  - The selector of `mat` is non-null;
-     *  - `mat` has exactly one irrefutable case;
-     *  - No guards are used;
+     * - The selector of `mat` is non-null;
+     * - `mat` has exactly one irrefutable case;
+     * - No guards are used;
      *
      * == Example ==
      * {{{
@@ -542,5 +600,38 @@ trait Language extends CommonIR {
       case Block(Nil, expr) => expr
       case _ => tree
     }
+
+    /**
+     * Provides commonly used meta-information for an input [[Tree]].
+     *
+     * == Assumptions ==
+     * - The input [[Tree]] is in LNF form.
+     */
+    class Meta(tree: Tree) {
+
+      private val defs: Map[Symbol, ValDef] = (tree collect {
+        case vd@ValDef(_, _, _, rhs) if !isParam(vd) => vd.symbol -> vd
+      }).toMap
+
+      private val uses: Map[Symbol, Int] = {
+        val builder = List.newBuilder[(Symbol, Int)]
+
+        tree collect {
+          case id: Ident => (id.symbol, 1)
+        } groupBy {
+          case (sym, _) => sym
+        } map {
+          case (sym, group) => (sym, group.size)
+        }
+      }
+
+      @inline
+      def valdef(sym: Symbol): Option[ValDef] = defs.get(sym)
+
+      @inline
+      def valuses(sym: Symbol): Int = uses.getOrElse(sym, 0)
+    }
+
   }
+
 }
