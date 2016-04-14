@@ -66,7 +66,8 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
   val (des1, res1) = {
 
     val des = typeCheckAndANF(reify {
-      val names = users.map(u => (u.name.first, u.name.last))
+      val names = users
+        .map(u => (u.name.first, u.name.last))
       names
     })
 
@@ -88,7 +89,8 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
   val (des2, res2) = {
 
     val des = typeCheckAndANF(reify {
-      val names = users.flatMap(u => DataBag(Seq(u.name.first, u.name.last)))
+      val names = users
+        .flatMap(u => DataBag(Seq(u.name.first, u.name.last)))
       names
     })
 
@@ -112,7 +114,8 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
   val (des3, res3) = {
 
     val des = typeCheckAndANF(reify {
-      val names = users.withFilter(u => u.name.first != "John")
+      val names = users
+        .withFilter(u => u.name.first != "John")
       names
     })
 
@@ -140,7 +143,9 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
   val (des4, res4) = {
 
     val des = typeCheckAndANF(reify {
-      val names = users.flatMap(u => clicks.map(c => (u, c)))
+      val names = users
+        .flatMap(u => clicks
+          .map(c => (u, c)))
       names
     })
 
@@ -171,7 +176,10 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
   val (des5, res5) = {
 
     val des = typeCheckAndANF(reify {
-      val names = users.flatMap(u => clicks.flatMap(c => ads.map(a => (a, u, c))))
+      val names = users
+        .flatMap(u => clicks
+          .flatMap(c => ads
+            .map(a => (a, u, c))))
       names
     })
 
@@ -185,6 +193,59 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
             val flatMap$1 = flatten[(Ad, User, Click), DataBag] {
               comprehension[DataBag[(Ad, User, Click)], DataBag] {
                 val c = generator(clicks$1)
+                head {
+                  val ads$1 = ads
+                  val map$1 = comprehension[(Ad, User, Click), DataBag] {
+                    val a = generator(ads$1)
+                    head {
+                      (a, u, c)
+                    }
+                  }
+                  map$1
+                }
+              }
+            }
+            flatMap$1
+          }
+        }
+      }
+      names
+    })
+
+    (des, res)
+  }
+
+  // nested (flat)maps - 3 generators and two filters
+  val (des6, res6) = {
+
+    val des = typeCheckAndANF(reify {
+      val names = users
+        .flatMap(u => clicks
+          .withFilter(_.userID == u.id)
+          .flatMap(c => ads.map(a => (a, u, c))))
+      names
+    })
+
+    val res = (typeCheckAndANF _ andThen fix _) (reify {
+      val users$1 = users
+      val names = flatten[(Ad, User, Click), DataBag] {
+        comprehension[DataBag[(Ad, User, Click)], DataBag] {
+          val u = generator(users$1)
+          head {
+            val clicks$1 = clicks
+            val withFilter$1 = comprehension[Click, DataBag] {
+              val c = generator(clicks$1)
+              guard {
+                val x$1 = c.userID
+                val x$2 = u.id
+                val x$3 = x$1 == x$2
+                x$3
+              }
+              head(c)
+            }
+            val flatMap$1 = flatten[(Ad, User, Click), DataBag] {
+              comprehension[DataBag[(Ad, User, Click)], DataBag] {
+                val c = generator(withFilter$1)
                 head {
                   val ads$1 = ads
                   val map$1 = comprehension[(Ad, User, Click), DataBag] {
@@ -229,6 +290,9 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
       "with three generators" in {
         resugar(des5) shouldEqual res5
       }
+      "with three generators and two filters" in {
+        resugar(des6) shouldEqual res6
+      }
     }
   }
 
@@ -248,7 +312,10 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
         desugar(res4) shouldEqual des4
       }
       "with three generators" in {
-        desugar(des5) shouldEqual des5
+        desugar(res5) shouldEqual des5
+      }
+      "with three generators and two filters" in {
+        desugar(res6) shouldEqual des6
       }
     }
   }

@@ -17,9 +17,9 @@ trait Comprehensions extends CommonIR {
     trait MonadOp {
       val symbol: TermSymbol
 
-      def apply(xs: Tree)(fn: Function): Tree
+      def apply(xs: Tree)(fn: Tree): Tree
 
-      def unapply(tree: Tree): Option[(Tree, Function)]
+      def unapply(tree: Tree): Option[(Tree, Tree)]
     }
 
     class Syntax(val monad: Symbol) {
@@ -34,11 +34,11 @@ trait Comprehensions extends CommonIR {
       object map extends MonadOp {
         override val symbol = monad.info.decl(TermName("map")).asTerm
 
-        override def apply(xs: Tree)(fn: Function): Tree =
+        override def apply(xs: Tree)(fn: Tree): Tree =
           app(Term.sel(xs, symbol), Type.arg(2, fn))(fn)
 
-        override def unapply(apply: Tree): Option[(Tree, Function)] = apply match {
-          case q"${map@Select(xs, _)}[$_](${fn: Function})"
+        override def unapply(apply: Tree): Option[(Tree, Tree)] = apply match {
+          case q"${map@Select(xs, _)}[$_](${fn: Tree})"
             if Term.of(map) == symbol => Some(xs, fn)
           case _ =>
             Option.empty
@@ -48,11 +48,11 @@ trait Comprehensions extends CommonIR {
       object flatMap extends MonadOp {
         override val symbol = monad.info.decl(TermName("flatMap")).asTerm
 
-        override def apply(xs: Tree)(fn: Function): Tree =
+        override def apply(xs: Tree)(fn: Tree): Tree =
           app(Term.sel(xs, symbol), Type.arg(1, Type.arg(2, fn)))(fn)
 
-        override def unapply(tree: Tree): Option[(Tree, Function)] = tree match {
-          case q"${flatMap@Select(xs, _)}[$_](${fn: Function})"
+        override def unapply(tree: Tree): Option[(Tree, Tree)] = tree match {
+          case q"${flatMap@Select(xs, _)}[$_](${fn: Tree})"
             if Term.of(flatMap) == symbol => Some(xs, fn)
           case _ =>
             Option.empty
@@ -62,11 +62,11 @@ trait Comprehensions extends CommonIR {
       object withFilter extends MonadOp {
         override val symbol = monad.info.decl(TermName("withFilter")).asTerm
 
-        override def apply(xs: Tree)(fn: Function): Tree =
+        override def apply(xs: Tree)(fn: Tree): Tree =
           app(Term.sel(xs, symbol))(fn)
 
-        override def unapply(tree: Tree): Option[(Tree, Function)] = tree match {
-          case q"${withFilter@Select(xs, _)}(${fn: Function})"
+        override def unapply(tree: Tree): Option[(Tree, Tree)] = tree match {
+          case q"${withFilter@Select(xs, _)}(${fn: Tree})"
             if Term.of(withFilter) == symbol => Some(xs, fn)
           case _ =>
             Option.empty
@@ -161,29 +161,44 @@ trait Comprehensions extends CommonIR {
      */
     def resugar(monad: Symbol)(tree: Tree): Tree = {
       // construct comprehension syntax helper for the given monad
-      val cs = new Syntax(monad: Symbol)
+      val cs = new Comprehension.Syntax(monad: Symbol)
 
-      postWalk(tree) {
-        case cs.map(xs, q"(${arg: ValDef}) => ${body: Tree}") =>
+      object fn {
+        val meta = new LNF.Meta(tree)
+
+        def unapply(tree: Tree): Option[(ValDef, Tree)] = tree match {
+          case q"(${arg: ValDef}) => ${body: Tree}" =>
+            Some(arg, body)
+          case id: Ident =>
+            meta.valdef(Term.of(id)) map {
+              case ValDef(_, _, _, q"(${arg: ValDef}) => ${body: Tree}") => (arg, body)
+            }
+        }
+      }
+
+      def resugar(tree: Tree): Tree = transform(tree) {
+        case cs.map(xs, fn(arg, body)) =>
           cs.comprehension(
             List(
-              cs.generator(Term.of(arg), xs)),
-            cs.head(body))
+              cs.generator(Term.of(arg), resugar(xs))),
+            cs.head(resugar(body)))
 
-        case cs.flatMap(xs, q"(${arg: ValDef}) => ${body: Tree}") =>
+        case cs.flatMap(xs, fn(arg, body)) =>
           cs.flatten(
             cs.comprehension(
               List(
-                cs.generator(Term.of(arg), xs)),
-              cs.head(body)))
+                cs.generator(Term.of(arg), resugar(xs))),
+              cs.head(resugar(body))))
 
-        case cs.withFilter(xs, q"(${arg: ValDef}) => ${body: Tree}") =>
+        case cs.withFilter(xs, fn(arg, body)) =>
           cs.comprehension(
             List(
-              cs.generator(Term.of(arg), xs),
+              cs.generator(Term.of(arg), resugar(xs)),
               cs.guard(body)),
             cs.head(ref(Term.of(arg))))
       }
+
+      (resugar _ andThen LNF.dce) (tree)
     }
 
     /**
@@ -209,10 +224,16 @@ trait Comprehensions extends CommonIR {
             val (curr, list) = res
             val cs.guard(expr) = guard
 
+            val frhs = lambda(sym)(expr)
+            val fnme = Term.fresh("anonfun")
+            val fsym = Term.free(fnme.toString, frhs.tpe)
+
             val name = Term.fresh(cs.withFilter.symbol.name.encodedName)
             val next = Term.free(name.toString, curr.info)
 
-            (next, list :+ val_(next, cs.withFilter(ref(curr))(lambda(sym)(expr))))
+            (next, list ++ List(
+              val_(fsym, frhs),
+              val_(next, cs.withFilter(ref(curr))(ref(fsym)))))
           })
 
           if (expr.symbol == sym) {
@@ -238,11 +259,17 @@ trait Comprehensions extends CommonIR {
                   cs.head(expr)))
             }
 
+            val frhs = lambda(sym)(body)
+            val fnme = Term.fresh("anonfun")
+            val fsym = Term.free(fnme.toString, frhs.tpe)
+
             val name = Term.fresh(op.symbol.name.encodedName)
             val term = Term.free(name.toString, t.tpe)
 
             block(
-              prefix :+ val_(term, op(ref(next))(lambda(sym)(body))),
+              prefix ++ List(
+                val_(fsym, frhs),
+                val_(term, op(ref(next))(ref(fsym)))),
               ref(term))
           }
 
@@ -260,29 +287,7 @@ trait Comprehensions extends CommonIR {
           }
       }
 
-      val unnestBlocks = (tree: Tree) => postWalk(tree) {
-        case parent: Block if parent.stats.exists {
-          case ValDef(_, _, _, _: Block) => true
-          case _ => false
-        } =>
-          // flatten nested stats
-          val flatStats = parent.stats.flatMap {
-            case stat@ValDef(mods, name, tpt, child: Block) =>
-              child.stats.last match {
-                case n@ValDef(_, _, _, rhs) =>
-                  child.stats.init :+ val_(Term.of(stat), rhs, mods.flags)
-                case _ =>
-                  List(stat)
-              }
-            case t =>
-              List(t)
-          }
-
-          block(flatStats, parent.expr)
-      }
-
-      val res = (desugar andThen unnestBlocks) (tree)
-      res
+      (desugar andThen LNF.flatten) (tree)
     }
 
     /**
