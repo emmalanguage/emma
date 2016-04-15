@@ -239,7 +239,7 @@ trait Language extends CommonIR with Comprehensions {
       case EmptyTree => EmptyTree
       case lit: Literal => block(lit)
       case id: Ident if id.isTerm => block(id)
-      case value: ValDef if isParam(value) => value
+      case value: ValDef if Is param value => value
 
       case fun: Function =>
         val name = Term.fresh(nameOf(fun))
@@ -297,7 +297,7 @@ trait Language extends CommonIR with Comprehensions {
 
           val rhs = Tree.app(target)(params: _*)
           // Partially applied multi-arg-list method
-          if (Type.isMethod(Type of app)) block(init, rhs)
+          if (Is method Type.of(app)) block(init, rhs)
           else block(init, val_(lhs, rhs), ref(lhs))
         }
 
@@ -457,10 +457,10 @@ trait Language extends CommonIR with Comprehensions {
         }
 
       val vals = tree.collect {
-        case vd: ValDef if !isParam(vd) && vd.rhs.nonEmpty =>
+        case value: ValDef if !Is.param(value) && value.rhs.nonEmpty =>
           // NOTE: Lazy vals not supported
-          assert(!isLazy(vd))
-          Term.of(vd) -> vd.rhs
+          assert(!Is.lzy(value))
+          Term.of(value) -> value.rhs
       }
 
       val dict = loop((vals, Map.empty))
@@ -681,24 +681,24 @@ trait Language extends CommonIR with Comprehensions {
      */
     class Meta(tree: Tree) {
 
-      val defs: Map[Symbol, ValDef] = (tree collect {
-        case vd@ValDef(_, _, _, rhs) if !isParam(vd) => vd.symbol -> vd
-      }).toMap
+      val defs: Map[Symbol, ValDef] = tree.collect {
+        case value: ValDef if !Is.param(value) =>
+          value.symbol -> value
+      }.toMap
 
-      val uses: Map[Symbol, Int] = {
-        val builder = List.newBuilder[(Symbol, Int)]
-
+      val uses: Map[Symbol, Int] =
         tree.collect { case id: Ident => id.symbol }
           .view.groupBy(identity)
           .mapValues(_.size)
           .withDefaultValue(0)
-      }
 
       @inline
-      def valdef(sym: Symbol): Option[ValDef] = defs.get(sym)
+      def valdef(sym: Symbol): Option[ValDef] =
+        defs.get(sym)
 
       @inline
-      def valuses(sym: Symbol): Int = uses.getOrElse(sym, 0)
+      def valuses(sym: Symbol): Int =
+        uses(sym)
     }
 
   }

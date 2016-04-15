@@ -29,19 +29,6 @@ trait Symbols extends Util { this: Trees with Types =>
     lazy val funSet: Set[Symbol] =
       fun.values.toSet
 
-    /** Is `sym` the `_root_` package? */
-    def isRoot(sym: Symbol): Boolean =
-      sym == rootMirror.RootClass ||
-        sym == rootMirror.RootPackage
-
-    /** Returns `true` if `sym` is not degenerate. */
-    def isDefined(sym: Symbol): Boolean =
-      sym != null && sym != NoSymbol
-
-    /** Checks common pre-conditions for type-checked [[Symbol]]s. */
-    def verify(sym: Symbol): Boolean =
-      isDefined(sym) && Has.tpe(sym)
-
     /** Returns a mutable metadata container for `sym`. */
     def meta(sym: Symbol): Attachments =
       attachments(sym)
@@ -64,8 +51,7 @@ trait Symbols extends Util { this: Trees with Types =>
 
     /** Returns the (lazy) owner chain of `target`. */
     def chain(target: Symbol): Stream[Symbol] =
-      Stream.iterate(target)(_.owner)
-        .takeWhile(Symbol.isDefined)
+      Stream.iterate(target)(_.owner).takeWhile(Is.defined)
 
     /**
      * Fixes the [[Symbol]] owner chain of `tree` at `owner`.
@@ -144,13 +130,13 @@ trait Symbols extends Util { this: Trees with Types =>
 
     /** Returns the name of `sym`. */
     def name(sym: Symbol): TermName = {
-      assert(Symbol.verify(sym))
+      assert(Is defined sym, s"Undefined symbol: `$sym`")
       sym.name.toTermName
     }
 
     /** Returns a new [[TermName]]. */
     def name(name: String): TermName = {
-      assert(name.nonEmpty)
+      assert(name.nonEmpty, "Empty term name")
       TermName(name)
     }
 
@@ -169,8 +155,8 @@ trait Symbols extends Util { this: Trees with Types =>
       flags: FlagSet = Flag.SYNTHETIC,
       origin: String = null): FreeTermSymbol = {
 
-      assert(name.nonEmpty)
-      assert(Type.isDefined(tpe))
+      assert(name.nonEmpty, "Empty term name")
+      assert(Is defined tpe, s"Undefined type: `$tpe`")
       val term = newFreeTerm(name, null, flags, origin)
       setInfo(term, Type.fix(tpe))
     }
@@ -180,29 +166,29 @@ trait Symbols extends Util { this: Trees with Types =>
       flags: FlagSet = Flag.SYNTHETIC,
       pos: Position = NoPosition): TermSymbol = {
 
-      assert(name.toString.nonEmpty)
-      assert(Type.isDefined(tpe))
+      assert(name.toString.nonEmpty, "Empty term name")
+      assert(Is defined tpe, s"Undefined type: `$tpe`")
       val term = termSymbol(owner, name, flags, pos)
       setInfo(term, Type.fix(tpe))
     }
 
     /** Returns the term of `tree`. */
     def of(tree: Tree): TermSymbol = {
-      assert(Has.termSym(tree))
+      assert(Has termSym tree, s"No term symbol found for:\n$tree")
       tree.symbol.asTerm
     }
 
     /** Finds field / method `member` accessible in `target` and returns its symbol. */
     def member(target: Symbol, member: TermName): TermSymbol = {
-      assert(Symbol.verify(target))
-      assert(member.toString.nonEmpty)
+      assert(Is valid target, s"Invalid target: `$target`")
+      assert(member.toString.nonEmpty, "Unspecified term member")
       Type.of(target).member(member).asTerm
     }
 
     /** Finds field / method `member` accessible in `target` and returns its symbol. */
     def member(target: Tree, member: TermName): TermSymbol = {
-      assert(Has.tpe(target))
-      assert(member.toString.nonEmpty)
+      assert(Has tpe target, s"Untyped target:\n$target")
+      assert(member.toString.nonEmpty, "Unspecified term member")
       Type.of(target).member(member).asTerm
     }
 
@@ -216,22 +202,20 @@ trait Symbols extends Util { this: Trees with Types =>
 
     /** Imports a term from a [[Tree]] by name. */
     def imp(from: Tree, name: TermName): Import = {
-      assert(Tree.verify(from))
-      assert(name.toString.nonEmpty)
-      Type.check {
-        q"import $from.$name"
-      }.asInstanceOf[Import]
+      assert(Is valid from, s"Invalid import selector:\n$from")
+      assert(name.toString.nonEmpty, "Unspecified import")
+      Type.check(q"import $from.$name").asInstanceOf[Import]
     }
 
     /** Returns a new field access ([[Select]]). */
     def sel(target: Tree, member: TermSymbol,
       tpe: Type = NoType): Select = {
 
-      assert(Has.tpe(target))
-      assert(member.toString.nonEmpty)
+      assert(Has tpe target, s"Untyped target:\n$target")
+      assert(member.toString.nonEmpty, "Unspecified term member")
       val sel = Select(target, member)
       val result =
-        if (Type.isDefined(tpe)) tpe
+        if (Is defined tpe) tpe
         else member.infoIn(Type.of(target))
 
       setSymbol(sel, member)

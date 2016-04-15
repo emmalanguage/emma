@@ -20,7 +20,6 @@ trait Util {
   type ~>[A, B] = PartialFunction[A, B]
 
   import universe._
-  import internal.reificationSupport._
 
   /** Raises a warning. */
   def warning(pos: Position, msg: String): Unit
@@ -271,56 +270,6 @@ trait Util {
         if (pf.isDefinedAt(tree)) pf(tree)
       }
     }.traverse
-
-  /** Utility for testing the existence of [[Tree]] attributes. */
-  object Has {
-
-    /** Does `tree` have a [[Type]]? */
-    def tpe(tree: Tree): Boolean = {
-      val tpe = tree.tpe
-      tpe != null && tpe != NoType
-    }
-
-    /** Does `sym` have a [[Type]]? */
-    def tpe(sym: Symbol): Boolean = {
-      val tpe = sym.info
-      tpe != null && tpe != NoType
-    }
-
-    /** Does `tree` have a [[Symbol]]? */
-    def sym(tree: Tree): Boolean = {
-      val sym = tree.symbol
-      sym != null && sym != NoSymbol
-    }
-
-    /** Does `tree` have a [[TermSymbol]]? */
-    def termSym(tree: Tree): Boolean =
-      Has.sym(tree) && tree.symbol.isTerm
-
-    /** Does `tree` have a [[TypeSymbol]]? */
-    def typeSym(tree: Tree): Boolean =
-      Has.sym(tree) && tree.symbol.isType
-
-    /** Does `sym` have an owner? */
-    def owner(sym: Symbol): Boolean = {
-      val owner = sym.owner
-      owner != null && owner != NoSymbol &&
-        owner != rootMirror.RootClass &&
-        owner != rootMirror.RootPackage
-    }
-
-    /** Does `tree` have a [[Position]]? */
-    def pos(tree: Tree): Boolean = {
-      val pos = tree.pos
-      pos != null && pos != NoPosition
-    }
-
-    /** Does `sym` have a [[Position]]? */
-    def pos(sym: Symbol): Boolean = {
-      val pos = sym.pos
-      pos != null && pos != NoPosition
-    }
-  }
 
   // ------------------------
   // Abstract wrapper methods

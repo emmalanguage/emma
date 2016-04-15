@@ -11,6 +11,103 @@ trait Trees extends Util { this: Types with Symbols =>
   import internal._
   import reificationSupport._
 
+  object Has {
+
+    /** Does `tree` have a type? */
+    def tpe(tree: Tree): Boolean =
+      Is defined tree.tpe
+
+    /** Does `sym` have a type? */
+    def tpe(sym: Symbol): Boolean =
+      Is defined sym.info
+
+    /** Does `tree` have a symbol? */
+    def sym(tree: Tree): Boolean =
+      Is defined tree.symbol
+
+    /** Does `tree` have a term symbol? */
+    def termSym(tree: Tree): Boolean =
+      Has.sym(tree) && tree.symbol.isTerm
+
+    /** Does `tpe` have a term symbol? */
+    def termSym(tpe: Type): Boolean =
+      Is defined tpe.termSymbol
+
+    /** Does `tree` have a type symbol? */
+    def typeSym(tree: Tree): Boolean =
+      Has.sym(tree) && tree.symbol.isType
+
+    /** Does `tpe` have a type symbol? */
+    def typeSym(tpe: Type): Boolean =
+      Is defined tpe.typeSymbol
+
+    /** Does `sym` have an owner? */
+    def owner(sym: Symbol): Boolean = {
+      val owner = sym.owner
+      Is.defined(owner) && !Is.root(owner)
+    }
+
+    /** Does `tree` have a position? */
+    def pos(tree: Tree): Boolean =
+      Is defined tree.pos
+
+    /** Does `sym` have a position? */
+    def pos(sym: Symbol): Boolean =
+      Is defined sym.pos
+  }
+
+  object Is {
+    import Flag._
+
+    /** Does `sym` satisfy the specified property? */
+    def apply(property: FlagSet, sym: Symbol): Boolean =
+      Symbol mods sym hasFlag property
+
+    /** Is `sym` non-degenerate? */
+    def defined(sym: Symbol): Boolean =
+      sym != null && sym != NoSymbol
+
+    /** Is `tpe` non-degenerate? */
+    def defined(tpe: Type): Boolean =
+      tpe != null && tpe != NoType
+
+    /** Is `pos` non-degenerate? */
+    def defined(pos: Position): Boolean =
+      pos != null && pos != NoPosition
+
+    /** Would `sym` be accepted by the compiler? */
+    def valid(sym: Symbol): Boolean =
+      Is.defined(sym) && Has.tpe(sym)
+
+    /** Would `tree` be accepted by the compiler? */
+    def valid(tree: Tree): Boolean =
+      tree.tpe != null
+
+    /** Is `sym` the `_root_` package? */
+    def root(sym: Symbol): Boolean =
+      sym == rootMirror.RootClass || sym == rootMirror.RootPackage
+
+    /** Is `value` a method or lambda parameter? */
+    def param(value: ValDef): Boolean =
+      value.mods.hasFlag(PARAM) || Term.of(value).isParameter
+
+    /** Is `value` a lazy val? */
+    def lzy(value: ValDef): Boolean =
+      value.mods.hasFlag(LAZY) || Term.of(value).isLazy
+
+    /** Is `tpe` a method type (e.g. `+ : (Int, Int)Int`)? */
+    def method(tpe: Type): Boolean = tpe match {
+      case _: NullaryMethodType => true
+      case _: MethodType => true
+      case _: PolyType => true
+      case _ => false
+    }
+
+    /** Is `tree` type-checked? */
+    def typeChecked(tree: Tree): Boolean =
+      tree forAll Is.valid
+  }
+
   object Tree {
 
     // Predefined trees
@@ -26,7 +123,7 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns `null` of [[Type]] `tpe`. */
     def nil(tpe: Type): Tree = {
-      assert(Type.isDefined(tpe))
+      assert(Is defined tpe, s"Undefined type: `$tpe`")
       Type.check(q"null.asInstanceOf[$tpe]")
     }
 
@@ -77,9 +174,9 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Casts `tree` up to `tpe` (i.e. `tree: tpe`). */
     def ascribe(tree: Tree, tpe: Type): Typed = {
-      assert(Has.tpe(tree))
-      assert(Type.isDefined(tpe))
-      assert(Type.of(tree) weak_<:< tpe)
+      assert(Has tpe tree, s"Untyped tree:\n$tree")
+      assert(Is defined tpe, s"Undefined type ascription: `$tpe`")
+      assert(Type.of(tree) weak_<:< tpe, "Type ascription does not match")
       val typed = Typed(tree, Type.quote(tpe))
       setType(typed, tpe)
     }
@@ -102,14 +199,11 @@ trait Trees extends Util { this: Types with Symbols =>
         case vd @ ValDef(_, Term.eta(_), _, _) => vd
       }: _*)
 
-    /** Returns a reference to `term`. */
-    def ref(term: TermSymbol, quoted: Boolean = false): Ident = {
-      assert(Symbol.verify(term))
-      val id =
-        if (quoted) q"`$term`".asInstanceOf[Ident]
-        else Ident(term)
-
-      setType(id, Type.of(term))
+    /** Returns a reference to `sym`. */
+    def ref(sym: TermSymbol, quoted: Boolean = false): Ident = {
+      assert(Is valid sym, s"Invalid symbol: `$sym`")
+      val id = if (quoted) q"`$sym`".asInstanceOf[Ident] else Ident(sym)
+      setType(id, Type.of(sym))
     }
 
     /** Binding constructors and extractors. */
@@ -117,7 +211,7 @@ trait Trees extends Util { this: Types with Symbols =>
 
       /** Returns a binding of `lhs` to use when pattern matching. */
       def apply(lhs: TermSymbol, pat: Tree = Ident(Term.wildcard)): Bind = {
-        assert(Symbol.verify(lhs), s"Invalid symbol $lhs")
+        assert(Is valid lhs, s"Invalid LHS: `$lhs`")
         val x = Bind(lhs.name, pat)
         setSymbol(x, lhs)
         setType(x, Type.of(lhs))
@@ -137,9 +231,9 @@ trait Trees extends Util { this: Types with Symbols =>
         rhs: Tree = EmptyTree,
         flags: FlagSet = Flag.SYNTHETIC): ValDef = {
 
-        assert(Symbol.verify(lhs))
-        assert(rhs.isEmpty || (Has.tpe(rhs) &&
-          Type.of(rhs).weak_<:<(Type.of(lhs))))
+        assert(Is valid lhs, s"Invalid LHS: `$lhs`")
+        assert(rhs.isEmpty || (Has.tpe(rhs) && Type.of(rhs).weak_<:<(Type of lhs)),
+          "LHS and RHS types don't match")
 
         val mods = Modifiers(flags)
         val tpt = Type.quote(Type.of(lhs))
@@ -156,8 +250,8 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns a new [[Block]] with the supplied content. */
     def block(body: Tree*): Block = {
-      assert(body.forall(verify))
-      assert(Has.tpe(body.last))
+      assert(body forall Is.valid, "Invalid block body")
+      assert(Has tpe body.last, s"Invalid expression:\n${body.last}")
       val (stats, expr) =
         if (body.isEmpty) (Nil, unit)
         else (body.init.filter {
@@ -176,9 +270,9 @@ trait Trees extends Util { this: Types with Symbols =>
     /** Returns `target` applied to the ([[Type]]) arguments. */
     @tailrec
     def app(target: Tree, types: Type*)(args: Tree*): Tree = {
-      assert(Has.tpe(target))
-      assert(types.forall(Type.isDefined))
-      assert(args.forall(Has.tpe))
+      assert(Has tpe target, s"Untyped target:\n$target")
+      assert(types forall Is.defined, "Unspecified type arguments")
+      assert(args forall Has.tpe, "Untyped arguments")
       if (types.isEmpty) {
         val app = Apply(target, args.toList)
         setType(app, Type.result(target))
@@ -190,8 +284,8 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns `target` instantiated with the [[Type]] arguments. */
     def typeApp(target: Tree, types: Type*): Tree = {
-      assert(Has.tpe(target))
-      assert(types.forall(Type.isDefined))
+      assert(Has tpe target, s"Untyped target:\n$target")
+      assert(types forall Is.defined, "Unspecified type arguments")
       if (types.isEmpty) target else {
         val typeArgs =  types.map(Type.quote(_)).toList
         val typeApp = TypeApply(target, typeArgs)
@@ -205,9 +299,9 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns a new class instantiation. */
     def inst(target: TypeSymbol, types: Type*)(args: Tree*): Tree = {
-      assert(Symbol.verify(target))
-      assert(types.forall(Type.isDefined))
-      assert(args.forall(Has.tpe))
+      assert(Is valid target, s"Invalid target: `$target`")
+      assert(types forall Is.defined, "Unspecified type arguments")
+      assert(args forall Has.tpe, "Untyped arguments")
       // TODO: Handle alternatives properly
       val clazz = Type.of(target)
       val sym = clazz.decl(Term.init)
@@ -250,9 +344,9 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns a new anonymous [[Function]]. */
     def lambda(args: TermSymbol*)(body: Tree*): Function = {
-      assert(args.forall(Symbol.verify))
-      assert(body.forall(verify))
-      assert(Has.tpe(body.last))
+      assert(args forall Is.valid, "Invalid lambda parameters")
+      assert(body forall Is.valid, "Invalid lambda body")
+      assert(Has tpe body.last, s"Invalid expression:\n${body.last}")
       val bodyBlock =
         if (body.size == 1) body.head
         else block(body: _*)
@@ -367,25 +461,15 @@ trait Trees extends Util { this: Types with Symbols =>
     def verify(tree: Tree): Boolean =
       tree.tpe != null
 
-    /** Is `vd` a method or lambda parameter? */
-    def isParam(vd: ValDef): Boolean =
-      Term.of(vd).isParameter ||
-        vd.mods.hasFlag(Flag.PARAM)
-
-    /** Is `vd` a lazy val? */
-    def isLazy(vd: ValDef): Boolean =
-      Term.of(vd).isLazy ||
-        vd.mods.hasFlag(Flag.LAZY)
-
     /** Returns a mutable metadata container for `tree`. */
     def meta(tree: Tree): Attachments =
       attachments(tree)
 
     /** Returns a new `if` branch. */
     def branch(cond: Tree, thn: Tree, els: Tree): Tree = {
-      assert(Has.tpe(cond) && Type.of(cond) =:= Type.bool)
-      assert(Has.tpe(thn))
-      assert(Has.tpe(els))
+      assert(Has.tpe(cond) && Type.of(cond) =:= Type.bool, s"Non-boolean condition:\n$cond")
+      assert(Has tpe thn, s"Untyped then branch:\n$thn")
+      assert(Has tpe els, s"Untyped else branch:\n$els")
       val branch = If(cond, thn, els)
       setType(branch, Type.weakLub(thn, els))
     }
@@ -413,8 +497,8 @@ trait Trees extends Util { this: Types with Symbols =>
       flags: FlagSet = Flag.SYNTHETIC,
       pos: Position = NoPosition): MethodSymbol = {
 
-      assert(name.nonEmpty)
-      assert(Type.isDefined(tpe))
+      assert(name.nonEmpty, "Empty method name")
+      assert(Is defined tpe, s"Undefined method type: `$tpe`")
       val sym = newMethodSymbol(NoSymbol, Term.name(name), pos, flags)
       setInfo(sym, Type.fix(tpe))
     }
@@ -424,8 +508,8 @@ trait Trees extends Util { this: Types with Symbols =>
       flags: FlagSet = Flag.SYNTHETIC,
       pos: Position = NoPosition): MethodSymbol = {
 
-      assert(name.toString.nonEmpty)
-      assert(Type.isDefined(tpe))
+      assert(name.toString.nonEmpty, "Empty method name")
+      assert(Is defined tpe, s"Undefined method type: `$tpe`")
       val sym = newMethodSymbol(owner, name, pos, flags)
       setInfo(sym, Type.fix(tpe))
     }
@@ -435,9 +519,9 @@ trait Trees extends Util { this: Types with Symbols =>
       (argLists: Seq[TermSymbol]*)
       (body: Type): Type = {
 
-      assert(typeArgs.forall(Symbol.verify))
-      assert(argLists.flatten.forall(Symbol.verify))
-      assert(Type.isDefined(body))
+      assert(typeArgs forall Is.valid, "Unspecified method type parameters")
+      assert(argLists.flatten forall Is.valid, "Unspecified method parameters")
+      assert(Is defined body, s"Undefined method return type: `$body`")
       val result = Type.fix(body)
       val tpe = if (argLists.isEmpty) {
         nullaryMethodType(result)
@@ -455,9 +539,9 @@ trait Trees extends Util { this: Types with Symbols =>
       (args: TermSymbol*)
       (body: Tree*): DefDef = {
 
-      assert(Symbol.verify(sym))
-      assert(args.forall(Symbol.verify))
-      assert(body.forall(verify))
+      assert(Is valid sym, s"Invalid method symbol: `$sym`")
+      assert(args forall Is.valid, "Unspecified method parameters")
+      assert(body forall Is.valid, "Invalid method body")
       assert(Has.tpe(body.last))
       val bodyBlock =
         if (body.size == 1) body.head
@@ -476,7 +560,7 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns a new lambda [[Function]] wrapping `method`. */
     def curry(method: MethodSymbol): Function = {
-      assert(Symbol.verify(method))
+      assert(Is valid method, s"Invalid method symbol: `$method`")
       val tpe = Type.of(method)
       val args = tpe match {
         case _: NullaryMethodType => Nil

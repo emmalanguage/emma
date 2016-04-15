@@ -44,7 +44,7 @@ trait Types extends Util { this: Trees with Symbols =>
     /** Returns a new tuple [[Type]] with specified elements. */
     def tuple(arg: Type, args: Type*): Type = {
       val n = args.size + 1
-      assert(n <= maxTupleElems)
+      assert(n <= maxTupleElems, s"Cannot have $n > $maxTupleElems tuple elements")
       val constructor = Symbol.tuple(n).toTypeConstructor
       apply(constructor, arg +: args: _*)
     }
@@ -56,7 +56,7 @@ trait Types extends Util { this: Trees with Symbols =>
     /** Returns a new [[Function]] [[Type]] with specified arguments and result. */
     def fun(args: Type*)(result: Type): Type = {
       val n = args.size
-      assert(n <= maxFunArgs)
+      assert(n <= maxFunArgs, s"Cannot have $n > $maxFunArgs lambda parameters")
       val constructor = Symbol.fun(n).toTypeConstructor
       apply(constructor, args :+ result: _*)
     }
@@ -81,13 +81,13 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Returns the [[TypeName]] of `sym`. */
     def name(sym: Symbol): TypeName = {
-      assert(Symbol.verify(sym))
+      assert(Is defined sym, s"Undefined symbol: `$sym`")
       sym.name.toTypeName
     }
 
     /** Returns a new [[TypeName]]. */
     def name(name: String): TypeName = {
-      assert(name.nonEmpty)
+      assert(name.nonEmpty, "Empty type name")
       TypeName(name)
     }
 
@@ -106,7 +106,7 @@ trait Types extends Util { this: Trees with Symbols =>
       flags: FlagSet = Flag.SYNTHETIC,
       origin: String = null): FreeTypeSymbol = {
 
-      assert(name.nonEmpty)
+      assert(name.nonEmpty, "Empty type name")
       newFreeType(name, flags, origin)
     }
 
@@ -115,15 +115,15 @@ trait Types extends Util { this: Trees with Symbols =>
       flags: FlagSet = Flag.SYNTHETIC,
       pos: Position = NoPosition): TypeSymbol = {
 
-      assert(name.toString.nonEmpty)
+      assert(name.toString.nonEmpty, "Empty type name")
       typeSymbol(owner, name, flags, pos)
     }
 
     /** Applies a [[Type]] constructor. */
     def apply(constructor: Type, args: Type*): Type = {
-      assert(isDefined(constructor))
-      assert(args.forall(isDefined))
-      assert(constructor.takesTypeArgs)
+      assert(Is defined constructor, s"Undefined type constructor: `$constructor`")
+      assert(args forall Is.defined, "Unspecified type arguments")
+      assert(constructor.takesTypeArgs, s"Type `$constructor` is not a type constructor")
       appliedType(fix(constructor), args.map(fix): _*)
     }
 
@@ -145,24 +145,20 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Returns the [[TypeSymbol]] of `tree` (must be type-checked). */
     def symOf(tree: Tree): TypeSymbol = {
-      assert(Has.typeSym(tree))
+      assert(Has typeSym tree, s"No type symbol found for:\n$tree")
       tree.symbol.asType
     }
 
     /** Equivalent to `tpe.dealias.widen`. */
     def fix(tpe: Type): Type = {
-      assert(isDefined(tpe))
+      assert(Is defined tpe, s"Undefined type: `$tpe`")
       tpe.dealias.widen
     }
 
-    /** Returns `true` if `tpe` is not degenerate. */
-    def isDefined(tpe: Type): Boolean =
-      tpe != null && tpe != NoType
-
     /** Returns the `i`-th [[Type]] argument of `tpe`. */
     def arg(i: Int, tpe: Type): Type = {
-      assert(isDefined(tpe))
-      assert(tpe.typeArgs.size >= i)
+      assert(Is defined tpe, s"Undefined type: `$tpe`")
+      assert(tpe.typeArgs.size >= i, s"Type `$tpe` has no type argument #$i")
       fix(tpe.typeArgs(i - 1))
     }
 
@@ -177,7 +173,7 @@ trait Types extends Util { this: Trees with Symbols =>
       case _ if tpe.typeArgs.nonEmpty =>
         tpe.typeArgs.last
       case _ =>
-        warning(NoPosition, s"`$tpe` doesn't have a return type")
+        warning(pos(tpe), s"Type `$tpe` is not a method or function")
         tpe
     })
 
@@ -187,21 +183,17 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Finds type `member` accessible in `target` and returns its symbol. */
     def member(target: Symbol, member: TypeName): TypeSymbol = {
-      assert(Symbol.verify(target))
-      assert(member.toString.nonEmpty)
+      assert(Is valid target, s"Invalid target: `$target`")
+      assert(member.toString.nonEmpty, "Unspecified type member")
       of(target).member(member).asType
     }
 
     /** Finds type `member` accessible in `target` and returns its symbol. */
     def member(target: Tree, member: TypeName): TypeSymbol = {
-      assert(Has.tpe(target))
-      assert(member.toString.nonEmpty)
+      assert(Has tpe target, s"Untyped target:\n$target")
+      assert(member.toString.nonEmpty, "Unspecified type member")
       of(target).member(member).asType
     }
-
-    /** Is `tree` type-checked? */
-    def isChecked(tree: Tree): Boolean =
-      tree.forAll(t => !Has.termSym(t) || Has.tpe(t.symbol))
 
     /** Type-checks `tree` (use `typeMode=true` for [[TypeTree]]s). */
     def check(tree: Tree, typeMode: Boolean = false): Tree =
@@ -219,7 +211,7 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Returns a [[Tree]] representation of `tpe`. */
     def quote(tpe: Type): TypeTree =
-      if (isDefined(tpe)) TypeTree(fix(tpe))
+      if (Is defined tpe) TypeTree(fix(tpe))
       else TypeTree()
 
     /** Returns a [[Tree]] representation of `sym`'s [[Type]]. */
@@ -241,22 +233,20 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Imports a [[Type]] from a [[Tree]] by name. */
     def imp(from: Tree, name: TypeName): Import = {
-      assert(Tree.verify(from))
-      assert(name.toString.nonEmpty)
-      check {
-        q"import $from.$name"
-      }.asInstanceOf[Import]
+      assert(Is valid from, s"Invalid import selector:\n$from")
+      assert(name.toString.nonEmpty, "Unspecified import")
+      Type.check(q"import $from.$name").asInstanceOf[Import]
     }
 
     /** Returns a new type `member` access ([[Select]]). */
     def sel(target: Tree, member: TypeSymbol,
       tpe: Type = NoType): Select = {
 
-      assert(Has.tpe(target))
-      assert(member.toString.nonEmpty)
+      assert(Has tpe target, s"Untyped target:\n$target")
+      assert(member.toString.nonEmpty, "Unspecified type member")
       val sel = Select(target, member)
       val result =
-        if (isDefined(tpe)) tpe
+        if (Is defined tpe) tpe
         else member.infoIn(of(target))
 
       setSymbol(sel, member)
@@ -270,15 +260,15 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Returns the least upper bound of the argument types. */
     def lub(tree: Tree, trees: Tree*): Type = {
-      assert(Has tpe tree)
-      assert(trees forall Has.tpe)
+      assert(Has tpe tree, s"Untyped tree:\n$tree")
+      assert(trees forall Has.tpe, "Untyped trees")
       lub(Type of tree, trees map Type.of: _*)
     }
 
     /** Returns the least upper bound of the argument types. */
     def lub(sym: Symbol, symbols: Symbol*): Type = {
-      assert(Has tpe sym)
-      assert(symbols forall Has.tpe)
+      assert(Has tpe sym, s"Untyped symbol: `$sym`")
+      assert(symbols forall Has.tpe, "Untyped symbols")
       lub(Type of sym, symbols map Type.of: _*)
     }
 
@@ -292,24 +282,27 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Returns the weak least upper bound of the argument types. */
     def weakLub(tree: Tree, trees: Tree*): Type = {
-      assert(Has tpe tree)
-      assert(trees forall Has.tpe)
+      assert(Has tpe tree, s"Untyped tree:\n$tree")
+      assert(trees forall Has.tpe, "Untyped trees")
       weakLub(Type of tree, trees map Type.of: _*)
     }
 
     /** Returns the weak least upper bound of the argument types. */
     def weakLub(sym: Symbol, symbols: Symbol*): Type = {
-      assert(Has tpe sym)
-      assert(symbols forall Has.tpe)
+      assert(Has tpe sym, s"Untyped symbol: `$sym`")
+      assert(symbols forall Has.tpe, "Untyped symbols")
       weakLub(Type of sym, symbols map Type.of: _*)
     }
 
-    /** Is `tpe` a method type, e.g. `+ : (Int, Int)Int`? */
-    def isMethod(tpe: Type): Boolean = tpe match {
-      case _: NullaryMethodType => true
-      case _: MethodType => true
-      case _: PolyType => true
-      case _ => false
+    /** Returns the position of `tpe` if any, otherwise `NoPosition`. */
+    def pos(tpe: Type): Position = {
+      val sym =
+        if (Has typeSym tpe) tpe.typeSymbol
+        else if (Has termSym tpe) tpe.termSymbol
+        else NoSymbol
+
+      if (Has pos sym) sym.pos
+      else NoPosition
     }
   }
 }
