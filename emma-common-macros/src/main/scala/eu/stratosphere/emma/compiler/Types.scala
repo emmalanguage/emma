@@ -123,6 +123,26 @@ trait Types extends Util { this: Trees with Symbols =>
         if (id.isType) Some(Type sym id) else None
     }
 
+    /** Type member selection. */
+    object sel {
+
+      /** Returns a new type `member` access (Select). */
+      def apply(target: Tree, member: TypeSymbol, tpe: Type = NoType): Select = {
+        assert(Has tpe target, s"Untyped target:\n$target")
+        assert(member.toString.nonEmpty, "Unspecified type member")
+        val sel = Select(target, member)
+        val result =
+          if (Is defined tpe) tpe
+          else member.infoIn(of(target))
+
+        setSymbol(sel, member)
+        setType(sel, result)
+      }
+
+      def unapply(sel: Select): Option[(Tree, TypeSymbol)] =
+        if (Has typeSym sel) Some(sel.qualifier, Type sym sel) else None
+    }
+
     /** Returns a new tuple type of specific elements. */
     def tuple(first: Type, rest: Type*): Type = {
       val n = rest.size + 1
@@ -271,19 +291,6 @@ trait Types extends Util { this: Trees with Symbols =>
       assert(Is valid from, s"Invalid import selector:\n$from")
       assert(name.toString.nonEmpty, "Unspecified import")
       Type.check(q"import $from.$name").asInstanceOf[Import]
-    }
-
-    /** Returns a new type `member` access (select). */
-    def sel(target: Tree, member: TypeSymbol, tpe: Type = NoType): Select = {
-      assert(Has tpe target, s"Untyped target:\n$target")
-      assert(member.toString.nonEmpty, "Unspecified type member")
-      val sel = Select(target, member)
-      val result =
-        if (Is defined tpe) tpe
-        else member.infoIn(of(target))
-
-      setSymbol(sel, member)
-      setType(sel, result)
     }
 
     /** Returns the least upper bound of all types. */
