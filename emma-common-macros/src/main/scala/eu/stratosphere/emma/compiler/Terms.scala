@@ -143,17 +143,24 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
       Type.check(q"import $from.$name").asInstanceOf[Import]
     }
 
-    /** Returns a new field access (Select). */
-    def sel(target: Tree, member: TermSymbol, tpe: Type = NoType): Select = {
-      assert(Has tpe target, s"Untyped target:\n$target")
-      assert(member.toString.nonEmpty, "Unspecified term member")
-      val sel = Select(target, member)
-      val result =
-        if (Is defined tpe) tpe
-        else member.infoIn(Type of target)
+    /** Term member selection. */
+    object sel {
 
-      setSymbol(sel, member)
-      setType(sel, result)
+      /** Returns a new field access (Select). */
+      def apply(target: Tree, member: TermSymbol, tpe: Type = NoType): Select = {
+        assert(Has tpe target, s"Untyped target:\n$target")
+        assert(member.toString.nonEmpty, "Unspecified term member")
+        val sel = Select(target, member)
+        val result =
+          if (Is defined tpe) tpe
+          else member.infoIn(Type of target)
+
+        setSymbol(sel, member)
+        setType(sel, result)
+      }
+
+      def unapply(sel: Select): Option[(Tree, TermSymbol)] =
+        if (Has termSym sel) Some(sel.qualifier, Term sym sel) else None
     }
   }
 }
