@@ -5,7 +5,7 @@ import scala.annotation.tailrec
 import scala.reflect.macros.Attachments
 
 /** Utility for trees (depends on [[Types]] and [[Symbols]]). */
-trait Trees extends Util { this: Types with Symbols =>
+trait Trees extends Util { this: Terms with Types with Symbols =>
 
   import universe._
   import internal._
@@ -89,11 +89,11 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Is `value` a method or lambda parameter? */
     def param(value: ValDef): Boolean =
-      value.mods.hasFlag(PARAM) || Term.of(value).isParameter
+      value.mods.hasFlag(PARAM) || Term.sym(value).isParameter
 
     /** Is `value` a lazy val? */
     def lzy(value: ValDef): Boolean =
-      value.mods.hasFlag(LAZY) || Term.of(value).isLazy
+      value.mods.hasFlag(LAZY) || Term.sym(value).isLazy
 
     /** Is `tpe` a method type (e.g. `+ : (Int, Int)Int`)? */
     def method(tpe: Type): Boolean = tpe match {
@@ -112,7 +112,7 @@ trait Trees extends Util { this: Types with Symbols =>
 
     // Predefined trees
     lazy val unit = lit(())
-    lazy val Root = q"${Term.root}"
+    lazy val Root = q"${Term.name.root}"
     lazy val Java = q"$Root.java"
     lazy val Scala = q"$Root.scala"
     lazy val predef = Type.check(q"$Scala.Predef")
@@ -133,7 +133,7 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Imports everything from a [[Tree]]. */
     def impAll(from: Tree): Import = {
-      val sel = ImportSelector(Term.wildcard, -1, null, -1)
+      val sel = ImportSelector(Term.name.wildcard, -1, null, -1)
       val imp = Import(from, sel :: Nil)
       setType(imp, NoType)
     }
@@ -156,16 +156,16 @@ trait Trees extends Util { this: Types with Symbols =>
     /** Returns the [[Set]] of terms defined in `tree`. */
     def defs(tree: Tree): Set[TermSymbol] = tree.collect {
       case dt @ (_: ValDef | _: Bind | _: DefDef) => dt
-    }.map(Term.of).toSet
+    }.map(Term.sym(_)).toSet
 
     /** Returns the [[Set]] of terms referenced in `tree`. */
     def refs(tree: Tree): Set[TermSymbol] =
       tree.collect {
         // Could be a type ref
         case id: Ident if Has.termSym(id) && {
-          val term = Term.of(id)
+          val term = Term.sym(id)
           term.isVal || term.isVar || term.isMethod
-        } => Term.of(id)
+        } => Term.sym(id)
       }.toSet
 
     /** Returns the [[Set]] of references to the outer scope of `tree`. */
@@ -196,7 +196,7 @@ trait Trees extends Util { this: Types with Symbols =>
      */
     def etaCompact(tree: Tree): Tree =
       inline(tree, tree.collect {
-        case vd @ ValDef(_, Term.eta(_), _, _) => vd
+        case vd @ ValDef(_, Term.name.eta(_), _, _) => vd
       }: _*)
 
     /** Returns a reference to `sym`. */
@@ -210,7 +210,7 @@ trait Trees extends Util { this: Types with Symbols =>
     object bind {
 
       /** Returns a binding of `lhs` to use when pattern matching. */
-      def apply(lhs: TermSymbol, pat: Tree = Ident(Term.wildcard)): Bind = {
+      def apply(lhs: TermSymbol, pat: Tree = Ident(Term.name.wildcard)): Bind = {
         assert(Is valid lhs, s"Invalid LHS: `$lhs`")
         val x = Bind(lhs.name, pat)
         setSymbol(x, lhs)
@@ -218,7 +218,7 @@ trait Trees extends Util { this: Types with Symbols =>
       }
 
       def unapply(tree: Tree): Option[(TermSymbol, Tree)] = tree match {
-        case x@Bind(_, pat) => Some(Term.of(x), pat)
+        case x@Bind(_, pat) => Some(Term.sym(x), pat)
         case _ => None
       }
     }
@@ -243,7 +243,7 @@ trait Trees extends Util { this: Types with Symbols =>
       }
 
       def unapply(tree: Tree): Option[(TermSymbol, Tree, FlagSet)] = tree match {
-        case x@ValDef(mods, _, _, rhs) => Some(Term.of(x), rhs, mods.flags)
+        case x@ValDef(mods, _, _, rhs) => Some(Term.sym(x), rhs, mods.flags)
         case _ => None
       }
     }
@@ -304,7 +304,7 @@ trait Trees extends Util { this: Types with Symbols =>
       assert(args forall Has.tpe, "Untyped arguments")
       // TODO: Handle alternatives properly
       val clazz = Type.of(target)
-      val sym = clazz.decl(Term.init)
+      val sym = clazz.decl(Term.name.init)
       val tpe =
         if (types.isEmpty) clazz
         else Type(clazz, types: _*)
@@ -353,7 +353,7 @@ trait Trees extends Util { this: Types with Symbols =>
 
       val types = args.map(Type.of)
       val tpe = Type.fun(types: _*)(Type.of(bodyBlock))
-      val term = Term.free(Term.lambda.toString, tpe)
+      val term = Term.sym.free(Term.name.lambda, tpe)
       val argFlags = Flag.SYNTHETIC | Flag.PARAM
       val params = for ((arg, tpe) <- args zip types) yield
         Term.sym(term, arg.name, tpe, argFlags)
@@ -418,13 +418,13 @@ trait Trees extends Util { this: Types with Symbols =>
      */
     def rename(in: Tree, dict: Map[TermSymbol, TermSymbol]): Tree =
       if (dict.isEmpty) in else postWalk(in) {
-        case vd: ValDef if dict.contains(Term.of(vd)) =>
-          val_(dict(Term.of(vd)), vd.rhs)
+        case vd: ValDef if dict.contains(Term.sym(vd)) =>
+          val_(dict(Term.sym(vd)), vd.rhs)
         // Could be a type ref
-        case id: Ident if Has.termSym(id) && dict.contains(Term.of(id)) =>
-          ref(dict(Term.of(id)))
-        case bd: Bind if dict.contains(Term.of(bd)) =>
-          bind(dict(Term.of(bd)), bd.body)
+        case id: Ident if Has.termSym(id) && dict.contains(Term.sym(id)) =>
+          ref(dict(Term.sym(id)))
+        case bd: Bind if dict.contains(Term.sym(bd)) =>
+          bind(dict(Term.sym(bd)), bd.body)
       }
 
     /**
@@ -436,7 +436,7 @@ trait Trees extends Util { this: Types with Symbols =>
      */
     def refresh(in: Tree, terms: TermSymbol*): Tree =
       rename(in, (for (term <- terms) yield {
-        val name = Term.fresh(term.name.toString)
+        val name = Term.name.fresh(term.name)
         term -> Term.sym(term.owner, name, term.info, pos = term.pos)
       }): _*)
 
@@ -476,7 +476,7 @@ trait Trees extends Util { this: Types with Symbols =>
 
     /** Returns a [[scala.collection.Set]] of all var mutations in `tree`. */
     def assignments(tree: Tree): Set[TermSymbol] = tree.collect {
-      case assign: Assign => Term.of(assign)
+      case assign: Assign => Term.sym(assign)
     }.toSet
   }
 

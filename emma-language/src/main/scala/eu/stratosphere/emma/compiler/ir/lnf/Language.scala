@@ -10,6 +10,7 @@ trait Language extends CommonIR with Comprehensions {
 
   import universe._
   import Tree._
+  import Term.name.fresh
 
   private[emma] object LNF {
 
@@ -242,16 +243,16 @@ trait Language extends CommonIR with Comprehensions {
       case value: ValDef if Is param value => value
 
       case fun: Function =>
-        val name = Term.fresh(nameOf(fun))
+        val name = fresh(nameOf(fun))
         val tpe = Type.of(fun)
-        val sym = Term.free(name.toString, tpe)
+        val sym = Term.sym.free(name, tpe)
         block(val_(sym, fun), ref(sym))
 
       case Typed(Block(stats, expr), tpt) =>
-        val tpe = Type.of(tpt)
-        val name = Term.fresh(nameOf(expr))
-        val lhs = Term.free(name.toString, tpe)
-        val rhs = ascribe(expr, tpe)
+        val T = Type.of(tpt)
+        val x = fresh(nameOf(expr))
+        val lhs = Term.sym.free(x, T)
+        val rhs = ascribe(expr, T)
         block(stats, val_(lhs, rhs), ref(lhs))
 
       case sel@Select(Block(stats, target), _: TypeName) =>
@@ -260,17 +261,16 @@ trait Language extends CommonIR with Comprehensions {
         block(stats, Type.sel(target, sym, tpe))
 
       case sel@Select(Block(stats, target), member: TermName) =>
-        val sym = Term.of(sel)
-        val tpe = Type.of(sel)
-        val rhs = Term.sel(target, sym, tpe)
+        val sym = Term.sym(sel)
+        val T = Type.of(sel)
+        val rhs = Term.sel(target, sym, T)
         if (sym.isPackage || // Parameter lists follow
           (sym.isMethod && sym.asMethod.paramLists.nonEmpty) ||
           IR.comprehensionOps.contains(sym)) {
 
           block(stats, rhs)
         } else {
-          val name = Term.fresh(member).toString
-          val lhs = Term.free(name, tpe)
+          val lhs = Term.sym.free(fresh(member), T)
           block(stats, val_(lhs, rhs), ref(lhs))
         }
 
@@ -279,12 +279,13 @@ trait Language extends CommonIR with Comprehensions {
         block(stats, expr)
 
       case app@Apply(Block(stats, target), args) =>
-        if (IR.comprehensionOps.contains(Term.of(target))) {
+        if (IR.comprehensionOps contains Term.sym(target)) {
           val expr = Tree.app(target)(args.map(this.expr): _*)
           block(stats, expr)
         } else {
-          val name = Term.fresh(nameOf(target))
-          val lhs = Term.free(name.toString, Type.of(app))
+          val x = fresh(nameOf(target))
+          val T = Type.of(app)
+          val lhs = Term.sym.free(x, T)
           val init = stats ::: args.flatMap {
             case Block(nested, _) => nested
             case _ => Nil
@@ -315,14 +316,12 @@ trait Language extends CommonIR with Comprehensions {
         Tree.block(body.init, body.last)
 
       // Avoid duplication of intermediates
-      case value@ValDef(mods, _, _, Block(stats :+ (int: ValDef), rhs: Ident))
+      case val_(lhs, Block(stats :+ (int: ValDef), rhs: Ident), flags)
         if int.symbol == rhs.symbol =>
-        val lhs = Term.of(value)
-        block(stats, val_(lhs, int.rhs, mods.flags), unit)
+        block(stats, val_(lhs, int.rhs, flags), unit)
 
-      case value@ValDef(mods, _, _, Block(stats, rhs)) =>
-        val lhs = Term.of(value)
-        block(stats, val_(lhs, rhs, mods.flags), unit)
+      case val_(lhs, Block(stats, rhs), flags) =>
+        block(stats, val_(lhs, rhs, flags), unit)
     }
 
     /** Ensures that all definitions within the `tree` have unique names. */
@@ -359,7 +358,7 @@ trait Language extends CommonIR with Comprehensions {
         case Block(_, expr) => loop(expr)
         case Apply(target, _) => loop(target)
         case TypeApply(target, _) => loop(target)
-        case _: Function => Term.lambda
+        case _: Function => Term.name.lambda
         case _: Literal => Term.name("x")
         case _ => throw new RuntimeException("Unsupported tree")
       }
@@ -460,7 +459,7 @@ trait Language extends CommonIR with Comprehensions {
         case value: ValDef if !Is.param(value) && value.rhs.nonEmpty =>
           // NOTE: Lazy vals not supported
           assert(!Is.lzy(value))
-          Term.of(value) -> value.rhs
+          Term.sym(value) -> value.rhs
       }
 
       val dict = loop((vals, Map.empty))
@@ -509,17 +508,17 @@ trait Language extends CommonIR with Comprehensions {
         case parent: Block if hasNestedBlocks(parent) =>
           // flatten (potentially) nested block stats
           val flatStats = parent.stats.flatMap {
-            case vd@ValDef(mods, name, tpt, child: Block) =>
-              child.stats :+ val_(Term.of(vd), child.expr, mods.flags)
-            case t =>
-              List(t)
+            case val_(sym, Block(stats, expr), flags) =>
+              stats :+ val_(sym, expr, flags)
+            case stat =>
+              stat :: Nil
           }
           // flatten (potentially) nested block expr
           val flatExpr = parent.expr match {
-            case child: Block =>
-              child.stats :+ child.expr
-            case t =>
-              List(t)
+            case Block(stats, expr) =>
+              stats :+ expr
+            case expr =>
+              expr :: Nil
           }
 
           block(flatStats ++ flatExpr)
@@ -597,10 +596,10 @@ trait Language extends CommonIR with Comprehensions {
         case tp@Typed(pat, _) if Type.of(sel) weak_<:< Type.of(tp) =>
           irrefutable(ascribe(sel, Type.of(tp)), pat)
 
-        case bd@Bind(_, pat) =>
-          val sym = Term.of(bd)
-          lazy val vd = val_(sym, sel)
-          irrefutable(ref(sym), pat).map(vd :: _)
+        case bind @ Bind(_, pat) =>
+          val lhs = Term.sym(bind)
+          lazy val value = val_(lhs, sel)
+          irrefutable(ref(lhs), pat).map(value :: _)
 
         // Alternative patterns don't allow binding
         case Alternative(patterns) =>
@@ -660,8 +659,7 @@ trait Language extends CommonIR with Comprehensions {
         val CaseDef(pat, guard, body) = cases.head
         assert(guard.isEmpty)
         val T = Type.of(sel)
-        val name = Term.fresh("x").toString
-        val x = Term.free(name, T)
+        val x = Term.sym.free(fresh("x"), T)
         val binds = irrefutable(ref(x), pat)
         assert(binds.isDefined)
         block(val_(x, sel) :: binds.get, body)

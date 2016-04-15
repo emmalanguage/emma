@@ -4,6 +4,7 @@ trait Comprehensions {
   self: Language =>
 
   import universe._
+  import Term._
   import Tree._
 
   private[emma] object Comprehension {
@@ -33,9 +34,10 @@ trait Comprehensions {
         def unapply(tree: Tree): Option[(ValDef, Tree)] = tree match {
           case q"(${arg: ValDef}) => ${body: Tree}" =>
             Some(arg, body)
-          case id: Ident =>
-            meta.valdef(Term.of(id)) map {
-              case ValDef(_, _, _, q"(${arg: ValDef}) => ${body: Tree}") => (arg, body)
+          case Term.ref(sym) =>
+            meta.valdef(sym) map {
+              case ValDef(_, _, _, Function(arg :: Nil, body)) =>
+                (arg, body)
             }
         }
       }
@@ -44,22 +46,22 @@ trait Comprehensions {
         case cs.map(xs, fn(arg, body)) =>
           cs.comprehension(
             List(
-              cs.generator(Term.of(arg), xs)),
+              cs.generator(Term sym arg, xs)),
             cs.head(body))
 
         case cs.flatMap(xs, fn(arg, body)) =>
           cs.flatten(
             cs.comprehension(
               List(
-                cs.generator(Term.of(arg), xs)),
+                cs.generator(Term sym arg, xs)),
               cs.head(body)))
 
         case cs.withFilter(xs, fn(arg, body)) =>
           cs.comprehension(
             List(
-              cs.generator(Term.of(arg), xs),
+              cs.generator(Term sym arg, xs),
               cs.guard(body)),
-            cs.head(ref(Term.of(arg))))
+            cs.head(ref(Term sym arg)))
       }
 
       (transform andThen LNF.dce) (tree)
@@ -96,17 +98,17 @@ trait Comprehensions {
           val (tail, prefix) = {
             ({
               // step (1) accumulate the result
-              (_: List[Tree]).foldLeft((Term.of(rhs), List.empty[Tree]))((res, guard) => {
+              (_: List[Tree]).foldLeft((Term sym rhs, List.empty[Tree]))((res, guard) => {
                 val (currSym, currPfx) = res
                 val cs.guard(expr) = guard
 
                 val funcRhs = lambda(sym)(expr)
-                val funcNme = Term.fresh("anonfun")
-                val funcSym = Term.free(funcNme.toString, funcRhs.tpe)
+                val funcNme = Term.name.fresh("anonfun")
+                val funcSym = Term.sym.free(funcNme, funcRhs.tpe)
                 val funcVal = val_(funcSym, funcRhs)
 
-                val nextNme = Term.fresh(cs.withFilter.symbol.name.encodedName)
-                val nextSym = Term.free(nextNme.toString, currSym.info)
+                val nextNme = Term.name.fresh(cs.withFilter.symbol.name)
+                val nextSym = Term.sym.free(nextNme, currSym.info)
                 val nextVal = val_(nextSym, cs.withFilter(ref(currSym))(ref(funcSym)))
 
                 (nextSym, nextVal :: funcVal :: currPfx)
@@ -141,8 +143,7 @@ trait Comprehensions {
             }
 
             val func = lambda(sym)(body)
-            val name = Term.fresh("anonfun")
-            val term = Term.free(name.toString, func.tpe)
+            val term = Term.sym.free(Term.name.lambda, func.tpe)
 
             block(
               prefix,
@@ -200,7 +201,7 @@ trait Comprehensions {
 
         override def unapply(apply: Tree): Option[(Tree, Tree)] = apply match {
           case q"${map@Select(xs, _)}[$_](${fn: Tree})"
-            if Term.of(map) == symbol => Some(xs, fn)
+            if Term.sym(map) == symbol => Some(xs, fn)
           case _ =>
             Option.empty
         }
@@ -214,7 +215,7 @@ trait Comprehensions {
 
         override def unapply(tree: Tree): Option[(Tree, Tree)] = tree match {
           case q"${flatMap@Select(xs, _)}[$_](${fn: Tree})"
-            if Term.of(flatMap) == symbol => Some(xs, fn)
+            if Term.sym(flatMap) == symbol => Some(xs, fn)
           case _ =>
             Option.empty
         }
@@ -228,7 +229,7 @@ trait Comprehensions {
 
         override def unapply(tree: Tree): Option[(Tree, Tree)] = tree match {
           case q"${withFilter@Select(xs, _)}(${fn: Tree})"
-            if Term.of(withFilter) == symbol => Some(xs, fn)
+            if Term.sym(withFilter) == symbol => Some(xs, fn)
           case _ =>
             Option.empty
         }
@@ -247,7 +248,7 @@ trait Comprehensions {
 
         def unapply(tree: Tree): Option[(List[Tree], Tree)] = tree match {
           case Apply(fun, List(Block(qs, hd)))
-            if Term.of(fun) == symbol => Some(qs, hd)
+            if Term.sym(fun) == symbol => Some(qs, hd)
           case _ =>
             Option.empty
         }
@@ -262,7 +263,7 @@ trait Comprehensions {
 
         def unapply(tree: Tree): Option[(TermSymbol, Tree)] = tree match {
           case vd@val_(term, Apply(fun, List(arg)), _)
-            if Term.of(fun) == symbol => Some(term, arg)
+            if Term.sym(fun) == symbol => Some(term, arg)
           case _ =>
             Option.empty
         }
@@ -277,7 +278,7 @@ trait Comprehensions {
 
         def unapply(tree: Tree): Option[Tree] = tree match {
           case Apply(fun, List(expr))
-            if Term.of(fun) == symbol => Some(expr)
+            if Term.sym(fun) == symbol => Some(expr)
           case _ =>
             Option.empty
         }
@@ -292,7 +293,7 @@ trait Comprehensions {
 
         def unapply(tree: Tree): Option[Tree] = tree match {
           case Apply(fun, List(expr))
-            if Term.of(fun) == symbol => Some(expr)
+            if Term.sym(fun) == symbol => Some(expr)
           case _ =>
             Option.empty
         }
@@ -307,7 +308,7 @@ trait Comprehensions {
 
         def unapply(tree: Tree): Option[Tree] = tree match {
           case Apply(fun, List(expr))
-            if Term.of(fun) == symbol => Some(expr)
+            if Term.sym(fun) == symbol => Some(expr)
           case _ =>
             Option.empty
         }

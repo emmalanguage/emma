@@ -12,9 +12,9 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
     object name {
 
       // Predefined names
-      val anon = name("anon")
+      val anon = apply("anon")
       val init = termNames.CONSTRUCTOR
-      val lambda = name("anonfun")
+      val lambda = apply("anonfun")
       val root = termNames.ROOTPKG
       val wildcard = termNames.WILDCARD
 

@@ -13,15 +13,16 @@ class ConvertersMacros(val c: blackbox.Context) extends compiler.MacroUtil {
   import Emma._
   import Tree._
   import Type._
+  import Term.name.fresh
 
   private val builder =
-    Term.fresh("builder")
+    fresh("builder")
 
   def materializeCSVConverters[T: c.WeakTypeTag] = Type.check {
     val T = Type.weak[T]
-    val value = Term.fresh("value")
-    val index = Term.fresh("index")
-    val sep = Term.fresh("sep")
+    val value = fresh("value")
+    val index = fresh("index")
+    val sep = fresh("sep")
 
     val from = q"""
       ($value: ${array(string)}) => {
@@ -44,7 +45,7 @@ class ConvertersMacros(val c: blackbox.Context) extends compiler.MacroUtil {
 
   def fromCSV(T: Type, value: Tree, index: Tree): Tree =
     if (T <:< Type[Product]) {
-      val method = T.decl(Term.init).alternatives.head.asMethod
+      val method = T.decl(Term.name.init).alternatives.head.asMethod
       val params = method.typeSignatureIn(T).paramLists.head
       val args = for (p <- params) yield fromCSV(Type.of(p), value, index)
       q"new $T(..$args)"
@@ -68,7 +69,7 @@ class ConvertersMacros(val c: blackbox.Context) extends compiler.MacroUtil {
 
   def toCSV(T: Type, value: Tree): Tree = {
     if (T <:< Type[Product]) {
-      val method = T.decl(Term.init).alternatives.head.asMethod
+      val method = T.decl(Term.name.init).alternatives.head.asMethod
       val params = method.typeSignatureIn(T).paramLists.head
       val fields = for {
         param <- params
