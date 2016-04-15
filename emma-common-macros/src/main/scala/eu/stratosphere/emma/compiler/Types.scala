@@ -109,6 +109,20 @@ trait Types extends Util { this: Trees with Symbols =>
         Some(sym.name, Symbol flags sym)
     }
 
+    /** Type references (Idents). */
+    object ref {
+
+      /** Returns a new type reference (use `quoted=true` for Unicode support). */
+      def apply(sym: TypeSymbol, quoted: Boolean = false): Ident = {
+        val id = if (quoted) q"`$sym`".asInstanceOf[Ident] else Ident(sym)
+        setType(id, Type of sym)
+        setSymbol(id, sym)
+      }
+
+      def unapply(id: Ident): Option[TypeSymbol] =
+        if (id.isType) Some(Type sym id) else None
+    }
+
     /** Returns a new tuple type of specific elements. */
     def tuple(first: Type, rest: Type*): Type = {
       val n = rest.size + 1
