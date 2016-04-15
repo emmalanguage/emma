@@ -344,5 +344,16 @@ trait Types extends Util { this: Trees with Symbols =>
       if (Has pos sym) sym.pos
       else NoPosition
     }
+
+    /** Returns `target` instantiated with the type arguments. */
+    def app(target: Tree, types: Type*): Tree = {
+      assert(Has tpe target, s"Untyped target:\n$target")
+      assert(types forall Is.defined, "Unspecified type arguments")
+      if (types.isEmpty) target else {
+        val typeArgs =  types.map(Type quote _).toList
+        val typeApp = TypeApply(target, typeArgs)
+        setType(typeApp, Type(target.tpe, types: _*))
+      }
+    }
   }
 }

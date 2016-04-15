@@ -4,7 +4,7 @@ package compiler
 import scala.annotation.tailrec
 import scala.reflect.macros.Attachments
 
-/** Utility for trees (depends on [[Types]] and [[Symbols]]). */
+/** Utility for trees. */
 trait Trees extends Util { this: Terms with Types with Symbols =>
 
   import universe._
@@ -117,21 +117,21 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     lazy val Scala = q"$Root.scala"
     lazy val predef = Type.check(q"$Scala.Predef")
 
-    /** Returns `null` of [[Type]] `T`. */
+    /** Returns `null` of type `T`. */
     def nil[T: TypeTag]: Tree =
       nil(Type[T])
 
-    /** Returns `null` of [[Type]] `tpe`. */
+    /** Returns `null` of type `tpe`. */
     def nil(tpe: Type): Tree = {
       assert(Is defined tpe, s"Undefined type: `$tpe`")
       Type.check(q"null.asInstanceOf[$tpe]")
     }
 
-    /** Returns a new [[Literal]] containing `const`. */
+    /** Returns a new literal containing `const`. */
     def lit[A](const: A): Tree =
       Type.check(Literal(Constant(const)))
 
-    /** Imports everything from a [[Tree]]. */
+    /** Imports everything from a tree. */
     def impAll(from: Tree): Import = {
       val sel = ImportSelector(Term.name.wildcard, -1, null, -1)
       val imp = Import(from, sel :: Nil)
@@ -153,22 +153,18 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     def parse(code: String): Tree =
       Type.check(Trees.this.parse(code))
 
-    /** Returns the [[Set]] of terms defined in `tree`. */
+    /** Returns the set of terms defined in `tree`. */
     def defs(tree: Tree): Set[TermSymbol] = tree.collect {
-      case dt @ (_: ValDef | _: Bind | _: DefDef) => dt
+      case definition @ (_: ValDef | _: Bind | _: DefDef) => definition
     }.map(Term.sym(_)).toSet
 
-    /** Returns the [[Set]] of terms referenced in `tree`. */
+    /** Returns the set of terms referenced in `tree`. */
     def refs(tree: Tree): Set[TermSymbol] =
-      tree.collect {
-        // Could be a type ref
-        case id: Ident if Has.termSym(id) && {
-          val term = Term.sym(id)
-          term.isVal || term.isVar || term.isMethod
-        } => Term.sym(id)
+      tree.collect { case Term.ref(sym)
+        if sym.isVal || sym.isVar || sym.isMethod => sym
       }.toSet
 
-    /** Returns the [[Set]] of references to the outer scope of `tree`. */
+    /** Returns the set of references to the outer scope of `tree`. */
     def closure(tree: Tree): Set[TermSymbol] =
       refs(tree) diff defs(tree)
 
@@ -177,11 +173,11 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       assert(Has tpe tree, s"Untyped tree:\n$tree")
       assert(Is defined tpe, s"Undefined type ascription: `$tpe`")
       assert(Type.of(tree) weak_<:< tpe, "Type ascription does not match")
-      val typed = Typed(tree, Type.quote(tpe))
+      val typed = Typed(tree, Type quote tpe)
       setType(typed, tpe)
     }
 
-    /** Returns `tree` without [[Type]] ascriptions (ie. `x: Ascription`). */
+    /** Returns `tree` without type ascriptions (ie. `x: Ascription`). */
     @tailrec
     def unAscribe(tree: Tree): Tree = tree match {
       case Typed(inner, _) => unAscribe(inner)
@@ -191,34 +187,27 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     /**
      * Reverses eta expansion.
      *
-     * @param tree The [[Tree]] to normalize.
-     * @return The [[Tree]] with all eta expansions inlined.
+     * @param tree The tree to normalize.
+     * @return The tree with all eta expansions inlined.
      */
     def etaCompact(tree: Tree): Tree =
       inline(tree, tree.collect {
-        case vd @ ValDef(_, Term.name.eta(_), _, _) => vd
+        case value @ ValDef(_, Term.name.eta(_), _, _) => value
       }: _*)
-
-    /** Returns a reference to `sym`. */
-    def ref(sym: TermSymbol, quoted: Boolean = false): Ident = {
-      assert(Is valid sym, s"Invalid symbol: `$sym`")
-      val id = if (quoted) q"`$sym`".asInstanceOf[Ident] else Ident(sym)
-      setType(id, Type.of(sym))
-    }
 
     /** Binding constructors and extractors. */
     object bind {
 
       /** Returns a binding of `lhs` to use when pattern matching. */
-      def apply(lhs: TermSymbol, pat: Tree = Ident(Term.name.wildcard)): Bind = {
+      def apply(lhs: TermSymbol, pattern: Tree = Ident(Term.name.wildcard)): Bind = {
         assert(Is valid lhs, s"Invalid LHS: `$lhs`")
-        val x = Bind(lhs.name, pat)
+        val x = Bind(lhs.name, pattern)
         setSymbol(x, lhs)
-        setType(x, Type.of(lhs))
+        setType(x, Type of lhs)
       }
 
       def unapply(tree: Tree): Option[(TermSymbol, Tree)] = tree match {
-        case x@Bind(_, pat) => Some(Term.sym(x), pat)
+        case bind @ Bind(_, pattern) => Some(Term sym bind, pattern)
         case _ => None
       }
     }
@@ -236,22 +225,23 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
           "LHS and RHS types don't match")
 
         val mods = Modifiers(flags)
-        val tpt = Type.quote(Type.of(lhs))
-        val vd = ValDef(mods, lhs.name, tpt, rhs)
-        setSymbol(vd, lhs)
-        setType(vd, NoType)
+        val T = Type quote Type.of(lhs)
+        val value = ValDef(mods, lhs.name, T, rhs)
+        setSymbol(value, lhs)
+        setType(value, NoType)
       }
 
       def unapply(tree: Tree): Option[(TermSymbol, Tree, FlagSet)] = tree match {
-        case x@ValDef(mods, _, _, rhs) => Some(Term.sym(x), rhs, mods.flags)
+        case value @ ValDef(mods, _, _, rhs) => Some(Term sym value, rhs, mods.flags)
         case _ => None
       }
     }
 
-    /** Returns a new [[Block]] with the supplied content. */
+    /** Returns a new block with the supplied body. */
     def block(body: Tree*): Block = {
       assert(body forall Is.valid, "Invalid block body")
       assert(Has tpe body.last, s"Invalid expression:\n${body.last}")
+      // Implicitly remove no-ops
       val (stats, expr) =
         if (body.isEmpty) (Nil, unit)
         else (body.init.filter {
@@ -260,14 +250,14 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
         }.toList, body.last)
 
       val block = Block(stats, expr)
-      setType(block, Type.of(expr))
+      setType(block, Type of expr)
     }
 
-    /** Returns a new [[Block]] with the supplied content. */
+    /** Returns a new block with the supplied body. */
     def block(init: Seq[Tree], rest: Tree*): Block =
       block(init ++ rest: _*)
 
-    /** Returns `target` applied to the ([[Type]]) arguments. */
+    /** Returns `target` applied to the (type) arguments. */
     @tailrec
     def app(target: Tree, types: Type*)(args: Tree*): Tree = {
       assert(Has tpe target, s"Untyped target:\n$target")
@@ -275,21 +265,10 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       assert(args forall Has.tpe, "Untyped arguments")
       if (types.isEmpty) {
         val app = Apply(target, args.toList)
-        setType(app, Type.result(target))
+        setType(app, Type result target)
       } else {
-        val typeApp = this.typeApp(target, types: _*)
+        val typeApp = Type.app(target, types: _*)
         app(typeApp)(args: _*)
-      }
-    }
-
-    /** Returns `target` instantiated with the [[Type]] arguments. */
-    def typeApp(target: Tree, types: Type*): Tree = {
-      assert(Has tpe target, s"Untyped target:\n$target")
-      assert(types forall Is.defined, "Unspecified type arguments")
-      if (types.isEmpty) target else {
-        val typeArgs =  types.map(Type.quote(_)).toList
-        val typeApp = TypeApply(target, typeArgs)
-        setType(typeApp, Type(target.tpe, types: _*))
       }
     }
 
@@ -304,14 +283,11 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       assert(args forall Has.tpe, "Untyped arguments")
       // TODO: Handle alternatives properly
       val clazz = Type.of(target)
-      val sym = clazz.decl(Term.name.init)
-      val tpe =
-        if (types.isEmpty) clazz
-        else Type(clazz, types: _*)
-
+      val constructor = clazz.decl(Term.name.init)
+      val T = if (types.isEmpty) clazz else Type(clazz, types: _*)
       val inst = q"new ${resolve(target)}[..$types](..$args)"
-      setSymbol(inst, sym)
-      setType(inst, tpe)
+      setSymbol(inst, constructor)
+      setType(inst, T)
     }
 
     /** Returns a new class instantiation. */
@@ -322,8 +298,8 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     def resolve(target: Symbol): Tree =
       if (target.isStatic) {
         val owner =
-          if (Has.owner(target)) resolve(target.owner)
-          else ref(rootMirror.RootPackage)
+          if (Has owner target) resolve(target.owner)
+          else Term ref rootMirror.RootPackage
 
         if (target.isModule) {
           Term.sel(owner, rootMirror.staticModule(target.fullName))
@@ -332,134 +308,126 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
         } else if (target.isClass) {
           Type.sel(owner, rootMirror.staticClass(target.fullName))
         } else if (target.isType) {
-          Type.sel(resolve(target.owner), target.asType)
+          Type.sel(owner, target.asType)
         } else {
-          Term.sel(resolve(target.owner), target.asTerm)
+          Term.sel(owner, target.asTerm)
         }
       } else if (target.isType) {
-        Type.quote(target)
+        Type ref target.asType
       } else {
-        ref(target.asTerm)
+        Term ref target.asTerm
       }
 
-    /** Returns a new anonymous [[Function]]. */
+    /** Returns a new anonymous function. */
     def lambda(args: TermSymbol*)(body: Tree*): Function = {
       assert(args forall Is.valid, "Invalid lambda parameters")
       assert(body forall Is.valid, "Invalid lambda body")
       assert(Has tpe body.last, s"Invalid expression:\n${body.last}")
-      val bodyBlock =
-        if (body.size == 1) body.head
-        else block(body: _*)
-
+      val bodyBlock = if (body.size == 1) body.head else block(body: _*)
       val types = args.map(Type.of)
-      val tpe = Type.fun(types: _*)(Type.of(bodyBlock))
-      val term = Term.sym.free(Term.name.lambda, tpe)
+      val T = Type.fun(types: _*)(Type of bodyBlock)
+      val anon = Term.sym.free(Term.name.lambda, T)
       val argFlags = Flag.SYNTHETIC | Flag.PARAM
       val params = for ((arg, tpe) <- args zip types) yield
-        Term.sym(term, arg.name, tpe, argFlags)
+        Term.sym(anon, arg.name, tpe, argFlags)
 
       val paramList = params.map(val_(_, flags = argFlags)).toList
       val rhs = rename(bodyBlock, args zip params: _*)
       val fn = Function(paramList, rhs)
-      setSymbol(fn, term)
-      setType(fn, tpe)
+      setSymbol(fn, anon)
+      setType(fn, T)
     }
 
     /**
-     * Bind a dictionary of [[Symbol]]-value pairs in a [[Tree]].
+     * Bind a dictionary of symbol-value pairs in a tree.
      *
-     * @param in The [[Tree]] to substitute in.
-     * @param dict A [[Map]] of [[Symbol]]-value pairs to bind.
-     * @return This [[Tree]] with all [[Symbol]]s in `dict` bound to their respective values.
+     * @param in The tree to substitute in.
+     * @param dict A map of symbol-value pairs to bind.
+     * @return This tree with all symbols in `dict` bound to their respective values.
      */
     def subst(in: Tree, dict: Map[Symbol, Tree]): Tree =
       if (dict.isEmpty) in else {
-        val closure = dict.values
+        val closure = dict.valuesIterator
           .flatMap(this.closure)
           .filterNot(dict.keySet)
           .map(_.name).toSet
 
-        val capture = defs(in).filter(term => closure(term.name))
+        val capture = defs(in).filter(sym => closure(sym.name))
         transform(refresh(in, capture.toSeq: _*)) {
-          case id: Ident if dict.contains(id.symbol) => dict(id.symbol)
+          case id: Ident if dict contains id.symbol => dict(id.symbol)
         }
       }
 
     /**
-     * Replace occurrences of the `find` [[Tree]] with the `repl` [[Tree]].
+     * Replace occurrences of the `find` tree with the `repl` tree.
      *
-     * @param in The [[Tree]] to substitute in.
-     * @param find The [[Tree]] to look for.
-     * @param repl The [[Tree]] that should replace `find`.
-     * @return A substituted version of the enclosing [[Tree]].
+     * @param in The tree to substitute in.
+     * @param find The tree to look for.
+     * @param repl The tree that should replace `find`.
+     * @return A substituted version of the enclosing tree.
      */
     def replace(in: Tree, find: Tree, repl: Tree): Tree =
       transform(in) {
-        case tree if tree.equalsStructure(find) =>
+        case tree if tree equalsStructure find =>
           repl
       }
 
     /**
-     * Replace a sequence of [[Symbol]]s with references to their aliases.
+     * Replace a sequence of symbols with references to their aliases.
      *
-     * @param in The [[Tree]] to rename in.
+     * @param in The tree to rename in.
      * @param aliases A sequence of aliases to replace.
-     * @return The [[Tree]] with the specified [[Symbol]]s replaced.
+     * @return The tree with the specified symbols replaced.
      */
     def rename(in: Tree, aliases: (TermSymbol, TermSymbol)*): Tree =
       rename(in, aliases.toMap)
 
     /**
-     * Replace a sequence of [[Symbol]]s with references to their aliases.
+     * Replace a sequence of symbols with references to their aliases.
      *
-     * @param in The [[Tree]] to rename in.
+     * @param in The tree to rename in.
      * @param dict A dictionary of aliases to replace.
-     * @return The [[Tree]] with the specified [[Symbol]]s replaced.
+     * @return The tree with the specified symbols replaced.
      */
     def rename(in: Tree, dict: Map[TermSymbol, TermSymbol]): Tree =
       if (dict.isEmpty) in else postWalk(in) {
-        case vd: ValDef if dict.contains(Term.sym(vd)) =>
-          val_(dict(Term.sym(vd)), vd.rhs)
-        // Could be a type ref
-        case id: Ident if Has.termSym(id) && dict.contains(Term.sym(id)) =>
-          ref(dict(Term.sym(id)))
-        case bd: Bind if dict.contains(Term.sym(bd)) =>
-          bind(dict(Term.sym(bd)), bd.body)
+        case val_(lhs, rhs, flags) if dict contains lhs =>
+          val_(dict(lhs), rhs, flags)
+        case Term.ref(sym) if dict contains sym =>
+          Term ref dict(sym)
+        case bind(lhs, pattern) if dict contains lhs =>
+          bind(dict(lhs), pattern)
       }
 
     /**
-     * Replace a sequence of [[Symbol]]s in a [[Tree]] with fresh ones.
+     * Replace a sequence of symbols in a tree with fresh ones.
      *
-     * @param in The [[Tree]] to refresh.
-     * @param terms The sequence of [[Symbol]]s to rename.
-     * @return The [[Tree]] with the specified [[Symbol]]s replaced.
+     * @param in The tree to refresh.
+     * @param terms The sequence of symbols to rename.
+     * @return The tree with the specified symbols replaced.
      */
     def refresh(in: Tree, terms: TermSymbol*): Tree =
       rename(in, (for (term <- terms) yield {
-        val name = Term.name.fresh(term.name)
-        term -> Term.sym(term.owner, name, term.info, pos = term.pos)
+        val x = Term.name.fresh(term.name)
+        term -> Term.sym(term.owner, x, term.info, pos = term.pos)
       }): _*)
 
     /**
-     * Inline a sequence of value definitions in a [[Tree]].
-     * It's assumed that they are part of the [[Tree]].
+     * Inline a sequence of value definitions in a tree.
+     * It's assumed that they are part of the tree.
      *
-     * @param in The [[Tree]] to inline in.
-     * @param defs A sequence of [[ValDef]]s to inline.
-     * @return The [[Tree]] with the specified value definitions inlined.
+     * @param in The tree to inline in.
+     * @param defs A sequence of value definitions to inline.
+     * @return The tree with the specified value definitions inlined.
      */
     def inline(in: Tree, defs: ValDef*): Tree =
       if (defs.isEmpty) in else {
-        val dict = defs.map(vd => vd.symbol -> vd.rhs).toMap
+        val dict = defs.map(v => v.symbol -> v.rhs).toMap
         transform(in) {
-          case vd: ValDef if dict.contains(vd.symbol) => unit
-          case id: Ident if dict.contains(id.symbol) => dict(id.symbol)
+          case value: ValDef if dict contains value.symbol => unit
+          case id: Ident if dict contains id.symbol => dict(id.symbol)
         }
       }
-
-    /** Checks common pre-conditions for type-checked [[Tree]]s. */
-    def verify(tree: Tree): Boolean =
-      tree.tpe != null
 
     /** Returns a mutable metadata container for `tree`. */
     def meta(tree: Tree): Attachments =
@@ -474,9 +442,9 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       setType(branch, Type.weakLub(thn, els))
     }
 
-    /** Returns a [[scala.collection.Set]] of all var mutations in `tree`. */
+    /** Returns a set of all var mutations in `tree`. */
     def assignments(tree: Tree): Set[TermSymbol] = tree.collect {
-      case assign: Assign => Term.sym(assign)
+      case assign: Assign => Term sym assign
     }.toSet
   }
 
@@ -487,34 +455,33 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     val maxTupleElems = 22
   }
 
-  /** Utility for methods ([[DefDef]]s). */
+  /** Utility for methods (DefDefs). */
   object Method {
-
     import Tree._
 
-    /** Returns a free [[MethodSymbol]] (i.e. without owner). */
-    def free(name: String, tpe: Type,
+    /** Returns a free method symbol (i.e. without owner). */
+    def free(name: TermName, tpe: Type,
       flags: FlagSet = Flag.SYNTHETIC,
       pos: Position = NoPosition): MethodSymbol = {
 
-      assert(name.nonEmpty, "Empty method name")
+      assert(name.toString.nonEmpty, "Empty method name")
       assert(Is defined tpe, s"Undefined method type: `$tpe`")
-      val sym = newMethodSymbol(NoSymbol, Term.name(name), pos, flags)
-      setInfo(sym, Type.fix(tpe))
+      val method = newMethodSymbol(NoSymbol, name, pos, flags)
+      setInfo(method, Type fix tpe)
     }
 
-    /** Returns a new [[MethodSymbol]] with provided specification. */
+    /** Returns a new method symbol with provided specification. */
     def sym(owner: Symbol, name: TermName, tpe: Type,
       flags: FlagSet = Flag.SYNTHETIC,
       pos: Position = NoPosition): MethodSymbol = {
 
       assert(name.toString.nonEmpty, "Empty method name")
       assert(Is defined tpe, s"Undefined method type: `$tpe`")
-      val sym = newMethodSymbol(owner, name, pos, flags)
-      setInfo(sym, Type.fix(tpe))
+      val method = newMethodSymbol(owner, name, pos, flags)
+      setInfo(method, Type fix tpe)
     }
 
-    /** Returns a new [[MethodType]] (possibly generic with multiple arg lists). */
+    /** Returns a new method type (possibly generic with multiple arg lists). */
     def tpe(typeArgs: TypeSymbol*)
       (argLists: Seq[TermSymbol]*)
       (body: Type): Type = {
@@ -523,14 +490,14 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       assert(argLists.flatten forall Is.valid, "Unspecified method parameters")
       assert(Is defined body, s"Undefined method return type: `$body`")
       val result = Type.fix(body)
-      val tpe = if (argLists.isEmpty) {
+      val T = if (argLists.isEmpty) {
         nullaryMethodType(result)
       } else argLists.foldRight(result) { (args, result) =>
         methodType(args.toList, result)
       }
 
-      if (typeArgs.isEmpty) tpe
-      else polyType(typeArgs.toList, tpe)
+      if (typeArgs.isEmpty) T
+      else polyType(typeArgs.toList, T)
     }
 
     /** Returns a new simple method (i.e. with single arg list and no generics). */
@@ -542,36 +509,33 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       assert(Is valid sym, s"Invalid method symbol: `$sym`")
       assert(args forall Is.valid, "Unspecified method parameters")
       assert(body forall Is.valid, "Invalid method body")
-      assert(Has.tpe(body.last))
-      val bodyBlock =
-        if (body.size == 1) body.head
-        else block(body: _*)
-
+      assert(Has tpe body.last, s"Invalid expression:\n${body.last}")
+      val bodyBlock = if (body.size == 1) body.head else block(body: _*)
       val argFlags = Flag.SYNTHETIC | Flag.PARAM
       val params = for (arg <- args) yield
         Term.sym(sym, arg.name, Type.of(arg), argFlags)
 
       val paramLists = params.map(val_(_)).toList :: Nil
       val rhs = rename(bodyBlock, args zip params: _*)
-      val dd = defDef(sym, Modifiers(flags), paramLists, rhs)
-      setSymbol(dd, sym)
-      setType(dd, NoType)
+      val method = defDef(sym, Modifiers(flags), paramLists, rhs)
+      setSymbol(method, sym)
+      setType(method, NoType)
     }
 
-    /** Returns a new lambda [[Function]] wrapping `method`. */
-    def curry(method: MethodSymbol): Function = {
+    /** Returns a new lambda function wrapping `method`. */
+    def lambdafy(method: MethodSymbol): Function = {
       assert(Is valid method, s"Invalid method symbol: `$method`")
-      val tpe = Type.of(method)
-      val args = tpe match {
+      val T = Type.of(method)
+      val args = T match {
         case _: NullaryMethodType => Nil
         case mt: MethodType if mt.typeArgs.isEmpty =>
           mt.paramLists.flatten.map(_.asTerm)
         case _ => abort(method.pos,
-          s"Cannot curry method with generic type `$tpe`")
+          s"Cannot lambdafy method with generic type `$T`")
       }
 
       lambda(args: _*) {
-        app(ref(method))(args.map(ref(_)): _*)
+        app(Term ref method)(args.map(Term.ref(_)): _*)
       }
     }
   }

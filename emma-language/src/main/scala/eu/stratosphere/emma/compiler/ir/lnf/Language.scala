@@ -243,44 +243,44 @@ trait Language extends CommonIR with Comprehensions {
       case value: ValDef if Is param value => value
 
       case fun: Function =>
-        val name = fresh(nameOf(fun))
-        val tpe = Type.of(fun)
-        val sym = Term.sym.free(name, tpe)
-        block(val_(sym, fun), ref(sym))
+        val x = fresh(nameOf(fun))
+        val T = Type.of(fun)
+        val lhs = Term.sym.free(x, T)
+        block(val_(lhs, fun), Term ref lhs)
 
       case Typed(Block(stats, expr), tpt) =>
-        val T = Type.of(tpt)
         val x = fresh(nameOf(expr))
+        val T = Type.of(tpt)
         val lhs = Term.sym.free(x, T)
         val rhs = ascribe(expr, T)
-        block(stats, val_(lhs, rhs), ref(lhs))
+        block(stats, val_(lhs, rhs), Term ref lhs)
 
       case sel@Select(Block(stats, target), _: TypeName) =>
-        val sym = Type.sym(sel)
-        val tpe = Type.of(sel)
-        block(stats, Type.sel(target, sym, tpe))
+        val x = Type.sym(sel)
+        val T = Type.of(sel)
+        block(stats, Type.sel(target, x, T))
 
       case sel@Select(Block(stats, target), member: TermName) =>
-        val sym = Term.sym(sel)
+        val x = Term.sym(sel)
         val T = Type.of(sel)
-        val rhs = Term.sel(target, sym, T)
-        if (sym.isPackage || // Parameter lists follow
-          (sym.isMethod && sym.asMethod.paramLists.nonEmpty) ||
-          IR.comprehensionOps.contains(sym)) {
+        val rhs = Term.sel(target, x, T)
+        if (x.isPackage || // Parameter lists follow
+          (x.isMethod && x.asMethod.paramLists.nonEmpty) ||
+          IR.comprehensionOps.contains(x)) {
 
           block(stats, rhs)
         } else {
           val lhs = Term.sym.free(fresh(member), T)
-          block(stats, val_(lhs, rhs), ref(lhs))
+          block(stats, val_(lhs, rhs), Term ref lhs)
         }
 
       case TypeApply(Block(stats, target), types) =>
-        val expr = typeApp(target, types.map(Type.of): _*)
+        val expr = Type.app(target, types map Type.of: _*)
         block(stats, expr)
 
       case app@Apply(Block(stats, target), args) =>
         if (IR.comprehensionOps contains Term.sym(target)) {
-          val expr = Tree.app(target)(args.map(this.expr): _*)
+          val expr = Tree.app(target)(args map this.expr: _*)
           block(stats, expr)
         } else {
           val x = fresh(nameOf(target))
@@ -299,7 +299,7 @@ trait Language extends CommonIR with Comprehensions {
           val rhs = Tree.app(target)(params: _*)
           // Partially applied multi-arg-list method
           if (Is method Type.of(app)) block(init, rhs)
-          else block(init, val_(lhs, rhs), ref(lhs))
+          else block(init, val_(lhs, rhs), Term ref lhs)
         }
 
       // Only if contains nested blocks
@@ -441,7 +441,7 @@ trait Language extends CommonIR with Comprehensions {
             }
 
             val dict = {
-              val dict = aliases ++ eq.map(_._1 -> ref(lhs1))
+              val dict = aliases ++ eq.map(_._1 -> Term.ref(lhs1))
               rhs1 match {
                 case lit: Literal => dict + (lhs1 -> lit)
                 case _ => dict
@@ -599,7 +599,7 @@ trait Language extends CommonIR with Comprehensions {
         case bind @ Bind(_, pat) =>
           val lhs = Term.sym(bind)
           lazy val value = val_(lhs, sel)
-          irrefutable(ref(lhs), pat).map(value :: _)
+          irrefutable(Term ref lhs, pat).map(value :: _)
 
         // Alternative patterns don't allow binding
         case Alternative(patterns) =>
@@ -659,10 +659,10 @@ trait Language extends CommonIR with Comprehensions {
         val CaseDef(pat, guard, body) = cases.head
         assert(guard.isEmpty)
         val T = Type.of(sel)
-        val x = Term.sym.free(fresh("x"), T)
-        val binds = irrefutable(ref(x), pat)
+        val lhs = Term.sym.free(fresh("x"), T)
+        val binds = irrefutable(Term ref lhs, pat)
         assert(binds.isDefined)
-        block(val_(x, sel) :: binds.get, body)
+        block(val_(lhs, sel) :: binds.get, body)
     }
 
     // Avoids blocks without statements

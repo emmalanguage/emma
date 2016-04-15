@@ -103,7 +103,7 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
     object ref {
 
       /** Returns a term reference to `sym` (use `quoted=true` for Unicode support). */
-      def ref(sym: TermSymbol, quoted: Boolean = false): Ident = {
+      def apply(sym: TermSymbol, quoted: Boolean = false): Ident = {
         assert(Is valid sym, s"Invalid symbol: `$sym`")
         val id = if (quoted) q"`$sym`".asInstanceOf[Ident] else Ident(sym)
         setType(id, Type of sym)
