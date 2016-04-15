@@ -12,13 +12,13 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
 
-  import compiler.IR.comprehensionOps
   import compiler.universe._
 
   // ---------------------------------------------------------------------------
   // Helper methods
   // ---------------------------------------------------------------------------
 
+  /** Pipeline for this spec. */
   def typeCheckAndANF[T](expr: Expr[T]): Tree = {
     val pipeline = {
       compiler.typeCheck(_: Tree)
@@ -31,23 +31,13 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
     pipeline(expr.tree)
   }
 
-  /**
-   * Fix some issues with the expected trees.
-   *
-   * - Remove empty blocks.
-   * - Normalize mock-comprehension selection chains.
-   */
+  /** Normalize mock-comprehension selection chains. */
   private def fix(tree: Tree): Tree = {
     val moduleSel = compiler.Tree.resolve(compiler.IR.module)
-    def transform = compiler.preWalk(tree) {
-      case s@Select(_, name) if s.symbol.isTerm && (comprehensionOps contains s.symbol.asTerm) =>
+    compiler.preWalk(tree) {
+      case s@Select(_, name) if compiler.IR.comprehensionOps contains s.symbol.asTerm =>
         compiler.Term.sel(moduleSel, s.symbol.asTerm)
-      case Block(Nil, expr) =>
-        expr
-      case block =>
-        block
     }
-    time(transform, "fix expected tree")
   }
 
   private def resugar(tree: Tree): Tree = {
