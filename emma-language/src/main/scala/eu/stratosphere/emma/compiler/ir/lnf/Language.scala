@@ -255,7 +255,7 @@ trait Language extends CommonIR with Comprehensions {
         block(stats, val_(lhs, rhs), ref(lhs))
 
       case sel@Select(Block(stats, target), _: TypeName) =>
-        val sym = Type.symOf(sel)
+        val sym = Type.sym(sel)
         val tpe = Type.of(sel)
         block(stats, Type.sel(target, sym, tpe))
 
