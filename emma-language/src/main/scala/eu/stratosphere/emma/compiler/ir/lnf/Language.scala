@@ -462,33 +462,83 @@ trait Language extends CommonIR
      * Unnests nested blocks [[Tree]].
      *
      * == Preconditions ==
-     * - Except the nested blocks, the input `tree` is in ANF (see [[LNF.anf()]]).
+     * - Except the nested blocks, the input tree is in simplified ANF form (see [[LNF.anf()]] and [[LNF.simplify()]]).
      *
      * == Postconditions ==
-     * - Nested blocks have been flattened.
+     * - A simplified ANF tree where all nested blocks have been flattened.
      *
-     * @param tree The [[Tree]] to be pruned.
+     * @param tree The [[Tree]] to be normalized.
      * @return A [[Tree]] with the same semantics but without common subexpressions.
      */
-    def flatten(tree: Tree): Tree = postWalk(tree) {
-      case parent: Block if parent.stats.exists {
-        case ValDef(_, _, _, _: Block) => true
-        case _ => false
-      } =>
-        // flatten nested stats
-        val flatStats = parent.stats.flatMap {
-          case stat@ValDef(mods, name, tpt, child: Block) =>
-            child.stats.last match {
-              case n@ValDef(_, _, _, rhs) =>
-                child.stats.init :+ val_(Term.of(stat), rhs, mods.flags)
-              case _ =>
-                List(stat)
-            }
-          case t =>
-            List(t)
-        }
+    def flatten(tree: Tree): Tree = {
 
-        block(flatStats, parent.expr)
+      def hasNestedBlocks(tree: Block): Boolean = {
+        val inStats = tree.stats exists {
+          case ValDef(_, _, _, _: Block) => true
+          case _ => false
+        }
+        val inExpr = tree.expr match {
+          case _: Block => true
+          case _ => false
+        }
+        inStats || inExpr
+      }
+
+      postWalk(tree) {
+        case parent: Block if hasNestedBlocks(parent) =>
+          // flatten (potentially) nested block stats
+          val flatStats = parent.stats.flatMap {
+            case vd@ValDef(mods, name, tpt, child: Block) =>
+              child.stats :+ val_(Term.of(vd), child.expr, mods.flags)
+            case t =>
+              List(t)
+          }
+          // flatten (potentially) nested block expr
+          val flatExpr = parent.expr match {
+            case child: Block =>
+              child.stats :+ child.expr
+            case t =>
+              List(t)
+          }
+
+          block(flatStats ++ flatExpr)
+      }
+    }
+
+    /**
+     * Inlines `Ident` return expressions in blocks whenever refered symbol is used only once.
+     * The resulting [[Tree]] is said to be in ''simplified ANF'' form.
+     *
+     * == Preconditions ==
+     * - The input `tree` is in ANF (see [[LNF.anf()]]).
+     *
+     * == Postconditions ==
+     * - `Ident` return expressions in blocks have been inlined whenever possible.
+     *
+     * @param tree The [[Tree]] to be normalized.
+     * @return A [[Tree]] with the same semantics but without common subexpressions.
+     */
+    def simplify(tree: Tree): Tree = {
+
+      def uses(sym: Symbol, stats: List[Tree]): Boolean = Block(stats, EmptyTree) exists {
+        case id: Ident if id.symbol == sym => true
+        case _ => false
+      }
+
+      def prune(sym: Symbol, stats: List[Tree]): (List[Tree], Option[Tree]) = stats
+        .reverse
+        .foldLeft((List.empty[Tree], Option.empty[Tree]))((res, tree) => tree match {
+          case ValDef(_, _, _, rhs) if tree.symbol == sym =>
+            res.copy(_2 = Some(rhs))
+          case _ =>
+            res.copy(_1 = tree :: res._1)
+        })
+
+      postWalk(tree) {
+        case bl@Block(stats, expr: Ident) if !uses(expr.symbol, stats) =>
+          val (pstats, pexpr) = prune(expr.symbol, stats)
+          pexpr.map(expr => block(pstats, expr)).getOrElse(bl)
+      }
     }
 
     /**

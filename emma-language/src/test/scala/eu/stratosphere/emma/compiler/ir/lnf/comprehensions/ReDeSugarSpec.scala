@@ -26,6 +26,8 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
       compiler.LNF.resolveNameClashes
     } andThen {
       compiler.LNF.anf
+    } andThen {
+      compiler.LNF.simplify
     }
 
     pipeline(expr.tree)
@@ -63,13 +65,12 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
 
     val res = (typeCheckAndANF _ andThen fix _) (reify {
       val users$1 = users
-      val names = comprehension[(String, String), DataBag] {
+      comprehension[(String, String), DataBag] {
         val u = generator(users$1)
         head {
           (u.name.first, u.name.last)
         }
       }
-      names
     })
 
     (des, res)
@@ -86,7 +87,7 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
 
     val res = (typeCheckAndANF _ andThen fix _) (reify {
       val users$1 = users
-      val names = flatten[String, DataBag] {
+      flatten[String, DataBag] {
         comprehension[DataBag[String], DataBag] {
           val u = generator(users$1)
           head {
@@ -94,7 +95,6 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
           }
         }
       }
-      names
     })
 
     (des, res)
@@ -111,7 +111,7 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
 
     val res = (typeCheckAndANF _ andThen fix _) (reify {
       val users$1 = users
-      val names = comprehension[User, DataBag] {
+      comprehension[User, DataBag] {
         val u = generator(users$1)
         guard {
           val name$1 = u.name
@@ -123,7 +123,6 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
           u
         }
       }
-      names
     })
 
     (des, res)
@@ -141,22 +140,20 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
 
     val res = (typeCheckAndANF _ andThen fix _) (reify {
       val users$1 = users
-      val names = flatten[(User, Click), DataBag] {
+      flatten[(User, Click), DataBag] {
         comprehension[DataBag[(User, Click)], DataBag] {
           val u = generator(users$1)
           head {
             val clicks$1 = clicks
-            val map$1 = comprehension[(User, Click), DataBag] {
+            comprehension[(User, Click), DataBag] {
               val c = generator(clicks$1)
               head {
                 (u, c)
               }
             }
-            map$1
           }
         }
       }
-      names
     })
 
     (des, res)
@@ -205,7 +202,7 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
     (des, res)
   }
 
-  // nested (flat)maps - 3 generators and two filters
+  // nested (flat)maps - 3 generators and a filter
   val (des6, res6) = {
 
     val des = typeCheckAndANF(reify {
@@ -280,7 +277,7 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
       "with three generators" in {
         resugar(des5) shouldEqual res5
       }
-      "with three generators and two filters" in {
+      "with three generators and one filter" in {
         resugar(des6) shouldEqual res6
       }
     }
@@ -304,7 +301,7 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
       "with three generators" in {
         desugar(res5) shouldEqual des5
       }
-      "with three generators and two filters" in {
+      "with three generators and one filter" in {
         desugar(res6) shouldEqual des6
       }
     }

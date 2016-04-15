@@ -112,9 +112,9 @@ trait Comprehensions {
             // trivial head expression consisting of the matched sym 'x'
             // omit the resulting trivial mapper
 
-            block(
+            LNF.simplify(block(
               prefix,
-              ref(next))
+              ref(next)))
 
           } else {
             // append a map or a flatMap to the result depending on
@@ -131,32 +131,22 @@ trait Comprehensions {
                   cs.head(expr)))
             }
 
-            val frhs = lambda(sym)(body)
-            val fnme = Term.fresh("anonfun")
-            val fsym = Term.free(fnme.toString, frhs.tpe)
-
-            val name = Term.fresh(op.symbol.name.encodedName)
-            val term = Term.free(name.toString, t.tpe)
+            val func = lambda(sym)(body)
+            val name = Term.fresh("anonfun")
+            val term = Term.free(name.toString, func.tpe)
 
             block(
-              prefix ++ List(
-                val_(fsym, frhs),
-                val_(term, op(ref(next))(ref(fsym)))),
-              ref(term))
+              prefix :+ val_(term, func),
+              op(ref(next))(ref(term)))
           }
 
-        case t@cs.flatten(Block(stats, expr)) =>
-          stats.last match {
-            case vd@ValDef(_, _, _, cs.map(xs, fn)) if vd.symbol == expr.symbol =>
-              val name = Term.fresh(cs.flatMap.symbol.name.encodedName)
-              val term = Term.free(name.toString, t.tpe)
+        case t@cs.flatten(Block(stats, expr@cs.map(xs, fn))) =>
 
-              block(
-                stats.init :+ val_(term, cs.flatMap(xs)(fn)),
-                ref(term))
-            case _ =>
-              t
-          }
+          val rooot = t
+
+          block(
+            stats,
+            cs.flatMap(xs)(fn))
       }
 
       (desugar _ andThen LNF.flatten) (tree)
@@ -285,6 +275,7 @@ trait Comprehensions {
         }
       }
 
+      /** Con- and destructs a head from/to a [[Tree]]. */
       object head {
         val symbol = IR.head
 
@@ -299,6 +290,7 @@ trait Comprehensions {
         }
       }
 
+      /** Con- and destructs a flatten from/to a [[Tree]]. */
       object flatten {
         val symbol = IR.flatten
 
