@@ -4,6 +4,7 @@ package compiler.ir.lnf
 import compiler.ir.CommonIR
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 /** Let-normal form language. */
 trait Language extends CommonIR with Comprehensions {
@@ -58,131 +59,124 @@ trait Language extends CommonIR with Comprehensions {
     }
 
     /** Check alpha-equivalence of trees. */
-    def eq(x: Tree, y: Tree)
-          (implicit map: Map[Symbol, Symbol] = Map.empty[Symbol, Symbol]): Boolean = (x, y) match {
+    private[emma] def eq(x: Tree, y: Tree)
+      (implicit dict: mutable.Map[Symbol, Symbol] = mutable.Map.empty): Boolean = (x, y) match {
 
-      case (NewIOFormat(apply$x, implicitArgs$x), NewIOFormat(apply$y, implicitArgs$y)) =>
-        eq(apply$x, apply$y)
+      case (NewIOFormat(app$x, _), NewIOFormat(app$y, _)) =>
+        eq(app$x, app$y)
 
       case (EmptyTree, EmptyTree) =>
         true
 
-      case (Annotated(annot$x, arg$x), Annotated(annot$y, arg$y)) =>
-        def annotEq = eq(annot$x, annot$y)
-        def argEq = eq(arg$x, arg$y)
-        annotEq && argEq
+      case (Annotated(ann$x, arg$x), Annotated(ann$y, arg$y)) =>
+        lazy val annEq = eq(ann$x, ann$y)
+        lazy val argEq = eq(arg$x, arg$y)
+        annEq && argEq
 
       case (This(qual$x), This(qual$y)) =>
-        qual$x == qual$y && x.symbol == y.symbol
+        lazy val qualEq = qual$x == qual$y
+        lazy val symEq = x.symbol == y.symbol
+        symEq && qualEq
 
-      case (AppliedTypeTree(tpt$x, args$x), AppliedTypeTree(tpt$y, args$y)) =>
+      case (x: AppliedTypeTree, y: AppliedTypeTree) =>
         x.tpe =:= y.tpe
 
-      case (tpe$x: TypeTree, tpe$y: TypeTree) =>
-        tpe$x.tpe =:= tpe$y.tpe
+      case (x: TypeTree, y: TypeTree) =>
+        x.tpe =:= y.tpe
 
-      case (Literal(Constant(value$x)), Literal(Constant(value$y))) =>
-        value$x == value$y
+      case (Literal(Constant(val$x)), Literal(Constant(val$y))) =>
+        val$x == val$y
 
-      case (Ident(name$x), Ident(name$y)) =>
+      case (x: Ident, y: Ident) =>
         eq(x.symbol, y.symbol)
 
       case (Typed(expr$x, tpt$x), Typed(expr$y, tpt$y)) =>
-        def exprEq = eq(expr$x, expr$x)
-        def tptEq = eq(tpt$x, tpt$y)
+        lazy val exprEq = eq(expr$x, expr$x)
+        lazy val tptEq = eq(tpt$x, tpt$y)
         exprEq && tptEq
 
-      case (Select(qualifier$x, name$x), Select(qualifier$y, name$y)) =>
-        def qualifierEq = eq(qualifier$x, qualifier$y)
-        def nameEq = name$x == name$y
-        qualifierEq && nameEq
+      case (Select(qual$x, name$x), Select(qual$y, name$y)) =>
+        lazy val qualEq = eq(qual$x, qual$y)
+        lazy val nameEq = name$x == name$y
+        nameEq && qualEq
 
       case (Block(stats$x, expr$x), Block(stats$y, expr$y)) =>
-        val xs = stats$x :+ expr$x
-        val ys = stats$y :+ expr$y
-        val us = xs zip ys
-
-        // collect DefDef pairs visible to all statements within the blocks
-        val defDefPairs = us collect {
-          case (x@DefDef(_, _, _, _, _, _), y@DefDef(_, _, _, _, _, _)) =>
-            (x.symbol, y.symbol)
-        }
-        // compute a stack of maps to be used at each position of us traversal
-        val maps = us.foldLeft(Seq(map ++ defDefPairs))((acc, pair) => pair match {
-          case (x@ValDef(_, _, _, _), y@ValDef(_, _, _, _)) =>
-            (acc.head + (x.symbol -> y.symbol)) +: acc
-          case _ =>
-            acc.head +: acc
-        }).tail.reverse
-
-        val statsSizeEq = stats$x.size == stats$y.size
-        val statsEq = (us zip maps) forall { case ((l, r), m) => eq(l, r)(m) }
-
-        statsSizeEq && statsEq
+        lazy val xs = stats$x :+ expr$x
+        lazy val ys = stats$y :+ expr$y
+        lazy val sizeEq = stats$x.size == stats$y.size
+        lazy val statsEq = xs.zip(ys).forall { case (l, r) => eq(l, r) }
+        sizeEq && statsEq
 
       case (ValDef(mods$x, _, tpt$x, rhs$x), ValDef(mods$y, _, tpt$y, rhs$y)) =>
-        val modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
-        val tptEq = eq(tpt$x, tpt$y)
-        val rhsEq = eq(rhs$x, rhs$y)
+        dict += x.symbol -> y.symbol
+        lazy val modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
+        lazy val tptEq = eq(tpt$x, tpt$y)
+        lazy val rhsEq = eq(rhs$x, rhs$y)
         modsEq && tptEq && rhsEq
 
-      case (DefDef(mods$x, _, tps$x, vpss$x, tpt$x, rhs$x), DefDef(mods$y, _, tps$y, vpss$y, tpt$y, rhs$y)) =>
-        val valDefPairs = (vpss$x.flatten zip vpss$y.flatten) collect {
-          case (x@ValDef(_, _, _, _), y@ValDef(_, _, _, _)) =>
-            (x.symbol, y.symbol)
-        }
+      case (
+        DefDef(mods$x, _, types$x, params$x, tpt$x, rhs$x),
+        DefDef(mods$y, _, types$y, params$y, tpt$y, rhs$y)) =>
 
-        val modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
-        val tpsSizeEq = tps$x.size == tps$y.size
-        val tpsEq = (tps$x zip tps$y) forall { case (l, r) => eq(l, r) }
-        val vpssSizeEq = vpss$x.size == vpss$y.size && ((vpss$x zip vpss$y) forall { case (l, r) => l.size == r.size })
-        val vpssEq = (vpss$x.flatten zip vpss$y.flatten) forall { case (l, r) => eq(l, r)(map ++ valDefPairs) }
+        dict += x.symbol -> y.symbol
+        lazy val modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
+        lazy val typeSizeEq = types$x.size == types$y.size
+        lazy val typesEq = types$x.zip(types$y).forall { case (l, r) => eq(l, r) }
+        lazy val paramSizeEq = params$x.size == params$y.size &&
+          params$x.zip(params$y).forall { case (l, r) => l.size == r.size }
+        val paramsEq = params$x.flatten.zip(params$y.flatten).forall { case (l, r) => eq(l, r) }
         val tptEq = eq(tpt$x, tpt$y)
-        val rhsEq = eq(rhs$x, rhs$y)(map ++ valDefPairs)
-        modsEq && tpsSizeEq && tpsEq && vpssSizeEq && vpssEq && tptEq && rhsEq
+        val rhsEq = eq(rhs$x, rhs$y)
+        modsEq && typeSizeEq && paramSizeEq && tptEq && typesEq && paramsEq && rhsEq
 
-      case (Function(vparams$x, body$x), Function(vparams$y, body$y)) =>
-        lazy val valDefPairs = (vparams$x zip vparams$y) collect {
-          case (x@ValDef(_, _, _, _), y@ValDef(_, _, _, _)) =>
-            (x.symbol, y.symbol)
-        }
+      case (Function(params$x, body$x), Function(params$y, body$y)) =>
+        dict += x.symbol -> y.symbol
+        lazy val paramSizeEq = params$x.size == params$y.size
+        lazy val paramsEq = params$x.zip(params$y).forall { case (l, r) => eq(l, r) }
+        lazy val bodyEq = eq(body$x, body$y)
+        paramSizeEq && paramsEq && bodyEq
 
-        def vparamsSizeEq = vparams$x.size == vparams$y.size
-        def vparamsEq = (vparams$x zip vparams$y) forall { case (l, r) => eq(l, r)(map ++ valDefPairs) }
-        def bodyEq = eq(body$x, body$y)(map ++ valDefPairs)
-        vparamsSizeEq && vparamsEq && bodyEq
-
-      case (TypeApply(fun$x, args$x), TypeApply(fun$y, args$y)) =>
-        def symEq = x.symbol == y.symbol
-        def funEq = eq(fun$x, fun$y)
-        def argsSizeEq = args$x.size == args$y.size
-        def argsEq = (args$x zip args$y) forall { case (a$x, a$y) => eq(a$x, a$y) }
-        symEq && funEq && argsSizeEq && argsEq
+      case (TypeApply(fun$x, types$x), TypeApply(fun$y, types$y)) =>
+        lazy val symEq = x.symbol == y.symbol
+        lazy val funEq = eq(fun$x, fun$y)
+        lazy val typeSizeEq = types$x.size == types$y.size
+        lazy val typesEq = types$x.zip(types$y).forall { case (l, r) => eq(l, r) }
+        symEq && typeSizeEq && funEq && typesEq
 
       case (Apply(fun$x, args$x), Apply(fun$y, args$y)) =>
-        def symEq = eq(x.symbol, y.symbol)
-        def funEq = eq(fun$x, fun$y)
-        def argsSizeEq = args$x.size == args$y.size
-        def argsEq = (args$x zip args$y) forall { case (a$x, a$y) => eq(a$x, a$y) }
-        symEq && funEq && argsSizeEq && argsEq
+        lazy val symEq = eq(x.symbol, y.symbol)
+        lazy val funEq = eq(fun$x, fun$y)
+        lazy val argSizeEq = args$x.size == args$y.size
+        lazy val argsEq = args$x.zip(args$y).forall { case (l, r) => eq(l, r) }
+        symEq && argSizeEq && funEq && argsEq
 
-      case (If(cond$x, thenp$x, elsep$x), If(cond$y, thenp$y, elsep$y)) =>
-        def condEq = eq(cond$x, cond$y)
-        def thenpEq = eq(thenp$x, thenp$y)
-        def elsepEq = eq(elsep$x, elsep$y)
-        condEq && thenpEq && elsepEq
+      case (If(cond$x, then$x, else$x), If(cond$y, then$y, else$y)) =>
+        lazy val condEq = eq(cond$x, cond$y)
+        lazy val thenEq = eq(then$x, then$y)
+        lazy val elseEq = eq(else$x, else$y)
+        condEq && thenEq && elseEq
 
       case _ =>
         false
     }
 
     /** Check symbol equivalence. */
-    private def eq(x: Symbol, y: Symbol)(implicit map: Map[Symbol, Symbol]): Boolean = (x, y) match {
-      case (x: FreeTermSymbol, y: FreeTermSymbol) =>
-        x.value == y.value
-      case _ =>
-        if (map.contains(x)) map(x) == y
-        else x == y
+    private def eq(x: Symbol, y: Symbol)
+      (implicit dict: mutable.Map[Symbol, Symbol]): Boolean = {
+
+      import Term.name.{exprOwner, local}
+
+      x == y || ((x, y) match {
+        case (x: FreeTermSymbol, y: FreeTermSymbol)
+          if x.name == y.name => x.value == y.value
+        case (Term.sym(`exprOwner`, _), Term.sym(`exprOwner`, _)) |
+          (Term.sym(`local`, _), Term.sym(`local`, _)) => true
+        case _ =>
+          lazy val contains = dict contains x
+          lazy val symEq = dict(x) == y
+          lazy val ownerEq = eq(x.owner, y.owner)
+          contains && symEq && ownerEq
+      })
     }
 
     /**

@@ -12,7 +12,8 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
 
-  import compiler.universe._
+  import compiler._
+  import universe._
 
   // ---------------------------------------------------------------------------
   // Helper methods
@@ -22,30 +23,36 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
   def typeCheckAndANF[T]: Expr[T] => Tree = {
     (_: Expr[T]).tree
   } andThen {
-    compiler.typeCheck(_: Tree)
+    Type.check(_)
   } andThen {
-    compiler.LNF.resolveNameClashes
+    LNF.resolveNameClashes
   } andThen {
-    compiler.LNF.anf
+    LNF.anf
   } andThen {
-    compiler.LNF.simplify
+    LNF.simplify
+  } andThen {
+    Owner.at(Owner.enclosing)
   }
 
   /** Normalize mock-comprehension selection chains. */
   def fix: Tree => Tree = tree => {
-    val moduleSel = compiler.Tree.resolve(compiler.IR.module)
-    compiler.preWalk(tree) {
-      case s@Select(_, name) if compiler.IR.comprehensionOps contains s.symbol.asTerm =>
-        compiler.Term.sel(moduleSel, s.symbol.asTerm)
+    val moduleSel = Tree.resolve(IR.module)
+    preWalk(tree) {
+      case s@Select(_, name) if IR.comprehensionOps contains s.symbol.asTerm =>
+        Term.sel(moduleSel, s.symbol.asTerm)
     }
   }
 
   def resugar: Tree => Tree = {
-    time(compiler.Comprehension.resugar(compiler.API.bagSymbol)(_), "resugar")
+    time(Comprehension.resugar(API.bagSymbol)(_), "resugar")
+  } andThen {
+    Owner.at(Owner.enclosing)
   }
 
   def desugar: Tree => Tree = {
-    time(compiler.Comprehension.desugar(compiler.API.bagSymbol)(_), "desugar")
+    time(Comprehension.desugar(API.bagSymbol)(_), "desugar")
+  } andThen {
+    Owner.at(Owner.enclosing)
   }
 
   // ---------------------------------------------------------------------------

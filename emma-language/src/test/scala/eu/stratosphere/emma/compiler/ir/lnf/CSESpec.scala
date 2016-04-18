@@ -8,20 +8,23 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class CSESpec extends BaseCompilerSpec with TreeEquality {
 
-  import compiler.universe._
+  import compiler._
+  import universe._
 
   def typeCheckAndNormalize[T]: Expr[T] => Tree = {
     (_: Expr[T]).tree
   } andThen {
-    compiler.typeCheck(_: Tree)
+    Type.check(_)
   } andThen {
-    compiler.LNF.destructPatternMatches
+    LNF.destructPatternMatches
   } andThen {
-    compiler.LNF.resolveNameClashes
+    LNF.resolveNameClashes
   } andThen {
-    compiler.LNF.anf
+    LNF.anf
   } andThen {
-    time(compiler.LNF.cse(_), "cse")
+    time(LNF.cse(_), "cse")
+  } andThen {
+    Owner.at(Owner.enclosing)
   }
 
   "field selections" - {
