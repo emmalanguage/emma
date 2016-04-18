@@ -446,6 +446,10 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     def assignments(tree: Tree): Set[TermSymbol] = tree.collect {
       case assign: Assign => Term sym assign
     }.toSet
+
+    /** Returns a copy of `tree`. */
+    def copy(tree: Tree): Tree =
+      tree.duplicate.asInstanceOf[Tree]
   }
 
   /** Some useful constants. */
