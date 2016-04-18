@@ -380,36 +380,36 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
      * @return The tree with the specified symbols replaced.
      */
     def rename(in: Tree, aliases: (TermSymbol, TermSymbol)*): Tree =
-      rename(in, aliases.toMap)
+      if (aliases.isEmpty) in else rename(in, aliases.toMap)
 
     /**
-     * Replace a sequence of symbols with references to their aliases.
+     * Replace term symbols with references to their aliases.
      *
      * @param in The tree to rename in.
-     * @param dict A dictionary of aliases to replace.
-     * @return The tree with the specified symbols replaced.
+     * @param pf A partial function mapping term symbols to their aliases.
+     * @return The tree with the matched symbols replaced.
      */
-    def rename(in: Tree, dict: Map[TermSymbol, TermSymbol]): Tree =
-      if (dict.isEmpty) in else postWalk(in) {
-        case val_(lhs, rhs, flags) if dict contains lhs =>
-          val_(dict(lhs), rhs, flags)
-        case Term.ref(sym) if dict contains sym =>
-          Term ref dict(sym)
-        case bind(lhs, pattern) if dict contains lhs =>
-          bind(dict(lhs), pattern)
+    def rename(in: Tree, pf: TermSymbol ~> TermSymbol): Tree =
+      preWalk(in) {
+        case Term.ref(sym) if pf isDefinedAt sym =>
+          Term ref pf(sym)
+        case val_(lhs, rhs, flags) if pf isDefinedAt lhs =>
+          val_(pf(lhs), rhs, flags)
+        case bind(lhs, pattern) if pf isDefinedAt lhs =>
+          bind(pf(lhs), pattern)
       }
 
     /**
      * Replace a sequence of symbols in a tree with fresh ones.
      *
      * @param in The tree to refresh.
-     * @param terms The sequence of symbols to rename.
+     * @param symbols The sequence of symbols to rename.
      * @return The tree with the specified symbols replaced.
      */
-    def refresh(in: Tree, terms: TermSymbol*): Tree =
-      rename(in, (for (term <- terms) yield {
-        val x = Term.name.fresh(term.name)
-        term -> Term.sym(term.owner, x, term.info, pos = term.pos)
+    def refresh(in: Tree, symbols: TermSymbol*): Tree =
+      rename(in, (for (sym <- symbols) yield {
+        val x = Term.name.fresh(sym.name)
+        sym -> Term.sym(sym.owner, x, sym.info, pos = sym.pos)
       }): _*)
 
     /**
