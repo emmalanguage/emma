@@ -13,8 +13,10 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
 
       // Predefined names
       val anon = apply("anon")
+      val exprOwner = apply("<expression-owner>")
       val init = termNames.CONSTRUCTOR
       val lambda = apply("anonfun")
+      val local = apply(s"<local $exprOwner>")
       val root = termNames.ROOTPKG
       val wildcard = termNames.WILDCARD
 
