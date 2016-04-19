@@ -40,29 +40,29 @@ trait Comprehensions {
         }
       }
 
-      def resugar(tree: Tree): Tree = transform(tree) {
+      val transform: Tree => Tree = preWalk {
         case cs.map(xs, fn(arg, body)) =>
           cs.comprehension(
             List(
-              cs.generator(Term.of(arg), resugar(xs))),
-            cs.head(resugar(body)))
+              cs.generator(Term.of(arg), xs)),
+            cs.head(body))
 
         case cs.flatMap(xs, fn(arg, body)) =>
           cs.flatten(
             cs.comprehension(
               List(
-                cs.generator(Term.of(arg), resugar(xs))),
-              cs.head(resugar(body))))
+                cs.generator(Term.of(arg), xs)),
+              cs.head(body)))
 
         case cs.withFilter(xs, fn(arg, body)) =>
           cs.comprehension(
             List(
-              cs.generator(Term.of(arg), resugar(xs)),
+              cs.generator(Term.of(arg), xs),
               cs.guard(body)),
             cs.head(ref(Term.of(arg))))
       }
 
-      (resugar _ andThen LNF.dce) (tree)
+      (transform andThen LNF.dce) (tree)
     }
 
     /**
@@ -84,7 +84,7 @@ trait Comprehensions {
       // construct comprehension syntax helper for the given monad
       val cs = new Syntax(monad: Symbol)
 
-      def desugar(tree: Tree): Tree = postWalk(tree) {
+      val transform: Tree => Tree = postWalk {
         case t@cs.comprehension(cs.generator(sym, rhs) :: qs, cs.head(expr)) =>
 
           val (guards, rest) = qs span {
@@ -149,7 +149,7 @@ trait Comprehensions {
             cs.flatMap(xs)(fn))
       }
 
-      (desugar _ andThen LNF.flatten) (tree)
+      (transform andThen LNF.flatten) (tree)
     }
 
     /**
