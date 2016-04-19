@@ -1,6 +1,7 @@
 package eu.stratosphere.emma
 package compiler
 
+import scala.annotation.tailrec
 import scala.language.higherKinds
 
 /** Utility for types. */
@@ -345,15 +346,45 @@ trait Types extends Util { this: Trees with Symbols =>
       else NoPosition
     }
 
-    /** Returns `target` instantiated with the type arguments. */
-    def app(target: Tree, types: Type*): Tree = {
-      assert(Has tpe target, s"Untyped target:\n$target")
-      assert(types forall Is.defined, "Unspecified type arguments")
-      if (types.isEmpty) target else {
-        val typeArgs =  types.map(Type quote _).toList
-        val typeApp = TypeApply(target, typeArgs)
-        setType(typeApp, Type(target.tpe, types: _*))
+    /** Type application. */
+    object app {
+
+      /** Returns `target` instantiated with the type arguments. */
+      def apply(target: Tree, types: Type*): Tree = {
+        assert(Has tpe target, s"Untyped target:\n$target")
+        assert(types forall Is.defined, "Unspecified type arguments")
+        if (types.isEmpty) target else {
+          val typeArgs =  types.map(Type quote _).toList
+          val typeApp = TypeApply(target, typeArgs)
+          setType(typeApp, Type(target.tpe, types: _*))
+        }
       }
+
+      def unapplySeq(app: TypeApply): Option[(Tree, Seq[Type])] =
+        Some(app.fun, app.args map Type.of)
+    }
+
+    /** Type ascriptions. */
+    object ascription {
+
+      /** Casts `tree` up to `tpe` (i.e. `tree: tpe`). */
+      def apply(tree: Tree, tpe: Type): Typed = {
+        assert(Has tpe tree, s"Untyped tree:\n$tree")
+        assert(Is defined tpe, s"Undefined type ascription: `$tpe`")
+        assert(of(tree) weak_<:< tpe, "Type ascription does not match")
+        val typed = Typed(tree, Type quote tpe)
+        setType(typed, tpe)
+      }
+
+      /** Returns `tree` without type ascriptions (ie. `x: Ascription`). */
+      @tailrec
+      def remove(tree: Tree): Tree = tree match {
+        case Typed(inner, _) => remove(inner)
+        case _ => tree
+      }
+
+      def unapply(tpd: Typed): Option[(Tree, Type)] =
+        Some(tpd.expr, Type of tpd)
     }
   }
 }

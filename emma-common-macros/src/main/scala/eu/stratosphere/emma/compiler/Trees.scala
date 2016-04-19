@@ -1,7 +1,6 @@
 package eu.stratosphere.emma
 package compiler
 
-import scala.annotation.tailrec
 import scala.reflect.macros.Attachments
 
 /** Utility for trees. */
@@ -10,6 +9,7 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
   import universe._
   import internal._
   import reificationSupport._
+  import Term._
 
   object Has {
 
@@ -111,25 +111,9 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
   object Tree {
 
     // Predefined trees
-    lazy val unit = lit(())
-    lazy val Root = q"${Term.name.root}"
-    lazy val Java = q"$Root.java"
-    lazy val Scala = q"$Root.scala"
-    lazy val predef = Type.check(q"$Scala.Predef")
-
-    /** Returns `null` of type `T`. */
-    def nil[T: TypeTag]: Tree =
-      nil(Type[T])
-
-    /** Returns `null` of type `tpe`. */
-    def nil(tpe: Type): Tree = {
-      assert(Is defined tpe, s"Undefined type: `$tpe`")
-      Type.check(q"null.asInstanceOf[$tpe]")
-    }
-
-    /** Returns a new literal containing `const`. */
-    def lit[A](const: A): Tree =
-      Type.check(Literal(Constant(const)))
+    val Root = q"${Term.name.root}"
+    val Java = q"$Root.java"
+    val Scala = q"$Root.scala"
 
     /** Imports everything from a tree. */
     def impAll(from: Tree): Import = {
@@ -153,10 +137,34 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     def parse(code: String): Tree =
       Type.check(Trees.this.parse(code))
 
+    /** Returns the set of values (mutable or immutable) defined in `tree`. */
+    def vals(tree: Tree): Set[TermSymbol] = tree.collect {
+      case value: ValDef => Term sym value
+    }.toSet
+
+    /** Returns the set of variables (i.e. mutable) defined in `tree`. */
+    def vars(tree: Tree): Set[TermSymbol] = {
+      import Flag.MUTABLE
+      tree.collect {
+        case value: ValDef if Is(MUTABLE, value.symbol) =>
+          Term sym value
+      }.toSet
+    }
+
+    /** Returns the set of lambdas (`Function`s) defined in `tree`. */
+    def lambdas(tree: Tree): Set[TermSymbol] = tree.collect {
+      case fun: Function => Term sym fun
+    }.toSet
+
+    /** Returns the set of methods (`DefDef`s) defined in `tree`. */
+    def methods(tree: Tree): Set[TermSymbol] = tree.collect {
+      case method: DefDef => Term sym method
+    }.toSet
+
     /** Returns the set of terms defined in `tree`. */
     def defs(tree: Tree): Set[TermSymbol] = tree.collect {
       case definition @ (_: ValDef | _: Bind | _: DefDef) => definition
-    }.map(Term.sym(_)).toSet
+    }.map(Term sym _).toSet
 
     /** Returns the set of terms referenced in `tree`. */
     def refs(tree: Tree): Set[TermSymbol] =
@@ -168,22 +176,6 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     def closure(tree: Tree): Set[TermSymbol] =
       refs(tree) diff defs(tree)
 
-    /** Casts `tree` up to `tpe` (i.e. `tree: tpe`). */
-    def ascribe(tree: Tree, tpe: Type): Typed = {
-      assert(Has tpe tree, s"Untyped tree:\n$tree")
-      assert(Is defined tpe, s"Undefined type ascription: `$tpe`")
-      assert(Type.of(tree) weak_<:< tpe, "Type ascription does not match")
-      val typed = Typed(tree, Type quote tpe)
-      setType(typed, tpe)
-    }
-
-    /** Returns `tree` without type ascriptions (ie. `x: Ascription`). */
-    @tailrec
-    def unAscribe(tree: Tree): Tree = tree match {
-      case Typed(inner, _) => unAscribe(inner)
-      case _ => tree
-    }
-
     /**
      * Reverses eta expansion.
      *
@@ -191,7 +183,7 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
      * @return The tree with all eta expansions inlined.
      */
     def etaCompact(tree: Tree): Tree =
-      inline(tree, tree.collect {
+      inline(tree, tree collect {
         case value @ ValDef(_, Term.name.eta(_), _, _) => value
       }: _*)
 
@@ -199,17 +191,16 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     object bind {
 
       /** Returns a binding of `lhs` to use when pattern matching. */
-      def apply(lhs: TermSymbol, pattern: Tree = Ident(Term.name.wildcard)): Bind = {
+      def apply(lhs: TermSymbol, rhs: Tree = Ident(Term.name.wildcard)): Bind = {
         assert(Is valid lhs, s"Invalid LHS: `$lhs`")
+        val pattern = Owner.at(lhs)(rhs)
         val x = Bind(lhs.name, pattern)
         setSymbol(x, lhs)
         setType(x, Type of lhs)
       }
 
-      def unapply(tree: Tree): Option[(TermSymbol, Tree)] = tree match {
-        case bind @ Bind(_, pattern) => Some(Term sym bind, pattern)
-        case _ => None
-      }
+      def unapply(tree: Bind): Option[(TermSymbol, Tree)] =
+        Some(Term sym tree, tree.body)
     }
 
     /** `val` constructors and extractors. No support for lazy vals. */
@@ -226,73 +217,73 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
 
         val mods = Modifiers(flags)
         val T = Type quote Type.of(lhs)
-        val value = ValDef(mods, lhs.name, T, rhs)
+        val body = if (rhs.isEmpty) rhs else Owner.at(lhs)(rhs)
+        val value = ValDef(mods, lhs.name, T, body)
         setSymbol(value, lhs)
         setType(value, NoType)
       }
 
-      def unapply(tree: Tree): Option[(TermSymbol, Tree, FlagSet)] = tree match {
-        case value @ ValDef(mods, _, _, rhs) => Some(Term sym value, rhs, mods.flags)
+      def unapply(value: ValDef): Option[(TermSymbol, Tree, FlagSet)] =
+        Some(Term sym value, value.rhs, value.mods.flags)
+    }
+
+    /** Blocks. */
+    object block {
+
+      /** Returns a new block with the supplied body. */
+      def apply(body: Tree*): Block = {
+        assert(body forall Is.valid, "Invalid block body")
+        assert(Has tpe body.last, s"Invalid expression:\n${body.last}")
+        // Implicitly remove no-ops
+        val (stats, expr) =
+          if (body.isEmpty) (Nil, unit)
+          else (body.init.filter {
+            case q"()" => false
+            case _ => true
+          }.toList, body.last)
+
+        val block = Block(stats, expr)
+        setType(block, Type of expr)
+      }
+
+      /** Returns a new block with the supplied body. */
+      def apply(init: Seq[Tree], rest: Tree*): Block =
+        apply(init ++ rest: _*)
+
+      def unapplySeq(block: Block): Option[Seq[Tree]] =
+        Some(block.stats :+ block.expr)
+
+      def unapply(block: Block): Option[(Seq[Tree], Tree)] =
+        Some(block.stats, block.expr)
+    }
+
+    /** Object creation / class instantiation. */
+    object inst {
+
+      /** Returns a new class instantiation. */
+      def apply(target: TypeSymbol, types: Type*)(args: Tree*): Tree = {
+        assert(Is valid target, s"Invalid target: `$target`")
+        assert(types forall Is.defined, "Unspecified type arguments")
+        assert(args forall Has.tpe, "Untyped arguments")
+        // TODO: Handle alternatives properly
+        val clazz = Type of target
+        val constructor = clazz decl Term.name.init
+        val T = if (types.isEmpty) clazz else Type(clazz, types: _*)
+        val inst = q"new ${resolve(target)}[..$types](..$args)"
+        setSymbol(inst, constructor)
+        setType(inst, T)
+      }
+
+      /** Returns a new class instantiation. */
+      def apply(tpe: Type, types: Type*)(args: Tree*): Tree =
+        apply(tpe.typeSymbol.asType, types: _*)(args: _*)
+
+      def unapplySeq(tree: Tree): Option[(TypeSymbol, Seq[Type], Seq[Tree])] = tree match {
+        case q"new ${clazz: Tree}[..${types: Seq[Tree]}](..${args: Seq[Tree]})" =>
+          Some(Type sym clazz, types map Type.of, args)
         case _ => None
       }
     }
-
-    /** Returns a new block with the supplied body. */
-    def block(body: Tree*): Block = {
-      assert(body forall Is.valid, "Invalid block body")
-      assert(Has tpe body.last, s"Invalid expression:\n${body.last}")
-      // Implicitly remove no-ops
-      val (stats, expr) =
-        if (body.isEmpty) (Nil, unit)
-        else (body.init.filter {
-          case q"()" => false
-          case _ => true
-        }.toList, body.last)
-
-      val block = Block(stats, expr)
-      setType(block, Type of expr)
-    }
-
-    /** Returns a new block with the supplied body. */
-    def block(init: Seq[Tree], rest: Tree*): Block =
-      block(init ++ rest: _*)
-
-    /** Returns `target` applied to the (type) arguments. */
-    @tailrec
-    def app(target: Tree, types: Type*)(args: Tree*): Tree = {
-      assert(Has tpe target, s"Untyped target:\n$target")
-      assert(types forall Is.defined, "Unspecified type arguments")
-      assert(args forall Has.tpe, "Untyped arguments")
-      if (types.isEmpty) {
-        val app = Apply(target, args.toList)
-        setType(app, Type result target)
-      } else {
-        val typeApp = Type.app(target, types: _*)
-        app(typeApp)(args: _*)
-      }
-    }
-
-    /** Returns a new method invocation. */
-    def call(target: Tree, method: TermSymbol, types: Type*)(args: Tree*): Tree =
-      app(Term.sel(target, method), types: _*)(args: _*)
-
-    /** Returns a new class instantiation. */
-    def inst(target: TypeSymbol, types: Type*)(args: Tree*): Tree = {
-      assert(Is valid target, s"Invalid target: `$target`")
-      assert(types forall Is.defined, "Unspecified type arguments")
-      assert(args forall Has.tpe, "Untyped arguments")
-      // TODO: Handle alternatives properly
-      val clazz = Type.of(target)
-      val constructor = clazz.decl(Term.name.init)
-      val T = if (types.isEmpty) clazz else Type(clazz, types: _*)
-      val inst = q"new ${resolve(target)}[..$types](..$args)"
-      setSymbol(inst, constructor)
-      setType(inst, T)
-    }
-
-    /** Returns a new class instantiation. */
-    def inst(tpe: Type, types: Type*)(args: Tree*): Tree =
-      inst(tpe.typeSymbol.asType, types: _*)(args: _*)
 
     /** Returns a fully-qualified reference to `target` (must be static). */
     def resolve(target: Symbol): Tree =
@@ -318,24 +309,31 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
         Term ref target.asTerm
       }
 
-    /** Returns a new anonymous function. */
-    def lambda(args: TermSymbol*)(body: Tree*): Function = {
-      assert(args forall Is.valid, "Invalid lambda parameters")
-      assert(body forall Is.valid, "Invalid lambda body")
-      assert(Has tpe body.last, s"Invalid expression:\n${body.last}")
-      val bodyBlock = if (body.size == 1) body.head else block(body: _*)
-      val types = args.map(Type.of)
-      val T = Type.fun(types: _*)(Type of bodyBlock)
-      val anon = Term.sym.free(Term.name.lambda, T)
-      val argFlags = Flag.SYNTHETIC | Flag.PARAM
-      val params = for ((arg, tpe) <- args zip types) yield
-        Term.sym(anon, arg.name, tpe, argFlags)
+    /** Anonymous Functions. */
+    object lambda {
 
-      val paramList = params.map(val_(_, flags = argFlags)).toList
-      val rhs = rename(bodyBlock, args zip params: _*)
-      val fn = Function(paramList, rhs)
-      setSymbol(fn, anon)
-      setType(fn, T)
+      /** Returns a new anonymous function. */
+      def apply(args: TermSymbol*)(body: Tree*): Function = {
+        assert(args forall Is.valid, "Invalid lambda parameters")
+        assert(body forall Is.valid, "Invalid lambda body")
+        assert(Has tpe body.last, s"Invalid expression:\n${body.last}")
+        val bodyBlock = if (body.size == 1) body.head else block(body: _*)
+        val types = args map Type.of
+        val T = Type.fun(types: _*)(Type of bodyBlock)
+        val anon = Term.sym.free(Term.name.lambda, T)
+        val argFlags = Flag.SYNTHETIC | Flag.PARAM
+        val params = for ((arg, tpe) <- args zip types) yield
+          Term.sym(anon, arg.name, tpe, argFlags)
+
+        val paramList = params.map(val_(_, flags = argFlags)).toList
+        val rhs = Owner.at(anon)(rename(bodyBlock, args zip params: _*))
+        val fun = Function(paramList, rhs)
+        setSymbol(fun, anon)
+        setType(fun, T)
+      }
+
+      def unapply(fun: Function): Option[(TermSymbol, Seq[TermSymbol], Tree)] =
+        Some(Term sym fun, fun.vparams.map(Term sym _), fun.body)
     }
 
     /**
@@ -493,7 +491,7 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       assert(typeArgs forall Is.valid, "Unspecified method type parameters")
       assert(argLists.flatten forall Is.valid, "Unspecified method parameters")
       assert(Is defined body, s"Undefined method return type: `$body`")
-      val result = Type.fix(body)
+      val result = Type fix body
       val T = if (argLists.isEmpty) {
         nullaryMethodType(result)
       } else argLists.foldRight(result) { (args, result) =>
@@ -517,10 +515,10 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       val bodyBlock = if (body.size == 1) body.head else block(body: _*)
       val argFlags = Flag.SYNTHETIC | Flag.PARAM
       val params = for (arg <- args) yield
-        Term.sym(sym, arg.name, Type.of(arg), argFlags)
+        Term.sym(sym, arg.name, Type of arg, argFlags)
 
       val paramLists = params.map(val_(_)).toList :: Nil
-      val rhs = rename(bodyBlock, args zip params: _*)
+      val rhs = Owner.at(sym)(rename(bodyBlock, args zip params: _*))
       val method = defDef(sym, Modifiers(flags), paramLists, rhs)
       setSymbol(method, sym)
       setType(method, NoType)
@@ -539,8 +537,23 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       }
 
       lambda(args: _*) {
-        app(Term ref method)(args.map(Term.ref(_)): _*)
+        app(Term ref method)(args.map(Term ref _))
       }
+    }
+
+    /** Method calls (application). */
+    object call {
+
+      /** Returns a new method invocation. */
+      def apply(target: Tree, method: TermSymbol, types: Type*)(argss: Seq[Tree]*): Tree =
+        app(Term.sel(target, method), types: _*)(argss: _*)
+
+      def unapplySeq(tree: Tree): Option[(Tree, TermSymbol, Seq[Type], Seq[Seq[Tree]])] =
+        tree match {
+          case app(sel(target, method), types, argss @ _*) =>
+            Some(target, method, types, argss)
+          case _ => None
+        }
     }
   }
 }

@@ -9,6 +9,7 @@ trait Symbols extends Util { this: Trees with Terms with Types =>
 
   import universe._
   import internal.reificationSupport._
+  import Tree._
 
   object Symbol {
 
@@ -83,7 +84,7 @@ trait Symbols extends Util { this: Trees with Terms with Types =>
       // def method(...)(...)... = { body }
       case method @ DefDef(mods, name, Nil, argLists, _, rhs) =>
         val old = method.symbol.asMethod
-        val tpe = Type.of(old)
+        val tpe = Type of old
         val sym = Method.sym(owner, name, tpe, mods.flags, method.pos)
         dict += old -> sym
         argLists.flatten foreach repair(sym, dict)
@@ -94,7 +95,7 @@ trait Symbols extends Util { this: Trees with Terms with Types =>
       // (...args) => { body }
       case lambda @ Function(args, body) =>
         val old = lambda.symbol
-        val tpe = Type.of(lambda)
+        val tpe = Type of lambda
         val sym = Term.sym(owner, Term.name.lambda, tpe, pos = lambda.pos)
         dict += old -> sym
         args foreach repair(sym, dict)
@@ -103,26 +104,24 @@ trait Symbols extends Util { this: Trees with Terms with Types =>
         setType(lambda, tpe)
 
       // ...mods val name: tpt = { rhs }
-      case value @ ValDef(mods, name, _, rhs) =>
-        val old = value.symbol
-        val tpe = Type.of(old)
-        val lhs = Term.sym(owner, name, tpe, mods.flags, value.pos)
+      case value @ val_(old, rhs, flags) =>
+        val tpe = Type of old
+        val lhs = Term.sym(owner, value.name, tpe, flags, value.pos)
         dict += old -> lhs
         repair(lhs, dict)(rhs)
         setSymbol(value, lhs)
         setType(value, NoType)
 
       // case x @ pattern => { ... }
-      case bind @ Bind(_, pattern) =>
-        val old = Term.sym(bind)
-        val tpe = Type.of(old)
+      case bind @ Tree.bind(old, pattern) =>
+        val tpe = Type of old
         val lhs = Term.sym(owner, old.name, tpe, pos = bind.pos)
         dict += old -> lhs
         repair(owner, dict)(pattern)
         setSymbol(bind, lhs)
         setType(bind, tpe)
 
-      case id @ Term.ref(old) if dict.contains(old) =>
+      case id @ Term.ref(old) if dict contains old =>
         val sym = dict(old)
         setSymbol(id, sym)
         setType(id, Type of sym)
