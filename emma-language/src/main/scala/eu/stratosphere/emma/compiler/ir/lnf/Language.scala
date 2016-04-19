@@ -382,16 +382,38 @@ trait Language extends CommonIR
      */
     def dce(tree: Tree): Tree = {
 
+      // create a mutable local copy of uses to keep track of unused terms
       val meta = new LNF.Meta(tree)
+      val uses = collection.mutable.Map() ++ meta.uses
 
-      postWalk(tree) {
-        case Block(stats, expr) => Block(
+      // initialize iteration variables
+      var done = false
+      var rslt = tree
+
+      val decrementUses: Tree => Unit = traverse {
+        case id@Ident(_) if uses.contains(id.symbol) =>
+          uses(id.symbol) -= 1
+          done = false
+      }
+
+      val transform: Tree => Tree = postWalk {
+        case Block(stats, expr) => block(
           stats filter {
-            case vd: ValDef => meta.valuses(vd.symbol) > 0
-            case _ => true
+            case vd@val_(sym, rhs, _) if uses.getOrElse(sym, 0) < 1 =>
+              decrementUses(rhs); false
+            case _ =>
+              true
           },
           expr)
       }
+
+      while (!done) {
+        done = true
+        val t = transform(rslt)
+        rslt = t
+      }
+
+      rslt
     }
 
     /**
@@ -660,11 +682,11 @@ trait Language extends CommonIR
      */
     class Meta(tree: Tree) {
 
-      private val defs: Map[Symbol, ValDef] = (tree collect {
+      val defs: Map[Symbol, ValDef] = (tree collect {
         case vd@ValDef(_, _, _, rhs) if !isParam(vd) => vd.symbol -> vd
       }).toMap
 
-      private val uses: Map[Symbol, Int] = {
+      val uses: Map[Symbol, Int] = {
         val builder = List.newBuilder[(Symbol, Int)]
 
         tree.collect { case id: Ident => id.symbol }
