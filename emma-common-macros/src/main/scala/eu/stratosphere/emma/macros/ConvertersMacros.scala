@@ -11,6 +11,7 @@ class ConvertersMacros(val c: blackbox.Context) extends compiler.MacroUtil {
 
   import universe._
   import Emma._
+  import Term._
   import Tree._
   import Type._
   import Term.name.fresh
@@ -50,7 +51,7 @@ class ConvertersMacros(val c: blackbox.Context) extends compiler.MacroUtil {
       val args = for (p <- params) yield fromCSV(Type.of(p), value, index)
       q"new $T(..$args)"
     } else {
-      if (T =:= Type.unit || T =:= void) Tree.unit
+      if (T =:= Type.unit || T =:= void) Term.unit
       else if (T =:= bool || T =:= jBool) q"$value($index).toBoolean"
       else if (T =:= char || T =:= jChar) q"$value($index).head"
       else if (T =:= byte || T =:= jByte) q"$value($index).toByte"
@@ -64,7 +65,7 @@ class ConvertersMacros(val c: blackbox.Context) extends compiler.MacroUtil {
       else if (T =:= jBigInt) q"new $Java.math.BigInteger($value($index))"
       else if (T =:= jBigDec) q"new $Java.math.BigDecimal($value($index))"
       else if (T =:= string) q"$value($index)"
-      else q"{ $index; ${nil(T)} }"
+      else q"{ $index; ${null_(T)} }"
     }
 
   def toCSV(T: Type, value: Tree): Tree = {

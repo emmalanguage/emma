@@ -194,44 +194,44 @@ trait Comprehensions {
       // -----------------------------------------------------------------------
 
       object map extends MonadOp {
-        override val symbol = monad.info.decl(TermName("map")).asTerm
 
-        override def apply(xs: Tree)(fn: Tree): Tree =
-          app(Term.sel(xs, symbol), Type.arg(2, fn))(fn)
+        override val symbol =
+          Term.member(monad, Term name "map")
+
+        override def apply(xs: Tree)(f: Tree): Tree =
+          Method.call(xs, symbol, Type.arg(2, f))(f :: Nil)
 
         override def unapply(apply: Tree): Option[(Tree, Tree)] = apply match {
-          case q"${map@Select(xs, _)}[$_](${fn: Tree})"
-            if Term.sym(map) == symbol => Some(xs, fn)
-          case _ =>
-            Option.empty
+          case Method.call(xs, `symbol`, _, Seq(f)) => Some(xs, f)
+          case _ => None
         }
       }
 
       object flatMap extends MonadOp {
-        override val symbol = monad.info.decl(TermName("flatMap")).asTerm
 
-        override def apply(xs: Tree)(fn: Tree): Tree =
-          app(Term.sel(xs, symbol), Type.arg(1, Type.arg(2, fn)))(fn)
+        override val symbol =
+          Term.member(monad, Term name "flatMap")
+
+        override def apply(xs: Tree)(f: Tree): Tree =
+          Method.call(xs, symbol, Type.arg(1, Type.arg(2, f)))(f :: Nil)
 
         override def unapply(tree: Tree): Option[(Tree, Tree)] = tree match {
-          case q"${flatMap@Select(xs, _)}[$_](${fn: Tree})"
-            if Term.sym(flatMap) == symbol => Some(xs, fn)
-          case _ =>
-            Option.empty
+          case Method.call(xs, `symbol`, _, Seq(f)) => Some(xs, f)
+          case _ => None
         }
       }
 
       object withFilter extends MonadOp {
-        override val symbol = monad.info.decl(TermName("withFilter")).asTerm
 
-        override def apply(xs: Tree)(fn: Tree): Tree =
-          app(Term.sel(xs, symbol))(fn)
+        override val symbol =
+          Term.member(monad, Term name "withFilter")
+
+        override def apply(xs: Tree)(p: Tree): Tree =
+          Method.call(xs, symbol)(p :: Nil)
 
         override def unapply(tree: Tree): Option[(Tree, Tree)] = tree match {
-          case q"${withFilter@Select(xs, _)}(${fn: Tree})"
-            if Term.sym(withFilter) == symbol => Some(xs, fn)
-          case _ =>
-            Option.empty
+          case Method.call(xs, `symbol`, _, Seq(p)) => Some(xs, p)
+          case _ => None
         }
       }
 
@@ -244,13 +244,13 @@ trait Comprehensions {
         val symbol = IR.comprehension
 
         def apply(qs: List[Tree], hd: Tree): Tree =
-          call(moduleSel, symbol, Type.of(hd), monadTpe)(block(qs, hd))
+          Method.call(moduleSel, symbol, Type of hd, monadTpe)(block(qs, hd) :: Nil)
 
         def unapply(tree: Tree): Option[(List[Tree], Tree)] = tree match {
-          case Apply(fun, List(Block(qs, hd)))
+          case Apply(fun, Block(qs, hd) :: Nil)
             if Term.sym(fun) == symbol => Some(qs, hd)
           case _ =>
-            Option.empty
+            None
         }
       }
 
@@ -258,14 +258,14 @@ trait Comprehensions {
       object generator {
         val symbol = IR.generator
 
-        def apply(sym: TermSymbol, rhs: Tree): Tree =
-          val_(sym, call(moduleSel, symbol, Type.arg(1, rhs), monadTpe)(rhs))
+        def apply(lhs: TermSymbol, rhs: Tree): Tree =
+          val_(lhs, Method.call(moduleSel, symbol, Type.arg(1, rhs), monadTpe)(rhs :: Nil))
 
         def unapply(tree: Tree): Option[(TermSymbol, Tree)] = tree match {
-          case vd@val_(term, Apply(fun, List(arg)), _)
-            if Term.sym(fun) == symbol => Some(term, arg)
+          case val_(lhs, Apply(fun, arg :: Nil), _)
+            if Term.sym(fun) == symbol => Some(lhs, arg)
           case _ =>
-            Option.empty
+            None
         }
       }
 
@@ -274,13 +274,13 @@ trait Comprehensions {
         val symbol = IR.guard
 
         def apply(expr: Tree): Tree =
-          call(moduleSel, symbol)(expr)
+          Method.call(moduleSel, symbol)(expr :: Nil)
 
         def unapply(tree: Tree): Option[Tree] = tree match {
-          case Apply(fun, List(expr))
+          case Apply(fun, expr :: Nil)
             if Term.sym(fun) == symbol => Some(expr)
           case _ =>
-            Option.empty
+            None
         }
       }
 
@@ -289,13 +289,13 @@ trait Comprehensions {
         val symbol = IR.head
 
         def apply(expr: Tree): Tree =
-          call(moduleSel, symbol, Type.of(expr))(expr)
+          Method.call(moduleSel, symbol, Type of expr)(expr :: Nil)
 
         def unapply(tree: Tree): Option[Tree] = tree match {
-          case Apply(fun, List(expr))
+          case Apply(fun, expr :: Nil)
             if Term.sym(fun) == symbol => Some(expr)
           case _ =>
-            Option.empty
+            None
         }
       }
 
@@ -304,13 +304,13 @@ trait Comprehensions {
         val symbol = IR.flatten
 
         def apply(expr: Tree): Tree =
-          call(moduleSel, symbol, Type.arg(1, Type.arg(1, expr)), monadTpe)(expr)
+          Method.call(moduleSel, symbol, Type.arg(1, Type.arg(1, expr)), monadTpe)(expr :: Nil)
 
         def unapply(tree: Tree): Option[Tree] = tree match {
-          case Apply(fun, List(expr))
+          case Apply(fun, expr :: Nil)
             if Term.sym(fun) == symbol => Some(expr)
           case _ =>
-            Option.empty
+            None
         }
       }
 

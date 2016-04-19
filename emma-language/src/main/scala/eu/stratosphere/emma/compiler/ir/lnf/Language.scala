@@ -10,6 +10,7 @@ import scala.collection.mutable
 trait Language extends CommonIR with Comprehensions {
 
   import universe._
+  import Term._
   import Tree._
   import Term.name.fresh
 
@@ -238,25 +239,25 @@ trait Language extends CommonIR with Comprehensions {
 
       case fun: Function =>
         val x = fresh(nameOf(fun))
-        val T = Type.of(fun)
+        val T = Type of fun
         val lhs = Term.sym.free(x, T)
         block(val_(lhs, fun), Term ref lhs)
 
       case Typed(Block(stats, expr), tpt) =>
         val x = fresh(nameOf(expr))
-        val T = Type.of(tpt)
+        val T = Type of tpt
         val lhs = Term.sym.free(x, T)
-        val rhs = ascribe(expr, T)
+        val rhs = Type.ascription(expr, T)
         block(stats, val_(lhs, rhs), Term ref lhs)
 
       case sel@Select(Block(stats, target), _: TypeName) =>
-        val x = Type.sym(sel)
-        val T = Type.of(sel)
+        val x = Type sym sel
+        val T = Type of sel
         block(stats, Type.sel(target, x, T))
 
       case sel@Select(Block(stats, target), member: TermName) =>
-        val x = Term.sym(sel)
-        val T = Type.of(sel)
+        val x = Term sym sel
+        val T = Type of sel
         val rhs = Term.sel(target, x, T)
         if (x.isPackage || // Parameter lists follow
           (x.isMethod && x.asMethod.paramLists.nonEmpty) ||
@@ -274,11 +275,11 @@ trait Language extends CommonIR with Comprehensions {
 
       case app@Apply(Block(stats, target), args) =>
         if (IR.comprehensionOps contains Term.sym(target)) {
-          val expr = Tree.app(target)(args map this.expr: _*)
+          val expr = Term.app(target)(args map this.expr)
           block(stats, expr)
         } else {
           val x = fresh(nameOf(target))
-          val T = Type.of(app)
+          val T = Type of app
           val lhs = Term.sym.free(x, T)
           val init = stats ::: args.flatMap {
             case Block(nested, _) => nested
@@ -290,7 +291,7 @@ trait Language extends CommonIR with Comprehensions {
             case arg => arg
           }
 
-          val rhs = Tree.app(target)(params: _*)
+          val rhs = Term.app(target)(params)
           // Partially applied multi-arg-list method
           if (Is method Type.of(app)) block(init, rhs)
           else block(init, val_(lhs, rhs), Term ref lhs)
@@ -458,12 +459,10 @@ trait Language extends CommonIR with Comprehensions {
 
       val dict = loop((vals, Map.empty))
       expr(postWalk(tree) {
-        case id: Ident if Has.termSym(id) &&
-          dict.contains(id.symbol) =>
+        case id: Ident if Has.termSym(id) && dict.contains(id.symbol) =>
           dict(id.symbol)
 
-        case vd: ValDef
-          if dict.contains(vd.symbol) =>
+        case value: ValDef if dict contains value.symbol =>
           unit
 
         case Block(stats, expr) =>
@@ -580,18 +579,16 @@ trait Language extends CommonIR with Comprehensions {
       }
 
       def isVarPattern(id: Ident) =
-        !id.isBackquoted &&
-          !id.name.toString.head.isUpper
+        !id.isBackquoted && !id.name.toString.head.isUpper
 
       pattern match {
         case id: Ident if isVarPattern(id) =>
           Some(Nil)
 
-        case tp@Typed(pat, _) if Type.of(sel) weak_<:< Type.of(tp) =>
-          irrefutable(ascribe(sel, Type.of(tp)), pat)
+        case Type.ascription(pat, tpe) if Type.of(sel) weak_<:< tpe =>
+          irrefutable(Type.ascription(sel, tpe), pat)
 
-        case bind @ Bind(_, pat) =>
-          val lhs = Term.sym(bind)
+        case bind(lhs, pat) =>
           lazy val value = val_(lhs, sel)
           irrefutable(Term ref lhs, pat).map(value :: _)
 
@@ -605,13 +602,13 @@ trait Language extends CommonIR with Comprehensions {
             case un: UnApply => un.args
           }
 
-          val tpe = Type.of(sel)
+          val T = Type of sel
           val clazz = Type.of(extractor).typeSymbol.asClass
           val inst = clazz.primaryConstructor
-          val params = inst.infoIn(tpe).paramLists.head
+          val params = inst.infoIn(T).paramLists.head
           val selects = params.map { param =>
-            val field = tpe.member(param.name).asTerm
-            Term.sel(sel, field, Type.of(param))
+            val field = T.member(param.name).asTerm
+            Term.sel(sel, field, Type of param)
           }
 
           val patterns = selects zip args map (irrefutable _).tupled

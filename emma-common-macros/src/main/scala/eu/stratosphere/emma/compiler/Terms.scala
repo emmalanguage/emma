@@ -1,4 +1,8 @@
-package eu.stratosphere.emma.compiler
+package eu.stratosphere.emma
+package compiler
+
+import scala.annotation.tailrec
+import scala.reflect.ClassTag
 
 /** Utility for terms. */
 trait Terms extends Util { this: Trees with Types with Symbols =>
@@ -7,6 +11,10 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
   import internal.reificationSupport._
 
   object Term {
+
+    // Predefined terms
+    lazy val unit = lit(())
+    lazy val predef = Type.check(q"${Tree.Scala}.Predef")
 
     /** Utility for term names. */
     object name {
@@ -101,21 +109,6 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
         Some(sym.name, Symbol flags sym)
     }
 
-    /** Term references (Idents). */
-    object ref {
-
-      /** Returns a term reference to `sym` (use `quoted=true` for Unicode support). */
-      def apply(sym: TermSymbol, quoted: Boolean = false): Ident = {
-        assert(Is valid sym, s"Invalid symbol: `$sym`")
-        val id = if (quoted) q"`$sym`".asInstanceOf[Ident] else Ident(sym)
-        setType(id, Type of sym)
-        setSymbol(id, sym)
-      }
-
-      def unapply(id: Ident): Option[TermSymbol] =
-        if (id.isTerm) Some(Term sym id) else None
-    }
-
     /** Finds field / method `member` accessible in `target` and returns its symbol. */
     def member(target: Symbol, member: TermName): TermSymbol = {
       assert(Is valid target, s"Invalid target: `$target`")
@@ -145,6 +138,54 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
       Type.check(q"import $from.$name").asInstanceOf[Import]
     }
 
+    /** Literals (constants). */
+    object lit {
+
+      /** Returns a new literal containing `const`. */
+      def apply[A](const: A): Tree =
+        Type.check(Literal(Constant(const)))
+
+      def unapply[A: ClassTag](lit: Literal): Option[A] = lit match {
+        case Literal(Constant(const: A)) => Some(const)
+        case _ => None
+      }
+    }
+
+    /** Null values (considered different than literals). */
+    object null_ {
+
+      /** Returns `null` of type `T`. */
+      def apply[T: TypeTag]: Tree =
+        apply(Type[T])
+
+      /** Returns `null` of type `tpe`. */
+      def apply(tpe: Type): Tree = {
+        assert(Is defined tpe, s"Undefined type: `$tpe`")
+        Type.check(q"null.asInstanceOf[$tpe]")
+      }
+
+      def unapply(tree: Tree): Option[Type] = tree match {
+        case q"null.asInstanceOf[$_]" => Some(Type of tree)
+        case q"null" => Some(Type of tree)
+        case _ => None
+      }
+    }
+
+    /** Term references (Idents). */
+    object ref {
+
+      /** Returns a term reference to `sym` (use `quoted=true` for Unicode support). */
+      def apply(sym: TermSymbol, quoted: Boolean = false): Ident = {
+        assert(Is valid sym, s"Invalid symbol: `$sym`")
+        val id = if (quoted) q"`$sym`".asInstanceOf[Ident] else Ident(sym)
+        setType(id, Type of sym)
+        setSymbol(id, sym)
+      }
+
+      def unapply(id: Ident): Option[TermSymbol] =
+        if (id.isTerm) Some(Term sym id) else None
+    }
+
     /** Term member selection. */
     object sel {
 
@@ -163,6 +204,31 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
 
       def unapply(sel: Select): Option[(Tree, TermSymbol)] =
         if (Has termSym sel) Some(sel.qualifier, Term sym sel) else None
+    }
+
+    /** Method calls and Function applications. */
+    object app {
+
+      /** Returns `target` applied to the (type) arguments. */
+      @tailrec
+      def apply(target: Tree, types: Type*)(argss: Seq[Tree]*): Tree = {
+        assert(Has tpe target, s"Untyped target:\n$target")
+        assert(types forall Is.defined, "Unspecified type arguments")
+        assert(argss.flatten forall Has.tpe, "Untyped arguments")
+        if (types.isEmpty) argss.foldLeft(target) { (tgt, args) =>
+          val app = Apply(tgt, args.toList)
+          setType(app, Type result target)
+        } else {
+          val typeApp = Type.app(target, types: _*)
+          apply(typeApp)(argss: _*)
+        }
+      }
+
+      def unapplySeq(tree: Tree): Option[(Tree, Seq[Type], Seq[Seq[Tree]])] = tree match {
+        case q"${target: Tree}[..${types: Seq[Tree]}](...${argss: Seq[Seq[Tree]]})" =>
+          Some(target, types map Type.of, argss)
+        case _ => None
+      }
     }
   }
 }
