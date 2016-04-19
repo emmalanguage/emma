@@ -13,7 +13,6 @@ import scala.reflect.api.Universe
  * This trait has to be instantiated with a [[Universe]] type and works for both runtime and
  * compile time reflection.
  */
-@deprecated("Use `emma.compiler.ReflectUtil` instead", "24.02.2016")
 trait ReflectUtil {
   val universe: Universe
 
