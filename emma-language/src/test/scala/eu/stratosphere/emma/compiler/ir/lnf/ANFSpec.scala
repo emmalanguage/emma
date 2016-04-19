@@ -1,35 +1,30 @@
 package eu.stratosphere.emma
 package compiler.ir.lnf
 
+import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.compiler.BaseCompilerSpec
+import eu.stratosphere.emma.compiler.ir._
+import eu.stratosphere.emma.testschema.Marketing._
+import eu.stratosphere.emma.testschema.Math._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-/** A spec defining the core fragment of Scala supported by Emma. */
+/** A spec for the `LNF.anf` transformation. */
 @RunWith(classOf[JUnitRunner])
 class ANFSpec extends BaseCompilerSpec with TreeEquality {
 
-  import ANFSpec._
   import compiler.universe._
-  import eu.stratosphere.emma.compiler.ir._
-  import eu.stratosphere.emma.testschema.Marketing._
 
-  def typeCheckAndANF[T](expr: Expr[T]): Tree = {
-    val pipeline = {
-      compiler.typeCheck(_: Tree)
-    } andThen {
-      compiler.LNF.destructPatternMatches
-    } andThen {
-      compiler.LNF.resolveNameClashes
-    } andThen {
-      compiler.LNF.anf
-    }
-
-    pipeline(expr.tree)
-  }
-
-  def typeCheck[T](expr: Expr[T]): Tree = {
-    compiler.typeCheck(expr.tree)
+  def typeCheckAndANF[T]: Expr[T] => Tree = {
+    (_: Expr[T]).tree
+  } andThen {
+    compiler.typeCheck(_: Tree)
+  } andThen {
+    compiler.LNF.destructPatternMatches
+  } andThen {
+    compiler.LNF.resolveNameClashes
+  } andThen {
+    time(compiler.LNF.anf(_), "anf")
   }
 
   "field selections" - {
@@ -176,15 +171,15 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
 
     val exp = typeCheck(reify {
       comprehension {
-        val u = generator {
+        val u = generator[User, DataBag] {
           val u$1 = users
           u$1
         }
-        val a = generator {
+        val a = generator[Ad, DataBag] {
           val a$1 = ads
           a$1
         }
-        val c = generator {
+        val c = generator[Click, DataBag] {
           val c$1 = clicks
           c$1
         }
@@ -275,13 +270,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
         x$5
       })
 
-    act shouldEqual exp
+      act shouldEqual exp
     }
   }
-}
-
-object ANFSpec {
-
-  case class Point(x: Int, y: Int)
-
 }

@@ -9,26 +9,19 @@ import org.scalatest.junit.JUnitRunner
 class DCESpec extends BaseCompilerSpec with TreeEquality {
 
   import compiler.universe._
-  import eu.stratosphere.emma.testschema.Marketing._
 
-  def typeCheckAndDCE[T](expr: Expr[T]): Tree = {
-    val pipeline = {
-      compiler.typeCheck(_: Tree)
-    } andThen {
-      compiler.LNF.destructPatternMatches
-    } andThen {
-      compiler.LNF.resolveNameClashes
-    } andThen {
-      compiler.LNF.anf
-    } andThen {
-      compiler.LNF.dce
-    }
-
-    pipeline(expr.tree)
-  }
-
-  def typeCheck[T](expr: Expr[T]): Tree = {
-    compiler.typeCheck(expr.tree)
+  def typeCheckAndDCE[T]: Expr[T] => Tree = {
+    (_: Expr[T]).tree
+  } andThen {
+    compiler.typeCheck(_: Tree)
+  } andThen {
+    compiler.LNF.destructPatternMatches
+  } andThen {
+    compiler.LNF.resolveNameClashes
+  } andThen {
+    compiler.LNF.anf
+  } andThen {
+    time(compiler.LNF.dce(_), "dce")
   }
 
   "eliminate unused valdefs" - {

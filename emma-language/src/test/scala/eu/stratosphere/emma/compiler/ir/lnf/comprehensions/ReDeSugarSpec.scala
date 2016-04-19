@@ -8,7 +8,7 @@ import eu.stratosphere.emma.testschema.Marketing._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-/** A spec for resugaring comprehensions. */
+/** A spec for the `Comprehension.{re|de}sugar` transformations. */
 @RunWith(classOf[JUnitRunner])
 class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
 

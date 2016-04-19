@@ -4,9 +4,7 @@ import java.time.Instant
 
 import eu.stratosphere.emma.api.DataBag
 
-/**
- * A simple domain for marketing, consisting of ads and ad views.
- */
+/** A simple domain for marketing, consisting of ads and ad views. */
 object Marketing {
 
   case class Name(first: String, last: String)

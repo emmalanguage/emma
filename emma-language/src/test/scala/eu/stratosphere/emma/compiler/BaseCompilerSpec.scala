@@ -11,6 +11,18 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks {
 
   val compiler = new RuntimeCompiler()
 
+  import compiler.universe._
+
+  // ---------------------------------------------------------------------------
+  // Common transformation pipelines
+  // ---------------------------------------------------------------------------
+
+  def typeCheck[T]: Expr[T] => Tree = {
+    (_: Expr[T]).tree
+  } andThen {
+    compiler.typeCheck(_: Tree)
+  }
+
   // ---------------------------------------------------------------------------
   // Common value definitions used in compiler tests
   // ---------------------------------------------------------------------------
