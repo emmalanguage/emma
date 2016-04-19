@@ -667,13 +667,10 @@ trait Language extends CommonIR
       private val uses: Map[Symbol, Int] = {
         val builder = List.newBuilder[(Symbol, Int)]
 
-        tree collect {
-          case id: Ident => (id.symbol, 1)
-        } groupBy {
-          case (sym, _) => sym
-        } map {
-          case (sym, group) => (sym, group.size)
-        }
+        tree.collect { case id: Ident => id.symbol }
+          .view.groupBy(identity)
+          .mapValues(_.size)
+          .withDefaultValue(0)
       }
 
       @inline

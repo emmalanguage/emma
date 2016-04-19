@@ -92,21 +92,30 @@ trait Comprehensions {
             case _ => false
           }
 
-          val (next, prefix) = guards.foldLeft((Term.of(rhs), List.empty[Tree]))((res, guard) => {
-            val (curr, list) = res
-            val cs.guard(expr) = guard
+          // accumulate filters in a prefix of valdefs and keep track of the tail valdef symbol
+          val (tail, prefix) = {
+            ({
+              // step (1) accumulate the result
+              (_: List[Tree]).foldLeft((Term.of(rhs), List.empty[Tree]))((res, guard) => {
+                val (currSym, currPfx) = res
+                val cs.guard(expr) = guard
 
-            val frhs = lambda(sym)(expr)
-            val fnme = Term.fresh("anonfun")
-            val fsym = Term.free(fnme.toString, frhs.tpe)
+                val funcRhs = lambda(sym)(expr)
+                val funcNme = Term.fresh("anonfun")
+                val funcSym = Term.free(funcNme.toString, funcRhs.tpe)
+                val funcVal = val_(funcSym, funcRhs)
 
-            val name = Term.fresh(cs.withFilter.symbol.name.encodedName)
-            val next = Term.free(name.toString, curr.info)
+                val nextNme = Term.fresh(cs.withFilter.symbol.name.encodedName)
+                val nextSym = Term.free(nextNme.toString, currSym.info)
+                val nextVal = val_(nextSym, cs.withFilter(ref(currSym))(ref(funcSym)))
 
-            (next, list ++ List(
-              val_(fsym, frhs),
-              val_(next, cs.withFilter(ref(curr))(ref(fsym)))))
-          })
+                (nextSym, nextVal :: funcVal :: currPfx)
+              })
+            } andThen {
+              // step (2) reverse the prefix
+              case (currSym, currPfx) => (currSym, currPfx.reverse)
+            }) (guards)
+          }
 
           if (expr.symbol == sym) {
             // trivial head expression consisting of the matched sym 'x'
@@ -114,7 +123,7 @@ trait Comprehensions {
 
             LNF.simplify(block(
               prefix,
-              ref(next)))
+              ref(tail)))
 
           } else {
             // append a map or a flatMap to the result depending on
@@ -136,13 +145,12 @@ trait Comprehensions {
             val term = Term.free(name.toString, func.tpe)
 
             block(
-              prefix :+ val_(term, func),
-              op(ref(next))(ref(term)))
+              prefix,
+              val_(term, func),
+              op(ref(tail))(ref(term)))
           }
 
         case t@cs.flatten(Block(stats, expr@cs.map(xs, fn))) =>
-
-          val rooot = t
 
           block(
             stats,
@@ -253,8 +261,8 @@ trait Comprehensions {
           val_(sym, call(moduleSel, symbol, Type.arg(1, rhs), monadTpe)(rhs))
 
         def unapply(tree: Tree): Option[(TermSymbol, Tree)] = tree match {
-          case vd@ValDef(_, _, _, Apply(fun, List(arg)))
-            if Term.of(fun) == symbol => Some(vd.symbol.asTerm, arg)
+          case vd@val_(term, Apply(fun, List(arg)), _)
+            if Term.of(fun) == symbol => Some(term, arg)
           case _ =>
             Option.empty
         }
