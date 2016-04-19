@@ -5,33 +5,31 @@ import eu.stratosphere.emma.compiler.BaseCompilerSpec
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-/** A spec defining the core fragment of Scala supported by Emma. */
+/** A spec defining the subset of Scala modeling the LNF language used by the Emma compiler. */
 @RunWith(classOf[JUnitRunner])
 class LanguageSpec extends BaseCompilerSpec {
 
   import compiler.universe._
 
-  def typecheckAndValidate[T](expr: Expr[T]): Boolean = {
-    val pipeline = {
-      compiler.typeCheck(_: Tree)
-    } andThen {
-      compiler.Core.validate _
-    }
-
-    pipeline(expr.tree)
+  def typeCheckAndValidate[T]: Expr[T] => Boolean = {
+    (_: Expr[T]).tree
+  } andThen {
+    compiler.typeCheck(_: Tree)
+  } andThen {
+    time(compiler.LNF.validate(_), "validate")
   }
 
   // modeled by `Literal(Constant(value))` nodes
   "literals" in {
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       42
     }) shouldBe true
 
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       4.2
     }) shouldBe true
 
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       "42"
     }) shouldBe true
   }
@@ -39,32 +37,32 @@ class LanguageSpec extends BaseCompilerSpec {
   // modeled by `Ident(name)` where `sym` is a "free term symbol"
   "identifiers" in {
     val u = 42
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       u
     }) shouldBe true
   }
 
   // modeled by `Typed(expr, tpt)` nodes
   "type ascriptions" in {
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       42: Int
     }) shouldBe true
   }
 
   // modeled by `Select(qualifier, name)` nodes
   "field selections" in {
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       t._2
     }) shouldBe true
 
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       scala.Int.MaxValue
     }) shouldBe true
   }
 
   // modeled by `Block(stats, expr)` nodes
   "blocks" in {
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       val z = 5
       x + z
     }) shouldBe true
@@ -72,81 +70,81 @@ class LanguageSpec extends BaseCompilerSpec {
 
   // modeled by `ValDef(lhs, rhs)` nodes
   "value and variable definitions" in {
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       val u = 42
     }) shouldBe true
 
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       val u = s"$x is $y"
     }) shouldBe true
   }
 
   // modeled by `Function(args, body)` nodes
   "anonymous function definitions" - {
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       (x: Int, y: Int) => x + y
     }) shouldBe true
   }
 
   // modeled by `TypeApply(fun, args)` nodes
   "type applications" in {
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       Seq.empty[Int]
     }) shouldBe true
   }
 
   // modeled by `Apply(fun, args)` nodes
   "function applications" in {
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       x == 42
     }) shouldBe true
 
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       x + 4.2
     }) shouldBe true
 
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       scala.Predef.println(y)
     }) shouldBe true
 
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       y.substring(1)
     }) shouldBe true
 
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       ((x: Int, y: Int) => x + y) (x, x)
     }) shouldBe true
 
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       Seq(x, x)
     }) shouldBe true
 
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       val zs: DataBag[Int] = DataBag(xs.fetch())
     }) shouldBe true
   }
 
   // modeled by `New` nodes
   "class instantiation" in {
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       new Tuple2("route", 66)
     }) shouldBe true
 
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       new CSVInputFormat[(Int, String)]
     }) shouldBe true
   }
 
   // modeled by `If(cond, thenp, elsep)` nodes
   "conditionals" in {
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       if (x == 42) x else x / 42
     }) shouldBe true
   }
 
   // modeled direct-style by `DefDef` call chains
   "while loops" in {
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       def b$00(): Unit = {
         val i$1 = 0
         val r$1 = 0
@@ -167,7 +165,7 @@ class LanguageSpec extends BaseCompilerSpec {
       b$00()
     }) shouldBe true
 
-    typecheckAndValidate(reify {
+    typeCheckAndValidate(reify {
       def b$00(): Unit = {
         val i$1 = 0
         val r$1 = 0
