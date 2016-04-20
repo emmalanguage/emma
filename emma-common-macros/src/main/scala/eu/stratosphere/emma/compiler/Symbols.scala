@@ -48,6 +48,19 @@ trait Symbols extends Util { this: Trees with Terms with Types =>
   /** Utility for symbol owners. */
   object Owner {
 
+    /** Returns the enclosing owner in the current program context. */
+    def enclosing: Symbol = enclosingOwner
+
+    /**
+     * Duplicates `tree` and repairs its owner chain (see
+     * [[eu.stratosphere.emma.compiler.Symbols.Owner.repair()]]).
+     */
+    def at(owner: Symbol)(tree: Tree) = {
+      val copy = Tree copy tree
+      repair(owner)(copy)
+      copy
+    }
+
     /** Returns the (lazy) owner chain of `target`. */
     def chain(target: Symbol): Stream[Symbol] =
       Stream.iterate(target)(_.owner).takeWhile(Is.defined)
@@ -63,7 +76,7 @@ trait Symbols extends Util { this: Trees with Terms with Types =>
      * @param owner The symbol to set as the new owner of `tree`.
      * @param dict A map with terms that have been fixed so far.
      */
-    def repair(owner: Symbol,
+    private[compiler] def repair(owner: Symbol,
       dict: mutable.Map[Symbol, Symbol] = mutable.Map.empty)
       (tree: Tree): Unit = traverse(tree) {
 

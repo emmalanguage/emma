@@ -275,6 +275,7 @@ trait Util {
   // Abstract wrapper methods
   // ------------------------
 
+  private[compiler] def enclosingOwner: Symbol
   private[compiler] def getFlags(sym: Symbol): FlagSet
   private[compiler] def setFlags(sym: Symbol, flags: FlagSet): Unit
   private[compiler] def setName(sym: Symbol, name: Name): Unit

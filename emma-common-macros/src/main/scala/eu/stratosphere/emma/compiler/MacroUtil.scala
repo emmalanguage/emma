@@ -35,6 +35,9 @@ trait MacroUtil extends ReflectUtil {
   override def abort(pos: Position, msg: String): Nothing =
     c.abort(pos, msg)
 
+  private[compiler] override def enclosingOwner: Symbol =
+    c.internal.enclosingOwner
+
   private[compiler] override def getFlags(sym: Symbol): FlagSet =
     internal.flags(sym)
 
