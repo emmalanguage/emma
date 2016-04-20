@@ -13,18 +13,21 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class ANFSpec extends BaseCompilerSpec with TreeEquality {
 
-  import compiler.universe._
+  import compiler._
+  import universe._
 
   def typeCheckAndANF[T]: Expr[T] => Tree = {
     (_: Expr[T]).tree
   } andThen {
-    compiler.typeCheck(_: Tree)
+    Type.check(_)
   } andThen {
-    compiler.LNF.destructPatternMatches
+    LNF.destructPatternMatches
   } andThen {
-    compiler.LNF.resolveNameClashes
+    LNF.resolveNameClashes
   } andThen {
-    time(compiler.LNF.anf(_), "anf")
+    time(LNF.anf(_), "anf")
+  } andThen {
+    Owner.at(Owner.enclosing)
   }
 
   "field selections" - {

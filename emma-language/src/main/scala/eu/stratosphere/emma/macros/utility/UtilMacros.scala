@@ -9,10 +9,10 @@ import scala.reflect.macros.blackbox
 class UtilMacros(val c: blackbox.Context) extends MacroUtil {
 
   import universe._
-  import Tree._
+  import Term._
 
   def desugar(e: Expr[Any]) =
-    lit(Tree.show(e.tree))
+    lit(Tree show e.tree)
 
   def desugarRaw(e: Expr[Any]) =
     lit(showRaw(e.tree))

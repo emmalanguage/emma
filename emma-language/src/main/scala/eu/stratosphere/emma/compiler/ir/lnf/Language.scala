@@ -4,12 +4,15 @@ package compiler.ir.lnf
 import compiler.ir.CommonIR
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 /** Let-normal form language. */
 trait Language extends CommonIR with Comprehensions {
 
   import universe._
+  import Term._
   import Tree._
+  import Term.name.fresh
 
   private[emma] object LNF {
 
@@ -57,131 +60,124 @@ trait Language extends CommonIR with Comprehensions {
     }
 
     /** Check alpha-equivalence of trees. */
-    def eq(x: Tree, y: Tree)
-          (implicit map: Map[Symbol, Symbol] = Map.empty[Symbol, Symbol]): Boolean = (x, y) match {
+    private[emma] def eq(x: Tree, y: Tree)
+      (implicit dict: mutable.Map[Symbol, Symbol] = mutable.Map.empty): Boolean = (x, y) match {
 
-      case (NewIOFormat(apply$x, implicitArgs$x), NewIOFormat(apply$y, implicitArgs$y)) =>
-        eq(apply$x, apply$y)
+      case (NewIOFormat(app$x, _), NewIOFormat(app$y, _)) =>
+        eq(app$x, app$y)
 
       case (EmptyTree, EmptyTree) =>
         true
 
-      case (Annotated(annot$x, arg$x), Annotated(annot$y, arg$y)) =>
-        def annotEq = eq(annot$x, annot$y)
-        def argEq = eq(arg$x, arg$y)
-        annotEq && argEq
+      case (Annotated(ann$x, arg$x), Annotated(ann$y, arg$y)) =>
+        lazy val annEq = eq(ann$x, ann$y)
+        lazy val argEq = eq(arg$x, arg$y)
+        annEq && argEq
 
       case (This(qual$x), This(qual$y)) =>
-        qual$x == qual$y && x.symbol == y.symbol
+        lazy val qualEq = qual$x == qual$y
+        lazy val symEq = x.symbol == y.symbol
+        symEq && qualEq
 
-      case (AppliedTypeTree(tpt$x, args$x), AppliedTypeTree(tpt$y, args$y)) =>
+      case (x: AppliedTypeTree, y: AppliedTypeTree) =>
         x.tpe =:= y.tpe
 
-      case (tpe$x: TypeTree, tpe$y: TypeTree) =>
-        tpe$x.tpe =:= tpe$y.tpe
+      case (x: TypeTree, y: TypeTree) =>
+        x.tpe =:= y.tpe
 
-      case (Literal(Constant(value$x)), Literal(Constant(value$y))) =>
-        value$x == value$y
+      case (Literal(Constant(val$x)), Literal(Constant(val$y))) =>
+        val$x == val$y
 
-      case (Ident(name$x), Ident(name$y)) =>
+      case (x: Ident, y: Ident) =>
         eq(x.symbol, y.symbol)
 
       case (Typed(expr$x, tpt$x), Typed(expr$y, tpt$y)) =>
-        def exprEq = eq(expr$x, expr$x)
-        def tptEq = eq(tpt$x, tpt$y)
+        lazy val exprEq = eq(expr$x, expr$x)
+        lazy val tptEq = eq(tpt$x, tpt$y)
         exprEq && tptEq
 
-      case (Select(qualifier$x, name$x), Select(qualifier$y, name$y)) =>
-        def qualifierEq = eq(qualifier$x, qualifier$y)
-        def nameEq = name$x == name$y
-        qualifierEq && nameEq
+      case (Select(qual$x, name$x), Select(qual$y, name$y)) =>
+        lazy val qualEq = eq(qual$x, qual$y)
+        lazy val nameEq = name$x == name$y
+        nameEq && qualEq
 
       case (Block(stats$x, expr$x), Block(stats$y, expr$y)) =>
-        val xs = stats$x :+ expr$x
-        val ys = stats$y :+ expr$y
-        val us = xs zip ys
-
-        // collect DefDef pairs visible to all statements within the blocks
-        val defDefPairs = us collect {
-          case (x@DefDef(_, _, _, _, _, _), y@DefDef(_, _, _, _, _, _)) =>
-            (x.symbol, y.symbol)
-        }
-        // compute a stack of maps to be used at each position of us traversal
-        val maps = us.foldLeft(Seq(map ++ defDefPairs))((acc, pair) => pair match {
-          case (x@ValDef(_, _, _, _), y@ValDef(_, _, _, _)) =>
-            (acc.head + (x.symbol -> y.symbol)) +: acc
-          case _ =>
-            acc.head +: acc
-        }).tail.reverse
-
-        val statsSizeEq = stats$x.size == stats$y.size
-        val statsEq = (us zip maps) forall { case ((l, r), m) => eq(l, r)(m) }
-
-        statsSizeEq && statsEq
+        lazy val xs = stats$x :+ expr$x
+        lazy val ys = stats$y :+ expr$y
+        lazy val sizeEq = stats$x.size == stats$y.size
+        lazy val statsEq = xs.zip(ys).forall { case (l, r) => eq(l, r) }
+        sizeEq && statsEq
 
       case (ValDef(mods$x, _, tpt$x, rhs$x), ValDef(mods$y, _, tpt$y, rhs$y)) =>
-        val modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
-        val tptEq = eq(tpt$x, tpt$y)
-        val rhsEq = eq(rhs$x, rhs$y)
+        dict += x.symbol -> y.symbol
+        lazy val modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
+        lazy val tptEq = eq(tpt$x, tpt$y)
+        lazy val rhsEq = eq(rhs$x, rhs$y)
         modsEq && tptEq && rhsEq
 
-      case (DefDef(mods$x, _, tps$x, vpss$x, tpt$x, rhs$x), DefDef(mods$y, _, tps$y, vpss$y, tpt$y, rhs$y)) =>
-        val valDefPairs = (vpss$x.flatten zip vpss$y.flatten) collect {
-          case (x@ValDef(_, _, _, _), y@ValDef(_, _, _, _)) =>
-            (x.symbol, y.symbol)
-        }
+      case (
+        DefDef(mods$x, _, types$x, params$x, tpt$x, rhs$x),
+        DefDef(mods$y, _, types$y, params$y, tpt$y, rhs$y)) =>
 
-        val modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
-        val tpsSizeEq = tps$x.size == tps$y.size
-        val tpsEq = (tps$x zip tps$y) forall { case (l, r) => eq(l, r) }
-        val vpssSizeEq = vpss$x.size == vpss$y.size && ((vpss$x zip vpss$y) forall { case (l, r) => l.size == r.size })
-        val vpssEq = (vpss$x.flatten zip vpss$y.flatten) forall { case (l, r) => eq(l, r)(map ++ valDefPairs) }
+        dict += x.symbol -> y.symbol
+        lazy val modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
+        lazy val typeSizeEq = types$x.size == types$y.size
+        lazy val typesEq = types$x.zip(types$y).forall { case (l, r) => eq(l, r) }
+        lazy val paramSizeEq = params$x.size == params$y.size &&
+          params$x.zip(params$y).forall { case (l, r) => l.size == r.size }
+        val paramsEq = params$x.flatten.zip(params$y.flatten).forall { case (l, r) => eq(l, r) }
         val tptEq = eq(tpt$x, tpt$y)
-        val rhsEq = eq(rhs$x, rhs$y)(map ++ valDefPairs)
-        modsEq && tpsSizeEq && tpsEq && vpssSizeEq && vpssEq && tptEq && rhsEq
+        val rhsEq = eq(rhs$x, rhs$y)
+        modsEq && typeSizeEq && paramSizeEq && tptEq && typesEq && paramsEq && rhsEq
 
-      case (Function(vparams$x, body$x), Function(vparams$y, body$y)) =>
-        lazy val valDefPairs = (vparams$x zip vparams$y) collect {
-          case (x@ValDef(_, _, _, _), y@ValDef(_, _, _, _)) =>
-            (x.symbol, y.symbol)
-        }
+      case (Function(params$x, body$x), Function(params$y, body$y)) =>
+        dict += x.symbol -> y.symbol
+        lazy val paramSizeEq = params$x.size == params$y.size
+        lazy val paramsEq = params$x.zip(params$y).forall { case (l, r) => eq(l, r) }
+        lazy val bodyEq = eq(body$x, body$y)
+        paramSizeEq && paramsEq && bodyEq
 
-        def vparamsSizeEq = vparams$x.size == vparams$y.size
-        def vparamsEq = (vparams$x zip vparams$y) forall { case (l, r) => eq(l, r)(map ++ valDefPairs) }
-        def bodyEq = eq(body$x, body$y)(map ++ valDefPairs)
-        vparamsSizeEq && vparamsEq && bodyEq
-
-      case (TypeApply(fun$x, args$x), TypeApply(fun$y, args$y)) =>
-        def symEq = x.symbol == y.symbol
-        def funEq = eq(fun$x, fun$y)
-        def argsSizeEq = args$x.size == args$y.size
-        def argsEq = (args$x zip args$y) forall { case (a$x, a$y) => eq(a$x, a$y) }
-        symEq && funEq && argsSizeEq && argsEq
+      case (TypeApply(fun$x, types$x), TypeApply(fun$y, types$y)) =>
+        lazy val symEq = x.symbol == y.symbol
+        lazy val funEq = eq(fun$x, fun$y)
+        lazy val typeSizeEq = types$x.size == types$y.size
+        lazy val typesEq = types$x.zip(types$y).forall { case (l, r) => eq(l, r) }
+        symEq && typeSizeEq && funEq && typesEq
 
       case (Apply(fun$x, args$x), Apply(fun$y, args$y)) =>
-        def symEq = eq(x.symbol, y.symbol)
-        def funEq = eq(fun$x, fun$y)
-        def argsSizeEq = args$x.size == args$y.size
-        def argsEq = (args$x zip args$y) forall { case (a$x, a$y) => eq(a$x, a$y) }
-        symEq && funEq && argsSizeEq && argsEq
+        lazy val symEq = eq(x.symbol, y.symbol)
+        lazy val funEq = eq(fun$x, fun$y)
+        lazy val argSizeEq = args$x.size == args$y.size
+        lazy val argsEq = args$x.zip(args$y).forall { case (l, r) => eq(l, r) }
+        symEq && argSizeEq && funEq && argsEq
 
-      case (If(cond$x, thenp$x, elsep$x), If(cond$y, thenp$y, elsep$y)) =>
-        def condEq = eq(cond$x, cond$y)
-        def thenpEq = eq(thenp$x, thenp$y)
-        def elsepEq = eq(elsep$x, elsep$y)
-        condEq && thenpEq && elsepEq
+      case (If(cond$x, then$x, else$x), If(cond$y, then$y, else$y)) =>
+        lazy val condEq = eq(cond$x, cond$y)
+        lazy val thenEq = eq(then$x, then$y)
+        lazy val elseEq = eq(else$x, else$y)
+        condEq && thenEq && elseEq
 
       case _ =>
         false
     }
 
     /** Check symbol equivalence. */
-    private def eq(x: Symbol, y: Symbol)(implicit map: Map[Symbol, Symbol]): Boolean = (x, y) match {
-      case (x: FreeTermSymbol, y: FreeTermSymbol) =>
-        x.value == y.value
-      case _ =>
-        if (map.contains(x)) map(x) == y
-        else x == y
+    private def eq(x: Symbol, y: Symbol)
+      (implicit dict: mutable.Map[Symbol, Symbol]): Boolean = {
+
+      import Term.name.{exprOwner, local}
+
+      x == y || ((x, y) match {
+        case (x: FreeTermSymbol, y: FreeTermSymbol)
+          if x.name == y.name => x.value == y.value
+        case (Term.sym(`exprOwner`, _), Term.sym(`exprOwner`, _)) |
+          (Term.sym(`local`, _), Term.sym(`local`, _)) => true
+        case _ =>
+          lazy val contains = dict contains x
+          lazy val symEq = dict(x) == y
+          lazy val ownerEq = eq(x.owner, y.owner)
+          contains && symEq && ownerEq
+      })
     }
 
     /**
@@ -239,52 +235,52 @@ trait Language extends CommonIR with Comprehensions {
       case EmptyTree => EmptyTree
       case lit: Literal => block(lit)
       case id: Ident if id.isTerm => block(id)
-      case value: ValDef if isParam(value) => value
+      case value: ValDef if Is param value => value
 
       case fun: Function =>
-        val name = Term.fresh(nameOf(fun))
-        val tpe = Type.of(fun)
-        val sym = Term.free(name.toString, tpe)
-        block(val_(sym, fun), ref(sym))
+        val x = fresh(nameOf(fun))
+        val T = Type of fun
+        val lhs = Term.sym.free(x, T)
+        block(val_(lhs, fun), Term ref lhs)
 
       case Typed(Block(stats, expr), tpt) =>
-        val tpe = Type.of(tpt)
-        val name = Term.fresh(nameOf(expr))
-        val lhs = Term.free(name.toString, tpe)
-        val rhs = ascribe(expr, tpe)
-        block(stats, val_(lhs, rhs), ref(lhs))
+        val x = fresh(nameOf(expr))
+        val T = Type of tpt
+        val lhs = Term.sym.free(x, T)
+        val rhs = Type.ascription(expr, T)
+        block(stats, val_(lhs, rhs), Term ref lhs)
 
       case sel@Select(Block(stats, target), _: TypeName) =>
-        val sym = Type.symOf(sel)
-        val tpe = Type.of(sel)
-        block(stats, Type.sel(target, sym, tpe))
+        val x = Type sym sel
+        val T = Type of sel
+        block(stats, Type.sel(target, x, T))
 
       case sel@Select(Block(stats, target), member: TermName) =>
-        val sym = Term.of(sel)
-        val tpe = Type.of(sel)
-        val rhs = Term.sel(target, sym, tpe)
-        if (sym.isPackage || // Parameter lists follow
-          (sym.isMethod && sym.asMethod.paramLists.nonEmpty) ||
-          IR.comprehensionOps.contains(sym)) {
+        val x = Term sym sel
+        val T = Type of sel
+        val rhs = Term.sel(target, x, T)
+        if (x.isPackage || // Parameter lists follow
+          (x.isMethod && x.asMethod.paramLists.nonEmpty) ||
+          IR.comprehensionOps.contains(x)) {
 
           block(stats, rhs)
         } else {
-          val name = Term.fresh(member).toString
-          val lhs = Term.free(name, tpe)
-          block(stats, val_(lhs, rhs), ref(lhs))
+          val lhs = Term.sym.free(fresh(member), T)
+          block(stats, val_(lhs, rhs), Term ref lhs)
         }
 
       case TypeApply(Block(stats, target), types) =>
-        val expr = typeApp(target, types.map(Type.of): _*)
+        val expr = Type.app(target, types map Type.of: _*)
         block(stats, expr)
 
       case app@Apply(Block(stats, target), args) =>
-        if (IR.comprehensionOps.contains(Term.of(target))) {
-          val expr = Tree.app(target)(args.map(this.expr): _*)
+        if (IR.comprehensionOps contains Term.sym(target)) {
+          val expr = Term.app(target)(args map this.expr)
           block(stats, expr)
         } else {
-          val name = Term.fresh(nameOf(target))
-          val lhs = Term.free(name.toString, Type.of(app))
+          val x = fresh(nameOf(target))
+          val T = Type of app
+          val lhs = Term.sym.free(x, T)
           val init = stats ::: args.flatMap {
             case Block(nested, _) => nested
             case _ => Nil
@@ -295,10 +291,10 @@ trait Language extends CommonIR with Comprehensions {
             case arg => arg
           }
 
-          val rhs = Tree.app(target)(params: _*)
+          val rhs = Term.app(target)(params)
           // Partially applied multi-arg-list method
-          if (Type.isMethod(Type of app)) block(init, rhs)
-          else block(init, val_(lhs, rhs), ref(lhs))
+          if (Is method Type.of(app)) block(init, rhs)
+          else block(init, val_(lhs, rhs), Term ref lhs)
         }
 
       // Only if contains nested blocks
@@ -315,14 +311,12 @@ trait Language extends CommonIR with Comprehensions {
         Tree.block(body.init, body.last)
 
       // Avoid duplication of intermediates
-      case value@ValDef(mods, _, _, Block(stats :+ (int: ValDef), rhs: Ident))
+      case val_(lhs, Block(stats :+ (int: ValDef), rhs: Ident), flags)
         if int.symbol == rhs.symbol =>
-        val lhs = Term.of(value)
-        block(stats, val_(lhs, int.rhs, mods.flags), unit)
+        block(stats, val_(lhs, int.rhs, flags), unit)
 
-      case value@ValDef(mods, _, _, Block(stats, rhs)) =>
-        val lhs = Term.of(value)
-        block(stats, val_(lhs, rhs, mods.flags), unit)
+      case val_(lhs, Block(stats, rhs), flags) =>
+        block(stats, val_(lhs, rhs, flags), unit)
     }
 
     /** Ensures that all definitions within the `tree` have unique names. */
@@ -359,7 +353,7 @@ trait Language extends CommonIR with Comprehensions {
         case Block(_, expr) => loop(expr)
         case Apply(target, _) => loop(target)
         case TypeApply(target, _) => loop(target)
-        case _: Function => Term.lambda
+        case _: Function => Term.name.lambda
         case _: Literal => Term.name("x")
         case _ => throw new RuntimeException("Unsupported tree")
       }
@@ -442,7 +436,7 @@ trait Language extends CommonIR with Comprehensions {
             }
 
             val dict = {
-              val dict = aliases ++ eq.map(_._1 -> ref(lhs1))
+              val dict = aliases ++ eq.map(_._1 -> Term.ref(lhs1))
               rhs1 match {
                 case lit: Literal => dict + (lhs1 -> lit)
                 case _ => dict
@@ -457,20 +451,18 @@ trait Language extends CommonIR with Comprehensions {
         }
 
       val vals = tree.collect {
-        case vd: ValDef if !isParam(vd) && vd.rhs.nonEmpty =>
+        case value: ValDef if !Is.param(value) && value.rhs.nonEmpty =>
           // NOTE: Lazy vals not supported
-          assert(!isLazy(vd))
-          Term.of(vd) -> vd.rhs
+          assert(!Is.lzy(value))
+          Term.sym(value) -> value.rhs
       }
 
       val dict = loop((vals, Map.empty))
       expr(postWalk(tree) {
-        case id: Ident if Has.termSym(id) &&
-          dict.contains(id.symbol) =>
+        case id: Ident if Has.termSym(id) && dict.contains(id.symbol) =>
           dict(id.symbol)
 
-        case vd: ValDef
-          if dict.contains(vd.symbol) =>
+        case value: ValDef if dict contains value.symbol =>
           unit
 
         case Block(stats, expr) =>
@@ -509,17 +501,17 @@ trait Language extends CommonIR with Comprehensions {
         case parent: Block if hasNestedBlocks(parent) =>
           // flatten (potentially) nested block stats
           val flatStats = parent.stats.flatMap {
-            case vd@ValDef(mods, name, tpt, child: Block) =>
-              child.stats :+ val_(Term.of(vd), child.expr, mods.flags)
-            case t =>
-              List(t)
+            case val_(sym, Block(stats, expr), flags) =>
+              stats :+ val_(sym, expr, flags)
+            case stat =>
+              stat :: Nil
           }
           // flatten (potentially) nested block expr
           val flatExpr = parent.expr match {
-            case child: Block =>
-              child.stats :+ child.expr
-            case t =>
-              List(t)
+            case Block(stats, expr) =>
+              stats :+ expr
+            case expr =>
+              expr :: Nil
           }
 
           block(flatStats ++ flatExpr)
@@ -587,20 +579,18 @@ trait Language extends CommonIR with Comprehensions {
       }
 
       def isVarPattern(id: Ident) =
-        !id.isBackquoted &&
-          !id.name.toString.head.isUpper
+        !id.isBackquoted && !id.name.toString.head.isUpper
 
       pattern match {
         case id: Ident if isVarPattern(id) =>
           Some(Nil)
 
-        case tp@Typed(pat, _) if Type.of(sel) weak_<:< Type.of(tp) =>
-          irrefutable(ascribe(sel, Type.of(tp)), pat)
+        case Type.ascription(pat, tpe) if Type.of(sel) weak_<:< tpe =>
+          irrefutable(Type.ascription(sel, tpe), pat)
 
-        case bd@Bind(_, pat) =>
-          val sym = Term.of(bd)
-          lazy val vd = val_(sym, sel)
-          irrefutable(ref(sym), pat).map(vd :: _)
+        case bind(lhs, pat) =>
+          lazy val value = val_(lhs, sel)
+          irrefutable(Term ref lhs, pat).map(value :: _)
 
         // Alternative patterns don't allow binding
         case Alternative(patterns) =>
@@ -612,13 +602,13 @@ trait Language extends CommonIR with Comprehensions {
             case un: UnApply => un.args
           }
 
-          val tpe = Type.of(sel)
+          val T = Type of sel
           val clazz = Type.of(extractor).typeSymbol.asClass
           val inst = clazz.primaryConstructor
-          val params = inst.infoIn(tpe).paramLists.head
+          val params = inst.infoIn(T).paramLists.head
           val selects = params.map { param =>
-            val field = tpe.member(param.name).asTerm
-            Term.sel(sel, field, Type.of(param))
+            val field = T.member(param.name).asTerm
+            Term.sel(sel, field, Type of param)
           }
 
           val patterns = selects zip args map (irrefutable _).tupled
@@ -660,11 +650,10 @@ trait Language extends CommonIR with Comprehensions {
         val CaseDef(pat, guard, body) = cases.head
         assert(guard.isEmpty)
         val T = Type.of(sel)
-        val name = Term.fresh("x").toString
-        val x = Term.free(name, T)
-        val binds = irrefutable(ref(x), pat)
+        val lhs = Term.sym.free(fresh("x"), T)
+        val binds = irrefutable(Term ref lhs, pat)
         assert(binds.isDefined)
-        block(val_(x, sel) :: binds.get, body)
+        block(val_(lhs, sel) :: binds.get, body)
     }
 
     // Avoids blocks without statements
@@ -681,24 +670,24 @@ trait Language extends CommonIR with Comprehensions {
      */
     class Meta(tree: Tree) {
 
-      val defs: Map[Symbol, ValDef] = (tree collect {
-        case vd@ValDef(_, _, _, rhs) if !isParam(vd) => vd.symbol -> vd
-      }).toMap
+      val defs: Map[Symbol, ValDef] = tree.collect {
+        case value: ValDef if !Is.param(value) =>
+          value.symbol -> value
+      }.toMap
 
-      val uses: Map[Symbol, Int] = {
-        val builder = List.newBuilder[(Symbol, Int)]
-
+      val uses: Map[Symbol, Int] =
         tree.collect { case id: Ident => id.symbol }
           .view.groupBy(identity)
           .mapValues(_.size)
           .withDefaultValue(0)
-      }
 
       @inline
-      def valdef(sym: Symbol): Option[ValDef] = defs.get(sym)
+      def valdef(sym: Symbol): Option[ValDef] =
+        defs.get(sym)
 
       @inline
-      def valuses(sym: Symbol): Int = uses.getOrElse(sym, 0)
+      def valuses(sym: Symbol): Int =
+        uses(sym)
     }
 
   }

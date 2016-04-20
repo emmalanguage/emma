@@ -2,7 +2,8 @@ package eu.stratosphere.emma
 package compiler
 
 /** Default macro extensions for trees, types and symbols. */
-trait ReflectUtil extends Util with Trees with Types with Symbols {
+trait ReflectUtil extends Util
+  with Trees with Terms with Types with Symbols {
 
   import universe._
   import Tree._

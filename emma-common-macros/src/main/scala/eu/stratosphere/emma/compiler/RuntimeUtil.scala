@@ -28,6 +28,9 @@ trait RuntimeUtil extends ReflectUtil {
   override def abort(pos: Position, msg: String): Nothing =
     throw new RuntimeException(s"error at position $pos: $msg")
 
+  private[compiler] override lazy val enclosingOwner =
+    Type.check(q"val x = 42").symbol.owner
+
   private[compiler] override def getFlags(sym: Symbol): FlagSet =
     internal.flags(sym)
 
