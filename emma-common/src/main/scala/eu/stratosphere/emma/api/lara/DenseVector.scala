@@ -5,14 +5,14 @@ import spire.math._
 
 import scala.reflect.ClassTag
 
-class DenseVector[A: Numeric : ClassTag](
-                                          override val length: Int,
-                                          val values: Array[A],
-                                          override val rowVector: Boolean = false) extends Vector[A] {
+private[emma] class DenseVector[A: Numeric : ClassTag](
+                                                        override val length: Int,
+                                                        val values: Array[A],
+                                                        override val rowVector: Boolean = false) extends Vector[A] {
 
   self =>
 
-  private[api] override val intern = values
+  private[emma] override val toArray = values
 
   //////////////////////////////////////////
   // pointwise M o scalar
@@ -91,48 +91,23 @@ class DenseVector[A: Numeric : ClassTag](
   }
 
   override
-  def fold[B](zero: B, to: A => B, f: (B, B) => B): B = {
-    values.foldLeft(zero)((b, a) => f(b, to(a)))
+  def fold[B](z: B)(s: A => B, p: (B, B) => B): B = {
+    values.foldLeft(z)((acc, x) => p(s(x), acc))
   }
-
-  //////////////////////////////////////////
-  // helper
-  //////////////////////////////////////////
-
-  override
-  private[emma] def get(i: Int): A = values(i)
-
-  private[lara] def mapScalar(scalar: A, f: (A, A) => A): Vector[A] = {
-    new DenseVector[A](length, values.map(f(_, scalar)), rowVector)
-  }
-
-  private[lara] def mapVector(that: Vector[A], f: (A, A) => A): Vector[A] = {
-    require(length == that.length, s"vectors have different size")
-
-    val res: Array[A] = new Array[A](length)
-    for (i <- Range) {
-      res(i) = f(get(i), that.get(i))
-    }
-    new DenseVector[A](
-      length,
-      res,
-      rowVector
-    )
-  }
-
-  override
-  def toString: String = {
-    //    s"[${vals.map(_.value).mkString(",")}]"
-    s"[${values.mkString(", ")}]"
-  }
-
-  //////////////////////////////////////////
-  // Monad stuff
-  //////////////////////////////////////////
 
   override
   def map[B: Numeric : ClassTag](f: (A) => B): Vector[B] = {
     new DenseVector[B](length, values.map(f(_)), rowVector)
+  }
+
+  override
+  def plus(other: Vector[A]): Vector[A] = {
+    val newLength = if (length > other.length) length else other.length
+    Vector.fill(newLength) { i =>
+      other.getOpt(i).getOrElse {
+        self.getOpt(i).getOrElse(implicitly[Numeric[A]].zero)
+      }
+    }
   }
 
   //  override
@@ -147,23 +122,72 @@ class DenseVector[A: Numeric : ClassTag](
   //    new DenseVector[A](filteredValues.length, filteredValues, rowVector)
   //  }
 
-  //  override
-  //  def equals(that: Any): Boolean = {
-  //    def compare(other: Vector[A]): Boolean = {
-  //      for (i <- 0 until length) {
-  //        if (get(i) != other.get(i))
-  //          return false
-  //      }
-  //      true
-  //    }
-  //    // TODO: Should we only check for dense or also compare against sparse vectors
-  //    that match {
-  //      case o: Vector[A] =>
-  //        o.length == length &&
-  //        o.rowVector == rowVector &&
-  //        compare(o)
-  //
-  //      case _ => false
-  //    }
-  //  }
+  //////////////////////////////////////////
+  // helper
+  //////////////////////////////////////////
+
+  override
+  private[emma] def get(i: Int): A = values(i)
+
+  override
+  private[emma] def getOpt(i: Int): Option[A] = {
+    if (i < length) {
+      Some(get(i))
+    } else {
+      None
+    }
+  }
+
+  private[lara] def mapScalar(scalar: A, f: (A, A) => A): Vector[A] = {
+    new DenseVector[A](length, values.map(f(_, scalar)), rowVector)
+  }
+
+  private[lara] def mapVector(that: Vector[A], f: (A, A) => A): Vector[A] = {
+    require(length == that.length, s"vectors have different size")
+
+    val res: Array[A] = new Array[A](length)
+    for (i <- Range) {
+      res(i) = f(get(i), that.get(i))
+    }
+    new DenseVector[A](length, res, rowVector)
+  }
+
+  //////////////////////////////////////////
+
+  // just for short comparison
+  lazy private val hash: Int = {
+    var result = 17
+    result = if (rowVector) 37 * result else 37 * result + 1
+    result = 37 * result + (length ^ (length >>> 32))
+    result
+  }
+
+  override
+  def hashCode(): Int = hash
+
+  override
+  def equals(that: Any): Boolean = {
+    def compare(other: Vector[A]): Boolean = {
+      for (i <- Range) {
+        if (get(i) != other.get(i)) {
+          return false
+        }
+      }
+      true
+    }
+    that match {
+      case o: Vector[A] =>
+        o.hashCode() == hashCode() &&
+        o.rowVector == rowVector &&
+        o.length == length &&
+        compare(o)
+
+      case _ => false
+    }
+  }
+
+  override
+  def toString: String = {
+    s"[${values.mkString(", ")}]"
+  }
 }

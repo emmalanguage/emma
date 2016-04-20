@@ -32,9 +32,7 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](
   self =>
 
   override
-  def toArray: Array[A] = {
-    values
-  }
+  private[emma] def toArray: Array[A] = values
 
   //////////////////////////////////////////
   // pointwise M o scalar
@@ -154,6 +152,32 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](
     }
   }
 
+  override
+  def elements[B](z: B)(s: A => B, p: (B, B) => B): B = {
+    values.foldLeft(z)((acc, x) => p(s(x), acc))
+  }
+
+  override
+  private[emma] def map[B: Numeric : ClassTag](f: (A) => B): Matrix[B] = {
+    val res: Array[B] = values.map(f(_))
+    new DenseMatrix(
+      numRows,
+      numCols,
+      res
+    )
+  }
+
+  override
+  private[emma] def plus(other: Matrix[A]): Matrix[A] = {
+    val rMax: Int = Math.max(numRows, other.numRows)
+    val cMax: Int = Math.max(numCols, other.numCols)
+    Matrix.fill(rMax, cMax) { (i, j) =>
+      other.getOpt(i, j).getOrElse {
+        self.getOpt(i, j).getOrElse(implicitly[Numeric[A]].zero)
+      }
+    }
+  }
+
   //////////////////////////////////////////
   // helper
   //////////////////////////////////////////
@@ -192,7 +216,15 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](
     values(index(i, j))
   }
 
-  private[lara] def set(i: Int, j: Int)(value: A): Unit = {
+  private[emma] def getOpt(i: Int, j: Int): Option[A] = {
+    if (i < numRows && j < numCols) {
+      Some(get(i, j))
+    } else {
+      None
+    }
+  }
+
+  private[emma] def set(i: Int, j: Int)(value: A): Unit = {
     values(index(i, j)) = value
   }
 
@@ -202,14 +234,40 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](
     if (!transposed) i * numCols + j else j * numRows + i
   }
 
+  //////////////////////////////////////////
+
+  // just for short comparison
+  lazy private val hash: Int = {
+    var result = 17
+    result = if (transposed) 37 * result else 37 * result + 1
+    result = 37 * result + (numRows ^ (numRows >>> 32))
+    result = 37 * result + (numCols ^ (numCols >>> 32))
+    result
+  }
+
   override
-  private[emma] def map[B: Numeric : ClassTag](f: (A) => B): Matrix[B] = {
-    val res: Array[B] = values.map(f(_))
-    new DenseMatrix(
-      numRows,
-      numCols,
-      res
-    )
+  def hashCode(): Int = hash
+
+  override
+  def equals(that: Any): Boolean = {
+    def compare(other: Matrix[A]): Boolean = {
+      for (i <- rRange; j <- cRange) {
+        if (get(i, j) != other.get(i, j)) {
+          return false
+        }
+      }
+      true
+    }
+    that match {
+      case o: Matrix[A] =>
+        o.hashCode() == hashCode() &&
+        o.transposed == transposed &&
+        o.numRows == numRows &&
+        o.numCols == numCols &&
+        compare(o)
+
+      case _ => false
+    }
   }
 
   override
