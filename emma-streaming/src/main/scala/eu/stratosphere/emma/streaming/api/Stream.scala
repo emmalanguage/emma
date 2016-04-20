@@ -2,6 +2,7 @@ package eu.stratosphere.emma.streaming.api
 
 import eu.stratosphere.emma.streaming.api.Stream._
 
+
 sealed class Stream[+A](x: => A, xs: => Stream[A]) {
 
   def head: A = x
