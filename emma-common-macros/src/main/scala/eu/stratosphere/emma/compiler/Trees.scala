@@ -364,11 +364,9 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
      * @param repl The tree that should replace `find`.
      * @return A substituted version of the enclosing tree.
      */
-    def replace(in: Tree, find: Tree, repl: Tree): Tree =
-      transform(in) {
-        case tree if tree equalsStructure find =>
-          repl
-      }
+    def replace(in: Tree, find: Tree, repl: Tree): Tree = transform(in) {
+      case tree if tree equalsStructure find => repl
+    }
 
     /**
      * Replace a sequence of symbols with references to their aliases.
@@ -378,7 +376,7 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
      * @return The tree with the specified symbols replaced.
      */
     def rename(in: Tree, aliases: (TermSymbol, TermSymbol)*): Tree =
-      if (aliases.isEmpty) in else rename(in, aliases.toMap)
+      if (aliases.isEmpty) in else rename(in)(aliases.toMap)
 
     /**
      * Replace term symbols with references to their aliases.
@@ -387,15 +385,14 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
      * @param pf A partial function mapping term symbols to their aliases.
      * @return The tree with the matched symbols replaced.
      */
-    def rename(in: Tree, pf: TermSymbol ~> TermSymbol): Tree =
-      preWalk(in) {
-        case Term.ref(sym) if pf isDefinedAt sym =>
-          Term ref pf(sym)
-        case val_(lhs, rhs, flags) if pf isDefinedAt lhs =>
-          val_(pf(lhs), rhs, flags)
-        case bind(lhs, pattern) if pf isDefinedAt lhs =>
-          bind(pf(lhs), pattern)
-      }
+    def rename(in: Tree)(pf: TermSymbol =?> TermSymbol): Tree = preWalk(in) {
+      case Term.ref(sym) if pf isDefinedAt sym =>
+        Term ref pf(sym)
+      case val_(lhs, rhs, flags) if pf isDefinedAt lhs =>
+        val_(pf(lhs), rhs, flags)
+      case bind(lhs, pattern) if pf isDefinedAt lhs =>
+        bind(pf(lhs), pattern)
+    }
 
     /**
      * Replace a sequence of symbols in a tree with fresh ones.
