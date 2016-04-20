@@ -1,7 +1,6 @@
 package eu.stratosphere.emma
 package compiler
 
-import scala.annotation.tailrec
 import scala.reflect.api.Universe
 import scala.reflect.macros.Attachments
 
@@ -17,7 +16,7 @@ import scala.reflect.macros.Attachments
 trait Util {
 
   val universe: Universe
-  type ~>[A, B] = PartialFunction[A, B]
+  type =?>[-A, +B] = PartialFunction[A, B]
 
   import universe._
 
@@ -27,14 +26,79 @@ trait Util {
   /** Raises an error and terminates compilation. */
   def abort(pos: Position, msg: String): Nothing
 
-  /** Shorthand for one-shot `transform(pf).apply(tree)`. */
-  def transform(tree: Tree)(pf: Tree ~> Tree): Tree =
-    transform(pf).apply(tree)
+  /** Provides the ancestor chain for AST transformation and traversal. */
+  trait Ancestors {
+
+    def trace: Boolean
+
+    private var ancestorChain: Seq[Tree] =
+      Vector.empty
+
+    /**
+     * A chain of all ancestors of the current tree on the path to the root node.
+     * `ancestors.head` is the immediate parent, `ancestors.last` is the root.
+     * Always empty if `trace` is false.
+     */
+    def ancestors: Seq[Tree] = ancestorChain
+
+    /** Prepends `tree` to the ancestor chain for the duration of `f` (if `trace` is true). */
+    def atParent[A](tree: Tree)(f: => A): A = if (trace) {
+      ancestorChain +:= tree
+      val result = f
+      ancestorChain = ancestors.tail
+      result
+    } else f
+  }
+
+  /** A generic AST transformation scheme guided by a template (partial function). */
+  abstract class Transformation(val trace: Boolean)
+    extends Transformer with Ancestors with (Tree => Tree) {
+
+    currentOwner = enclosingOwner
+
+    /** Override to provide the transformation logic. */
+    def template: Tree =?> Tree
+
+    override def apply(tree: Tree): Tree =
+      transform(tree)
+
+    override def transform(tree: Tree): Tree = atParent(tree)(tree match {
+      // NOTE: TypeTree.original is not transformed by default
+      case tpt: TypeTree if tpt.original != null =>
+        val original = transform(tpt.original)
+        if (original eq tpt.original) tpt else {
+          val copy = treeCopy.TypeTree(tpt)
+          setOriginal(copy, original)
+          copy
+        }
+
+      case _ =>
+        super.transform(tree)
+    })
+  }
+
+  /** A generic AST traversal scheme using a partial function for callback. */
+  abstract class Traversal(val trace: Boolean)
+    extends Traverser with Ancestors with (Tree => Unit) {
+
+    currentOwner = enclosingOwner
+
+    /** Override to provide the callback logic. */
+    def callback: Tree =?> Any
+
+    override def apply(tree: Tree): Unit =
+      traverse(tree)
+
+    override def traverse(tree: Tree): Unit = atParent(tree)(tree match {
+      // NOTE: TypeTree.original is not traversed by default
+      case tpt: TypeTree if tpt.original != null => traverse(tpt.original)
+      case _ => super.traverse(tree)
+    })
+  }
 
   /**
-   * Returns a function that performs a depth-first top-down transformation of a tree using the
-   * provided partial function as a template. Recognizes all Scala trees. Does not descend into the
-   * result of `pf`.
+   * A depth-first top-down transformation scheme using the provided partial function as template.
+   * Recognizes all Scala trees. Does not descend into the result of `template`.
    *
    * == Example ==
    *
@@ -58,36 +122,27 @@ trait Util {
    *   }
    * }}}
    *
-   * @param pf A [[scala.PartialFunction]] that returns the desired result for matched trees.
-   * @return A new [[scala.reflect.api.Trees.Transformer.transform()]] that applies `pf`.
+   * @param trace Set to `true` in case the ancestor chain is needed (default: `false`).
    */
-  def transform(pf: Tree ~> Tree): Tree => Tree =
-    new Transformer {
-      override def transform(tree: Tree): Tree =
-        if (pf.isDefinedAt(tree)) pf(tree)
-        else tree match {
-          // NOTE: TypeTree.original is not transformed by default
-          case tt: TypeTree if tt.original != null =>
-            val original = transform(tt.original)
-            if (original eq tt.original) tt else {
-              val copy = treeCopy.TypeTree(tt)
-              setOriginal(copy, original)
-              copy
-            }
+  abstract class transform(trace: Boolean = false) extends Transformation(trace) {
+    override final def transform(tree: Tree): Tree =
+      template.applyOrElse(tree, super.transform)
+  }
 
-          case _ =>
-            super.transform(tree)
-        }
-    }.transform
+  object transform {
 
-  /** Shorthand for one-shot `preWalk(pf).apply(tree)`. */
-  def preWalk(tree: Tree)(pf: Tree ~> Tree): Tree =
-    preWalk(pf).apply(tree)
+    /** See [[eu.stratosphere.emma.compiler.Util.transform]]. */
+    def apply(pf: Tree =?> Tree): Transformation =
+      new transform { override val template = pf }
+
+    /** Shorthand for one-shot `transform(pf).apply(tree)`. */
+    def apply(tree: Tree)(pf: Tree =?> Tree): Tree =
+      apply(pf)(tree)
+  }
 
   /**
-   * Returns a function that performs a depth-first pre-order transformation of a tree using the
-   * provided partial function as a template. Recognizes all Scala trees. Descends into the result
-   * of `pf`.
+   * A depth-first pre-order transformation scheme using the provided partial function as template.
+   * Recognizes all Scala trees. Descends into the result of `template`.
    *
    * WARNING: Make sure the transformation terminates!
    *
@@ -100,7 +155,7 @@ trait Util {
    *     case q"${_: Int}" =>
    *       counter += 1
    *       q"$counter"
-   *   }.apply(reify {
+   *   }.transform(reify {
    *     val x = 42
    *     val y = x + 313
    *     y - 55
@@ -113,37 +168,27 @@ trait Util {
    *   }
    * }}}
    *
-   * @param pf A [[scala.PartialFunction]] that returns the desired result for matched trees.
-   * @return A new [[scala.reflect.api.Trees.Transformer.transform()]] that applies `pf`.
+   * @param trace Set to `true` in case the ancestor chain is needed (default: `false`).
    */
-  def preWalk(pf: Tree ~> Tree): Tree => Tree =
-    new Transformer {
-      override def transform(tree: Tree): Tree = {
-        val result = if (pf.isDefinedAt(tree)) pf(tree) else tree
-        result match {
-          // NOTE: TypeTree.original is not transformed by default
-          case tt: TypeTree if tt.original != null =>
-            val original = transform(tt.original)
-            if (original eq tt.original) tt else {
-              val copy = treeCopy.TypeTree(tt)
-              setOriginal(copy, original)
-              copy
-            }
+  abstract class preWalk(trace: Boolean = false) extends Transformation(trace) {
+    override final def transform(tree: Tree): Tree =
+      super.transform(template.applyOrElse(tree, identity[Tree]))
+  }
 
-          case _ =>
-            super.transform(result)
-        }
-      }
-    }.transform
+  object preWalk {
 
-  /** Shorthand for one-shot `postWalk(pf).apply(tree)`. */
-  def postWalk(tree: Tree)(pf: Tree ~> Tree): Tree =
-    postWalk(pf).apply(tree)
+    /** See [[eu.stratosphere.emma.compiler.Util.preWalk]]. */
+    def apply(pf: Tree =?> Tree): Transformation =
+      new preWalk { override val template = pf }
+
+    /** Shorthand for one-shot `preWalk(pf).transform(tree)`. */
+    def apply(tree: Tree)(pf: Tree =?> Tree): Tree =
+      apply(pf)(tree)
+  }
 
   /**
-   * Returns a function that performs a depth-first post-order transformation of a tree using the
-   * provided partial function as a template. Recognizes all Scala trees. Arguments to `pf` have
-   * already been walked recursively.
+   * A depth-first post-order transformation scheme using the provided partial function as template.
+   * Recognizes all Scala trees. Arguments to `template` have already been walked recursively.
    *
    * == Example ==
    *
@@ -154,7 +199,7 @@ trait Util {
    *     case q"${i: Int}" =>
    *       counter += 1
    *       q"$counter + $i"
-   *   }.apply(reify {
+   *   }.transform(reify {
    *     val x = 42
    *     val y = x + 313
    *     y - 55
@@ -167,109 +212,93 @@ trait Util {
    *   }
    * }}}
    *
-   * @param pf A [[scala.PartialFunction]] that returns the desired result for matched trees.
-   * @return A new [[scala.reflect.api.Trees.Transformer.transform()]] that applies `pf`.
+   * @param trace Set to `true` in case the ancestor chain is needed (default: `false`).
    */
-  def postWalk(pf: Tree ~> Tree): Tree => Tree =
-    new Transformer {
-      override def transform(tree: Tree): Tree = {
-        val result = tree match {
-          // NOTE: TypeTree.original is not transformed by default
-          case tt: TypeTree if tt.original != null =>
-            val original = transform(tt.original)
-            if (original eq tt.original) tt else {
-              val copy = treeCopy.TypeTree(tt)
-              setOriginal(copy, original)
-              copy
-            }
+  abstract class postWalk(trace: Boolean = false) extends Transformation(trace) {
+    override final def transform(tree: Tree): Tree =
+      template.applyOrElse(super.transform(tree), identity[Tree])
+  }
 
-          case _ =>
-            super.transform(tree)
-        }
+  object postWalk {
 
-        if (pf.isDefinedAt(result)) pf(result)
-        else result
-      }
-    }.transform
+    /** See [[eu.stratosphere.emma.compiler.Util.postWalk]]. */
+    def apply(pf: Tree =?> Tree): Transformation =
+      new postWalk { override val template = pf }
 
-  /** Shorthand for one-shot `traverse(pf).apply(tree)`. */
-  def traverse[U](tree: Tree)(pf: Tree ~> U): Unit =
-    traverse(pf).apply(tree)
+    /** Shorthand for one-shot `postWalk(pf).transform(tree)`. */
+    def apply(tree: Tree)(pf: Tree =?> Tree): Tree =
+      apply(pf)(tree)
+  }
 
   /**
-   * Returns a function that performs a depth-first top-down traversal of a tree using the provided
-   * partial function for callback. Recognizes all Scala trees. Does not descend into trees matched
-   * by `pf`.
+   * A depth-first top-down traversal scheme using the provided partial function for callback.
+   * Recognizes all Scala trees. Does not descend into trees matched by `callback`.
    *
-   * @param pf A [[scala.PartialFunction]] that performs the desired effect for matched trees.
-   * @return A new [[scala.reflect.api.Trees.Traverser.traverse()]] that calls `pf`.
+   * @param trace Set to `true` in case the ancestor chain is needed (default: `false`).
    */
-  def traverse[U](pf: Tree ~> U): Tree => Unit =
-    new Traverser {
-      @tailrec
-      override def traverse(tree: Tree) =
-        if (pf.isDefinedAt(tree)) pf(tree)
-        else tree match {
-          // NOTE: TypeTree.original is not traversed by default
-          case tt: TypeTree if tt.original != null =>
-            traverse(tt.original)
-          case _ =>
-            super.traverse(tree)
-        }
-    }.traverse
+  abstract class traverse(trace: Boolean = false) extends Traversal(trace) {
+    override final def traverse(tree: Tree): Unit =
+      callback.applyOrElse(tree, super.traverse)
+  }
 
-  /** Shorthand for one-shot `topDown(pf).apply(tree)`. */
-  def topDown[U](tree: Tree)(pf: Tree ~> U): Unit =
-    topDown(pf).apply(tree)
+  object traverse {
+
+    /** See [[eu.stratosphere.emma.compiler.Util.traverse]]. */
+    def apply(pf: Tree =?> Any): Traversal =
+      new traverse { override val callback = pf }
+
+    /** Shorthand for one-shot `traverse(pf).apply(tree)`. */
+    def apply(tree: Tree)(pf: Tree =?> Any): Unit =
+      apply(pf)(tree)
+  }
 
   /**
-   * Returns a function that performs a depth-first top-down traversal of a tree using the provided
-   * partial function for callback. Recognizes all Scala trees. Descends into trees matched by `pf`.
+   * A depth-first top-down traversal scheme using the provided partial function for callback.
+   * Recognizes all Scala trees. Descends into trees matched by `callback`.
    *
-   * @param pf A [[scala.PartialFunction]] that performs the desired effect for matched trees.
-   * @return A new [[scala.reflect.api.Trees.Traverser.traverse()]] that calls `pf`.
+   * @param trace Set to `true` in case the ancestor chain is needed (default: `false`).
    */
-  def topDown[U](pf: Tree ~> U): Tree => Unit =
-    new Traverser {
-      @tailrec
-      override def traverse(tree: Tree) = {
-        if (pf.isDefinedAt(tree)) pf(tree)
-        tree match {
-          // NOTE: TypeTree.original is not traversed by default
-          case tt: TypeTree if tt.original != null =>
-            traverse(tt.original)
-          case _ =>
-            super.traverse(tree)
-        }
-      }
-    }.traverse
+  abstract class topDown(trace: Boolean = false) extends Traversal(trace) {
+    override final def traverse(tree: Tree): Unit = {
+      callback.applyOrElse(tree, (_: Tree) => ())
+      super.traverse(tree)
+    }
+  }
 
-  /** Shorthand for one-shot `bottomUp(pf).apply(tree)`. */
-  def bottomUp[U](tree: Tree)(pf: Tree ~> U): Unit =
-    bottomUp(pf).apply(tree)
+  object topDown {
+
+    /** See [[eu.stratosphere.emma.compiler.Util.topDown]]. */
+    def apply(pf: Tree =?> Any): Traversal =
+      new topDown { override val callback = pf }
+
+    /** Shorthand for one-shot `topDown(pf).traverse(tree)`. */
+    def apply(tree: Tree)(pf: Tree =?> Any): Unit =
+      apply(pf)(tree)
+  }
 
   /**
-   * Returns a function that performs a depth-first bottom-up traversal of a tree using the provided
-   * partial function for callback. Recognizes all Scala trees. Arguments to `pf` have already been
-   * traversed recursively.
+   * A depth-first bottom-up traversal scheme using the provided partial function for callback.
+   * Recognizes all Scala trees. Arguments to `callback` have already been traversed recursively.
    *
-   * @param pf A [[scala.PartialFunction]] that performs the desired effect for matched trees.
-   * @return A new [[scala.reflect.api.Trees.Traverser.traverse()]] that calls `pf`.
+   * @param trace Set to `true` in case the ancestor chain is needed (default: `false`).
    */
-  def bottomUp[U](pf: Tree ~> U): Tree => Unit =
-    new Traverser {
-      override def traverse(tree: Tree) = {
-        tree match {
-          // NOTE: TypeTree.original is not traversed by default
-          case tt: TypeTree if tt.original != null =>
-            traverse(tt.original)
-          case _ =>
-            super.traverse(tree)
-        }
+  abstract class bottomUp(trace: Boolean = false) extends Traversal(trace) {
+    override final def traverse(tree: Tree): Unit = {
+      super.traverse(tree)
+      callback.applyOrElse(tree, (_: Tree) => ())
+    }
+  }
 
-        if (pf.isDefinedAt(tree)) pf(tree)
-      }
-    }.traverse
+  object bottomUp {
+
+    /** See [[eu.stratosphere.emma.compiler.Util.bottomUp]]. */
+    def apply(pf: Tree =?> Any): Traversal =
+      new bottomUp { override val callback = pf }
+
+    /** Shorthand for one-shot `bottomUp(pf).traverse(tree)`. */
+    def apply(tree: Tree)(pf: Tree =?> Any): Unit =
+      apply(pf)(tree)
+  }
 
   // ------------------------
   // Abstract wrapper methods
