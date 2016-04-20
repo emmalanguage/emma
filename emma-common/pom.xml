@@ -50,6 +50,13 @@
             <version>0.5.2</version>
         </dependency>
 
+        <!--Spire -->
+        <dependency>
+            <groupId>org.spire-math</groupId>
+            <artifactId>spire_${scala.tools.version}</artifactId>
+            <version>0.11.0</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>junit</groupId>
