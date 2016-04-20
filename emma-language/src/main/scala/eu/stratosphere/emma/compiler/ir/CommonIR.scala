@@ -70,18 +70,6 @@ trait CommonIR extends ReflectUtil {
   // Helper Patterns
   // ---------------------------------------------------------------------------
 
-  object NewIOFormat {
-    def unapply(root: Tree): Option[(Tree, Tree)] = root match {
-      case Apply(apply@Apply(Select(New(tpt), name), args), List(implicitArgs)) if isSubclass(tpt) =>
-        Some(apply, implicitArgs)
-      case _ =>
-        Option.empty[(Tree, Tree)]
-    }
-
-    def isSubclass(tree: Tree): Boolean =
-      tree.tpe.baseClasses.contains(API.inputFmtSymbol) || tree.tpe.baseClasses.contains(API.outputFmtSymbol)
-  }
-
   object WhileLoop {
     def unapply(root: Tree): Option[(Tree, Tree)] = root match {
       case LabelDef(name, Nil, If(cond, Block(List(body), Apply(fun, Nil)), Literal(Constant(()))))

@@ -28,8 +28,6 @@ trait Language extends CommonIR with Comprehensions {
         true
       case tpe: TypeTree =>
         tpe.original == null || validate(tpe.original)
-      case NewIOFormat(apply, implicitArgs) =>
-        validate(apply)
       case Annotated(annot, arg) =>
         validate(annot) && validate(arg)
       case AppliedTypeTree(tpt, args) =>
@@ -62,9 +60,6 @@ trait Language extends CommonIR with Comprehensions {
     /** Check alpha-equivalence of trees. */
     def eq(x: Tree, y: Tree)
       (implicit dict: mutable.Map[Symbol, Symbol] = mutable.Map.empty): Boolean = (x, y) match {
-
-      case (NewIOFormat(app$x, _), NewIOFormat(app$y, _)) =>
-        eq(app$x, app$y)
 
       case (EmptyTree, EmptyTree) =>
         true
