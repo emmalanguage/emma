@@ -389,15 +389,29 @@ trait Language extends CommonIR with Comprehensions {
           done = false
       }
 
-      val transform: Tree => Tree = postWalk {
-        case Block(stats, expr) => block(
-          stats filter {
-            case vd@val_(sym, rhs, _) if uses.getOrElse(sym, 0) < 1 =>
-              decrementUses(rhs); false
-            case _ =>
-              true
-          },
-          expr)
+      val transform = new postWalk(true) {
+
+        import IR.comprehension
+
+        override def template = {
+          // Skip comprehension blocks
+          case Block(stats, expr) if !comprehensionChild() =>
+            block(
+              stats filter {
+                case vd@val_(sym, rhs, _) if uses.getOrElse(sym, 0) < 1 =>
+                  decrementUses(rhs)
+                  false
+                case _ =>
+                  true
+              },
+              expr)
+        }
+
+        /** Check if the current tree is a child fo a `comprehension` application. */
+        private def comprehensionChild(): Boolean = ancestors.headOption.exists {
+          case Method.call(_, `comprehension`, _, _) => true
+          case _ => false
+        }
       }
 
       while (!done) {
