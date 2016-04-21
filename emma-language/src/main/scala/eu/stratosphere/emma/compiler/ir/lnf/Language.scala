@@ -646,13 +646,13 @@ trait Language extends CommonIR with Comprehensions {
      */
     val destructPatternMatches: Tree => Tree = postWalk {
       case Match(sel, cases) =>
-        assert(cases.size == 1)
+        assert(cases.nonEmpty, "No cases for pattern match")
         val CaseDef(pat, guard, body) = cases.head
-        assert(guard.isEmpty)
+        assert(guard.isEmpty, "Emma does not support guards for pattern matches")
         val T = Type.of(sel)
         val lhs = Term.sym.free(fresh("x"), T)
         val binds = irrefutable(Term ref lhs, pat)
-        assert(binds.isDefined)
+        assert(binds.isDefined,  "Unsupported refutable pattern match case detected")
         block(val_(lhs, sel) :: binds.get, body)
     }
 
