@@ -26,4 +26,22 @@ trait ReflectUtil extends Util
       if (seq.isEmpty) None
       else Some(seq.init, seq.last)
   }
+
+  /** Print tree for debuging. */
+  def printTree(title: String): Tree => Tree = (tree: Tree) => {
+    // prefix
+    println(title)
+    println("-" * 80)
+    // tree
+    println(showCode(tree)
+      .replace("<synthetic> ", "")
+      .replace("_root_.", "")
+      .replace("eu.stratosphere.emma.api.", "")
+      .replace("eu.stratosphere.emma.compiler.ir.`package`.", "")
+      .replaceAll("eu\\.stratosphere\\.emma\\.testschema\\.([a-zA-Z]+)\\.?", ""))
+    // suffix
+    println("-" * 80)
+    // don't  break the chain
+    tree
+  }
 }
