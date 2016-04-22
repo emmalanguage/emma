@@ -3,6 +3,7 @@ package eu.stratosphere.emma.api.lara
 import spire.math.Numeric
 
 import scala.reflect.ClassTag
+import scala.util.Random
 
 trait Matrix[A] {
 
@@ -52,7 +53,13 @@ trait Matrix[A] {
 
   def /(that: Matrix[A]): Matrix[A]
 
+  //////////////////////////////////////////
+  // M x M -> M and  M x V -> V
+  //////////////////////////////////////////
+
   def %*%(that: Matrix[A]): Matrix[A]
+
+  def %*%(that: Vector[A]): Vector[A]
 
   //////////////////////////////////////////
   // M operation
@@ -124,5 +131,9 @@ object Matrix {
 
   def eye[A: Numeric : ClassTag](rows: Int): Matrix[A] = {
     Matrix.fill(rows, rows)((i, j) => if (i == j) implicitly[Numeric[A]].one else implicitly[Numeric[A]].zero)
+  }
+
+  def rand[A: Numeric : ClassTag](rows: Int, cols: Int): Matrix[A] = {
+    Matrix.fill(rows, cols)((i, j) => implicitly[Numeric[A]].fromDouble(Random.nextDouble()))
   }
 }

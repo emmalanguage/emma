@@ -92,6 +92,15 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](
     new DenseMatrix[A](numRows, that.numCols, values)
   }
 
+  override
+  def %*%(that: Vector[A]): Vector[A] = {
+    val values: Array[A] = new Array[A](numRows)
+    for (i <- rRange) {
+      values(i) = row(i) dot that
+    }
+    new DenseVector[A](numRows, values)
+  }
+
   //////////////////////////////////////////
   // M operation
   //////////////////////////////////////////
