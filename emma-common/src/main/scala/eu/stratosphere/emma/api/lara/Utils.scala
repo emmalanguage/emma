@@ -10,11 +10,11 @@ object Utils {
     }
   }
 
-  def zipWithIndex: Product => Seq[(Int, Product)] = {
+  def zipWithIndex[A]: A => (Int, A) = {
     var i: Int = -1
-    (v: Product) => {
+    (v: A) => {
       i += 1
-      Seq((i, v))
+      (i, v)
     }
   }
 }
