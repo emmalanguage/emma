@@ -2,7 +2,9 @@ package eu.stratosphere.emma.api.lara
 
 import spire.math.Numeric
 
+import scala.collection.immutable.NumericRange
 import scala.reflect.ClassTag
+import scala.util.Random
 
 trait Vector[A] {
 
@@ -105,6 +107,18 @@ object Vector {
     new DenseVector[A](values.length, values, rowVector = isRowVector)
   }
 
+  def apply[A: Numeric : ClassTag](range: NumericRange[A]): Vector[A] = {
+    new DenseVector[A](range.length, range.toArray)
+  }
+
+  def apply[_ <: Int](range: Range): Vector[Int] = {
+    new DenseVector[Int](range.length, range.toArray)
+  }
+
+  def apply[A: Numeric : ClassTag](range: Range.Partial[Double, NumericRange[A]]): Vector[A] = {
+    apply[A](range.by(1.0))
+  }
+
   //////////////////////////////////////////
   // Generators
   // TODO: THIS SHOULD BE REPLACED BY CTORS USING EITHER DENSE OR SPARSE IMPLEMENTATION
@@ -122,7 +136,28 @@ object Vector {
     new DenseVector[A](size, Array.fill(size)(implicitly[Numeric[A]].zero), rowVector = isRowVector)
   }
 
+  def zerosLike[A: Numeric: ClassTag](that: Vector[A]): Vector[A] = {
+    Vector.zeros[A](that.length)
+  }
+
   def ones[A: Numeric : ClassTag](size: Int, isRowVector: Boolean = false): Vector[A] = {
     new DenseVector[A](size, Array.fill(size)(implicitly[Numeric[A]].one), rowVector = isRowVector)
+  }
+
+  def rand[A: Numeric:ClassTag](size: Int, isRowVector: Boolean = false): Vector[A] = {
+    val rng = new Random()
+    new DenseVector[A](
+      size,
+      Array.fill(size)(implicitly[Numeric[A]].fromDouble(rng.nextDouble())),
+      rowVector = isRowVector
+    )
+  }
+
+  def rand[A: Numeric: ClassTag](size: Int, isRowVector: Boolean, seed: Long): Vector[A] = {
+    val rng = new Random(seed)
+    new DenseVector[A](size,
+      Array.fill(size)(implicitly[Numeric[A]].fromDouble(rng.nextDouble())),
+      rowVector = isRowVector
+    )
   }
 }
