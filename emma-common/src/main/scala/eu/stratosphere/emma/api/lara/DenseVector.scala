@@ -5,10 +5,9 @@ import spire.math._
 
 import scala.reflect.ClassTag
 
-private[emma] class DenseVector[A: Numeric : ClassTag](
-                                                        override val length: Int,
-                                                        val values: Array[A],
-                                                        override val rowVector: Boolean = false) extends Vector[A] {
+private[emma] class DenseVector[A: Numeric : ClassTag](override val length: Int,
+                                                       val values: Array[A],
+                                                       override val rowVector: Boolean = false) extends Vector[A] {
 
   self =>
 

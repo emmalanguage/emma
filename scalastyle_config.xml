@@ -104,6 +104,7 @@
  <check level="warning" class="org.scalastyle.scalariform.MethodNamesChecker" enabled="true">
   <parameters>
    <parameter name="regex"><![CDATA[^[a-z_][A-Za-z0-9_\$]*$]]></parameter>
+   <parameter name="ignoreRegex"><![CDATA[^%?\+%?$|^%?-%?$|^%?\*%?$|^%?\/%?$]]></parameter>
   </parameters>
  </check>
  <check level="warning" class="org.scalastyle.scalariform.NumberOfMethodsInTypeChecker" enabled="true">

@@ -23,11 +23,10 @@ import scala.reflect.ClassTag
   * @param transposed is the matrix transposed (default: false)
   * @tparam A the type of the values in the matrix
   */
-private[emma] class DenseMatrix[A: Numeric : ClassTag](
-                                                        override val numRows: Int,
-                                                        override val numCols: Int,
-                                                        val values: Array[A],
-                                                        override val transposed: Boolean = false) extends Matrix[A] {
+private[emma] class DenseMatrix[A: Numeric : ClassTag](override val numRows: Int,
+                                                       override val numCols: Int,
+                                                       val values: Array[A],
+                                                       override val transposed: Boolean = false) extends Matrix[A] {
 
   self =>
 

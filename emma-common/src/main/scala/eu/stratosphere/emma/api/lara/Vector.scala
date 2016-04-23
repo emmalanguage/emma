@@ -41,27 +41,27 @@ trait Vector[A] {
   def /(that: Vector[A]): Vector[A]
 
   /**
-    * Inner / Dot product / row x column vector.
-    *
-    * @param that the row vector
-    * @return the inner product
-    */
+   * Inner / Dot product / row x column vector.
+   *
+   * @param that the row vector
+   * @return the inner product
+   */
   def dot(that: Vector[A]): A
 
   /**
-    * Outer product / column x row vector.
-    *
-    * @param that the column vector
-    * @return the outer product [[Matrix]]
-    */
+   * Outer product / column x row vector.
+   *
+   * @param that the column vector
+   * @return the outer product [[Matrix]]
+   */
   def %*%(that: Vector[A]): Matrix[A]
 
   /**
-    * Row vector x matrix.
-    *
-    * @param that the matrix
-    * @return the resulting row vector
-    */
+   * Row vector x matrix.
+   *
+   * @param that the matrix
+   * @return the resulting row vector
+   */
   def %*%(that: Matrix[A]): Vector[A]
 
   //////////////////////////////////////////
@@ -71,10 +71,10 @@ trait Vector[A] {
   def transpose(): Vector[A]
 
   /**
-    * Returns a [[Matrix]] with the vector elements as diagonal.
-    *
-    * @return a [[Matrix]] with the vector elements as diagonal.
-    */
+   * Returns a [[Matrix]] with the vector elements as diagonal.
+   *
+   * @return a [[Matrix]] with the vector elements as diagonal.
+   */
   def diag(): Matrix[A]
 
   def aggregate(f: (A, A) => A): A
@@ -136,7 +136,7 @@ object Vector {
     new DenseVector[A](size, Array.fill(size)(implicitly[Numeric[A]].zero), rowVector = isRowVector)
   }
 
-  def zerosLike[A: Numeric: ClassTag](that: Vector[A]): Vector[A] = {
+  def zerosLike[A: Numeric : ClassTag](that: Vector[A]): Vector[A] = {
     Vector.zeros[A](that.length)
   }
 
@@ -144,7 +144,7 @@ object Vector {
     new DenseVector[A](size, Array.fill(size)(implicitly[Numeric[A]].one), rowVector = isRowVector)
   }
 
-  def rand[A: Numeric:ClassTag](size: Int, isRowVector: Boolean = false): Vector[A] = {
+  def rand[A: Numeric : ClassTag](size: Int, isRowVector: Boolean = false): Vector[A] = {
     val rng = new Random()
     new DenseVector[A](
       size,
@@ -153,7 +153,7 @@ object Vector {
     )
   }
 
-  def rand[A: Numeric: ClassTag](size: Int, isRowVector: Boolean, seed: Long): Vector[A] = {
+  def rand[A: Numeric : ClassTag](size: Int, isRowVector: Boolean, seed: Long): Vector[A] = {
     val rng = new Random(seed)
     new DenseVector[A](size,
       Array.fill(size)(implicitly[Numeric[A]].fromDouble(rng.nextDouble())),
