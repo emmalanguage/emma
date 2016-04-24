@@ -162,7 +162,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
   "bypass mock comprehensions" in {
 
     val act = typeCheckAndANF(reify {
-      comprehension {
+      val res = comprehension {
         val u = generator(users)
         val a = generator(ads)
         val c = generator(clicks)
@@ -170,10 +170,11 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
         guard(a.id == c.adID)
         head(c.time, a.`class`)
       }
+      res
     })
 
     val exp = typeCheck(reify {
-      comprehension {
+      val res = comprehension {
         val u = generator[User, DataBag] {
           val u$1 = users
           u$1
@@ -205,6 +206,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
           x$9
         }
       }
+      res
     })
 
     act shouldEqual exp

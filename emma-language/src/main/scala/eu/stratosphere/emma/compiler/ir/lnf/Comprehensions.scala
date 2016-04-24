@@ -46,22 +46,23 @@ trait Comprehensions {
         case cs.map(xs, fn(arg, body)) =>
           cs.comprehension(
             List(
-              cs.generator(Term sym arg, xs)),
-            cs.head(body))
+              cs.generator(Term sym arg, asBlock(xs))),
+            cs.head(asBlock(body)))
 
         case cs.flatMap(xs, fn(arg, body)) =>
           cs.flatten(
-            cs.comprehension(
-              List(
-                cs.generator(Term sym arg, xs)),
-              cs.head(body)))
+            block(
+              cs.comprehension(
+                List(
+                  cs.generator(Term sym arg, asBlock(xs))),
+                cs.head(asBlock(body)))))
 
         case cs.withFilter(xs, fn(arg, body)) =>
           cs.comprehension(
             List(
-              cs.generator(Term sym arg, xs),
-              cs.guard(body)),
-            cs.head(ref(Term sym arg)))
+              cs.generator(Term sym arg, asBlock(xs)),
+              cs.guard(asBlock(body))),
+            cs.head(block(ref(Term sym arg))))
       }
 
       (transform andThen LNF.dce) (tree)
@@ -86,8 +87,39 @@ trait Comprehensions {
       // construct comprehension syntax helper for the given monad
       val cs = new Syntax(monad: Symbol)
 
+      def hasNestedBlocks(tree: Block): Boolean = {
+        val inStats = tree.stats exists {
+          case ValDef(_, _, _, _: Block) => true
+          case _ => false
+        }
+        val inExpr = tree.expr match {
+          case _: Block => true
+          case _ => false
+        }
+        inStats || inExpr
+      }
+
       val transform: Tree => Tree = postWalk {
-        case t@cs.comprehension(cs.generator(sym, rhs) :: qs, cs.head(expr)) =>
+
+        case parent: Block if hasNestedBlocks(parent) =>
+          // flatten (potentially) nested block stats
+          val flatStats = parent.stats.flatMap {
+            case val_(sym, Block(stats, expr), flags) =>
+              stats :+ val_(sym, expr, flags)
+            case stat =>
+              stat :: Nil
+          }
+          // flatten (potentially) nested block expr
+          val flatExpr = parent.expr match {
+            case Block(stats, expr) =>
+              stats :+ expr
+            case expr =>
+              expr :: Nil
+          }
+
+          block(flatStats ++ flatExpr)
+
+        case t@cs.comprehension(cs.generator(sym, block(_, rhs)) :: qs, cs.head(expr)) =>
 
           val (guards, rest) = qs span {
             case cs.guard(_) => true
@@ -119,46 +151,47 @@ trait Comprehensions {
             }) (guards)
           }
 
-          if (expr.symbol == sym) {
-            // trivial head expression consisting of the matched sym 'x'
-            // omit the resulting trivial mapper
+          expr match {
+            case block(Nil, id: Ident) if id.symbol == sym =>
+              // trivial head expression consisting of the matched sym 'x'
+              // omit the resulting trivial mapper
 
-            LNF.simplify(block(
-              prefix,
-              ref(tail)))
+              LNF.simplify(block(
+                prefix,
+                ref(tail)))
 
-          } else {
-            // append a map or a flatMap to the result depending on
-            // the size of the residual qualifier sequence 'qs'
+            case _ =>
+              // append a map or a flatMap to the result depending on
+              // the size of the residual qualifier sequence 'qs'
 
-            val (op: MonadOp, body: Tree) = rest match {
-              case Nil => (
-                cs.map,
-                expr)
-              case _ => (
-                cs.flatMap,
-                cs.comprehension(
-                  rest,
-                  cs.head(expr)))
-            }
+              val (op: MonadOp, body: Tree) = rest match {
+                case Nil => (
+                  cs.map,
+                  expr)
+                case _ => (
+                  cs.flatMap,
+                  cs.comprehension(
+                    rest,
+                    cs.head(expr)))
+              }
 
-            val func = lambda(sym)(body)
-            val term = Term.sym.free(Term.name.lambda, func.tpe)
+              val func = lambda(sym)(body)
+              val term = Term.sym.free(Term.name.lambda, func.tpe)
 
-            block(
-              prefix,
-              val_(term, func),
-              op(ref(tail))(ref(term)))
+              block(
+                prefix,
+                val_(term, func),
+                op(ref(tail))(ref(term)))
           }
 
-        case t@cs.flatten(Block(stats, expr@cs.map(xs, fn))) =>
+        case t@cs.flatten(block(stats, expr@cs.map(xs, fn))) =>
 
           block(
             stats,
             cs.flatMap(xs)(fn))
       }
 
-      (transform andThen LNF.flatten) (tree)
+      transform(tree)
     }
 
     /**
@@ -170,6 +203,15 @@ trait Comprehensions {
      */
     def normalize(monad: Symbol)(tree: Tree): Tree = {
       tree
+    }
+
+    // -------------------------------------------------------------------------
+    // General helpers
+    // -------------------------------------------------------------------------
+
+    def asBlock(tree: Tree): Block = tree match {
+      case block: Block => block
+      case other => block(other)
     }
 
     // -------------------------------------------------------------------------
@@ -247,8 +289,8 @@ trait Comprehensions {
           Method.call(moduleSel, symbol, Type of hd, monadTpe)(block(qs, hd) :: Nil)
 
         def unapply(tree: Tree): Option[(List[Tree], Tree)] = tree match {
-          case Apply(fun, Block(qs, hd) :: Nil)
-            if Term.sym(fun) == symbol => Some(qs, hd)
+          case Method.call(_, `symbol`, _, block(qs, hd) :: Nil) =>
+            Some(qs, hd)
           case _ =>
             None
         }
@@ -258,12 +300,12 @@ trait Comprehensions {
       object generator {
         val symbol = IR.generator
 
-        def apply(lhs: TermSymbol, rhs: Tree): Tree =
+        def apply(lhs: TermSymbol, rhs: Block): Tree =
           val_(lhs, Method.call(moduleSel, symbol, Type.arg(1, rhs), monadTpe)(rhs :: Nil))
 
-        def unapply(tree: Tree): Option[(TermSymbol, Tree)] = tree match {
-          case val_(lhs, Apply(fun, arg :: Nil), _)
-            if Term.sym(fun) == symbol => Some(lhs, arg)
+        def unapply(tree: ValDef): Option[(TermSymbol, Block)] = tree match {
+          case val_(lhs, Method.call(_, `symbol`, _, (arg: Block) :: Nil), _) =>
+            Some(lhs, arg)
           case _ =>
             None
         }
@@ -273,12 +315,12 @@ trait Comprehensions {
       object guard {
         val symbol = IR.guard
 
-        def apply(expr: Tree): Tree =
+        def apply(expr: Block): Tree =
           Method.call(moduleSel, symbol)(expr :: Nil)
 
-        def unapply(tree: Tree): Option[Tree] = tree match {
-          case Apply(fun, expr :: Nil)
-            if Term.sym(fun) == symbol => Some(expr)
+        def unapply(tree: Tree): Option[Block] = tree match {
+          case Method.call(_, `symbol`, _, (expr: Block) :: Nil) =>
+            Some(expr)
           case _ =>
             None
         }
@@ -288,12 +330,12 @@ trait Comprehensions {
       object head {
         val symbol = IR.head
 
-        def apply(expr: Tree): Tree =
+        def apply(expr: Block): Tree =
           Method.call(moduleSel, symbol, Type of expr)(expr :: Nil)
 
-        def unapply(tree: Tree): Option[Tree] = tree match {
-          case Apply(fun, expr :: Nil)
-            if Term.sym(fun) == symbol => Some(expr)
+        def unapply(tree: Tree): Option[Block] = tree match {
+          case Method.call(_, `symbol`, _, (expr: Block) :: Nil) =>
+            Some(expr)
           case _ =>
             None
         }
@@ -303,11 +345,11 @@ trait Comprehensions {
       object flatten {
         val symbol = IR.flatten
 
-        def apply(expr: Tree): Tree =
+        def apply(expr: Block): Tree =
           Method.call(moduleSel, symbol, Type.arg(1, Type.arg(1, expr)), monadTpe)(expr :: Nil)
 
-        def unapply(tree: Tree): Option[Tree] = tree match {
-          case Apply(fun, expr :: Nil)
+        def unapply(tree: Tree): Option[Block] = tree match {
+          case Apply(fun, (expr: Block) :: Nil)
             if Term.sym(fun) == symbol => Some(expr)
           case _ =>
             None

@@ -226,8 +226,8 @@ trait Language extends CommonIR with Comprehensions {
     def anf(tree: Tree): Tree = {
       assert(nameClashes(tree).isEmpty)
       assert(controlFlowNodes(tree).isEmpty)
-      // Avoid empty blocks
-      expr(anfTransform(tree))
+
+      anfTransform(tree)
     }
 
     private val anfTransform: Tree => Tree = postWalk {
@@ -275,7 +275,7 @@ trait Language extends CommonIR with Comprehensions {
 
       case app@Apply(Block(stats, target), args) =>
         if (IR.comprehensionOps contains Term.sym(target)) {
-          val expr = Term.app(target)(args map this.expr)
+          val expr = Term.app(target)(args)
           block(stats, expr)
         } else {
           val x = fresh(nameOf(target))
@@ -666,7 +666,7 @@ trait Language extends CommonIR with Comprehensions {
         val T = Type.of(sel)
         val lhs = Term.sym.free(fresh("x"), T)
         val binds = irrefutable(Term ref lhs, pat)
-        assert(binds.isDefined,  "Unsupported refutable pattern match case detected")
+        assert(binds.isDefined, "Unsupported refutable pattern match case detected")
         block(val_(lhs, sel) :: binds.get, body)
     }
 
