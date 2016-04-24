@@ -253,7 +253,7 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       def unapplySeq(block: Block): Option[Seq[Tree]] =
         Some(block.stats :+ block.expr)
 
-      def unapply(block: Block): Option[(Seq[Tree], Tree)] =
+      def unapply(block: Block): Option[(List[Tree], Tree)] =
         Some(block.stats, block.expr)
     }
 
