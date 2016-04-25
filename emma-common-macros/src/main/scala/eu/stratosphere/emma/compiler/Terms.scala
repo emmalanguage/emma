@@ -215,9 +215,14 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
         assert(Has tpe target, s"Untyped target:\n$target")
         assert(types forall Is.defined, "Unspecified type arguments")
         assert(argss.flatten forall Has.tpe, "Untyped arguments")
-        if (types.isEmpty) argss.foldLeft(target) { (tgt, args) =>
-          val app = Apply(tgt, args.toList)
-          setType(app, Type result target)
+        if (types.isEmpty) {
+          if (argss.isEmpty) {
+            val app = Apply(target, Nil)
+            setType(app, Type result target)
+          } else argss.foldLeft(target) { (tgt, args) =>
+            val app = Apply(tgt, args.toList)
+            setType(app, Type result target)
+          }
         } else {
           val typeApp = Type.app(target, types: _*)
           apply(typeApp)(argss: _*)

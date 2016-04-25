@@ -439,12 +439,22 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
 
     /** Returns a set of all var mutations in `tree`. */
     def assignments(tree: Tree): Set[TermSymbol] = tree.collect {
-      case assign: Assign => Term sym assign
+      case Assign(ref(variable), _) => variable
     }.toSet
+
+    /** Returns the closure of `tree` that is modified within `tree`. */
+    def closureMutations(tree: Tree): Set[TermSymbol] =
+      closure(tree) & assignments(tree)
 
     /** Returns a copy of `tree`. */
     def copy(tree: Tree): Tree =
       tree.duplicate.asInstanceOf[Tree]
+
+    /** Returns a new assignment `lhs = rhs`. */
+    def assign(lhs: Tree, rhs: Tree) = {
+      val assign = Assign(lhs, rhs)
+      setType(assign, NoType)
+    }
 
     /** While loops. */
     object while_ {
@@ -594,7 +604,12 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
 
       /** Returns a new method invocation. */
       def apply(target: Tree, method: TermSymbol, types: Type*)(argss: Seq[Tree]*): Tree =
-        app(Term.sel(target, method), types: _*)(argss: _*)
+        if (types.isEmpty && argss.isEmpty) {
+          val T = method.infoIn(Type of target).finalResultType
+          sel(target, method, T)
+        } else {
+          app(Term.sel(target, method), types: _*)(argss: _*)
+        }
 
       def unapplySeq(tree: Tree): Option[(Tree, TermSymbol, Seq[Type], Seq[Seq[Tree]])] =
         tree match {
