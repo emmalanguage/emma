@@ -7,6 +7,7 @@ import eu.stratosphere.emma.compiler.ir.CommonIR
 trait Language extends CommonIR {
 
   import universe._
+  import Tree._
 
   object Core {
 
@@ -46,9 +47,9 @@ trait Language extends CommonIR {
         validate(tpt)
       case If(cond, thenp, elsep) =>
         validate(cond) && validate(thenp) && validate(elsep)
-      case WhileLoop(cond, body) =>
+      case while_(cond, body) =>
         validate(cond) && validate(body)
-      case DoWhileLoop(cond, body) =>
+      case doWhile(cond, body) =>
         validate(cond) && validate(body)
       case Match(selector, cases) =>
         validate(selector) && cases.forall(validate)
@@ -158,12 +159,12 @@ trait Language extends CommonIR {
         def elsepEq = eq(elsep$x, elsep$y)
         condEq && thenpEq && elsepEq
 
-      case (WhileLoop(cond$x, body$x), WhileLoop(cond$y, body$y)) =>
+      case (while_(cond$x, body$x), while_(cond$y, body$y)) =>
         def condEq = eq(cond$x, cond$y)
         def bodyEq = eq(body$x, body$y)
         condEq && bodyEq
 
-      case (DoWhileLoop(cond$x, body$x), DoWhileLoop(cond$y, body$y)) =>
+      case (doWhile(cond$x, body$x), doWhile(cond$y, body$y)) =>
         def condEq = eq(cond$x, cond$y)
         def bodyEq = eq(body$x, body$y)
         condEq && bodyEq

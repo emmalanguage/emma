@@ -65,27 +65,4 @@ trait CommonIR extends ReflectUtil {
 
     val comprehensionOps /**/ = Set(flatten, generator, comprehension, guard, head)
   }
-
-  // ---------------------------------------------------------------------------
-  // Helper Patterns
-  // ---------------------------------------------------------------------------
-
-  object WhileLoop {
-    def unapply(root: Tree): Option[(Tree, Tree)] = root match {
-      case LabelDef(name, Nil, If(cond, Block(List(body), Apply(fun, Nil)), Literal(Constant(()))))
-        if fun.symbol == root.symbol => Some(cond, body)
-      case _ =>
-        Option.empty[(Tree, Tree)]
-    }
-  }
-
-  object DoWhileLoop {
-    def unapply(root: Tree): Option[(Tree, Tree)] = root match {
-      case LabelDef(name, Nil, Block(List(body), If(cond, Apply(fun, Nil), Literal(Constant(())))))
-        if fun.symbol == root.symbol => Some(cond, body)
-      case _ =>
-        Option.empty[(Tree, Tree)]
-    }
-  }
-
 }

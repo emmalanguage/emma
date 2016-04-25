@@ -323,8 +323,7 @@ trait Language extends CommonIR with Comprehensions {
       case branch: If => branch
       case patMat: Match => patMat
       case dd: DefDef => dd
-      case loop@WhileLoop(_, _) => loop
-      case loop@DoWhileLoop(_, _) => loop
+      case loop: LabelDef => loop
     }
 
     /** Returns the set of [[Term]]s in `tree` that have clashing names. */

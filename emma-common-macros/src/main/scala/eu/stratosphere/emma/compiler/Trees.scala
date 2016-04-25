@@ -445,6 +445,57 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     /** Returns a copy of `tree`. */
     def copy(tree: Tree): Tree =
       tree.duplicate.asInstanceOf[Tree]
+
+    /** While loops. */
+    object while_ {
+
+      /** Returns a new while loop. */
+      def apply(cond: Tree, stat: Tree, stats: Tree*): LabelDef = {
+        assert(Has tpe cond, s"Untyped loop condition:\n${debug(cond)}")
+        assert(Type.of(cond) =:= Type.bool, s"Non-boolean loop condition: `${Type of cond}`")
+        assert(Is.valid(stat) && stats.forall(Is.valid),
+          s"Invalid loop body:\n${debug(block(stat +: stats))}")
+        val name = Term.name.fresh("while")
+        val T = Method.tpe()()(Type.unit)
+        val sym = Method.free(name, T)
+        val body = branch(cond,
+          block(stat +: stats, app(ref(sym))()),
+          Term.unit)
+        val label = LabelDef(name, Nil, body)
+        setSymbol(label, sym)
+        setType(label, Type.unit)
+      }
+
+      def unapply(label: LabelDef): Option[(Tree, Tree)] = label match {
+        case q"while (${cond: Tree}) ${body: Tree}" => Some(cond, body)
+        case _ => None
+      }
+    }
+
+    /** Do while loops. */
+    object doWhile {
+
+      /** Returns a new do while loop. */
+      def apply(cond: Tree, stat: Tree, stats: Tree*): LabelDef = {
+        assert(Has tpe cond, s"Untyped loop condition:\n${debug(cond)}")
+        assert(Type.of(cond) =:= Type.bool, s"Non-boolean loop condition: `${Type of cond}`")
+        assert(Is.valid(stat) && stats.forall(Is.valid),
+          s"Invalid loop body:\n${debug(block(stat +: stats))}")
+        val name = Term.name.fresh("doWhile")
+        val T = Method.tpe()()(Type.unit)
+        val sym = Method.free(name, T)
+        val body = block(stat +: stats,
+          branch(cond, app(ref(sym))(), Term.unit))
+        val label = LabelDef(name, Nil, body)
+        setSymbol(label, sym)
+        setType(label, Type.unit)
+      }
+
+      def unapply(label: LabelDef): Option[(Tree, Tree)] = label match {
+        case q"do ${body: Tree} while (${cond: Tree})" => Some(cond, body)
+        case _ => None
+      }
+    }
   }
 
   /** Some useful constants. */
