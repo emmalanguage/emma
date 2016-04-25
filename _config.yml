@@ -31,4 +31,4 @@ defaults:
     values:
       layout:     documentation
 
-highlighter:      pygments
+highlighter:      rouge
