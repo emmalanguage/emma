@@ -389,18 +389,19 @@ trait Comprehensions extends Rewrite {
        * {
        *   $bs1
        *   val c = flatten {
+       *     $bs2
        *     comprehension {
        *       $qs1
        *       head {
-       *         $bs2
+       *         $bs3
        *         comprehension {
        *           $qs2
        *           head $hd
        *         } // child comprehension
        *       }
-       *     }
-       *   } // parent comprehension
-       *   $bs3
+       *     } // outer comprehension
+       *   } // parent expression
+       *   $bs4
        * } // enclosing block
        * }}}
        *
@@ -409,20 +410,21 @@ trait Comprehensions extends Rewrite {
        *
        * ==Rewrite==
        *
-       * Let $bs2 decompose into two subsets:
-       * - $bs2i (transitively) depends on symbols defined in $qs1, and
-       * - $bs2o is the independent complement $bs2 \ $bs2o.
+       * Let $bs3 decompose into the following two subsets:
+       * - $bs3i (transitively) depends on symbols defined in $qs1, and
+       * - $bs3o is the independent complement $bs3 \ $bs3o.
        *
        * {{{
        * {
        *   $bs1
-       *   $bs2o
+       *   $bs2
+       *   $bs3o
        *   val c = comprehension {
        *     $qs1
-       *     $qs2' // where let blocks are prefixed with $bs1i
-       *     head $hd' // where let blocks are prefixed with $bs1i
+       *     $qs2' // where let blocks are prefixed with $bs3i
+       *     head $hd' // where let blocks are prefixed with $bs3i
        *   } // flattened result comprehension
-       *   $bs3
+       *   $bs4
        * } // enclosing block
        * }}}
        */
@@ -430,8 +432,12 @@ trait Comprehensions extends Rewrite {
 
         case class RuleMatch(enclosing: Block, parent: Tree, child: Block) {
           lazy val bs1 = enclosing.children.takeWhile(_ != parent)
-          lazy val bs2 = child.stats
-          lazy val bs3 = enclosing.children.reverse.takeWhile(_ != parent).reverse
+          lazy val bs2 = parent match {
+            case val_(_, flatten(block(bs, comprehension(_, _))), _) => bs
+            case flatten(block(bs, comprehension(_, _))) => bs
+          }
+          lazy val bs3 = child.stats
+          lazy val bs4 = enclosing.children.reverse.takeWhile(_ != parent).reverse
           lazy val qs1 = parent match {
             case val_(_, flatten(block(Nil, comprehension(qs, _))), _) => qs
             case flatten(block(Nil, comprehension(qs, _))) => qs
@@ -439,9 +445,13 @@ trait Comprehensions extends Rewrite {
           lazy val (qs2, hd) = child.expr match {
             case comprehension(_qs2, head(_hd)) => (_qs2, _hd)
           }
-          lazy val (bs2i, bs2o) = {
-            val bs2refs = (bs2 map {
+          lazy val (bs3i, bs3o) = {
+            val surrogateSym = (t: Tree) =>
+              Term.sym.free(Term.name.fresh("x"), t.tpe)
+
+            val bs3refs = (bs3 map {
               case val_(sym, rhs, _) => sym -> Tree.refs(rhs)
+              case stmt => surrogateSym(stmt) -> Tree.refs(stmt)
             }).toMap
 
             val qs1defs = (qs1 flatMap {
@@ -449,32 +459,32 @@ trait Comprehensions extends Rewrite {
               case guard(_) => List.empty[TermSymbol]
             }).toSet
 
-            var bs2iSym = for {
-              sym <- bs2refs.keySet
-              if (bs2refs(sym) intersect qs1defs).nonEmpty
+            var bs3iSym = for {
+              sym <- bs3refs.keySet
+              if (bs3refs(sym) intersect qs1defs).nonEmpty
             } yield sym
 
             var delta = Set.empty[TermSymbol]
             do {
-              bs2iSym = bs2iSym union delta
+              bs3iSym = bs3iSym union delta
               delta = (for {
-                sym <- bs2refs.keySet
-                if (bs2refs(sym) intersect bs2iSym).nonEmpty
-              } yield sym) diff bs2iSym
+                sym <- bs3refs.keySet
+                if (bs3refs(sym) intersect bs3iSym).nonEmpty
+              } yield sym) diff bs3iSym
             } while (delta.nonEmpty)
 
-            val bs2oSym = bs2refs.keySet diff bs2iSym
+            val bs3oSym = bs3refs.keySet diff bs3iSym
 
-            val bs2i = bs2 flatMap {
-              case vd@val_(sym, _, _) if bs2iSym contains sym => List(vd)
+            val bs3i = bs3 flatMap {
+              case vd@val_(sym, _, _) if bs3iSym contains sym => List(vd)
               case _ => Nil
             }
-            val bs2o = bs2 flatMap {
-              case vd@val_(sym, _, _) if bs2oSym contains sym => List(vd)
+            val bs3o = bs3 flatMap {
+              case vd@val_(sym, _, _) if bs3oSym contains sym => List(vd)
               case _ => Nil
             }
 
-            (bs2i, bs2o)
+            (bs3i, bs3o)
           }
         }
 
@@ -483,10 +493,10 @@ trait Comprehensions extends Rewrite {
             override def foreach[U](f: (RuleMatch) => U): Unit = {
               val parents = (enclosing.stats collect {
                 // a ValDef statement with a `flatten(comprehension(...))` rhs
-                case parent@val_(_, flatten(block(Nil, outer@comprehension(_, _))), _) => (parent, outer)
+                case parent@val_(_, flatten(block(_, outer@comprehension(_, _))), _) => (parent, outer)
               }) ++ (enclosing.expr match {
                 // an expr with a `flatten(comprehension(...))`
-                case parent@flatten(block(Nil, outer@comprehension(_, _))) => List((parent, outer))
+                case parent@flatten(block(_, outer@comprehension(_, _))) => List((parent, outer))
                 case _ => Nil
               })
 
@@ -505,29 +515,29 @@ trait Comprehensions extends Rewrite {
         override def fire(rm: RuleMatch): Tree = {
           // construct a flattened version of the parent comprehension
           val flattened = rm.parent match {
-            case val_(vsym, flatten(block(Nil, comprehension(_, _))), _) =>
+            case val_(vsym, flatten(block(_, comprehension(_, _))), _) =>
               val_(vsym,
                 comprehension(
                   rm.qs1 ++ rm.qs2 collect {
                     case generator(sym, rhs) =>
-                      Syntax.this.generator(sym, prepend(rm.bs2i, rhs))
+                      Syntax.this.generator(sym, prepend(rm.bs3i, rhs))
                     case guard(expr) =>
-                      Syntax.this.guard(prepend(rm.bs2i, expr))
+                      Syntax.this.guard(prepend(rm.bs3i, expr))
                   },
-                  head(prepend(rm.bs2i, rm.hd))))
-            case flatten(block(Nil, comprehension(_, _))) =>
+                  head(prepend(rm.bs3i, rm.hd))))
+            case flatten(block(_, comprehension(_, _))) =>
               comprehension(
                 rm.qs1 ++ rm.qs2 collect {
                   case generator(sym, rhs) =>
-                    Syntax.this.generator(sym, prepend(rm.bs2i, rhs))
+                    Syntax.this.generator(sym, prepend(rm.bs3i, rhs))
                   case guard(expr) =>
-                    Syntax.this.guard(prepend(rm.bs2i, expr))
+                    Syntax.this.guard(prepend(rm.bs3i, expr))
                 },
-                head(prepend(rm.bs2i, rm.hd)))
+                head(prepend(rm.bs3i, rm.hd)))
           }
 
           // construct and return a new enclosing block
-          block(rm.bs1 ++ rm.bs2o ++ List(flattened) ++ rm.bs3)
+          block(rm.bs1 ++ rm.bs2 ++ rm.bs3o ++ List(flattened) ++ rm.bs4)
         }
 
         private def prepend(prefix: List[ValDef], blck: Block): Block =
