@@ -14,7 +14,7 @@ trait Language extends CommonIR with Comprehensions {
   import Tree._
   import Term.name.fresh
 
-  private[emma] object LNF {
+  object LNF {
 
     /** Validate that a Scala [[Tree]] belongs to the supported LNF language. */
     def validate(root: Tree): Boolean = root match {
@@ -60,7 +60,7 @@ trait Language extends CommonIR with Comprehensions {
     }
 
     /** Check alpha-equivalence of trees. */
-    private[emma] def eq(x: Tree, y: Tree)
+    def eq(x: Tree, y: Tree)
       (implicit dict: mutable.Map[Symbol, Symbol] = mutable.Map.empty): Boolean = (x, y) match {
 
       case (NewIOFormat(app$x, _), NewIOFormat(app$y, _)) =>
