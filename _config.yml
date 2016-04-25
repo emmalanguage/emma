@@ -5,7 +5,7 @@ description:      Emma is a Scala API for scalable data analysis. The goal of Em
 baseurl:          "http://emma-language.org" # the subpath of your site, e.g. /blog/
 url:              "" # the base hostname & protocol for your site
 twitter_username: ""
-github_username:  stratosphere/emma
+github_username:  emmalanguage/emma
 
 # Build settings
 markdown:         redcarpet
