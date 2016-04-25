@@ -35,6 +35,21 @@ trait MacroUtil extends ReflectUtil {
   override def abort(pos: Position, msg: String): Nothing =
     c.abort(pos, msg)
 
+  // ------------------------
+  // Parsing and typechecking
+  // ------------------------
+
+  override def parse(code: String): Tree =
+    c.parse(code)
+
+  override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
+    if (typeMode) c.typecheck(tree, c.TYPEmode)
+    else c.typecheck(tree)
+
+  // ------------------------
+  // Abstract wrapper methods
+  // ------------------------
+
   private[compiler] override def enclosingOwner: Symbol =
     c.internal.enclosingOwner
 
@@ -64,17 +79,6 @@ trait MacroUtil extends ReflectUtil {
 
   private[compiler] override def attachments(tree: Tree): Attachments =
     internal.attachments(tree)
-
-  private[compiler] override def parse(code: String): Tree =
-    c.parse(code)
-
-  private[compiler] override def typeCheck(
-    tree: Tree,
-    typeMode: Boolean = false): Tree = {
-
-    if (typeMode) c.typecheck(tree, c.TYPEmode)
-    else c.typecheck(tree)
-  }
 
   private[compiler] override def termSymbol(
     owner: Symbol,

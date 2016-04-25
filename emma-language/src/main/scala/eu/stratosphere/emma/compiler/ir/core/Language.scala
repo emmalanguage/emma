@@ -11,7 +11,7 @@ trait Language extends CommonIR {
   object Core {
 
     /** Validate that a Scala [[Tree]] belongs to the supported core language. */
-    private[emma] def validate(root: Tree): Boolean = root match {
+    def validate(root: Tree): Boolean = root match {
       case EmptyTree =>
         true
       case This(qual) =>
@@ -64,7 +64,7 @@ trait Language extends CommonIR {
     }
 
     /** Check alpha-equivalence of trees. */
-    private[emma] def eq(x: Tree, y: Tree)
+    def eq(x: Tree, y: Tree)
       (implicit map: Map[Symbol, Symbol] = Map.empty[Symbol, Symbol]): Boolean = (x, y) match {
 
       case (NewIOFormat(apply$x, implicitArgs$x), NewIOFormat(apply$y, implicitArgs$y)) =>

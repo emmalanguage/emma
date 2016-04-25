@@ -28,6 +28,21 @@ trait RuntimeUtil extends ReflectUtil {
   override def abort(pos: Position, msg: String): Nothing =
     throw new RuntimeException(s"error at position $pos: $msg")
 
+  // ------------------------
+  // Parsing and typechecking
+  // ------------------------
+
+  override def parse(code: String): Tree =
+    tb.parse(code)
+
+  override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
+    if (typeMode) tb.typecheck(tree, tb.TYPEmode)
+    else tb.typecheck(tree)
+
+  // ------------------------
+  // Abstract wrapper methods
+  // ------------------------
+
   private[compiler] override lazy val enclosingOwner =
     Type.check(q"val x = 42").symbol.owner
 
@@ -57,17 +72,6 @@ trait RuntimeUtil extends ReflectUtil {
 
   private[compiler] override def attachments(tree: Tree): Attachments =
     tree.attachments
-
-  private[compiler] override def parse(code: String): Tree =
-    tb.parse(code)
-
-  private[compiler] override def typeCheck(
-    tree: Tree,
-    typeMode: Boolean = false): Tree = {
-
-    if (typeMode) tb.typecheck(tree, tb.TYPEmode)
-    else tb.typecheck(tree)
-  }
 
   private[compiler] override def termSymbol(
     owner: Symbol,
