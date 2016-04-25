@@ -8,7 +8,7 @@ twitter_username: ""
 github_username:  emmalanguage/emma
 
 # Build settings
-markdown:         redcarpet
+markdown:         kramdown
 sass:
   style:          compressed
 collections:
