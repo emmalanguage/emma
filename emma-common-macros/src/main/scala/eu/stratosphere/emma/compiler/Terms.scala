@@ -142,11 +142,11 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
     object lit {
 
       /** Returns a new literal containing `const`. */
-      def apply[A](const: A): Tree =
-        Type.check(Literal(Constant(const)))
+      def apply[A](const: A): Literal =
+        Type.check(Literal(Constant(const))).asInstanceOf[Literal]
 
-      def unapply[A: ClassTag](lit: Literal): Option[A] = lit match {
-        case Literal(Constant(const: A)) => Some(const)
+      def unapply(lit: Literal): Option[Any] = lit match {
+        case Literal(Constant(const: Any)) => Some(const)
         case _ => None
       }
     }
