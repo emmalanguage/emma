@@ -1,15 +1,14 @@
-package eu.stratosphere.emma
-package compiler.ir.core
+package eu.stratosphere.emma.compiler.lang
 
 import eu.stratosphere.emma.compiler.ir.CommonIR
 
 /** Core language. */
-trait Language extends CommonIR {
+trait Source extends CommonIR {
 
   import universe._
   import Tree._
 
-  object Core {
+  object Source {
 
     /** Validate that a Scala [[Tree]] belongs to the supported core language. */
     def validate(root: Tree): Boolean = root match {

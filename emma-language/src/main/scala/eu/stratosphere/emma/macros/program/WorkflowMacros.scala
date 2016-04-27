@@ -23,7 +23,7 @@ class WorkflowMacros(val c: blackbox.Context) extends ControlFlow with Comprehen
 
     val compiler = new MacroCompiler(c)
 
-    compiler.Core.validate(e.tree.typeChecked.asInstanceOf[compiler.universe.Tree])
+    compiler.Source.validate(e.tree.typeChecked.asInstanceOf[compiler.universe.Tree])
 
     doSemanticChecks(e.tree)
 
