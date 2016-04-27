@@ -1,4 +1,4 @@
-package eu.stratosphere.emma.compiler.ir.lnf
+package eu.stratosphere.emma.compiler.lang.core
 
 import eu.stratosphere.emma.compiler.Compiler
 import org.scalactic.Equality
@@ -14,7 +14,7 @@ trait TreeEquality {
 
   implicit final val lnfEq = new Equality[Tree] {
     override def areEqual(a: Tree, b: Any): Boolean = b match {
-      case b: Tree => compiler.LNF.eq(a, b)
+      case b: Tree => compiler.Core.eq(a, b)
       case _ => false
     }
   }

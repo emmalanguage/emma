@@ -1,9 +1,10 @@
 package eu.stratosphere.emma.compiler.ir.lnf
 
 import eu.stratosphere.emma.compiler.ir.Rewrite
+import eu.stratosphere.emma.compiler.lang.Core
 
 trait Comprehensions extends Rewrite {
-  self: Language =>
+  self: Core =>
 
   import universe._
   import Term._
@@ -31,7 +32,7 @@ trait Comprehensions extends Rewrite {
       val cs = new Comprehension.Syntax(monad: Symbol)
 
       object fn {
-        val meta = new LNF.Meta(tree)
+        val meta = new Core.Meta(tree)
 
         def unapply(tree: Tree): Option[(ValDef, Tree)] = tree match {
           case q"(${arg: ValDef}) => ${body: Tree}" =>
@@ -67,7 +68,7 @@ trait Comprehensions extends Rewrite {
             cs.head(block(ref(Term sym arg))))
       }
 
-      (transform andThen LNF.dce) (tree)
+      (transform andThen Core.dce) (tree)
     }
 
     /**
@@ -158,7 +159,7 @@ trait Comprehensions extends Rewrite {
               // trivial head expression consisting of the matched sym 'x'
               // omit the resulting trivial mapper
 
-              LNF.simplify(block(
+              Core.simplify(block(
                 prefix,
                 ref(tail)))
 
@@ -212,7 +213,7 @@ trait Comprehensions extends Rewrite {
         Engine.postWalk(List(cs.UnnestHead, cs.UnnestGenerator))
       } andThen {
         // elminiate dead code produced by normalization
-        LNF.dce
+        Core.dce
       } andThen {
         // elminiate trivial guards produced by normalization
         postWalk {

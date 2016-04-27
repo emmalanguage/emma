@@ -1,4 +1,4 @@
-package eu.stratosphere.emma.compiler.ir.lnf
+package eu.stratosphere.emma.compiler.lang.core
 
 import eu.stratosphere.emma.api.{CSVInputFormat, DataBag}
 import eu.stratosphere.emma.compiler.BaseCompilerSpec
@@ -16,7 +16,7 @@ class LanguageSpec extends BaseCompilerSpec {
   } andThen {
     compiler.typeCheck(_: Tree)
   } andThen {
-    time(compiler.LNF.validate(_), "validate")
+    time(compiler.Core.validate(_), "validate")
   }
 
   // modeled by `Literal(Constant(value))` nodes

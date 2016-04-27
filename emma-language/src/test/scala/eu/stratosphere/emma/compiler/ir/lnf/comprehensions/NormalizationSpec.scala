@@ -5,7 +5,7 @@ import java.time.Instant
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.compiler.BaseCompilerSpec
 import eu.stratosphere.emma.compiler.ir._
-import eu.stratosphere.emma.compiler.ir.lnf.TreeEquality
+import eu.stratosphere.emma.compiler.lang.core.TreeEquality
 import eu.stratosphere.emma.testschema.Marketing._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -27,13 +27,13 @@ class NormalizationSpec extends BaseCompilerSpec with TreeEquality {
   } andThen {
     Type.check(_: Tree)
   } andThen {
-    LNF.destructPatternMatches
+    Core.destructPatternMatches
   } andThen {
-    LNF.resolveNameClashes
+    Core.resolveNameClashes
   } andThen {
-    LNF.anf
+    Core.anf
   } andThen {
-    LNF.simplify
+    Core.simplify
   } andThen {
     Comprehension.resugar(API.bagSymbol)
   } andThen {

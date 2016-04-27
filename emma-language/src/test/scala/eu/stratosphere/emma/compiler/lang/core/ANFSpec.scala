@@ -1,5 +1,4 @@
-package eu.stratosphere.emma
-package compiler.ir.lnf
+package eu.stratosphere.emma.compiler.lang.core
 
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.compiler.BaseCompilerSpec
@@ -21,11 +20,11 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
   } andThen {
     Type.check(_)
   } andThen {
-    LNF.destructPatternMatches
+    Core.destructPatternMatches
   } andThen {
-    LNF.resolveNameClashes
+    Core.resolveNameClashes
   } andThen {
-    time(LNF.anf(_), "anf")
+    time(Core.anf(_), "anf")
   } andThen {
     Owner.at(Owner.enclosing)
   }

@@ -1,4 +1,4 @@
-package eu.stratosphere.emma.compiler.ir.lnf
+package eu.stratosphere.emma.compiler.lang.core
 
 import eu.stratosphere.emma.compiler.BaseCompilerSpec
 import org.junit.runner.RunWith
@@ -16,13 +16,13 @@ class DCESpec extends BaseCompilerSpec with TreeEquality {
   } andThen {
     Type.check(_)
   } andThen {
-    LNF.destructPatternMatches
+    Core.destructPatternMatches
   } andThen {
-    LNF.resolveNameClashes
+    Core.resolveNameClashes
   } andThen {
-    LNF.anf
+    Core.anf
   } andThen {
-    time(LNF.dce(_), "dce")
+    time(Core.dce(_), "dce")
   } andThen {
     Owner.at(Owner.enclosing)
   }

@@ -3,7 +3,7 @@ package eu.stratosphere.emma.compiler.ir.lnf.comprehensions
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.compiler.BaseCompilerSpec
 import eu.stratosphere.emma.compiler.ir._
-import eu.stratosphere.emma.compiler.ir.lnf.TreeEquality
+import eu.stratosphere.emma.compiler.lang.core.TreeEquality
 import eu.stratosphere.emma.testschema.Marketing._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -25,11 +25,11 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
   } andThen {
     Type.check(_)
   } andThen {
-    LNF.resolveNameClashes
+    Core.resolveNameClashes
   } andThen {
-    LNF.anf
+    Core.anf
   } andThen {
-    LNF.simplify
+    Core.simplify
   } andThen {
     Owner.at(Owner.enclosing)
   }

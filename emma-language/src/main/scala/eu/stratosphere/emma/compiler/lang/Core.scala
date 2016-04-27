@@ -1,20 +1,20 @@
-package eu.stratosphere.emma
-package compiler.ir.lnf
+package eu.stratosphere.emma.compiler.lang
 
-import compiler.ir.CommonIR
+import eu.stratosphere.emma.compiler.ir.CommonIR
+import eu.stratosphere.emma.compiler.ir.lnf.Comprehensions
 
 import scala.annotation.tailrec
 import scala.collection.mutable
 
 /** Let-normal form language. */
-trait Language extends CommonIR with Comprehensions {
+trait Core extends CommonIR with Comprehensions {
 
-  import universe._
   import Term._
-  import Tree._
   import Term.name.fresh
+  import universe._
+  import Tree._
 
-  object LNF {
+  object Core {
 
     /** Validate that a Scala [[Tree]] belongs to the supported LNF language. */
     def validate(root: Tree): Boolean = root match {
@@ -359,7 +359,7 @@ trait Language extends CommonIR with Comprehensions {
      * Eliminates unused valdefs (dead code) from a [[Tree]].
      *
      * == Preconditions ==
-     * - The input `tree` is in ANF (see [[LNF.anf()]]).
+     * - The input `tree` is in ANF (see [[Core.anf()]]).
      *
      * == Postconditions ==
      * - All unused valdefs are pruned.
@@ -370,7 +370,7 @@ trait Language extends CommonIR with Comprehensions {
     def dce(tree: Tree): Tree = {
 
       // create a mutable local copy of uses to keep track of unused terms
-      val meta = new LNF.Meta(tree)
+      val meta = new Core.Meta(tree)
       val uses = collection.mutable.Map() ++ meta.uses
 
       // initialize iteration variables
@@ -421,7 +421,7 @@ trait Language extends CommonIR with Comprehensions {
      * Eliminates common subexpressions from a [[Tree]].
      *
      * == Preconditions ==
-     * - The input `tree` is in ANF (see [[LNF.anf()]]).
+     * - The input `tree` is in ANF (see [[Core.anf()]]).
      *
      * == Postconditions ==
      * - All common subexpressions and corresponding intermediate values are pruned.
@@ -483,7 +483,7 @@ trait Language extends CommonIR with Comprehensions {
      * Unnests nested blocks [[Tree]].
      *
      * == Preconditions ==
-     * - Except the nested blocks, the input tree is in simplified ANF form (see [[LNF.anf()]] and [[LNF.simplify()]]).
+     * - Except the nested blocks, the input tree is in simplified ANF form (see [[Core.anf()]] and [[Core.simplify()]]).
      *
      * == Postconditions ==
      * - A simplified ANF tree where all nested blocks have been flattened.
@@ -531,7 +531,7 @@ trait Language extends CommonIR with Comprehensions {
      * The resulting [[Tree]] is said to be in ''simplified ANF'' form.
      *
      * == Preconditions ==
-     * - The input `tree` is in ANF (see [[LNF.anf()]]).
+     * - The input `tree` is in ANF (see [[Core.anf()]]).
      *
      * == Postconditions ==
      * - `Ident` return expressions in blocks have been inlined whenever possible.

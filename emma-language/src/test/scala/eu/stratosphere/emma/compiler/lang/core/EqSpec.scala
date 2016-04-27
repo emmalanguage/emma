@@ -1,4 +1,4 @@
-package eu.stratosphere.emma.compiler.ir.lnf
+package eu.stratosphere.emma.compiler.lang.core
 
 import eu.stratosphere.emma.compiler.BaseCompilerSpec
 import org.junit.runner.RunWith
@@ -6,7 +6,7 @@ import org.scalatest.junit.JUnitRunner
 
 /** A spec for alpha-equivalence on LNF rees. */
 @RunWith(classOf[JUnitRunner])
-class EquivalenceSpec extends BaseCompilerSpec with TreeEquality {
+class EqSpec extends BaseCompilerSpec with TreeEquality {
 
   import compiler.universe._
 
