@@ -320,10 +320,10 @@ trait Util {
   // ------------------------
 
   private[compiler] def enclosingOwner: Symbol
-  private[compiler] def getFlags(sym: Symbol): FlagSet
   private[compiler] def setFlags(sym: Symbol, flags: FlagSet): Unit
   private[compiler] def setName(sym: Symbol, name: Name): Unit
   private[compiler] def setOwner(sym: Symbol, owner: Symbol): Unit
+  private[compiler] def setPos(sym: Symbol, pos: Position): Unit
   private[compiler] def setPos(tree: Tree, pos: Position): Unit
   private[compiler] def setOriginal(tt: TypeTree, original: Tree): Unit
   private[compiler] def annotate(sym: Symbol, ans: Annotation*): Unit
