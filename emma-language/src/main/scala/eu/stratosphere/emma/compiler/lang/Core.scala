@@ -1,12 +1,12 @@
 package eu.stratosphere.emma.compiler.lang
 
-import eu.stratosphere.emma.compiler.ir.CommonIR
+import eu.stratosphere.emma.compiler.Common
 
 import scala.annotation.tailrec
 import scala.collection.mutable
 
 /** Let-normal form language. */
-trait Core extends CommonIR with Comprehension {
+trait Core extends Common with Comprehension {
 
   import Term._
   import Term.name.fresh

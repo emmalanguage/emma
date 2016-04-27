@@ -1,9 +1,7 @@
-package eu.stratosphere.emma.compiler.ir
-
-import eu.stratosphere.emma.compiler.ReflectUtil
+package eu.stratosphere.emma.compiler
 
 /** Common IR tools. */
-trait CommonIR extends ReflectUtil {
+trait Common extends ReflectUtil {
 
   import universe._
 

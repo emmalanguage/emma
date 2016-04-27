@@ -1,9 +1,9 @@
 package eu.stratosphere.emma.compiler.lang
 
-import eu.stratosphere.emma.compiler.ir.CommonIR
+import eu.stratosphere.emma.compiler.Common
 
 /** Core language. */
-trait Source extends CommonIR {
+trait Source extends Common {
 
   import universe._
   import Tree._
