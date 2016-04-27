@@ -32,10 +32,10 @@ trait RuntimeUtil extends ReflectUtil {
   // Parsing and typechecking
   // ------------------------
 
-  override def parse(code: String): Tree =
+  private[compiler] override def parse(code: String): Tree =
     tb.parse(code)
 
-  override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
+  private[compiler] override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
     if (typeMode) tb.typecheck(tree, tb.TYPEmode)
     else tb.typecheck(tree)
 

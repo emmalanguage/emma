@@ -305,14 +305,14 @@ trait Util {
   // ------------------------
 
   /** Parses a snippet of source code and returns the AST. */
-  def parse(code: String): Tree
+  private[compiler] def parse(code: String): Tree
 
   /** Type-checks a [[Tree]] (use `typeMode=true` for [[TypeTree]]s). */
-  def typeCheck(tree: Tree, typeMode: Boolean = false): Tree
+  private[compiler] def typeCheck(tree: Tree, typeMode: Boolean = false): Tree
 
   /** Removes all [[Type]] and [[Symbol]] attributes from a [[Tree]]. */
   // FIXME: Replace with `c.untypecheck` once SI-5464 is resolved.
-  def unTypeCheck(tree: Tree): Tree =
+  private[compiler] def unTypeCheck(tree: Tree): Tree =
     parse(showCode(tree, printRootPkg = true))
 
   // ------------------------

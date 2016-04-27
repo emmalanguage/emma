@@ -39,10 +39,10 @@ trait MacroUtil extends ReflectUtil {
   // Parsing and typechecking
   // ------------------------
 
-  override def parse(code: String): Tree =
+  private[compiler] override def parse(code: String): Tree =
     c.parse(code)
 
-  override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
+  private[compiler] override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
     if (typeMode) c.typecheck(tree, c.TYPEmode)
     else c.typecheck(tree)
 
