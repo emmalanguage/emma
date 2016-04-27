@@ -85,18 +85,31 @@ trait Symbols extends Util { this: Trees with Terms with Types =>
       case method @ DefDef(mods, name, Nil, argLists, _, rhs) =>
         val old = method.symbol.asMethod
         val tpe = Type of old
-        val sym = Method.sym(owner, name, tpe, mods.flags, method.pos)
+        val flags = Symbol flags old
+        val sym = Method.sym(owner, name, tpe, flags, method.pos)
         dict += old -> sym
         argLists.flatten foreach repair(sym, dict)
         repair(sym, dict)(rhs)
         setSymbol(method, sym)
         setType(method, NoType)
 
+      // while (cond) { body }
+      case loop @ LabelDef(name, args, body) =>
+        val old = loop.symbol.asMethod
+        val flags = Symbol flags old
+        val sym = Method.sym(owner, name, Type.unit, flags, loop.pos)
+        dict += old -> sym
+        args foreach repair(sym, dict)
+        repair(sym, dict)(body)
+        setSymbol(loop, sym)
+        setType(loop, Type.unit)
+
       // (...args) => { body }
       case lambda @ Function(args, body) =>
         val old = lambda.symbol
         val tpe = Type of lambda
-        val sym = Term.sym(owner, Term.name.lambda, tpe, pos = lambda.pos)
+        val flags = Symbol flags old
+        val sym = Term.sym(owner, Term.name.lambda, tpe, flags, lambda.pos)
         dict += old -> sym
         args foreach repair(sym, dict)
         repair(sym, dict)(body)
@@ -104,8 +117,9 @@ trait Symbols extends Util { this: Trees with Terms with Types =>
         setType(lambda, tpe)
 
       // ...mods val name: tpt = { rhs }
-      case value @ val_(old, rhs, flags) =>
+      case value @ val_(old, rhs, _) =>
         val tpe = Type of old
+        val flags = Symbol flags old
         val lhs = Term.sym(owner, value.name, tpe, flags, value.pos)
         dict += old -> lhs
         repair(lhs, dict)(rhs)
@@ -115,7 +129,8 @@ trait Symbols extends Util { this: Trees with Terms with Types =>
       // case x @ pattern => { ... }
       case bind @ Tree.bind(old, pattern) =>
         val tpe = Type of old
-        val lhs = Term.sym(owner, old.name, tpe, pos = bind.pos)
+        val flags = Symbol flags old
+        val lhs = Term.sym(owner, old.name, tpe, flags, bind.pos)
         dict += old -> lhs
         repair(owner, dict)(pattern)
         setSymbol(bind, lhs)

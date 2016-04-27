@@ -15,6 +15,9 @@ private[core] trait LNF extends Common {
 
   private[core] object LNF {
 
+    private val foreach = Type[TraversableOnce[Nothing]]
+      .member(Term name "foreach").asTerm
+
     /**
      * Lift a Scala Source language [[Tree]] into let-normal form.
      *
@@ -268,6 +271,45 @@ private[core] trait LNF extends Common {
 
           block(flatStats ++ flatExpr)
       }
+    }
+
+    /**
+     * Converts a `foreach` method call to a `while` loop:
+     *
+     * {{{
+     *   for (x <- xs) println(x)
+     *   // equivalently
+     *   xs foreach println
+     *   // becomes
+     *   {
+     *     val iter = xs.toIterator
+     *     var x = null
+     *     while (iter.hasNext) {
+     *       x = iter.next()
+     *       println(x)
+     *     }
+     *   }
+     * }}}
+     */
+    val foreach2loop: Tree => Tree = postWalk {
+      case Method.call(xs, method, _, Seq(lambda(_, Seq(arg), body)))
+        if (method == foreach || method.overrides.contains(foreach)) &&
+          closureMutations(body).nonEmpty =>
+
+        val toIterator = Term.member(xs, Term name "toIterator")
+        val rhs = Method.call(xs, toIterator)()
+        val Iter = Type._1[Iterator](Type.arg(1, Type of rhs))
+        val iter = Term.sym.free(Term.name fresh "iter", Iter)
+        val hasNext = Term.member(iter, Term name "hasNext")
+        val next = Term.member(iter, Term name "next")
+        val elem = Term.sym fresh arg
+
+        block(
+          val_(iter, rhs),
+          var_(elem, null_(Type of arg)),
+          while_(Method.call(ref(iter), hasNext)(), block(
+            assign(ref(elem), Method.call(ref(iter), next)(Nil)),
+            rename(body, arg -> elem))))
     }
 
     /** Returns the set of [[Term]]s in `tree` that have clashing names. */
