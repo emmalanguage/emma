@@ -9,14 +9,15 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class LanguageSpec extends BaseCompilerSpec {
 
-  import compiler.universe._
+  import compiler._
+  import universe._
 
   def typeCheckAndValidate[T]: Expr[T] => Boolean = {
     (_: Expr[T]).tree
   } andThen {
-    compiler.typeCheck(_: Tree)
+    Type.check(_: Tree)
   } andThen {
-    time(compiler.Core.validate(_), "validate")
+    time(Core.validate(_), "validate")
   }
 
   // modeled by `Literal(Constant(value))` nodes
