@@ -211,7 +211,7 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
 
       /** Returns `target` applied to the (type) arguments. */
       @tailrec
-      def apply(target: Tree, types: Type*)(argss: Seq[Tree]*): Tree = {
+      def apply(target: Tree, types: Type*)(argss: Seq[Tree]*): Apply = {
         assert(Has tpe target, s"Untyped target:\n$target")
         assert(types forall Is.defined, "Unspecified type arguments")
         assert(argss.flatten forall Has.tpe, "Untyped arguments")
@@ -222,16 +222,22 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
           } else argss.foldLeft(target) { (tgt, args) =>
             val app = Apply(tgt, args.toList)
             setType(app, Type result target)
-          }
+          }.asInstanceOf[Apply]
         } else {
           val typeApp = Type.app(target, types: _*)
           apply(typeApp)(argss: _*)
         }
       }
 
-      def unapplySeq(tree: Tree): Option[(Tree, Seq[Type], Seq[Seq[Tree]])] = tree match {
-        case q"${target: Tree}[..${types: Seq[Tree]}](...${argss: Seq[Seq[Tree]]})" =>
-          Some(target, types map Type.of, argss)
+      def unapplySeq(tree: Apply): Option[(Tree, Seq[Type], Seq[Seq[Tree]])] = tree match {
+        case Apply(TypeApply(fn, targs), args) =>
+          Some(fn, targs map Type.of, Seq(args))
+        case Apply(app: Apply, args) => unapplySeq(app) match {
+          case Some((fn, targs, argss)) => Some(fn, targs, argss :+ args)
+          case None => None
+        }
+        case Apply(fn, args) =>
+          Some(fn, Nil, Seq(args))
         case _ => None
       }
     }
