@@ -1,4 +1,4 @@
-package eu.stratosphere.emma.compiler.ir.lnf.comprehensions
+package eu.stratosphere.emma.compiler.lang.comprehension
 
 import java.time.Instant
 

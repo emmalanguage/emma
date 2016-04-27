@@ -1,4 +1,4 @@
-package eu.stratosphere.emma.compiler.ir.lnf.comprehensions
+package eu.stratosphere.emma.compiler.lang.comprehension
 
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.compiler.BaseCompilerSpec

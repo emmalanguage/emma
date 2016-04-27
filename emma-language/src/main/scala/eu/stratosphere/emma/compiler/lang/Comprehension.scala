@@ -1,13 +1,12 @@
-package eu.stratosphere.emma.compiler.ir.lnf
+package eu.stratosphere.emma.compiler.lang
 
 import eu.stratosphere.emma.compiler.ir.Rewrite
-import eu.stratosphere.emma.compiler.lang.Core
 
-trait Comprehensions extends Rewrite {
+trait Comprehension extends Rewrite {
   self: Core =>
 
-  import universe._
   import Term._
+  import universe._
   import Tree._
 
   private[emma] object Comprehension {
