@@ -1,6 +1,6 @@
 package eu.stratosphere.emma.compiler.lang
 
-import eu.stratosphere.emma.compiler.ir.Rewrite
+import eu.stratosphere.emma.compiler.Rewrite
 
 trait Comprehension extends Rewrite {
   self: Core =>

@@ -1,6 +1,4 @@
-package eu.stratosphere.emma.compiler.ir
-
-import eu.stratosphere.emma.compiler.ReflectUtil
+package eu.stratosphere.emma.compiler
 
 import scala.annotation.tailrec
 
