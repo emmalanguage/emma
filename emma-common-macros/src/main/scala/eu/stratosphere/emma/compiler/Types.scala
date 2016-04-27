@@ -75,6 +75,10 @@ trait Types extends Util { this: Trees with Symbols =>
       def fresh(prefix: Name): TypeName =
         fresh(prefix.toString)
 
+      /** Returns a fresh type name starting with `prefix$`. */
+      def fresh(prefix: Symbol): TypeName =
+        fresh(prefix.name)
+
       def unapply(name: TypeName): Option[String] =
         Some(name.toString)
     }
@@ -106,6 +110,14 @@ trait Types extends Util { this: Trees with Symbols =>
         assert(strName.nonEmpty, "Empty type name")
         newFreeType(strName, flags, origin)
       }
+
+      /** Returns a new free type symbol equivalent to `original` but with new flags. */
+      def free(original: TypeSymbol, flags: FlagSet): FreeTypeSymbol =
+        free(name(original), flags)
+
+      /** Returns a new type symbol equivalent to `original` but with a fresh name. */
+      def fresh(original: TermSymbol, flags: FlagSet = Flag.SYNTHETIC): FreeTypeSymbol =
+        free(name.fresh(original), flags)
 
       def unapply(sym: TypeSymbol): Option[(TypeName, FlagSet)] =
         Some(sym.name, Symbol flags sym)
