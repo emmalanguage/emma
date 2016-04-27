@@ -436,13 +436,15 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     def meta(tree: Tree): Attachments =
       attachments(tree)
 
-    /** Returns a new `if` branch. */
-    def branch(cond: Tree, thn: Tree, els: Tree): Tree = {
-      assert(Has.tpe(cond) && Type.of(cond) =:= Type.bool, s"Non-boolean condition:\n$cond")
-      assert(Has tpe thn, s"Untyped then branch:\n$thn")
-      assert(Has tpe els, s"Untyped else branch:\n$els")
-      val branch = If(cond, thn, els)
-      setType(branch, Type.weakLub(thn, els))
+    object branch {
+      /** Returns a new `if` branch. */
+      def apply(cond: Tree, thn: Tree, els: Tree): Tree = {
+        assert(Has.tpe(cond) && Type.of(cond) =:= Type.bool, s"Non-boolean condition:\n$cond")
+        assert(Has tpe thn, s"Untyped then branch:\n$thn")
+        assert(Has tpe els, s"Untyped else branch:\n$els")
+        val branch = If(cond, thn, els)
+        setType(branch, Type.weakLub(thn, els))
+      }
     }
 
     /** Returns a set of all var mutations in `tree`. */
@@ -458,10 +460,12 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     def copy(tree: Tree): Tree =
       tree.duplicate.asInstanceOf[Tree]
 
-    /** Returns a new assignment `lhs = rhs`. */
-    def assign(lhs: Tree, rhs: Tree) = {
-      val assign = Assign(lhs, rhs)
-      setType(assign, NoType)
+    object assign {
+      /** Returns a new assignment `lhs = rhs`. */
+      def apply(lhs: Tree, rhs: Tree): Assign = {
+        val assign = Assign(lhs, rhs)
+        setType(assign, NoType).asInstanceOf[Assign]
+      }
     }
 
     /** While loops. */
