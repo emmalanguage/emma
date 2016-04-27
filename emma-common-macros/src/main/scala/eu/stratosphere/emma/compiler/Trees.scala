@@ -57,6 +57,7 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
   }
 
   object Is {
+
     import Flag._
 
     /** Does `sym` satisfy the specified property? */
@@ -250,39 +251,8 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       def apply(init: Seq[Tree], rest: Tree*): Block =
         apply(init ++ rest: _*)
 
-      def unapplySeq(block: Block): Option[Seq[Tree]] =
-        Some(block.stats :+ block.expr)
-
       def unapply(block: Block): Option[(List[Tree], Tree)] =
         Some(block.stats, block.expr)
-    }
-
-    /** Object creation / class instantiation. */
-    object inst {
-
-      /** Returns a new class instantiation. */
-      def apply(target: TypeSymbol, types: Type*)(args: Tree*): Tree = {
-        assert(Is valid target, s"Invalid target: `$target`")
-        assert(types forall Is.defined, "Unspecified type arguments")
-        assert(args forall Has.tpe, "Untyped arguments")
-        // TODO: Handle alternatives properly
-        val clazz = Type of target
-        val constructor = clazz decl Term.name.init
-        val T = if (types.isEmpty) clazz else Type(clazz, types: _*)
-        val inst = q"new ${resolve(target)}[..$types](..$args)"
-        setSymbol(inst, constructor)
-        setType(inst, T)
-      }
-
-      /** Returns a new class instantiation. */
-      def apply(tpe: Type, types: Type*)(args: Tree*): Tree =
-        apply(tpe.typeSymbol.asType, types: _*)(args: _*)
-
-      def unapplySeq(tree: Tree): Option[(TypeSymbol, Seq[Type], Seq[Tree])] = tree match {
-        case q"new ${clazz: Tree}[..${types: Seq[Tree]}](..${args: Seq[Tree]})" =>
-          Some(Type sym clazz, types map Type.of, args)
-        case _ => None
-      }
     }
 
     /** Returns a fully-qualified reference to `target` (must be static). */
@@ -316,33 +286,6 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       } else {
         Term ref target.asTerm
       }
-
-    /** Anonymous Functions. */
-    object lambda {
-
-      /** Returns a new anonymous function. */
-      def apply(args: TermSymbol*)(body: Tree*): Function = {
-        assert(args forall Is.valid, "Invalid lambda parameters")
-        assert(body forall Is.valid, "Invalid lambda body")
-        assert(Has tpe body.last, s"Invalid expression:\n${body.last}")
-        val bodyBlock = if (body.size == 1) body.head else block(body: _*)
-        val types = args map Type.of
-        val T = Type.fun(types: _*)(Type of bodyBlock)
-        val anon = Term.sym.free(Term.name.lambda, T)
-        val argFlags = Flag.SYNTHETIC | Flag.PARAM
-        val params = for ((arg, tpe) <- args zip types) yield
-          Term.sym(anon, arg.name, tpe, argFlags)
-
-        val paramList = params.map(val_(_, flags = argFlags)).toList
-        val rhs = Owner.at(anon)(rename(bodyBlock, args zip params: _*))
-        val fun = Function(paramList, rhs)
-        setSymbol(fun, anon)
-        setType(fun, T)
-      }
-
-      def unapply(fun: Function): Option[(TermSymbol, Seq[TermSymbol], Tree)] =
-        Some(Term sym fun, fun.vparams.map(Term sym _), fun.body)
-    }
 
     /**
      * Bind a dictionary of symbol-value pairs in a tree.
@@ -436,13 +379,19 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     def meta(tree: Tree): Attachments =
       attachments(tree)
 
-    /** Returns a new `if` branch. */
-    def branch(cond: Tree, thn: Tree, els: Tree): Tree = {
-      assert(Has.tpe(cond) && Type.of(cond) =:= Type.bool, s"Non-boolean condition:\n$cond")
-      assert(Has tpe thn, s"Untyped then branch:\n$thn")
-      assert(Has tpe els, s"Untyped else branch:\n$els")
-      val branch = If(cond, thn, els)
-      setType(branch, Type.weakLub(thn, els))
+    object branch {
+      /** Returns a new `if` branch. */
+      def apply(cond: Tree, thn: Tree, els: Tree): If = {
+        assert(Has.tpe(cond) && Type.of(cond) =:= Type.bool, s"Non-boolean condition:\n$cond")
+        assert(Has tpe thn, s"Untyped then branch:\n$thn")
+        assert(Has tpe els, s"Untyped else branch:\n$els")
+        val branch = If(cond, thn, els)
+        setType(branch, Type.weakLub(thn, els))
+      }
+
+      def unapply(branch: If): Option[(Tree, Tree, Tree)] = branch match {
+        case If(cond, thn, els) => Some(cond, thn, els)
+      }
     }
 
     /** Returns a set of all var mutations in `tree`. */
@@ -458,10 +407,16 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     def copy(tree: Tree): Tree =
       tree.duplicate.asInstanceOf[Tree]
 
-    /** Returns a new assignment `lhs = rhs`. */
-    def assign(lhs: Tree, rhs: Tree) = {
-      val assign = Assign(lhs, rhs)
-      setType(assign, NoType)
+    object assign {
+      /** Returns a new assignment `lhs = rhs`. */
+      def apply(lhs: Tree, rhs: Tree): Assign = {
+        val assign = Assign(lhs, rhs)
+        setType(assign, NoType)
+      }
+
+      def unapply(assign: Assign): Option[(Tree, Tree)] = assign match {
+        case Assign(lhs, rhs) => Some(lhs, rhs)
+      }
     }
 
     /** While loops. */
@@ -514,6 +469,34 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
         case _ => None
       }
     }
+
+    object match_ {
+
+      def apply(sel: Tree, cases: List[CaseDef]): Match = {
+        assert(Has tpe sel, s"Untyped selector:\n${debug(sel)}")
+        assert(cases.forall(Has.tpe), "Not all case defs are typed")
+        val mat = Match(sel, cases)
+        setType(mat, Type.weakLub(cases.head, cases.tail: _*))
+      }
+
+      def unapply(mat: Match): Option[(Tree, List[CaseDef])] = mat match {
+        case Match(sel, cases) => Some(sel, cases)
+      }
+    }
+
+    object case_ {
+
+      def apply(pat: Tree, guard: Tree, body: Tree) = {
+        assert(Has tpe body, s"Untyped selector:\n${debug(body)}")
+        val case_ = CaseDef(pat, guard, body)
+        setType(case_, Type of body)
+      }
+
+      def unapply(case_ : CaseDef): Option[(Tree, Tree, Tree)] = case_ match {
+        case CaseDef(pat, guard, body) => Some(pat, guard, body)
+      }
+    }
+
   }
 
   /** Some useful constants. */
