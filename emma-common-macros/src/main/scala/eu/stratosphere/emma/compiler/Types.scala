@@ -88,11 +88,11 @@ trait Types extends Util { this: Trees with Symbols =>
 
       /** Returns a new type symbol with specific attributes. */
       def apply(owner: Symbol, name: TypeName,
-        flags: FlagSet = Flag.SYNTHETIC,
+        flags: FlagSet = NoFlags,
         pos: Position = NoPosition): TypeSymbol = {
 
         assert(name.toString.nonEmpty, "Empty type name")
-        typeSymbol(owner, name, flags, pos)
+        typeSymbol(owner, name, flags | SYNTHETIC, pos)
       }
 
       /** Returns the type symbol of `tree` (`Has.typeSym` must be true). */
@@ -103,12 +103,12 @@ trait Types extends Util { this: Trees with Symbols =>
 
       /** Returns a free type symbol with specific attributes. */
       def free(name: TypeName,
-        flags: FlagSet = Flag.SYNTHETIC,
+        flags: FlagSet = NoFlags,
         origin: String = null): FreeTypeSymbol = {
 
         val strName = name.toString
         assert(strName.nonEmpty, "Empty type name")
-        newFreeType(strName, flags, origin)
+        newFreeType(strName, flags | SYNTHETIC, origin)
       }
 
       /** Returns a new free type symbol equivalent to `original` but with new flags. */
@@ -116,8 +116,8 @@ trait Types extends Util { this: Trees with Symbols =>
         free(name(original), flags)
 
       /** Returns a new type symbol equivalent to `original` but with a fresh name. */
-      def fresh(original: TermSymbol, flags: FlagSet = Flag.SYNTHETIC): FreeTypeSymbol =
-        free(name.fresh(original), flags)
+      def fresh(original: TermSymbol, flags: FlagSet = NoFlags): FreeTypeSymbol =
+        free(name fresh original, flags)
 
       def unapply(sym: TypeSymbol): Option[(TypeName, FlagSet)] =
         Some(sym.name, Symbol flags sym)

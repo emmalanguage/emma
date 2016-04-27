@@ -9,6 +9,7 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
   import universe._
   import internal._
   import reificationSupport._
+  import Flag._
   import Term._
 
   object Has {
@@ -145,7 +146,6 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
 
     /** Returns the set of variables (i.e. mutable) defined in `tree`. */
     def vars(tree: Tree): Set[TermSymbol] = {
-      import Flag.MUTABLE
       tree.collect {
         case value: ValDef if Is(MUTABLE, value.symbol) =>
           Term sym value
@@ -210,13 +210,13 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       /** Returns a new value / variable definition. */
       def apply(lhs: TermSymbol,
         rhs: Tree = EmptyTree,
-        flags: FlagSet = Flag.SYNTHETIC): ValDef = {
+        flags: FlagSet = NoFlags): ValDef = {
 
         assert(Is valid lhs, s"Invalid LHS: `$lhs`")
         assert(rhs.isEmpty || (Has.tpe(rhs) && Type.of(rhs).weak_<:<(Type of lhs)),
           "LHS and RHS types don't match")
 
-        val mods = Modifiers(flags | Flag.SYNTHETIC)
+        val mods = Modifiers(flags | SYNTHETIC)
         val T = Type quote Type.of(lhs)
         val body = if (rhs.isEmpty) rhs else Owner.at(lhs)(rhs)
         val value = ValDef(mods, lhs.name, T, body)
@@ -226,6 +226,21 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
 
       def unapply(value: ValDef): Option[(TermSymbol, Tree, FlagSet)] =
         Some(Term sym value, value.rhs, value.mods.flags)
+    }
+
+    /** `var` constructors and extractors. */
+    object var_ {
+
+      /** Returns a new variable definition. */
+      def apply(lhs: TermSymbol,
+        rhs: Tree = EmptyTree,
+        flags: FlagSet = NoFlags): ValDef = {
+
+        val_(lhs, rhs, flags | MUTABLE)
+      }
+
+      def unapply(variable: ValDef): Option[(TermSymbol, Tree, FlagSet)] =
+        if (variable.mods hasFlag MUTABLE) val_.unapply(variable) else None
     }
 
     /** Blocks. */
@@ -512,23 +527,23 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
 
     /** Returns a free method symbol (i.e. without owner). */
     def free(name: TermName, tpe: Type,
-      flags: FlagSet = Flag.SYNTHETIC,
+      flags: FlagSet = NoFlags,
       pos: Position = NoPosition): MethodSymbol = {
 
       assert(name.toString.nonEmpty, "Empty method name")
       assert(Is defined tpe, s"Undefined method type: `$tpe`")
-      val method = newMethodSymbol(NoSymbol, name, pos, flags)
+      val method = newMethodSymbol(NoSymbol, name, pos, flags | SYNTHETIC)
       setInfo(method, Type fix tpe)
     }
 
     /** Returns a new method symbol with provided specification. */
     def sym(owner: Symbol, name: TermName, tpe: Type,
-      flags: FlagSet = Flag.SYNTHETIC,
+      flags: FlagSet = NoFlags,
       pos: Position = NoPosition): MethodSymbol = {
 
       assert(name.toString.nonEmpty, "Empty method name")
       assert(Is defined tpe, s"Undefined method type: `$tpe`")
-      val method = newMethodSymbol(owner, name, pos, flags)
+      val method = newMethodSymbol(owner, name, pos, flags | SYNTHETIC)
       setInfo(method, Type fix tpe)
     }
 

@@ -8,6 +8,7 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
 
   import universe._
   import internal.reificationSupport._
+  import Flag._
 
   object Term {
 
@@ -81,12 +82,12 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
 
       /** Returns a new term symbol with specific properties. */
       def apply(owner: Symbol, name: TermName, tpe: Type,
-        flags: FlagSet = Flag.SYNTHETIC,
+        flags: FlagSet = NoFlags,
         pos: Position = NoPosition): TermSymbol = {
 
         assert(name.toString.nonEmpty, "Empty term name")
         assert(Is defined tpe, s"Undefined type: `$tpe`")
-        val term = termSymbol(owner, name, flags, pos)
+        val term = termSymbol(owner, name, flags | SYNTHETIC, pos)
         setInfo(term, Type fix tpe)
       }
 
@@ -98,13 +99,13 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
 
       /** Returns a free term symbol with specific properties. */
       def free(name: TermName, tpe: Type,
-        flags: FlagSet = Flag.SYNTHETIC,
+        flags: FlagSet = NoFlags,
         origin: String = null): FreeTermSymbol = {
 
         val strName = name.toString
         assert(strName.nonEmpty, "Empty term name")
         assert(Is defined tpe, s"Undefined type: `$tpe`")
-        val term = newFreeTerm(strName, null, flags, origin)
+        val term = newFreeTerm(strName, null, flags | SYNTHETIC, origin)
         setInfo(term, Type fix tpe)
       }
 
@@ -113,7 +114,7 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
         free(name(original), Type of original, flags)
 
       /** Returns a new term symbol equivalent to `original` but with a fresh name. */
-      def fresh(original: TermSymbol, flags: FlagSet = Flag.SYNTHETIC): FreeTermSymbol =
+      def fresh(original: TermSymbol, flags: FlagSet = NoFlags): FreeTermSymbol =
         free(name.fresh(original), Type of original, flags)
 
       def unapply(sym: TermSymbol): Option[(TermName, FlagSet)] =
