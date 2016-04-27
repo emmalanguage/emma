@@ -263,10 +263,11 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
       def apply(tpe: Type, types: Type*)(args: Tree*): Tree =
         apply(tpe.typeSymbol.asType, types: _*)(args: _*)
 
-      def unapplySeq(tree: Tree): Option[(TypeSymbol, Seq[Type], Seq[Tree])] = tree match {
-        case q"new ${clazz: Tree}[..${types: Seq[Tree]}](..${args: Seq[Tree]})" =>
-          Some(Type sym clazz, types map Type.of, args)
-        case _ => None
+      def unapplySeq(tree: Tree): Option[(TypeSymbol, Seq[Type], Seq[Seq[Tree]])] = tree match {
+        case app(sel(New(clazz), _), _, argss@_*) =>
+          Some(Type sym clazz, Type.of(clazz).typeArgs, argss)
+        case _ =>
+          None
       }
     }
 
