@@ -57,7 +57,7 @@ trait Source extends Common {
       case Bind(name, body) =>
         validate(body)
       case _ =>
-        abort(root.pos, s"Unsupported Scala node ${root.getClass} in quoted Emma core code")
+        abort(root.pos, s"Unsupported Scala node ${root.getClass} in quoted Emma source")
         false
     }
 
@@ -117,9 +117,9 @@ trait Source extends Common {
         statsSizeEq && statsEq
 
       case (ValDef(mods$x, _, tpt$x, rhs$x), ValDef(mods$y, _, tpt$y, rhs$y)) =>
-        def modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
-        def tptEq = eq(tpt$x, tpt$y)
-        def rhsEq = eq(rhs$x, rhs$y)
+        val modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
+        val tptEq = eq(tpt$x, tpt$y)
+        val rhsEq = eq(rhs$x, rhs$y)
         modsEq && tptEq && rhsEq
 
       case (Function(vparams$x, body$x), Function(vparams$y, body$y)) =>
@@ -151,6 +151,10 @@ trait Source extends Common {
         def argsSizeEq = args$x.size == args$y.size
         def argsEq = (args$x zip args$y) forall { case (a$x, a$y) => eq(a$x, a$y) }
         symEq && funEq && argsSizeEq && argsEq
+
+      case (New(tpt$x), New(tpt$y)) =>
+        val tptEq = eq(tpt$x, tpt$y)
+        tptEq
 
       case (If(cond$x, thenp$x, elsep$x), If(cond$y, thenp$y, elsep$y)) =>
         def condEq = eq(cond$x, cond$y)
@@ -205,6 +209,39 @@ trait Source extends Common {
         if (map.contains(x)) map(x) == y
         else x == y
     }
+
+    object Language {
+      //@formatter:off
+
+      // atomics
+      val lit     = Term.lit            // literals
+      val ref     = Term.ref            // references
+
+      // terms
+      val sel     = Term.sel            // selections
+      val app     = Term.app            // function applications
+      val inst    = Term.inst           // class instantiation
+      val lambda  = Term.lambda         // lambdas
+      val typed   = Type.ascription     // type ascriptions
+
+      // state
+      val val_    = Tree.val_           // val and var definitions
+      val assign  = Tree.assign         // assignments
+      val block   = Tree.block          // blocks
+
+      // control flow
+      val branch  = Tree.branch         // conditionals
+      val whiledo = Tree.while_         // while loop
+      val dowhile = Tree.doWhile        // do while loop
+
+      // pattern matching
+      val mat     = Tree.mat            // pattern match
+      val case_   = Tree.case_          // case
+      val bind    = Tree.bind           // bind
+
+      //@formatter:on
+    }
+
   }
 
 }
