@@ -288,20 +288,28 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     /** Returns a fully-qualified reference to `target` (must be static). */
     def resolve(target: Symbol): Tree =
       if (target.isStatic) {
-        val owner =
-          if (Has owner target) resolve(target.owner)
-          else Term ref rootMirror.RootPackage
+        val ancestors = Owner.chain(target).tail.reverse
 
-        if (target.isModule) {
-          Term.sel(owner, rootMirror.staticModule(target.fullName))
-        } else if (target.isPackage) {
+        val owner = ancestors.tail.foldLeft[Tree](Term ref rootMirror.RootPackage)((owner, sym) => {
+          assert(sym.isClass, s"Ancestor symbol '${sym.name}' is not a class")
+          if (sym.isPackage) {
+            Term.sel(owner, rootMirror.staticPackage(sym.fullName))
+          } else {
+            val cls = sym.asClass
+            if (cls.isModuleClass) Term.sel(owner, rootMirror.staticModule(cls.module.fullName))
+            else Type.sel(owner, rootMirror.staticClass(cls.fullName))
+          }
+        })
+
+        if (target.isPackage) {
           Term.sel(owner, rootMirror.staticPackage(target.fullName))
-        } else if (target.isClass) {
-          Type.sel(owner, rootMirror.staticClass(target.fullName))
-        } else if (target.isType) {
-          Type.sel(owner, target.asType)
+        } else if (target.isModule) {
+          Term.sel(owner, rootMirror.staticModule(target.fullName))
+        } else if (target.isMethod) {
+          Term.sel(owner, target.asMethod)
         } else {
-          Term.sel(owner, target.asTerm)
+          assert(target.isClass, s"Ancestor symbol '${target.name}' is not a class")
+          Type.sel(owner, rootMirror.staticClass(target.fullName))
         }
       } else if (target.isType) {
         Type ref target.asType
