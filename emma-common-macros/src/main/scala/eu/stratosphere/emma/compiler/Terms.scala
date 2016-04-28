@@ -2,7 +2,6 @@ package eu.stratosphere.emma
 package compiler
 
 import scala.annotation.tailrec
-import scala.reflect.ClassTag
 
 /** Utility for terms. */
 trait Terms extends Util { this: Trees with Types with Symbols =>
@@ -246,26 +245,32 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
     object inst {
 
       /** Returns a new class instantiation. */
-      def apply(target: TypeSymbol, types: Type*)(args: Tree*): Tree = {
+      def apply(target: TypeSymbol, types: Type*)(argss: Seq[Tree]*): Tree = {
         assert(Is valid target, s"Invalid target: `$target`")
         assert(types forall Is.defined, "Unspecified type arguments")
-        assert(args forall Has.tpe, "Untyped arguments")
+        assert(argss forall (_ forall Has.tpe), "Untyped arguments")
+
         // TODO: Handle alternatives properly
-        val clazz = Type of target
-        val constructor = clazz decl Term.name.init
-        val T = if (types.isEmpty) clazz else Type(clazz, types: _*)
-        val inst = q"new ${Tree.resolve(target)}[..$types](..$args)"
+        val clazz = Type fix target.toType.typeConstructor
+        val constructor = (clazz decl Term.name.init).asTerm
+        val tpe = if (types.isEmpty) clazz else Type(clazz, types: _*)
+
+        val tpt = New(Type.tree(tpe))
+        setType(tpt, tpe)
+
+        val inst = app(sel(tpt, constructor))(argss: _*)
+
         setSymbol(inst, constructor)
-        setType(inst, T)
+        setType(inst, tpe)
       }
 
       /** Returns a new class instantiation. */
-      def apply(tpe: Type, types: Type*)(args: Tree*): Tree =
-        apply(tpe.typeSymbol.asType, types: _*)(args: _*)
+      def apply(tpe: Type, types: Type*)(argss: Seq[Tree]*): Tree =
+        apply(tpe.typeSymbol.asType, types: _*)(argss: _*)
 
       def unapplySeq(tree: Tree): Option[(TypeSymbol, Seq[Type], Seq[Seq[Tree]])] = tree match {
         case app(sel(New(clazz), _), _, argss@_*) =>
-          Some(Type sym clazz, Type.of(clazz).typeArgs, argss)
+          Some(Type sym clazz, (Type of clazz).typeArgs, argss)
         case _ =>
           None
       }
