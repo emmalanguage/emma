@@ -409,7 +409,11 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       /** Returns a new assignment `lhs = rhs`. */
       def apply(lhs: Tree, rhs: Tree): Assign = {
         val assign = Assign(lhs, rhs)
-        setType(assign, NoType).asInstanceOf[Assign]
+        setType(assign, NoType)
+      }
+
+      def unapply(assign: Assign): Option[(Tree, Tree)] = assign match {
+        case Assign(lhs, rhs) => Some(lhs, rhs)
       }
     }
 
