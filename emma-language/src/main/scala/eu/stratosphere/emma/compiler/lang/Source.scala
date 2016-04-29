@@ -117,7 +117,7 @@ trait Source extends Common {
         statsSizeEq && statsEq
 
       case (ValDef(mods$x, _, tpt$x, rhs$x), ValDef(mods$y, _, tpt$y, rhs$y)) =>
-        def modsEq = mods$x.flags == mods$y.flags
+        def modsEq = (mods$x.flags | Flag.SYNTHETIC) == (mods$y.flags | Flag.SYNTHETIC)
         def tptEq = eq(tpt$x, tpt$y)
         def rhsEq = eq(rhs$x, rhs$y)
         modsEq && tptEq && rhsEq
