@@ -1,7 +1,10 @@
 package org.example.foo
 
-class Baz(val x: Int)
+class Baz[T:Numeric](val x: T)
 
 object Baz {
-  def apply(x: Int): Baz = new Baz(x)
+  def apply[T: Numeric](x: T) = {
+    val n = implicitly[Numeric[T]]
+    new Baz(n.toInt(x))
+  }
 }
