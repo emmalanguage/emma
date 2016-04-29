@@ -32,7 +32,7 @@ object Transformations {
     rowIndexed.foreach { e =>
       for (j <- 0 until e._1.productArity) {
         val i = e._2
-        array(indexer(i,j)) = e._1.productElement(j).asInstanceOf[A]
+        array(indexer(i, j)) = e._1.productElement(j).asInstanceOf[A]
       }
     }
     Matrix[A](rows, cols, array)
@@ -57,7 +57,7 @@ object Transformations {
     rowIndexed.foreach { e =>
       for (j <- 0 until e._1.length) {
         val i = e._2
-        array(indexer(i,j)) = e._1.get(j)
+        array(indexer(i, j)) = e._1.get(j)
       }
     }
     Matrix[A](rows, cols, array)
@@ -119,11 +119,11 @@ object Transformations {
    * @return A databag of vectors with type A
    */
   def toBag[A: Numeric : ClassTag](matrix: Matrix[A]): DataBag[Vector[A]] = {
-    DataBag((for (row <- matrix.rows()) yield row).toSeq)
+    DataBag(for (i <- matrix.rRange) yield matrix.row(i))
   }
 
   /**
-   * Transforms a [[Matrix]] `M` into a [[DataBag]] of (row index, [[Vector]]) tuples.
+   * Transforms a [[Matrix]] `M` into a [[DataBag]] of (row index, [[Vector]]) tuple's.
    *
    * @param matrix the matrix to be transformed
    * @tparam A element type of the matrix
@@ -131,5 +131,85 @@ object Transformations {
    */
   def toIndexedBag[A: Numeric : ClassTag](matrix: Matrix[A]): DataBag[(Int, Vector[A])] = {
     DataBag(for (i <- matrix.rRange) yield (i, matrix.row(i)))
+  }
+
+  //////////////////////////////////////////
+  // Bag -> Vector
+  //////////////////////////////////////////
+
+  /**
+   * Transforms a [[DataBag]] `bag` of [[spire.math.Numeric]]'s into a [[Vector]] `V`.
+   *
+   * The length of the vector `V` is defined by the number of elements in the bag.
+   *
+   * @param bag the databag to be transformed
+   * @tparam A element type of the output vector
+   * @return vector with values from the supplied databag
+   */
+  def toVector[A: Numeric : ClassTag](bag: DataBag[A]): Vector[A] = {
+    Vector(bag.vals.toArray[A])
+  }
+
+  /**
+   * Transforms a [[DataBag]] `bag` of (index, value) tuple's into a [[Vector]] `V`.
+   *
+   * The length of the vector `V` is implicitly defined by the largest index of the
+   * values in the `bag`.
+   *
+   * @param bag the databag to be transformed
+   * @tparam A element type of the output vector
+   * @return vector with values from the supplied databag
+   */
+  def indexedToVector[A: Numeric : ClassTag](bag: DataBag[(Int, A)]): Vector[A] = {
+    val size = bag.fold(0)(e => e._1, (a, b) => Math.max(a, b)) + 1
+    val values = Array.ofDim[A](size)
+    for (e <- bag.vals) {
+      values(e._1) = e._2
+    }
+    Vector(values)
+  }
+
+  /**
+   * Transforms a [[DataBag]] `bag` of (index, value) tuple's into a [[Vector]] `V`.
+   *
+   * The length of the vector `V` is explicitly defined by the `size` argument
+   *
+   * @param size the size of the resulting vector
+   * @param bag the databag to be transformed
+   * @tparam A element type of the output vector
+   * @return vector with values from the supplied databag
+   */
+  def indexedToVector[A: Numeric : ClassTag](size: Int)(bag: DataBag[(Int, A)]): Vector[A] = {
+    val values = Array.ofDim[A](size)
+    for (e <- bag.vals) {
+      values(e._1) = e._2
+    }
+    Vector(values)
+  }
+
+  //////////////////////////////////////////
+  // Vector -> Bag
+  //////////////////////////////////////////
+
+  /**
+   * Transforms a [[Vector]] `V` into a [[DataBag]] of [[spire.math.Numeric]]'s.
+   *
+   * @param vector the vector to be transformed
+   * @tparam A element type of the vector
+   * @return A databag of values with type A
+   */
+  def toBag[A: Numeric : ClassTag](vector: Vector[A]): DataBag[A] = {
+    DataBag(for (i <- vector.Range) yield vector.get(i))
+  }
+
+  /**
+   * Transforms a [[Vector]] `V` into a [[DataBag]] of (index, value) tuple's.
+   *
+   * @param vector the vector to be transformed
+   * @tparam A element type of the vector
+   * @return A databag of values with type A
+   */
+  def toIndexedBag[A: Numeric : ClassTag](vector: Vector[A]): DataBag[(Int, A)] = {
+    DataBag(for (i <- vector.Range) yield (i, vector.get(i)))
   }
 }
