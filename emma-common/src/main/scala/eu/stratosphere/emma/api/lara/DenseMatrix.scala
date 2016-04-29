@@ -31,7 +31,17 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](override val numRows: Int
   self =>
 
   override
-  private[emma] def toArray: Array[A] = values
+  private[emma] def toArray: Array[A] = {
+    if (!transposed) {
+      values
+    } else {
+      val arr = Array.ofDim[A](numRows * numCols)
+      for (i <- rRange; j <- cRange) {
+        arr(i * numCols + j) = get(i, j)
+      }
+      arr
+    }
+  }
 
   //////////////////////////////////////////
   // pointwise M o scalar
@@ -83,6 +93,7 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](override val numRows: Int
 
   override
   def %*%(that: Matrix[A]): Matrix[A] = {
+    require(numCols == that.numRows)
     // TODO: use blas, check for sparse input
     val values: Array[A] = new Array[A](numRows * that.numCols)
     for (i <- rRange; j <- that.cRange) {
@@ -93,6 +104,7 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](override val numRows: Int
 
   override
   def %*%(that: Vector[A]): Vector[A] = {
+    require(numCols == that.length)
     val values: Array[A] = new Array[A](numRows)
     for (i <- rRange) {
       values(i) = row(i) dot that
@@ -103,9 +115,6 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](override val numRows: Int
   //////////////////////////////////////////
   // M operation
   //////////////////////////////////////////
-
-  override
-  def inv(): Matrix[A] = ???
 
   override
   def diag(): Vector[A] = {
@@ -120,59 +129,72 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](override val numRows: Int
 
   override
   def transpose(): Matrix[A] = {
-    new DenseMatrix[A](
-      numCols,
-      numRows,
-      values,
-      !transposed
-    )
+    new DenseMatrix[A](numCols, numRows, values, !transposed)
   }
 
   override
   def row(rowIndex: Int): Vector[A] = {
+    require(rowIndex < numRows)
     Vector.fill[A](numCols, isRowVector = true)(i => get(rowIndex, i))
   }
 
   override
   def column(colIndex: Int): Vector[A] = {
+    require(colIndex < numCols)
     Vector.fill[A](numRows, isRowVector = false)(i => get(i, colIndex))
   }
 
   override
-  def rows(): Traversable[Vector[A]] = {
-    new Traversable[Vector[A]] {
-      override def foreach[U](f: (Vector[A]) => U): Unit = {
-        for (i <- rRange) {
-          f(self.row(i))
-        }
-      }
+  def rows[B: Numeric : ClassTag](f: Vector[A] => B): Vector[B] = {
+    val arr = Array.ofDim[B](numRows)
+    for (i <- rRange) {
+      arr(i) = f(row(i))
     }
+    Vector[B](arr, isRowVector = true)
   }
 
   override
-  def cols(): Traversable[Vector[A]] = {
-    new Traversable[Vector[A]] {
-      override def foreach[U](f: (Vector[A]) => U): Unit = {
-        for (i <- cRange) {
-          f(self.column(i))
-        }
+  def rows[B: Numeric : ClassTag](f: Vector[A] => Vector[B]): Matrix[B] = {
+    val arr = Array.ofDim[B](numRows * numCols)
+    for (i <- rRange) {
+      val newVec = f(row(i))
+      for (j <- newVec.Range) {
+        arr(index(i, j)) = newVec.get(j)
       }
     }
+    Matrix[B](numRows, numCols, arr)
+  }
+
+  override
+  def cols[B: Numeric : ClassTag](f: Vector[A] => B): Vector[B] = {
+    val arr = Array.ofDim[B](numCols)
+    for (j <- cRange) {
+      arr(j) = f(column(j))
+    }
+    Vector[B](arr, isRowVector = false)
+  }
+
+  override
+  def cols[B: Numeric : ClassTag](f: Vector[A] => Vector[B]): Matrix[B] = {
+    val arr = Array.ofDim[B](numRows * numCols)
+    for (j <- cRange) {
+      val newVec = f(column(j))
+      for (i <- newVec.Range) {
+        arr(index(i, j)) = newVec.get(i)
+      }
+    }
+    Matrix[B](numRows, numCols, arr)
   }
 
   override
   def elements[B](z: B)(s: A => B, p: (B, B) => B): B = {
-    values.foldLeft(z)((acc, x) => p(s(x), acc))
+    values.foldLeft(z)((acc, x) => p(acc, s(x)))
   }
 
   override
   private[emma] def map[B: Numeric : ClassTag](f: (A) => B): Matrix[B] = {
     val res: Array[B] = values.map(f(_))
-    new DenseMatrix(
-      numRows,
-      numCols,
-      res
-    )
+    new DenseMatrix(numRows, numCols, res)
   }
 
   override
@@ -208,12 +230,12 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](override val numRows: Int
 
   private[lara] def mapVector(that: Vector[A], f: (A, A) => A): DenseMatrix[A] = {
     val m = that match {
-      case v if !v.rowVector =>
-        assert(numCols == v.length)
+      case v if v.rowVector =>
+        require(numCols == v.length)
         Matrix.fill(numRows, numCols)((i, j) => v.get(j))
 
       case v =>
-        assert(numRows == v.length)
+        require(numRows == v.length)
         Matrix.fill(numRows, numCols)((i, j) => v.get(i))
     }
     mapMatrix(m, f)

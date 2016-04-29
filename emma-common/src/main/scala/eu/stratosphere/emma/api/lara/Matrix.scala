@@ -65,8 +65,6 @@ trait Matrix[A] {
   // M operation
   //////////////////////////////////////////
 
-  def inv(): Matrix[A]
-
   def diag(): Vector[A]
 
   def transpose(): Matrix[A]
@@ -75,10 +73,15 @@ trait Matrix[A] {
 
   def column(colIndex: Int): Vector[A]
 
-  def rows(): Traversable[Vector[A]]
+  def rows[B: Numeric : ClassTag](f: Vector[A] => B): Vector[B]
 
-  def cols(): Traversable[Vector[A]]
+  def rows[B: Numeric : ClassTag](f: Vector[A] => Vector[B]): Matrix[B]
 
+  def cols[B: Numeric : ClassTag](f: Vector[A] => B): Vector[B]
+
+  def cols[B: Numeric : ClassTag](f: Vector[A] => Vector[B]): Matrix[B]
+
+  // No order guarantees
   def elements[B](z: B)(s: A => B, p: (B, B) => B): B
 
   private[emma] def map[B: Numeric : ClassTag](f: (A) => B): Matrix[B]

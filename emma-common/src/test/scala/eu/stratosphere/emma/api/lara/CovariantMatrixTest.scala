@@ -24,15 +24,17 @@ class CovariantMatrixTest extends BaseTest {
 
     val mat = Matrix.fill[Double](10, 10)((i, j) => i * j)
 
-    //     TODO: Here we actually want means to be a vector instead of a Traversable
-    //     The result somehow depends as we ant to have a vector in this case here
-    //     but in general the result shoud be a matrix
-    //     return a matrix 1 x n instead?
-    val means = for (col <- mat.cols()) yield {
-      col.aggregate(_ + _) / col.length
-    }
-    val meanVector = Vector.apply[Double](means.toArray)
-    val U = mat - Matrix.fill[Double](mat.numRows, mat.numCols)((i, j) => meanVector.get(j))
+//    //     TODO: Here we actually want means to be a vector instead of a Traversable
+//    //     The result somehow depends as we ant to have a vector in this case here
+//    //     but in general the result shoud be a matrix
+//    //     return a matrix 1 x n instead?
+//    val means = for (col <- mat.cols()) yield {
+//      col.aggregate(_ + _) / col.length
+//    }
+//    val meanVector = Vector.apply[Double](means.toArray)
+
+    val means: Vector[Double] = mat.cols(col => col.aggregate(_ + _) / col.length)
+    val U = mat - Matrix.fill[Double](mat.numRows, mat.numCols)((i, j) => means.get(j))
 
     //     TODO: We can not write 1 / ... * U // have to provide implicits
     val C = U.transpose() %*% U * 1 / (U.numRows - 1)
