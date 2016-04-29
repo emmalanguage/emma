@@ -280,20 +280,19 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
     object lambda {
 
       /** Returns a new anonymous function. */
-      def apply(args: TermSymbol*)(body: Tree*): Function = {
+      def apply(args: TermSymbol*)(body: Tree): Function = {
         assert(args forall Is.valid, "Invalid lambda parameters")
-        assert(body forall Is.valid, "Invalid lambda body")
-        assert(Has tpe body.last, s"Invalid expression:\n${body.last}")
-        val bodyBlock = if (body.size == 1) body.head else Tree.block(body: _*)
+        assert(Is valid body, "Invalid lambda body")
+        assert(Has tpe body, s"Invalid expression:\n$body")
         val types = args map Type.of
-        val T = Type.fun(types: _*)(Type of bodyBlock)
+        val T = Type.fun(types: _*)(Type of body)
         val anon = Term.sym.free(Term.name.lambda, T)
         val argFlags = Flag.SYNTHETIC | Flag.PARAM
         val params = for ((arg, tpe) <- args zip types) yield
           Term.sym(anon, arg.name, tpe, argFlags)
 
         val paramList = params.map(Tree.val_(_, flags = argFlags)).toList
-        val rhs = Owner.at(anon)(Tree.rename(bodyBlock, args zip params: _*))
+        val rhs = Owner.at(anon)(Tree.rename(body, args zip params: _*))
         val fun = Function(paramList, rhs)
         setSymbol(fun, anon)
         setType(fun, T)
