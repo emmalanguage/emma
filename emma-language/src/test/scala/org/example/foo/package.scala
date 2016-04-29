@@ -4,7 +4,9 @@ package object foo {
 
   def bar: Boolean = true
 
-  class Bar(x: Int)
+  class Bar[T](x: Int) {
+    val y: T = null.asInstanceOf[T]
+  }
 
   object Bar {
 
