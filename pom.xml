@@ -127,7 +127,7 @@
                 <artifactId>emma-examples</artifactId>
                 <version>${project.version}</version>
             </dependency>
-			<dependency>
+            <dependency>
                 <groupId>eu.stratosphere</groupId>
                 <artifactId>emma-gui</artifactId>
                 <version>${project.version}</version>
@@ -227,6 +227,13 @@
                 <groupId>com.typesafe.scala-logging</groupId>
                 <artifactId>scala-logging-slf4j_${scala.tools.version}</artifactId>
                 <version>${scala-logging.version}</version>
+            </dependency>
+
+            <!-- Scalactic -->
+            <dependency>
+                <groupId>org.scalactic</groupId>
+                <artifactId>scalactic_${scala.tools.version}</artifactId>
+                <version>${scalatest.version}</version><!-- use scaslatest version -->
             </dependency>
 
             <!-- Test -->

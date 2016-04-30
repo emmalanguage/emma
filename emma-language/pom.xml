@@ -57,6 +57,12 @@
             <artifactId>hadoop-hdfs</artifactId>
         </dependency>
 
+        <!-- Scalactic -->
+        <dependency>
+            <groupId>org.scalactic</groupId>
+            <artifactId>scalactic_${scala.tools.version}</artifactId>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>junit</groupId>
