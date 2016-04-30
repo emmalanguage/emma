@@ -5,14 +5,13 @@ import java.time.Instant
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.compiler.BaseCompilerSpec
 import eu.stratosphere.emma.compiler.ir._
-import eu.stratosphere.emma.compiler.lang.core.TreeEquality
 import eu.stratosphere.emma.testschema.Marketing._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 /** A spec for resugaring comprehensions. */
 @RunWith(classOf[JUnitRunner])
-class NormalizationSpec extends BaseCompilerSpec with TreeEquality {
+class NormalizationSpec extends BaseCompilerSpec {
 
   import compiler._
   import universe._
@@ -347,28 +346,28 @@ class NormalizationSpec extends BaseCompilerSpec with TreeEquality {
 
   "normalize hard-coded comprehensions" - {
     "with two generators" in {
-      normalize(inp1) shouldEqual exp1
+      normalize(inp1) shouldBe alphaEqTo(exp1)
     }
     "with three generators" in {
-      normalize(inp2) shouldEqual exp2
+      normalize(inp2) shouldBe alphaEqTo(exp2)
     }
     "with three generators and two filters" in {
-      normalize(inp3) shouldEqual exp3
+      normalize(inp3) shouldBe alphaEqTo(exp3)
     }
   }
 
   "normalize resugared comprehensions" - {
     "with three generators and two filters at the end" in {
-      normalize(inp4) shouldEqual exp4
+      normalize(inp4) shouldBe alphaEqTo(exp4)
     }
     "with three generators and two interleaved filters" in {
-      normalize(inp5) shouldEqual exp5
+      normalize(inp5) shouldBe alphaEqTo(exp5)
     }
     "with one patmat generator and no filters" in {
-      normalize(inp6) shouldEqual exp6
+      normalize(inp6) shouldBe alphaEqTo(exp6)
     }
     "with two patmat generators and one filter" in {
-      normalize(inp7) shouldEqual exp7
+      normalize(inp7) shouldBe alphaEqTo(exp7)
     }
   }
 }

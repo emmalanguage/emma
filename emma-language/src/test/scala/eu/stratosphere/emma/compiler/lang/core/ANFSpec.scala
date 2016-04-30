@@ -10,7 +10,7 @@ import org.scalatest.junit.JUnitRunner
 
 /** A spec for the `LNF.anf` transformation. */
 @RunWith(classOf[JUnitRunner])
-class ANFSpec extends BaseCompilerSpec with TreeEquality {
+class ANFSpec extends BaseCompilerSpec {
 
   import compiler._
   import universe._
@@ -43,7 +43,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
         x$3
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
 
     "as selection" in {
@@ -59,7 +59,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
         d$1
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
 
     "package selections" in {
@@ -76,7 +76,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
         x$3
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
   }
 
@@ -95,7 +95,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
         x$3
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
 
     "with multiple parameter lists" in {
@@ -113,7 +113,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
         prod$2
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
   }
 
@@ -138,7 +138,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
       val c = b$2 + 15
     })
 
-    act shouldEqual exp
+    act shouldBe alphaEqTo(exp)
   }
 
   "type ascriptions" in {
@@ -155,7 +155,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
       b$1
     })
 
-    act shouldEqual exp
+    act shouldBe alphaEqTo(exp)
   }
 
   "bypass mock comprehensions" in {
@@ -208,7 +208,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
       res
     })
 
-    act shouldEqual exp
+    act shouldBe alphaEqTo(exp)
   }
 
   "irrefutable pattern matching" - {
@@ -228,7 +228,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
         x$2
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
 
     "of case classes" in {
@@ -248,7 +248,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
         x$2
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
 
     "of nested product types" in {
@@ -274,7 +274,7 @@ class ANFSpec extends BaseCompilerSpec with TreeEquality {
         x$5
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
   }
 }

@@ -3,14 +3,13 @@ package eu.stratosphere.emma.compiler.lang.comprehension
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.compiler.BaseCompilerSpec
 import eu.stratosphere.emma.compiler.ir._
-import eu.stratosphere.emma.compiler.lang.core.TreeEquality
 import eu.stratosphere.emma.testschema.Marketing._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
 /** A spec for the `Comprehension.{re|de}sugar` transformations. */
 @RunWith(classOf[JUnitRunner])
-class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
+class ReDeSugarSpec extends BaseCompilerSpec {
 
   import compiler._
   import universe._
@@ -267,23 +266,23 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
   "resugar" - {
 
     "map" in {
-      resugar(des1) shouldEqual res1
+      resugar(des1) shouldBe alphaEqTo(res1)
     }
     "flatMap" in {
-      resugar(des2) shouldEqual res2
+      resugar(des2) shouldBe alphaEqTo(res2)
     }
     "withFilter" in {
-      resugar(des3) shouldEqual res3
+      resugar(des3) shouldBe alphaEqTo(res3)
     }
     "nested (flat)maps" - {
       "with two generators" in {
-        resugar(des4) shouldEqual res4
+        resugar(des4) shouldBe alphaEqTo(res4)
       }
       "with three generators" in {
-        resugar(des5) shouldEqual res5
+        resugar(des5) shouldBe alphaEqTo(res5)
       }
       "with three generators and one filter" in {
-        resugar(des6) shouldEqual res6
+        resugar(des6) shouldBe alphaEqTo(res6)
       }
     }
   }
@@ -291,23 +290,23 @@ class ReDeSugarSpec extends BaseCompilerSpec with TreeEquality {
   "desugar" - {
 
     "map" in {
-      desugar(res1) shouldEqual des1
+      desugar(res1) shouldBe alphaEqTo(des1)
     }
     "flatMap" in {
-      desugar(res2) shouldEqual des2
+      desugar(res2) shouldBe alphaEqTo(des2)
     }
     "withFilter" in {
-      desugar(res3) shouldEqual des3
+      desugar(res3) shouldBe alphaEqTo(des3)
     }
     "nested (flat)maps" - {
       "with two generators" in {
-        desugar(res4) shouldEqual des4
+        desugar(res4) shouldBe alphaEqTo(des4)
       }
       "with three generators" in {
-        desugar(res5) shouldEqual des5
+        desugar(res5) shouldBe alphaEqTo(des5)
       }
       "with three generators and one filter" in {
-        desugar(res6) shouldEqual des6
+        desugar(res6) shouldBe alphaEqTo(des6)
       }
     }
   }

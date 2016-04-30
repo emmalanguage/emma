@@ -6,7 +6,7 @@ import org.scalatest.junit.JUnitRunner
 
 /** A spec for the `LNF.dce` transformation. */
 @RunWith(classOf[JUnitRunner])
-class DCESpec extends BaseCompilerSpec with TreeEquality {
+class DCESpec extends BaseCompilerSpec {
 
   import compiler._
   import universe._
@@ -42,7 +42,7 @@ class DCESpec extends BaseCompilerSpec with TreeEquality {
         x$3
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
 
     "transitively" in {
@@ -59,7 +59,7 @@ class DCESpec extends BaseCompilerSpec with TreeEquality {
         x$3
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
   }
 }

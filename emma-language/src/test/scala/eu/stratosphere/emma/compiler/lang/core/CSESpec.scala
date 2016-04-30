@@ -6,7 +6,7 @@ import org.scalatest.junit.JUnitRunner
 
 /** A spec for the `LNF.cse` transformation. */
 @RunWith(classOf[JUnitRunner])
-class CSESpec extends BaseCompilerSpec with TreeEquality {
+class CSESpec extends BaseCompilerSpec {
 
   import compiler._
   import universe._
@@ -41,7 +41,7 @@ class CSESpec extends BaseCompilerSpec with TreeEquality {
         x$3
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
 
     "as selection" in {
@@ -56,7 +56,7 @@ class CSESpec extends BaseCompilerSpec with TreeEquality {
         x$3
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
 
     "package selections" in {
@@ -73,7 +73,7 @@ class CSESpec extends BaseCompilerSpec with TreeEquality {
         x$3
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
   }
 
@@ -91,7 +91,7 @@ class CSESpec extends BaseCompilerSpec with TreeEquality {
         x$3
       })
 
-      act shouldEqual exp
+      act shouldBe alphaEqTo(exp)
     }
   }
 
@@ -117,7 +117,7 @@ class CSESpec extends BaseCompilerSpec with TreeEquality {
       r
     })
 
-    act shouldEqual exp
+    act shouldBe alphaEqTo(exp)
   }
 
   "constant propagation" in {
@@ -132,6 +132,6 @@ class CSESpec extends BaseCompilerSpec with TreeEquality {
       42
     })
 
-    act shouldEqual exp
+    act shouldBe alphaEqTo(exp)
   }
 }

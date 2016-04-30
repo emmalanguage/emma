@@ -28,20 +28,21 @@ trait ReflectUtil extends Util
   }
 
   /** Print tree for debuging. */
-  def printTree(title: String): Tree => Tree = (tree: Tree) => {
+  def asSource(title: String)(tree: Tree) = {
+    val sb = StringBuilder.newBuilder
     // prefix
-    println(title)
-    println("-" * 80)
+    sb.append(title).append("\n")
+    sb.append("-" * 80).append("\n")
     // tree
-    println(showCode(tree)
+    sb.append(showCode(tree)
       .replace("<synthetic> ", "")
       .replace("_root_.", "")
       .replace("eu.stratosphere.emma.api.", "")
       .replace("eu.stratosphere.emma.compiler.ir.`package`.", "")
-      .replaceAll("eu\\.stratosphere\\.emma\\.testschema\\.([a-zA-Z]+)\\.?", ""))
+      .replaceAll("eu\\.stratosphere\\.emma\\.testschema\\.([a-zA-Z]+)\\.?", "")).append("\n")
     // suffix
-    println("-" * 80)
-    // don't  break the chain
-    tree
+    sb.append("-" * 80).append("\n")
+    // grab the result
+    sb.result()
   }
 }

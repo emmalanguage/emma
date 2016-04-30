@@ -9,7 +9,7 @@ import org.scalatest.junit.JUnitRunner
 
 /** A spec defining the core fragment of Scala supported by Emma. */
 @RunWith(classOf[JUnitRunner])
-class LanguageSpec extends BaseCompilerSpec with TreeEquality {
+class LanguageSpec extends BaseCompilerSpec {
 
   import compiler._
   import universe._
@@ -46,7 +46,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be destructed and constructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (lit(const), i) =>
-          examples(i) shouldEqual repair(lit(const))
+          examples(i) shouldBe alphaEqTo(repair(lit(const)))
       }
     }
   }
@@ -75,7 +75,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be destructed and constructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (ref(sym), i) =>
-          examples(i) shouldEqual repair(ref(sym))
+          examples(i) shouldBe alphaEqTo(repair(ref(sym)))
       }
     }
   }
@@ -103,7 +103,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be destructed and constructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (sel(tgt, member), i) =>
-          examples(i) shouldEqual repair(sel(tgt, member))
+          examples(i) shouldBe alphaEqTo(repair(sel(tgt, member)))
       }
     }
   }
@@ -143,7 +143,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be constructed and destructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (app(fn, targs, argss), i) =>
-          examples(i) shouldEqual repair(app(fn, targs: _*)(argss))
+          examples(i) shouldBe alphaEqTo(repair(app(fn, targs: _*)(argss)))
       }
     }
   }
@@ -173,7 +173,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be constructed and destructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (inst(clazz, targs, argss@_*), i) =>
-          examples(i) shouldEqual repair(inst(clazz, targs: _*)(argss: _*))
+          examples(i) shouldBe alphaEqTo(repair(inst(clazz, targs: _*)(argss: _*)))
       }
     }
   }
@@ -196,7 +196,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be constructed and destructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (lambda(sym, params, body), i) =>
-          examples(i) shouldEqual repair(lambda(params: _*)(body))
+          examples(i) shouldBe alphaEqTo(repair(lambda(params: _*)(body)))
       }
     }
   }
@@ -220,7 +220,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be constructed and destructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (typed(tree, tpe), i) =>
-          examples(i) shouldEqual repair(typed(tree, tpe))
+          examples(i) shouldBe alphaEqTo(repair(typed(tree, tpe)))
       }
     }
   }
@@ -255,7 +255,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be constructed and destructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (val_(lhs, rhs, flags), i) =>
-          examples(i) shouldEqual repair(val_(lhs, rhs, flags))
+          examples(i) shouldBe alphaEqTo(repair(val_(lhs, rhs, flags)))
       }
     }
   }
@@ -289,7 +289,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be constructed and destructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (assign(lhs, rhs), i) =>
-          examples(i) shouldEqual repair(assign(lhs, rhs))
+          examples(i) shouldBe alphaEqTo(repair(assign(lhs, rhs)))
       }
     }
   }
@@ -315,7 +315,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be constructed and destructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (block(stats, expr), i) =>
-          examples(i) shouldEqual repair(block(stats, expr))
+          examples(i) shouldBe alphaEqTo(repair(block(stats, expr)))
       }
     }
   }
@@ -342,7 +342,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be constructed and destructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (branch(cond, thn, els), i) =>
-          examples(i) shouldEqual repair(branch(cond, thn, els))
+          examples(i) shouldBe alphaEqTo(repair(branch(cond, thn, els)))
       }
     }
   }
@@ -377,7 +377,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be constructed and destructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (whiledo(cond, body), i) =>
-          examples(i) shouldEqual repair(whiledo(cond, body))
+          examples(i) shouldBe alphaEqTo(repair(whiledo(cond, body)))
       }
     }
   }
@@ -412,7 +412,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be constructed and destructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (dowhile(cond, body), i) =>
-          examples(i) shouldEqual repair(dowhile(cond, body))
+          examples(i) shouldBe alphaEqTo(repair(dowhile(cond, body)))
       }
     }
   }
@@ -446,9 +446,9 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
     "can be constructed and destructed" in {
       for (t <- examples.zipWithIndex) t match {
         case (match_(selector, cases), i) =>
-          examples(i) shouldEqual repair(match_(selector, cases map {
+          examples(i) shouldBe alphaEqTo(repair(match_(selector, cases map {
             case cs@case_(pat, guard, body) => case_(pat, guard, body)
-          }))
+          })))
       }
     }
   }

@@ -1,14 +1,15 @@
-package eu.stratosphere.emma.compiler.lang.core
+package eu.stratosphere.emma.compiler.lang
 
 import eu.stratosphere.emma.compiler.BaseCompilerSpec
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-/** A spec for alpha-equivalence on LNF rees. */
+/** A spec for alpha equivalence of Scala ASTs. */
 @RunWith(classOf[JUnitRunner])
-class EqSpec extends BaseCompilerSpec with TreeEquality {
+class AlphaEqSpec extends BaseCompilerSpec {
 
-  import compiler.universe._
+  import compiler._
+  import universe._
 
   "simple valdefs and expressions" in {
     val lhs = typeCheck(reify {
@@ -23,7 +24,7 @@ class EqSpec extends BaseCompilerSpec with TreeEquality {
       15 * b$01 * b$02
     })
 
-    lhs shouldEqual rhs
+    lhs shouldBe alphaEqTo(rhs)
   }
 
   "conditionals" in {
@@ -37,7 +38,35 @@ class EqSpec extends BaseCompilerSpec with TreeEquality {
       if (x < 42) x * t._1 else x / b$01
     })
 
-    lhs shouldEqual rhs
+    lhs shouldBe alphaEqTo(rhs)
+  }
+
+  "variable assignment and loops" in {
+    val lhs = typeCheck(reify {
+      var u = x
+      while (u < 20) {
+        println(y)
+        u = u + 1
+      }
+
+      do {
+        u = u - 2
+      } while (u < 20)
+    })
+
+    val rhs = typeCheck(reify {
+      var v = x
+      while (v < 20) {
+        println(y)
+        v = v + 1
+      }
+
+      do {
+        v = v - 2
+      } while (v < 20)
+    })
+
+    lhs shouldBe alphaEqTo(rhs)
   }
 
   "loops" in {
@@ -83,6 +112,24 @@ class EqSpec extends BaseCompilerSpec with TreeEquality {
       x$00()
     })
 
-    lhs shouldEqual rhs
+    lhs shouldBe alphaEqTo(rhs)
+  }
+
+  "pattern matching" in {
+    val lhs = typeCheck(reify {
+      val u = (t, x)
+      u match {
+        case ((i, j: String), _) => i * 42
+      }
+    })
+
+    val rhs = typeCheck(reify {
+      val v = (t, x)
+      v match {
+        case ((l, m: String), _) => l * 42
+      }
+    })
+
+    lhs shouldBe alphaEqTo(rhs)
   }
 }

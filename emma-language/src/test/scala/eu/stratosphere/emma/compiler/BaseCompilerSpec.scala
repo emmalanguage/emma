@@ -1,13 +1,14 @@
 package eu.stratosphere.emma.compiler
 
 import eu.stratosphere.emma.api.DataBag
+import eu.stratosphere.emma.compiler.lang.TreeMatchers
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 
 /**
  * Common methods and mixins for all compier specs
  */
-trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks {
+trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with TreeMatchers {
 
   val compiler = new RuntimeCompiler()
 
