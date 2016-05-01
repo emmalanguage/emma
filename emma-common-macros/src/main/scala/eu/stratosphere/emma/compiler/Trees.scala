@@ -380,12 +380,16 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
 
     object branch {
       /** Returns a new `if` branch. */
-      def apply(cond: Tree, thn: Tree, els: Tree): Tree = {
+      def apply(cond: Tree, thn: Tree, els: Tree): If = {
         assert(Has.tpe(cond) && Type.of(cond) =:= Type.bool, s"Non-boolean condition:\n$cond")
         assert(Has tpe thn, s"Untyped then branch:\n$thn")
         assert(Has tpe els, s"Untyped else branch:\n$els")
         val branch = If(cond, thn, els)
         setType(branch, Type.weakLub(thn, els))
+      }
+
+      def unapply(branch: If): Option[(Tree, Tree, Tree)] = branch match {
+        case If(cond, thn, els) => Some(cond, thn, els)
       }
     }
 
