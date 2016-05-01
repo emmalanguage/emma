@@ -182,7 +182,7 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
       }
 
       def unapply(id: Ident): Option[TermSymbol] =
-        if (id.isTerm) Some(Term sym id) else None
+        if (id.isTerm && Has.sym(id)) Some(Term sym id) else None
     }
 
     /** Term member selection. */
