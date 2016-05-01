@@ -57,6 +57,7 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
   }
 
   object Is {
+
     import Flag._
 
     /** Does `sym` satisfy the specified property? */
@@ -468,6 +469,34 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
         case _ => None
       }
     }
+
+    object mat {
+
+      def apply(sel: Tree, cases: List[CaseDef]): Match = {
+        assert(Has tpe sel, s"Untyped selector:\n${debug(sel)}")
+        assert(cases.forall(Has.tpe), "Not all case defs are typed")
+        val mat = Match(sel, cases)
+        setType(mat, Type.lub(cases.head, cases.tail: _*))
+      }
+
+      def unapply(mat: Match): Option[(Tree, List[CaseDef])] = mat match {
+        case Match(sel, cases) => Some(sel, cases)
+      }
+    }
+
+    object case_ {
+
+      def apply(pat: Tree, guard: Tree, body: Tree) = {
+        assert(Has tpe body, s"Untyped selector:\n${debug(body)}")
+        val case_ = CaseDef(pat, guard, body)
+        setType(case_, Type of body)
+      }
+
+      def unapply(case_ : CaseDef): Option[(Tree, Tree, Tree)] = case_ match {
+        case CaseDef(pat, guard, body) => Some(pat, guard, body)
+      }
+    }
+
   }
 
   /** Some useful constants. */
