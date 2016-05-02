@@ -235,7 +235,7 @@ trait Source extends Common {
       val dowhile = Tree.doWhile        // do while loop
 
       // pattern matching
-      val mat     = Tree.mat            // pattern match
+      val match_  = Tree.match_         // pattern match
       val case_   = Tree.case_          // case
       val bind    = Tree.bind           // bind
 

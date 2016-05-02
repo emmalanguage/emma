@@ -445,8 +445,8 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
 
     "can be constructed and destructed" in {
       for (t <- examples.zipWithIndex) t match {
-        case (mat(selector, cases), i) =>
-          examples(i) shouldEqual repair(mat(selector, cases map {
+        case (match_(selector, cases), i) =>
+          examples(i) shouldEqual repair(match_(selector, cases map {
             case cs@case_(pat, guard, body) => case_(pat, guard, body)
           }))
       }
