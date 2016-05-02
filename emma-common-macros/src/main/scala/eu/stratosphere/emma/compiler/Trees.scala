@@ -476,7 +476,7 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
         assert(Has tpe sel, s"Untyped selector:\n${debug(sel)}")
         assert(cases.forall(Has.tpe), "Not all case defs are typed")
         val mat = Match(sel, cases)
-        setType(mat, Type.lub(cases.head, cases.tail: _*))
+        setType(mat, Type.weakLub(cases.head, cases.tail: _*))
       }
 
       def unapply(mat: Match): Option[(Tree, List[CaseDef])] = mat match {
