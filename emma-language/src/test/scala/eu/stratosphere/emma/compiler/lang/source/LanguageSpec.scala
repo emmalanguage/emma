@@ -155,7 +155,7 @@ class LanguageSpec extends BaseCompilerSpec with TreeEquality {
 
     // Resolves type examples `tpt` occurring in `New(tpt)`
     def fix: Tree => Tree = preWalk {
-      case New(tpt: Tree) => New(Type.tree(tpt.tpe)) // or Type.tree(tpt.tpe)
+      case New(tpt: Tree) => New(Type.quote(tpt.tpe)) // or Type.tree(tpt.tpe)
     }
 
     val examples: List[Tree] = List(
