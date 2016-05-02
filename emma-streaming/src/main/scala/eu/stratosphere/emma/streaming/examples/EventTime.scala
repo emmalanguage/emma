@@ -83,20 +83,20 @@ object EventTime {
     // Creates a sliding window of size 2, slide-size 1, and concatenates the elements
     // in the window. For clarity getAtTime(t) is used to have Bags as a window rather than
     // StreamBags.
-    def eventTimeWindowSpec(xs: StreamBag[(String, Int)]): StreamBag[(Window, String)] = {
-      val windowedStream: StreamBag[(Window, StreamBag[(String, Int)])] =
-        Windows.createWindows(xs, Windows.slidingWindow(2, 1))
-      val aggregatedWindows: StreamBag[(Window, String)] = for {
-        Timed(t, (w, sb)) <- windowedStream.withTimestamp
-      } yield {
-        (w, sb.scan("")(_._1, (x, y) => x ++ y).getAtTime(t))
-      }
-
-      aggregatedWindows
-    }
-
-    val eventTimeWindows = eventTimeStreamProcessing[(String, Int), (Window, String)](_._2)(xs, eventTimeWindowSpec)
-
-    println(StreamBag.flatten(eventTimeWindows).showFirstN(5))
+//    def eventTimeWindowSpec(xs: StreamBag[(String, Int)]): StreamBag[(Window, String)] = {
+//      val windowedStream: StreamBag[(Window, StreamBag[(String, Int)])] =
+//        Windows.createWindows(xs, Windows.slidingWindow(2, 1))
+//      val aggregatedWindows: StreamBag[(Window, String)] = for {
+//        Timed(t, (w, sb)) <- windowedStream.withTimestamp
+//      } yield {
+//        (w, sb.scan("")(_._1, (x, y) => x ++ y).getAtTime(t))
+//      }
+//
+//      aggregatedWindows
+//    }
+//
+//    val eventTimeWindows = eventTimeStreamProcessing[(String, Int), (Window, String)](_._2)(xs, eventTimeWindowSpec)
+//
+//    println(StreamBag.flatten(eventTimeWindows).showFirstN(5))
   }
 }

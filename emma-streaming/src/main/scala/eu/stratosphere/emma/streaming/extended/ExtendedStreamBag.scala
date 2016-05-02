@@ -17,18 +17,6 @@ class ExtendedStreamBag[+A](private val sb: StreamBag[A]) {
   // Group by
   // --------------------------------------------------------
 
-  //  def distinct(): StreamBag[A] = accumulate().sb.map(_.distinct())
-  // todo def by unfold
-  def distinct(): StreamBag[A] = {
-    val h = sb.head.distinct()
-    val t = sb.tail.map { case x => x.distinct().minus(h) }
-    Stream(h, new ExtendedStreamBag[A](StreamBag(t)).distinct())
-  }
-
-  def groupBy[K](k: (A) => K): StreamBag[(K, StreamBag[A])] =
-  // this is exactly the same as for Bag
-    for (key <- new ExtendedStreamBag[K](sb.map(k)).distinct()) yield (key, for (y <- sb; if k(y) == key) yield y)
-
   // --------------------------------------------------------
   // Miscellaneous.
   // --------------------------------------------------------
@@ -65,12 +53,12 @@ class ExtendedStreamBag[+A](private val sb: StreamBag[A]) {
     * @return
     * Postponed stream.
     */
-  def postpone(t: Int): StreamBag[A] =
-    if (t == 0) {
-      sb
-    } else {
-      Stream(DataBag(), postpone(t - 1))
+  def postpone(t: Int): StreamBag[A] = StreamBag(Stream.unfold[DataBag[A], (Int, Stream[DataBag[A]])](
+    (t, sb.sb), {
+      case (0, xs) => (xs.head, (0, xs.tail))
+      case (t, xs) => (DataBag(), (t-1, xs))
     }
+  ))
 
   /**
     * Postpone expressed with monad comprehension. Placed here, to avoid creating more
