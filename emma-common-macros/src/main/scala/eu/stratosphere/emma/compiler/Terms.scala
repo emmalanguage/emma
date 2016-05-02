@@ -255,7 +255,7 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
         val constructor = (clazz decl Term.name.init).asTerm
         val tpe = if (types.isEmpty) clazz else Type(clazz, types: _*)
 
-        val tpt = New(Type.tree(tpe))
+        val tpt = New(Type.quote(tpe))
         setType(tpt, tpe)
 
         val inst = app(sel(tpt, constructor))(argss: _*)
