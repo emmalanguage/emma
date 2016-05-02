@@ -2,7 +2,6 @@ package eu.stratosphere.emma
 package compiler
 
 import scala.annotation.tailrec
-import scala.reflect.ClassTag
 
 /** Utility for terms. */
 trait Terms extends Util { this: Trees with Types with Symbols =>
@@ -183,7 +182,7 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
       }
 
       def unapply(id: Ident): Option[TermSymbol] =
-        if (id.isTerm) Some(Term sym id) else None
+        if (id.isTerm && Has.sym(id)) Some(Term sym id) else None
     }
 
     /** Term member selection. */
@@ -211,7 +210,7 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
 
       /** Returns `target` applied to the (type) arguments. */
       @tailrec
-      def apply(target: Tree, types: Type*)(argss: Seq[Tree]*): Tree = {
+      def apply(target: Tree, types: Type*)(argss: Seq[Tree]*): Apply = {
         assert(Has tpe target, s"Untyped target:\n$target")
         assert(types forall Is.defined, "Unspecified type arguments")
         assert(argss.flatten forall Has.tpe, "Untyped arguments")
@@ -222,18 +221,85 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
           } else argss.foldLeft(target) { (tgt, args) =>
             val app = Apply(tgt, args.toList)
             setType(app, Type result target)
-          }
+          }.asInstanceOf[Apply]
         } else {
           val typeApp = Type.app(target, types: _*)
           apply(typeApp)(argss: _*)
         }
       }
 
-      def unapplySeq(tree: Tree): Option[(Tree, Seq[Type], Seq[Seq[Tree]])] = tree match {
-        case q"${target: Tree}[..${types: Seq[Tree]}](...${argss: Seq[Seq[Tree]]})" =>
-          Some(target, types map Type.of, argss)
+      def unapplySeq(tree: Apply): Option[(Tree, Seq[Type], Seq[Seq[Tree]])] = tree match {
+        case Apply(TypeApply(fn, targs), args) =>
+          Some(fn, targs map Type.of, Seq(args))
+        case Apply(app: Apply, args) => unapplySeq(app) match {
+          case Some((fn, targs, argss)) => Some(fn, targs, argss :+ args)
+          case None => None
+        }
+        case Apply(fn, args) =>
+          Some(fn, Nil, Seq(args))
         case _ => None
       }
+    }
+
+    /** Object creation / class instantiation. */
+    object inst {
+
+      /** Returns a new class instantiation. */
+      def apply(target: TypeSymbol, types: Type*)(argss: Seq[Tree]*): Tree = {
+        assert(Is valid target, s"Invalid target: `$target`")
+        assert(types forall Is.defined, "Unspecified type arguments")
+        assert(argss forall (_ forall Has.tpe), "Untyped arguments")
+
+        // TODO: Handle alternatives properly
+        val clazz = Type fix target.toType.typeConstructor
+        val constructor = (clazz decl Term.name.init).asTerm
+        val tpe = if (types.isEmpty) clazz else Type(clazz, types: _*)
+
+        val tpt = New(Type.quote(tpe))
+        setType(tpt, tpe)
+
+        val inst = app(sel(tpt, constructor))(argss: _*)
+
+        setSymbol(inst, constructor)
+        setType(inst, tpe)
+      }
+
+      /** Returns a new class instantiation. */
+      def apply(tpe: Type, types: Type*)(argss: Seq[Tree]*): Tree =
+        apply(tpe.typeSymbol.asType, types: _*)(argss: _*)
+
+      def unapplySeq(tree: Tree): Option[(TypeSymbol, Seq[Type], Seq[Seq[Tree]])] = tree match {
+        case app(sel(New(clazz), _), _, argss@_*) =>
+          Some(Type sym clazz, (Type of clazz).typeArgs, argss)
+        case _ =>
+          None
+      }
+    }
+
+    /** Anonymous Functions. */
+    object lambda {
+
+      /** Returns a new anonymous function. */
+      def apply(args: TermSymbol*)(body: Tree): Function = {
+        assert(args forall Is.valid, "Invalid lambda parameters")
+        assert(Is valid body, "Invalid lambda body")
+        assert(Has tpe body, s"Invalid expression:\n$body")
+        val types = args map Type.of
+        val T = Type.fun(types: _*)(Type of body)
+        val anon = Term.sym.free(Term.name.lambda, T)
+        val argFlags = Flag.SYNTHETIC | Flag.PARAM
+        val params = for ((arg, tpe) <- args zip types) yield
+          Term.sym(anon, arg.name, tpe, argFlags)
+
+        val paramList = params.map(Tree.val_(_, flags = argFlags)).toList
+        val rhs = Owner.at(anon)(Tree.rename(body, args zip params: _*))
+        val fun = Function(paramList, rhs)
+        setSymbol(fun, anon)
+        setType(fun, T)
+      }
+
+      def unapply(fun: Function): Option[(TermSymbol, Seq[TermSymbol], Tree)] =
+        Some(Term sym fun, fun.vparams.map(Term sym _), fun.body)
     }
   }
 }

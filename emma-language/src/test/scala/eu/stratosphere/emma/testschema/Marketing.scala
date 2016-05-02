@@ -7,6 +7,8 @@ import eu.stratosphere.emma.api.DataBag
 /** A simple domain for marketing, consisting of ads and ad views. */
 object Marketing {
 
+  val DEFAULT_CLASS = AdClass.FASHION
+
   case class Name(first: String, last: String)
 
   case class User(id: Long, name: Name, password: String)

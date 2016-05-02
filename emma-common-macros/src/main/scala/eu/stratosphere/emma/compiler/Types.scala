@@ -265,12 +265,12 @@ trait Types extends Util { this: Trees with Symbols =>
       q"{ ..${imports map Tree.impAll}; $tree }"
     }.asInstanceOf[Block].expr
 
-    /** Returns a tree representation of `tpe`. */
+    /** Returns a synthetic [[TypeTree]] representation of `tpe`. */
     def quote(tpe: Type): TypeTree =
       if (Is defined tpe) TypeTree(fix(tpe))
       else TypeTree()
 
-    /** Returns a tree representation of `sym`'s type. */
+    /** Returns a synthetic [[TypeTree]] representation of `sym`'s type. */
     def quote(sym: Symbol): TypeTree =
       if (Has tpe sym) quote(of(sym))
       else TypeTree()
