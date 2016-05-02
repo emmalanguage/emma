@@ -275,27 +275,6 @@ trait Types extends Util { this: Trees with Symbols =>
       if (Has tpe sym) quote(of(sym))
       else TypeTree()
 
-    /** Returns a direct [[Tree]] representation of `sym`'s type. */
-    def tree(tpe: Type): Tree =
-      if (Is defined tpe) {
-        val ftpe = fix(tpe)
-        val ftpeArgs = fix(tpe).typeArgs
-
-        val tree  =
-          if (ftpeArgs.isEmpty) Tree.resolve(ftpe.typeSymbol)
-          else AppliedTypeTree(Tree.resolve(ftpe.typeSymbol), ftpeArgs.map(t => Tree.resolve(t.typeSymbol)))
-
-        setSymbol(tree, ftpe.typeSymbol)
-        setType(tree, ftpe)
-      } else {
-        EmptyTree
-      }
-
-    /** Returns a direct [[Tree]] representation of `sym`'s type. */
-    def tree(sym: Symbol): Tree =
-      if (Has tpe sym) tree(of(sym))
-      else EmptyTree
-
     /** Returns a tree representation of `T`. */
     def quote[T: TypeTag]: TypeTree =
       quote(Type[T])
