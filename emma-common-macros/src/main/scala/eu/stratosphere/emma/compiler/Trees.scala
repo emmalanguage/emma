@@ -470,7 +470,7 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       }
     }
 
-    object mat {
+    object match_ {
 
       def apply(sel: Tree, cases: List[CaseDef]): Match = {
         assert(Has tpe sel, s"Untyped selector:\n${debug(sel)}")
