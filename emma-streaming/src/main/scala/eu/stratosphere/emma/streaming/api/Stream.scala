@@ -69,11 +69,4 @@ object Stream {
 
   val naturals: Stream[Int] = unfold[Int, Int](0, x => (x + 1, x + 1))
 
-  // todo define it based on unfold
-//  def flattenSeqs[A](xs: => Stream[Seq[A]]): Stream[A] =
-//    if (xs.head.isEmpty) {
-//      flattenSeqs(xs.tail)
-//    } else {
-//      Stream(xs.head.head, flattenSeqs(Stream(xs.head.tail, xs.tail)))
-//    }
 }

@@ -4,14 +4,6 @@ import eu.stratosphere.emma.api.DataBag
 
 import scala.collection.immutable.{Stream => _}
 
-/*
-  todo
-    tests
-    stateful computation reconsideration
-    count-based windows
-      (delta-windows, finding peeks)
-    further examples
- */
 sealed class StreamBag[+A](private[streaming] val sb: Stream[DataBag[A]]) {
 
   // --------------------------------------------------------
@@ -89,7 +81,7 @@ object StreamBag {
   def flatten[B](xss: StreamBag[StreamBag[B]]): StreamBag[B] = {
     val ssb: Stream[Stream[DataBag[B]]] =
       xss.sb.map(_.fold(StreamBag.empty[B])(identity, (x, y) => x.plus(y)))
-    StreamBag.alternativeStreamFlatten(ssb)
+    StreamBag.monoidStreamFlatten(ssb)
   }
 
   def unit[A](a: => A): StreamBag[A] = fromBag(DataBag(Seq(a)))
@@ -127,7 +119,6 @@ object StreamBag {
   def isEmptyFold[A]: (Boolean, A => Boolean, (Boolean, Boolean) => Boolean) =
     (true, _ => false, (b1, b2) => b1 && b2)
 
-  // todo express Bag as Monoid
   /**
     * Monad join of Stream[M] where M is a commutative monoid. Used to combine
     * this with Bag monad.
@@ -139,7 +130,7 @@ object StreamBag {
     * @return
     * Flat stream.
     */
-  def alternativeStreamFlatten[A](xss0: Stream[Stream[DataBag[A]]]): Stream[DataBag[A]] = {
+  def monoidStreamFlatten[A](xss0: Stream[Stream[DataBag[A]]]): Stream[DataBag[A]] = {
 
     val curr: Stream[Stream[DataBag[A]]] => DataBag[A] = _.head.head
 
