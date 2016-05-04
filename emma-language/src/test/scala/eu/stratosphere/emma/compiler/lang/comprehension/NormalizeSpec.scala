@@ -9,9 +9,9 @@ import eu.stratosphere.emma.testschema.Marketing._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-/** A spec for resugaring comprehensions. */
+/** A spec for comprehension normalization. */
 @RunWith(classOf[JUnitRunner])
-class NormalizationSpec extends BaseCompilerSpec {
+class NormalizeSpec extends BaseCompilerSpec {
 
   import compiler._
   import universe._
