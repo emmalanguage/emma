@@ -1,4 +1,4 @@
-package eu.stratosphere.emma.compiler.lang
+package eu.stratosphere.emma.compiler.lang.source
 
 import eu.stratosphere.emma.compiler.Common
 

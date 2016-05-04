@@ -1,9 +1,9 @@
-package eu.stratosphere.emma.compiler.lang
+package eu.stratosphere.emma.compiler.lang.core
 
 import eu.stratosphere.emma.compiler.Common
+import eu.stratosphere.emma.compiler.lang.comprehension.Comprehension
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 
 /** Let-normal form language. */
 trait Core extends Common with Comprehension {

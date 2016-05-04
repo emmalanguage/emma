@@ -1,7 +1,9 @@
 package eu.stratosphere.emma
 package compiler
 
-import eu.stratosphere.emma.compiler.lang.{AlphaEq, Core, Source}
+import eu.stratosphere.emma.compiler.lang.source.Source
+import eu.stratosphere.emma.compiler.lang.AlphaEq
+import eu.stratosphere.emma.compiler.lang.core.Core
 
 import scala.reflect.api.Universe
 
