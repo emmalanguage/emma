@@ -12,8 +12,6 @@ package eu.stratosphere.emma.streaming.backend.api
   * Handler of [[MetaMessage]]s.
   * @param deserializer
   * Deserializer of input messages.
-  * @param serializer
-  * Serializer of output messages.
   * @tparam S
   * Type of operator state.
   * @tparam IN
@@ -25,8 +23,8 @@ case class InputHandler[S, IN, OUT](
                                      inputName: String,
                                      handler: Handler[S, IN, OUT],
                                      metaHandler: Handler[S, MetaMessage, MetaMessage],
-                                     deserializer: Serializer[IN],
-                                     serializer: Serializer[OUT])
+                                     deserializer: Serializer[IN]
+                                   )
 
 /**
   * Stateful operator that can take multiple type of inputs.
@@ -36,6 +34,12 @@ case class InputHandler[S, IN, OUT](
   * Separate handlers.
   * @param parallelism
   * Number of operator instances to create.
+  * @param serializer
+  * Serializer of output messages.
+  * @param partitioner
+  * Partitioner of output values.
+  * @param metaMsgPartitioner
+  * Partitioner of [[MetaMessage]]s.
   * @param initState
   * Initial operator state.
   * @tparam S
@@ -43,5 +47,10 @@ case class InputHandler[S, IN, OUT](
   * @tparam OUT
   * Type of output.
   */
-case class Operator[S, OUT](inputs: Seq[InputHandler[S, _, OUT]], val parallelism: Int, initState: S)
+case class Operator[S, OUT](inputs: Seq[InputHandler[S, _, OUT]],
+                            parallelism: Int,
+                            serializer: Serializer[OUT],
+                            partitioner: Partitioner[OUT],
+                            metaMsgPartitioner: Partitioner[MetaMessage],
+                            initState: S)
 

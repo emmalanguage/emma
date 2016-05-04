@@ -11,5 +11,8 @@ package eu.stratosphere.emma.streaming.backend.api
   * Type of output.
   */
 trait Handler[S, IN, OUT] {
-  def process(in: IN, collector: Collector[OUT], state: S): Unit
+  def process(in: IN,
+              collector: Collector[OUT],
+              metaMsgCollector: Collector[MetaMessage],
+              state: S): Unit
 }

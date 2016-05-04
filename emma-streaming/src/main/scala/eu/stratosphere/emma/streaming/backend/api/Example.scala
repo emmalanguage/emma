@@ -45,7 +45,10 @@ object Example {
     // handle integer source, count incoming values
     val inpHandler1 = new InputHandler[GetSetState[Int], Int, String]("src1",
       new Handler[GetSetState[Int], Int, String] {
-        override def process(in: Int, collector: Collector[String], state: GetSetState[Int]): Unit = {
+        override def process(in: Int,
+                             collector: Collector[String],
+                             metaMsgCollector: Collector[MetaMessage],
+                             state: GetSetState[Int]): Unit = {
           val cnt = state.get()
           state.set(cnt + 1)
 
@@ -53,16 +56,21 @@ object Example {
         }
       },
       new Handler[GetSetState[Int], MetaMessage, MetaMessage] {
-        override def process(in: MetaMessage, collector: Collector[MetaMessage], state: GetSetState[Int]): Unit = ???
+        override def process(in: MetaMessage,
+                             collector: Collector[MetaMessage],
+                             metaMsgCollector: Collector[MetaMessage],
+                             state: GetSetState[Int]): Unit = {}
       },
-      deserializer = null,
-      serializer = null
+      deserializer = null
     )
 
     // handle string source, count incoming values
     val inpHandler2 = new InputHandler[GetSetState[Int], String, String]("src2",
       new Handler[GetSetState[Int], String, String] {
-        override def process(in: String, collector: Collector[String], state: GetSetState[Int]): Unit = {
+        override def process(in: String,
+                             collector: Collector[String],
+                             metaMsgCollector: Collector[MetaMessage],
+                             state: GetSetState[Int]): Unit = {
           val cnt = state.get()
           state.set(cnt + 1)
 
@@ -70,15 +78,23 @@ object Example {
         }
       },
       new Handler[GetSetState[Int], MetaMessage, MetaMessage] {
-        override def process(in: MetaMessage, collector: Collector[MetaMessage], state: GetSetState[Int]): Unit = ???
+        override def process(in: MetaMessage,
+                             collector: Collector[MetaMessage],
+                             metaMsgCollector: Collector[MetaMessage],
+                             state: GetSetState[Int]): Unit = {}
       },
-      deserializer = null,
-      serializer = null
+      deserializer = null
     )
 
     // add an operator that takes the 2 sources and counts incoming values
     dag.addOperator("op1",
-      new Operator[GetSetState[Int], String](Seq(inpHandler1, inpHandler2), 4, new VarGetSetState[Int](0)))
+      new Operator[GetSetState[Int], String](
+        Seq(inpHandler1, inpHandler2),
+        parallelism = 4,
+        serializer = null,
+        partitioner = null,
+        metaMsgPartitioner = null,
+        new VarGetSetState[Int](0)))
 
     // execute job
     dag.execute()
