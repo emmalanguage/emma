@@ -24,14 +24,14 @@ import eu.stratosphere.emma.streaming.extended.ExtendedStreamBag._
  */
 
 /**
-  * Time interval (left-closed, right-open). Start time data points
-  * will be included, end time data points will be excluded.
-  *
-  * @param start
-  * Start time of the window (included).
-  * @param end
-  * End time of the window (excluded).
-  */
+ * Time interval (left-closed, right-open). Start time data points
+ * will be included, end time data points will be excluded.
+ *
+ * @param start
+ * Start time of the window (included).
+ * @param end
+ * End time of the window (excluded).
+ */
 case class Window(start: Int, end: Int)
 
 // todo tests
@@ -109,10 +109,22 @@ object Windows {
         })
     }
 
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     val xs: StreamBag[Int] = Stream.naturals
-    val ys: StreamBag[Char] = Seq(DataBag(Seq('a', 'b', 'b')), DataBag(Seq('c', 'd')), DataBag(), DataBag(), DataBag(Seq('d', 'a', 'e')))
-    val ys2: StreamBag[Char] = Seq(DataBag(), DataBag(), DataBag(Seq('a', 'b', 'b')), DataBag(Seq('c', 'd')), DataBag(), DataBag(), DataBag(Seq('d', 'a', 'e')))
+    val ys: StreamBag[Char] = Seq(
+      DataBag(Seq('a', 'b', 'b')),
+      DataBag(Seq('c', 'd')),
+      DataBag(),
+      DataBag(),
+      DataBag(Seq('d', 'a', 'e')))
+    val ys2: StreamBag[Char] = Seq(
+      DataBag(),
+      DataBag(),
+      DataBag(Seq('a', 'b', 'b')),
+      DataBag(Seq('c', 'd')),
+      DataBag(),
+      DataBag(),
+      DataBag(Seq('d', 'a', 'e')))
     val zs: StreamBag[Int] = Seq(DataBag(Seq(2)), DataBag(Seq(3, 1)))
     val b: DataBag[String] = DataBag(Seq("anna", "emma"))
 

@@ -120,16 +120,16 @@ object StreamBag {
     (true, _ => false, (b1, b2) => b1 && b2)
 
   /**
-    * Monad join of Stream[M] where M is a commutative monoid. Used to combine
-    * this with Bag monad.
-    *
-    * @param xss0
-    * Doubly-nested stream to flatten.
-    * @tparam A
-    * Type of stream.
-    * @return
-    * Flat stream.
-    */
+   * Monad join of Stream[M] where M is a commutative monoid. Used to combine
+   * this with Bag monad.
+   *
+   * @param xss0
+   * Doubly-nested stream to flatten.
+   * @tparam A
+   * Type of stream.
+   * @return
+   * Flat stream.
+   */
   def monoidStreamFlatten[A](xss0: Stream[Stream[DataBag[A]]]): Stream[DataBag[A]] = {
 
     val curr: Stream[Stream[DataBag[A]]] => DataBag[A] = _.head.head

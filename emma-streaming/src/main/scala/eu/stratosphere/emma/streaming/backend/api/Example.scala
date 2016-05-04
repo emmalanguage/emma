@@ -1,8 +1,8 @@
 package eu.stratosphere.emma.streaming.backend.api
 
 /**
-  * This is an example for the target language.
-  */
+ * This is an example for the target language.
+ */
 object Example {
 
   trait GetSetState[S] {
