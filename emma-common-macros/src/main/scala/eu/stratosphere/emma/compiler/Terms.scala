@@ -141,11 +141,11 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
     object lit {
 
       /** Returns a new literal containing `const`. */
-      def apply[A](const: A): Literal =
-        Type.check(Literal(Constant(const))).asInstanceOf[Literal]
+      def apply[A](value: A): Literal =
+        Type.check(Literal(Constant(value))).asInstanceOf[Literal]
 
       def unapply(lit: Literal): Option[Any] = lit match {
-        case Literal(Constant(const: Any)) => Some(const)
+        case Literal(const@Constant(_)) => Some(const.value)
         case _ => None
       }
     }
@@ -191,9 +191,9 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
     object ref {
 
       /** Returns a term reference to `sym` (use `quoted=true` for Unicode support). */
-      def apply(sym: TermSymbol, quoted: Boolean = false): Ident = {
+      def apply(sym: TermSymbol): Ident = {
         assert(Is valid sym, s"Invalid symbol: `$sym`")
-        val id = if (quoted) q"`$sym`".asInstanceOf[Ident] else Ident(sym)
+        val id = Ident(sym)
         setType(id, Type of sym)
         setSymbol(id, sym)
       }
@@ -281,10 +281,6 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
         setSymbol(inst, constructor)
         setType(inst, tpe)
       }
-
-      /** Returns a new class instantiation. */
-      def apply(tpe: Type, types: Type*)(argss: Seq[Tree]*): Tree =
-        apply(tpe.typeSymbol.asType, types: _*)(argss: _*)
 
       def unapplySeq(tree: Tree): Option[(TypeSymbol, Seq[Type], Seq[Seq[Tree]])] = tree match {
         case app(sel(New(clazz), _), _, argss@_*) =>

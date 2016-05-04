@@ -216,7 +216,7 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
         assert(rhs.isEmpty || (Has.tpe(rhs) && Type.of(rhs).weak_<:<(Type of lhs)),
           "LHS and RHS types don't match")
 
-        val mods = Modifiers(flags)
+        val mods = Modifiers(flags | Flag.SYNTHETIC)
         val T = Type quote Type.of(lhs)
         val body = if (rhs.isEmpty) rhs else Owner.at(lhs)(rhs)
         val value = ValDef(mods, lhs.name, T, body)
@@ -411,7 +411,7 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
       /** Returns a new assignment `lhs = rhs`. */
       def apply(lhs: Tree, rhs: Tree): Assign = {
         val assign = Assign(lhs, rhs)
-        setType(assign, NoType)
+        setType(assign, Type.unit)
       }
 
       def unapply(assign: Assign): Option[(Tree, Tree)] = assign match {
@@ -552,25 +552,34 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     }
 
     /** Returns a new simple method (i.e. with single arg list and no generics). */
-    def simple(sym: MethodSymbol,
-      flags: FlagSet = Flag.SYNTHETIC)
-      (args: TermSymbol*)
-      (body: Tree*): DefDef = {
+    object def_ {
+      def apply(sym: MethodSymbol, flags: FlagSet = Flag.SYNTHETIC)
+        (params: TermSymbol*)
+        (body: Block): DefDef = {
 
-      assert(Is valid sym, s"Invalid method symbol: `$sym`")
-      assert(args forall Is.valid, "Unspecified method parameters")
-      assert(body forall Is.valid, "Invalid method body")
-      assert(Has tpe body.last, s"Invalid expression:\n${body.last}")
-      val bodyBlock = if (body.size == 1) body.head else block(body: _*)
-      val argFlags = Flag.SYNTHETIC | Flag.PARAM
-      val params = for (arg <- args) yield
-        Term.sym(sym, arg.name, Type of arg, argFlags)
+        assert(Is valid sym, s"Invalid method symbol: `$sym`")
+        assert(params forall Is.valid, "Unspecified method parameters")
+        assert(Is valid body, "Invalid method body")
+        assert(Has tpe body, s"Invalid expression:\n$body")
 
-      val paramLists = params.map(val_(_)).toList :: Nil
-      val rhs = Owner.at(sym)(rename(bodyBlock, args zip params: _*))
-      val method = defDef(sym, Modifiers(flags), paramLists, rhs)
-      setSymbol(method, sym)
-      setType(method, NoType)
+        // generate fresh parameter symbols and derive from them the method parameter ValDefs
+        val syms = for (sym <- params) yield Term.sym(sym, sym.name, Type of sym)
+        val pars = for (sym <- syms) yield val_(sym, flags = Flag.SYNTHETIC | Flag.PARAM)
+        // substitute the origianl with the fresh parameter symbols in the method body
+        val rhs = Owner.at(sym)(rename(body, params zip syms: _*))
+        // assemble the method definition
+        val method = defDef(sym, Modifiers(flags | Flag.SYNTHETIC), List(pars.toList), rhs)
+
+        setSymbol(method, sym)
+        setType(method, NoType) // FIXME: Why do we have a method symbol without a type?
+      }
+
+      def unapply(dd: DefDef): Option[(MethodSymbol, FlagSet, List[TermSymbol], Block)] = dd match {
+        case DefDef(mods, _, Nil, List(params), _, body: Block) =>
+          Some(dd.symbol.asMethod, mods.flags, params.map(_.symbol.asTerm), body)
+        case _ =>
+          None
+      }
     }
 
     /** Returns a new lambda function wrapping `method`. */
