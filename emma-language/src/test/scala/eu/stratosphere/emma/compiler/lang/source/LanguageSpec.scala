@@ -1,8 +1,11 @@
-package eu.stratosphere.emma.compiler.lang.source
+package eu.stratosphere
+package emma.compiler
+package lang
+package source
 
-import eu.stratosphere.emma.api.DataBag
-import eu.stratosphere.emma.compiler.BaseCompilerSpec
-import eu.stratosphere.emma.testschema.Marketing._
+import emma.api.DataBag
+import emma.testschema.Marketing._
+
 import org.example.foo.{Bar, Baz}
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -14,39 +17,68 @@ class LanguageSpec extends BaseCompilerSpec {
   import compiler._
   import universe._
   import Source.Language._
+  import Source.valid
+  import Validation._
 
-  def validate: Tree => Boolean = {
-    time(Source.validate(_), "validate")
-  }
+  def satisfy(validator: Validator) =
+    be (good) compose { (tree: Tree) =>
+      time(validateAs(validator, tree), "validate")
+    }
 
-  val repair: Tree => Tree =
-    Owner.at(Owner.enclosing)
+  override def alphaEqTo(tree: Tree) =
+    super.alphaEqTo(Owner.at(Owner.enclosing)(tree))
+
+  def `type-check and extract from`[A](expr: Expr[A]) =
+    Type.check(expr.tree) match {
+      case Apply(_, args) => args
+      case Block(stats, _) => stats
+    }
 
   // ---------------------------------------------------------------------------
   // atomics
   // ---------------------------------------------------------------------------
+
+  "this" - {
+    // modeled by
+    // - `this_` objects in `Source.Language`
+    // - `This(qual)` nodes in Scala ASTs
+
+    val examples = `type-check and extract from`(reify {
+      class A { println(this.toString) }
+      class B { println(LanguageSpec.this.x) }
+      object C { println(this.hashCode) }
+    }).flatMap(_ collect {
+      case ths: This => ths
+    })
+
+    assert(examples.nonEmpty, "No spec examples given")
+
+    "are valid language constructs" in {
+      all (examples) should satisfy (valid.this_)
+    }
+
+    "can be destructed and constructed" in {
+      examples foreach { case x@this_(sym) =>
+        x shouldBe alphaEqTo (this_(sym, x.qual.nonEmpty))
+      }
+    }
+  }
 
   "literals" - {
     // modeled by
     // - `lit` objects in `Source.Language`
     // - `Literal(Constant(value))` nodes in Scala ASTs
 
-    val examples: List[Tree] = List(
-      typeCheck(reify(42)),
-      typeCheck(reify(4.2)),
-      typeCheck(reify("42")))
-
+    val examples = `type-check and extract from`(reify(42, 4.2, "42"))
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (t <- examples)
-        validate(t) shouldBe true
+      all (examples) should satisfy (valid.lit)
     }
 
     "can be destructed and constructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (lit(const), i) =>
-          examples(i) shouldBe alphaEqTo(repair(lit(const)))
+      examples foreach { case x@lit(const) =>
+        x shouldBe alphaEqTo (lit(const))
       }
     }
   }
@@ -60,22 +92,16 @@ class LanguageSpec extends BaseCompilerSpec {
     val v = 4.2
     val w = "42"
 
-    val examples: List[Tree] = List(
-      typeCheck(reify(u)),
-      typeCheck(reify(v)),
-      typeCheck(reify(w)))
-
+    val examples = `type-check and extract from`(reify(u, v, w))
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (t <- examples)
-        validate(t) shouldBe true
+      all (examples) should satisfy (valid.ref)
     }
 
     "can be destructed and constructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (ref(sym), i) =>
-          examples(i) shouldBe alphaEqTo(repair(ref(sym)))
+      examples foreach { case x@ref(sym) =>
+        x shouldBe alphaEqTo (ref(sym))
       }
     }
   }
@@ -89,21 +115,16 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `sel` objects in `Source.Language`
     // - `Select(qualifier, name)` nodes in Scala ASTs
 
-    val examples: List[Tree] = List(
-      typeCheck(reify(t._2)),
-      typeCheck(reify(DEFAULT_CLASS)))
-
+    val examples = `type-check and extract from`(reify(t._2, DEFAULT_CLASS))
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (t <- examples)
-        validate(t) shouldBe true
+      all (examples) should satisfy (valid.sel)
     }
 
     "can be destructed and constructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (sel(tgt, member), i) =>
-          examples(i) shouldBe alphaEqTo(repair(sel(tgt, member)))
+      examples foreach { case x@sel(tgt, member) =>
+        x shouldBe alphaEqTo (sel(tgt, member))
       }
     }
   }
@@ -113,37 +134,26 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `app` objects in `Source.Language`
     // - `Apply(fun, args)` nodes in Scala ASTs
 
-    val examples: List[Tree] = List(
-      typeCheck(reify {
-        x == 42
-      }),
-      typeCheck(reify {
-        scala.Predef.println(y)
-      }),
-      typeCheck(reify {
-        y.substring(1)
-      }),
-      typeCheck(reify {
-        ((x: Int, y: Int) => x + y) (x, x)
-      }),
-      typeCheck(reify {
-        Seq(x, x)
-      }),
-      typeCheck(reify {
-        DataBag(xs.fetch())
-      }))
+    val examples = `type-check and extract from`(reify(
+      x == 42,
+      scala.Predef.println(y),
+      y.substring(1),
+      ((x: Int, y: Int) => x + y) (x, x),
+      Seq(x, x),
+      DataBag(xs.fetch()),
+      List.canBuildFrom[Int],
+      DataBag(Seq(1, 2, 3)).sum
+    )) map Type.ascription.remove
 
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (x <- examples)
-        validate(x) shouldBe true
+      all (examples) should satisfy (valid.app)
     }
 
     "can be constructed and destructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (app(fn, targs, argss), i) =>
-          examples(i) shouldBe alphaEqTo(repair(app(fn, targs: _*)(argss)))
+      examples foreach { case x@app(target, targs, argss@_*) =>
+        x shouldBe alphaEqTo (app(target, targs: _*)(argss: _*))
       }
     }
   }
@@ -154,26 +164,26 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `Apply(tpt: New, _)` nodes in Scala ASTs
 
     // Resolves type examples `tpt` occurring in `New(tpt)`
-    def fix: Tree => Tree = preWalk {
-      case New(tpt: Tree) => New(Type.quote(tpt.tpe)) // or Type.tree(tpt.tpe)
+    val fix: Tree => Tree = preWalk {
+      case New(tpt: Tree) =>
+        New(Type quote tpt.tpe) // or Type.tree(tpt.tpe)
     }
 
-    val examples: List[Tree] = List(
-      (typeCheck andThen fix) (reify(new Ad(1, "Uber AD", AdClass.SERVICES))),
-      (typeCheck andThen fix) (reify(new Baz(x))),
-      (typeCheck andThen fix) (reify(new Bar[Int](x))))
+    val examples = `type-check and extract from`(reify(
+      new Ad(1, "Uber AD", AdClass.SERVICES),
+      new Baz(x),
+      new Bar[Int](x)
+    )) map fix
 
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (x <- examples)
-        validate(x) shouldBe true
+      all (examples) should satisfy (valid.inst)
     }
 
     "can be constructed and destructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (inst(clazz, targs, argss@_*), i) =>
-          examples(i) shouldBe alphaEqTo(repair(inst(clazz, targs: _*)(argss: _*)))
+      examples foreach { case x@inst(clazz, targs, argss@_*) =>
+        x shouldBe alphaEqTo (inst(clazz, targs: _*)(argss: _*))
       }
     }
   }
@@ -183,20 +193,23 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `lambda` objects in `Source.Language`
     // - `Function(args, body)` nodes nodes in Scala ASTs
 
-    val examples: List[Tree] = List(
-      typeCheck(reify((x: Int, y: Int) => x + y)))
+    val examples = `type-check and extract from`(reify(
+      (x: Int, y: Int) => x + y,
+      "ellipsis".charAt _
+    )) flatMap {
+      case Block(stats, _) => stats
+      case tree => tree :: Nil
+    }
 
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (x <- examples)
-        validate(x) shouldBe true
+      all (examples) should satisfy (valid.lambda)
     }
 
     "can be constructed and destructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (lambda(sym, params, body), i) =>
-          examples(i) shouldBe alphaEqTo(repair(lambda(params: _*)(body)))
+      examples foreach { case x@lambda(sym, params, body) =>
+        x shouldBe alphaEqTo (lambda(params: _*)(body))
       }
     }
   }
@@ -206,21 +219,20 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `inst` objects in `Source.Language`
     // - `Typed(expr, tpt)` nodes nodes in Scala ASTs
 
-    val examples: List[Tree] = List(
-      typeCheck(reify(x: Number)),
-      typeCheck(reify(t: (Any, String))))
+    val examples = `type-check and extract from`(reify(
+      x: Number,
+      t: (Any, String)
+    ))
 
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (x <- examples)
-        validate(x) shouldBe true
+      all (examples) should satisfy (valid.typed)
     }
 
     "can be constructed and destructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (typed(tree, tpe), i) =>
-          examples(i) shouldBe alphaEqTo(repair(typed(tree, tpe)))
+      examples foreach { case x@typed(tree, tpe) =>
+        x shouldBe alphaEqTo (typed(tree, tpe))
       }
     }
   }
@@ -234,28 +246,20 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `val_` objects in `Source.Language`
     // - `ValDef(lhs, rhs)` nodes nodes in Scala ASTs
 
-    val examples: List[Tree] = List(
-      typeCheck(reify {
-        val u = s"$x is $y"
-      }),
-      typeCheck(reify {
-        val u = 42
-      }))
-      .collect {
-        case Block((vd: ValDef) :: Nil, _) => vd
-      }
+    val examples = `type-check and extract from`(reify {
+      val u = s"$x is $y"
+      val v = 42
+    }) map { case vd: ValDef => vd }
 
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (x <- examples)
-        validate(x) shouldBe true
+      all (examples) should satisfy (valid.val_)
     }
 
     "can be constructed and destructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (val_(lhs, rhs, flags), i) =>
-          examples(i) shouldBe alphaEqTo(repair(val_(lhs, rhs, flags)))
+      examples foreach { case x@val_(lhs, rhs, flags) =>
+        x shouldBe alphaEqTo (val_(lhs, rhs, flags))
       }
     }
   }
@@ -265,31 +269,24 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `val_` objects in `Source.Language`
     // - `Assign(lhs, rhs)` nodes nodes in Scala ASTs
 
-    var u = "still a ValDef but mutable"
-    var w = 42
-    val examples: List[Tree] = List(
-      typeCheck(reify {
-        u = "an updated ValDef"
-      }),
-      typeCheck(reify {
-        w = w + 1
-      }))
-      .flatMap(_ find {
-        case ass: Assign => true
-        case _ => false
-      })
+    val examples = `type-check and extract from`(reify {
+      var u = "still a ValDef but mutable"
+      var w = 42
+      u = "an updated ValDef"
+      w = w + 1
+    }) collect {
+      case assign: Assign => assign
+    }
 
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (x <- examples)
-        validate(x) shouldBe true
+      all (examples) should satisfy (valid.assign)
     }
 
     "can be constructed and destructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (assign(lhs, rhs), i) =>
-          examples(i) shouldBe alphaEqTo(repair(assign(lhs, rhs)))
+      examples foreach { case x@assign(lhs, rhs) =>
+        x shouldBe alphaEqTo (assign(lhs, rhs))
       }
     }
   }
@@ -299,23 +296,20 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `block` objects in `Source.Language`
     // - `Block(stats, expr)` nodes nodes in Scala ASTs
 
-    val examples: List[Tree] = List(
-      typeCheck(reify {
-        val z = 5
-        x + z
-      }))
+    val examples = `type-check and extract from`(reify(
+      { val z = 5; x + z },
+      t._2 + "implicit unit": Unit
+    )) map Type.ascription.remove
 
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (x <- examples)
-        validate(x) shouldBe true
+      all (examples) should satisfy (valid.block)
     }
 
     "can be constructed and destructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (block(stats, expr), i) =>
-          examples(i) shouldBe alphaEqTo(repair(block(stats, expr)))
+      examples foreach { case x@block(stats, expr) =>
+        x shouldBe alphaEqTo (block(stats, expr))
       }
     }
   }
@@ -329,20 +323,20 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `block` objects in `Source.Language`
     // - `If(cond, thenp, elsep)` nodes nodes in Scala ASTs
 
-    val examples: List[Tree] = List(
-      typeCheck(reify(if (x == 42) x else x / 42)))
+    val examples = `type-check and extract from`(reify(
+      if (x == 42) x else x / 42,
+      if (x < 42) "only one branch"
+    ))
 
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (x <- examples)
-        validate(x) shouldBe true
+      all (examples) should satisfy (valid.branch)
     }
 
     "can be constructed and destructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (branch(cond, thn, els), i) =>
-          examples(i) shouldBe alphaEqTo(repair(branch(cond, thn, els)))
+      examples foreach { case x@branch(cond, thn, els) =>
+        x shouldBe alphaEqTo (branch(cond, thn, els))
       }
     }
   }
@@ -352,32 +346,27 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `whiledo` objects in `Source.Language`
     // - `LabelDef(...)` nodes nodes in Scala ASTs
 
-    val examples: List[Tree] = List(
-      typeCheck(reify {
-        var r = 0
-        var i = 0
-        while (i < x) {
-          i = i + 1
-          r = r * i
-        }
-        i * r
-      }))
-      .flatMap(_ find {
-        case ldef: LabelDef => true
-        case _ => false
-      })
+    val examples = `type-check and extract from`(reify {
+      var r = 0
+      var i = 0
+      while (i < x) {
+        i = i + 1
+        r = r * i
+      }
+      i * r
+    }) collect {
+      case loop: LabelDef => loop
+    }
 
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (x <- examples)
-        validate(x) shouldBe true
+      all (examples) should satisfy (valid.whiledo)
     }
 
     "can be constructed and destructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (whiledo(cond, body), i) =>
-          examples(i) shouldBe alphaEqTo(repair(whiledo(cond, body)))
+      examples foreach { case x@whiledo(cond, body) =>
+        x shouldBe alphaEqTo (whiledo(cond, body))
       }
     }
   }
@@ -387,32 +376,27 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `dowhile` objects in `Source.Language`
     // - `LabelDef(...)` nodes nodes in Scala ASTs
 
-    val examples: List[Tree] = List(
-      typeCheck(reify {
-        var i = 0
-        var r = 0
-        do {
-          i = i + 1
-          r = r * i
-        } while (i < x)
-        i * r
-      }))
-      .flatMap(_ find {
-        case ldef: LabelDef => true
-        case _ => false
-      })
+    val examples = `type-check and extract from`(reify {
+      var i = 0
+      var r = 0
+      do {
+        i = i + 1
+        r = r * i
+      } while (i < x)
+      i * r
+    }) collect {
+      case loop: LabelDef => loop
+    }
 
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (x <- examples)
-        validate(x) shouldBe true
+      all (examples) should satisfy (valid.dowhile)
     }
 
     "can be constructed and destructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (dowhile(cond, body), i) =>
-          examples(i) shouldBe alphaEqTo(repair(dowhile(cond, body)))
+      examples foreach { case x@dowhile(cond, body) =>
+        x shouldBe alphaEqTo (dowhile(cond, body))
       }
     }
   }
@@ -426,29 +410,29 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `mat` objects in `Source.Language`
     // - `Match(selector, cases)` nodes nodes in Scala ASTs
 
-    val examples: List[Tree] = List(
-      typeCheck(reify {
-        ((1, 2): Any) match {
-          case (x: Int, _) => x
-          case Ad(id, name, _) => id
-          case Click(adID, userID, time) => adID
-          case _ => 42
-        }
-      }))
+    val examples = `type-check and extract from`(reify(
+      ((1, 2): Any) match {
+        case (x: Int, _) => x
+        case Ad(id, name, _) => id
+        case Click(adID, userID, time) => adID
+        case _ => 42
+      },
+      "binding" match {
+        case s@(_: String) => s + t._2
+      }
+    ))
 
     assert(examples.nonEmpty, "No spec examples given")
 
     "are valid language constructs" in {
-      for (x <- examples)
-        validate(x) shouldBe true
+      all (examples) should satisfy (valid.match_)
     }
 
     "can be constructed and destructed" in {
-      for (t <- examples.zipWithIndex) t match {
-        case (match_(selector, cases), i) =>
-          examples(i) shouldBe alphaEqTo(repair(match_(selector, cases map {
-            case cs@case_(pat, guard, body) => case_(pat, guard, body)
-          })))
+      examples foreach { case x@match_(selector, cases) =>
+        x shouldBe alphaEqTo (match_(selector, cases map {
+          case case_(pat, guard, body) => case_(pat, guard, body)
+        }))
       }
     }
   }

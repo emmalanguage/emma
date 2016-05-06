@@ -1,8 +1,9 @@
-package eu.stratosphere.emma.compiler.lang
+package eu.stratosphere
+package emma.compiler
+package lang
 
-import eu.stratosphere.emma.compiler.Compiler
-import org.scalactic.{Bad, Good}
-import org.scalatest.matchers.{BeMatcher, MatchResult}
+import org.scalactic._
+import org.scalatest.matchers._
 
 trait TreeMatchers {
 
@@ -10,6 +11,8 @@ trait TreeMatchers {
 
   import compiler._
   import universe._
+
+  def alphaEqTo(rhs: Tree) = new AlphaEqMatcher(rhs)
 
   class AlphaEqMatcher(rhs: Tree) extends BeMatcher[Tree] {
     def apply(lhs: Tree) = {
@@ -40,5 +43,12 @@ trait TreeMatchers {
     }
   }
 
-  def alphaEqTo(rhs: Tree) = new AlphaEqMatcher(rhs)
+  object good extends BeMatcher[Any Or Every[Any]] {
+    override def apply(or: Any Or Every[Any]): MatchResult = or match {
+      case Good(ok) =>
+        MatchResult(matches = true, "", s"$ok was good")
+      case Bad(errors) =>
+        MatchResult(matches = false, errors mkString "\n\n", "")
+    }
+  }
 }

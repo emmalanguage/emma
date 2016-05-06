@@ -1,4 +1,8 @@
-package eu.stratosphere.emma.compiler
+package eu.stratosphere
+package emma.compiler
+
+import org.scalactic._
+import org.scalactic.Accumulation._
 
 /** Common IR tools. */
 trait Common extends ReflectUtil {
@@ -62,5 +66,52 @@ trait Common extends ReflectUtil {
     val head /*            */ = module.info.decl(TermName("head")).asTerm
 
     val comprehensionOps /**/ = Set(flatten, generator, comprehension, guard, head)
+  }
+
+  /** Common validation helpers. */
+  object Validation {
+
+    val ok = ()
+    val pass = Good(ok)
+
+    type Valid = Unit
+    type Invalid = Every[Error]
+    type Verdict = Valid Or Invalid
+    type Validator = Tree =?> Verdict
+
+    def validateAs(expected: Validator, tree: Tree,
+      violation: => String = "Unexpected tree"): Verdict = {
+
+      expected.applyOrElse(tree, (unexpected: Tree) => {
+        Bad(One(Error(unexpected, violation)))
+      })
+    }
+
+    def oneOf(allowed: Validator*): Validator =
+      allowed.reduceLeft(_ orElse _)
+
+    case class Error(at: Tree, violation: String) {
+      override def toString = s"$violation:\n${Tree show at}"
+    }
+
+    case class all(trees: Seq[Tree]) {
+      case class are(expected: Validator) {
+        def otherwise(violation: => String): Verdict =
+          if (trees.isEmpty) pass
+          else trees validatedBy expected.orElse {
+            case unexpected => Bad(One(Error(unexpected, violation)))
+          } map (_.head)
+      }
+    }
+
+    object all {
+      def apply(tree: Tree, trees: Tree*): all =
+        apply(tree +: trees)
+    }
+
+    implicit class And(verdict: Verdict) {
+      def and(other: Verdict): Verdict =
+        withGood(verdict, other) { case _ => ok }
+    }
   }
 }
