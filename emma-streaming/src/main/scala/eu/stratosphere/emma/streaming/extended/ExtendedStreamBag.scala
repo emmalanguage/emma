@@ -21,15 +21,6 @@ class ExtendedStreamBag[+A](private val sb: StreamBag[A]) {
   // Miscellaneous.
   // --------------------------------------------------------
 
-  implicit def withTimestamp: StreamBag[Timed[A]] =
-  // this is Stream comprehension, NOT StreamBag
-    for {
-      b <- sb.sb
-      t <- Stream.naturals
-    } yield {
-      b.map(new Timed(t, _))
-    }
-
   override def toString: String = showFirstN(10)
 
   def showFirstN(n: Int): String = sb.sb.take(n)
@@ -71,8 +62,8 @@ class ExtendedStreamBag[+A](private val sb: StreamBag[A]) {
     */
   private def postponeWithComprehension(t: Int): StreamBag[A] =
     for {
-      x <- withTimestamp
-      y <- withTimestamp
+      x <- this.withTimestamp
+      y <- this.withTimestamp
       if y.t - x.t == t
     } yield x.v
 

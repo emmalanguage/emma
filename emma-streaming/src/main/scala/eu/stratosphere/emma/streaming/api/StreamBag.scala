@@ -47,6 +47,15 @@ sealed class StreamBag[+A](private[streaming] val sb: Stream[DataBag[A]]) {
   // Misc
   // --------------------------------------------------------
 
+  def withTimestamp: StreamBag[Timed[A]] =
+  // this is Stream comprehension, NOT StreamBag
+    for {
+      b <- sb
+      t <- Stream.naturals
+    } yield {
+      b.map(new Timed(t, _))
+    }
+
   def distinct() = StreamBag(Stream.unfold[DataBag[A], (Set[A], Stream[DataBag[A]])](
     (Set.empty[A], sb), {
       case (seen, xs) => {
