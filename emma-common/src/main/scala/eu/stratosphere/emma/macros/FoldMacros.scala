@@ -1,6 +1,7 @@
-package eu.stratosphere.emma.macros
+package eu.stratosphere
+package emma.macros
 
-import eu.stratosphere.emma.api.DataBag
+import emma.api.DataBag
 
 import scala.annotation.tailrec
 import scala.language.experimental.macros
@@ -10,9 +11,11 @@ import scala.reflect.macros.blackbox
  * Macro-based implementations of the methods in the `Folds` trait. These sit on top of the core
  * [[DataBag]] API and depend solely on the [[DataBag#fold]] method. Separating them out like this
  * makes for better extensibility and testability.
+ *
  * @param c the current macro context
  */
 class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
+
   import universe._
   import syntax._
 
@@ -20,7 +23,8 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
   private lazy val option = q"_root_.scala.Option"
   private lazy val some = q"_root_.scala.Some"
   private lazy val list = q"_root_.scala.List"
-  private lazy val self = unbox(c.prefix.tree)
+  private lazy val prefix = c.prefix.tree
+  private lazy val self = unbox(prefix)
 
   // Unbox implicit type conversions
   private def unbox(tree: Tree) =
@@ -30,43 +34,35 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
         "Manually instantiating DataBag extensions is not supported")
     }
 
-  def isEmpty = q"!$self.nonEmpty"
-  def nonEmpty = q"$self.exists(_ => ${true})"
+  def isEmpty = q"!$prefix.nonEmpty"
+  def nonEmpty = q"$prefix.exists(_ => ${true})"
 
   def reduce[E](z: Expr[E])(p: Expr[(E, E) => E]) =
     q"$self.fold($z)($id, $p)"
 
   def reduceOption[E: c.WeakTypeTag](p: Expr[(E, E) => E]) = {
+    val $(x, y, xo, yo) = $("x", "y", "x$opt", "y$opt")
     val E = weakTypeOf[E]
-    val $(x, y) = $("x", "y")
-    q"""$self.fold($option.empty[$E])($option(_), {
-      case ($x, $None) => $x
-      case ($None, $y) => $y
-      case ($x, $y) => $some($p($x.get, $y.get))
-    })"""
+    q"""$self.fold($option.empty[$E])($option(_), ($xo: Option[$E], $yo: Option[$E]) =>
+      (for ($x <- $xo; $y <- $yo) yield $p($x, $y)) orElse $xo orElse $yo)"""
   }
 
   def min[E](o: Expr[Ordering[E]]) =
-    q"$self.reduceOption($o.min(_, _)).get"
+    q"$prefix.reduceOption($o.min(_, _)).get"
 
   def max[E](o: Expr[Ordering[E]]) =
-    q"$self.reduceOption($o.max(_, _)).get"
+    q"$prefix.reduceOption($o.max(_, _)).get"
 
   def sum[E](n: Expr[Numeric[E]]) =
-    q"$self.reduce($n.zero)($n.plus)"
+    q"$prefix.reduce($n.zero)($n.plus)"
 
   def product[E](n: Expr[Numeric[E]]) =
-    q"$self.reduce($n.one)($n.times)"
+    q"$prefix.reduce($n.one)($n.times)"
 
-  def size = q"$self.fold(${0l})(_ => ${1l}, _ + _): $LONG"
+  def size = q"$self.fold(${0L})(_ => ${1L}, _ + _): $LONG"
 
-  def count[E](p: Expr[E => Boolean]) = {
-    val x = $"x"
-    q"""$self.fold(${0l})({
-      case $x if $p($x) => ${1l}
-      case _ => ${0l}
-    }, _ + _)"""
-  }
+  def count[E](p: Expr[E => Boolean]) =
+    q"$self.fold(${0L})($p(_) compare ${false}, _ + _)"
 
   def exists[E](p: Expr[E => Boolean]) =
     q"$self.fold(${false})($p, _ || _)"
@@ -74,43 +70,32 @@ class FoldMacros(val c: blackbox.Context) extends BlackBoxUtil {
   def forall[E](p: Expr[E => Boolean]) =
     q"$self.fold(${true})($p, _ && _)"
 
-  def find[E: c.WeakTypeTag](p: Expr[E => Boolean]) = {
-    val E = weakTypeOf[E]
-    val x = $"x"
-    q"""$self.fold($option.empty[$E])({
-      case $x if $p($x) => $some($x)
-      case _ => $None
-    }, {
-      case ($x @ $some(_), _) => $x
-      case (_, $x @ $some(_)) => $x
-      case (_, _) => $None
-    })"""
-  }
+  def find[E: c.WeakTypeTag](p: Expr[E => Boolean]) =
+    q"$self.fold($option.empty[${weakTypeOf[E]}])($some(_) filter $p, _ orElse _)"
 
   def bottom[E: c.WeakTypeTag](n: Expr[Int])(o: Expr[Ordering[E]]) = {
     val E = weakTypeOf[E]
-    q"""if ($n <= ${0}) $list.empty[$E] else {
-      $self.fold($list.empty[$E])(_ :: $Nil,
-        _root_.eu.stratosphere.emma.macros.FoldMacros.merge($n, _, _)($o))
-    }"""
+    val empty = q"$list.empty[$E]"
+    q"""if ($n <= ${0}) $empty else $self.fold($empty)(_ :: $Nil,
+      _root_.eu.stratosphere.emma.macros.FoldMacros.merge($n, _, _)($o))"""
   }
 
   def top[E](n: Expr[Int])(o: Expr[Ordering[E]]) =
-    q"$self.bottom($n)($o.reverse)"
+    q"$prefix.bottom($n)($o.reverse)"
 
   def sample[E: c.WeakTypeTag](n: Expr[Int]) = {
     val E = weakTypeOf[E]
     val $(x, y, sx, sy, rand, seed) = $("x", "y", "sx", "sy", "rand", "seed")
+    val empty = q"$list.empty[$E]"
     val now = q"_root_.java.lang.System.currentTimeMillis"
-    q"""if ($n <= ${0}) $list.empty[$E] else
-      $self.fold(($list.empty[$E], $now))({
-        case $x => ($x :: $Nil, $x.hashCode)
-      }, { case (($x, $sx), ($y, $sy)) =>
-        if ($x.size + $y.size <= $n) ($x ::: $y, $sx ^ $sy) else {
-          val $seed = $now ^ (($sx << ${Integer.SIZE}) | $sy)
-          val $rand = new _root_.scala.util.Random($seed)
-          ($rand.shuffle($x ::: $y).take($n), $rand.nextLong())
-        }
+    q"""if ($n <= ${0}) $empty else $self.fold(($empty, $now))(
+      ($x: $E) => ($x :: $Nil, $x.hashCode), {
+        case (($x, $sx), ($y, $sy)) =>
+          if ($x.size + $y.size <= $n) ($x ::: $y, $sx ^ $sy) else {
+            val $seed = $now ^ (($sx << ${Integer.SIZE}) | $sy)
+            val $rand = new _root_.scala.util.Random($seed)
+            ($rand.shuffle($x ::: $y).take($n), $rand.nextLong())
+          }
       })._1"""
   }
 
