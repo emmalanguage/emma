@@ -1,15 +1,21 @@
-package eu.stratosphere.emma.macros.program
+package eu.stratosphere
+package emma.macros
+package program
 
-import eu.stratosphere.emma.api.Algorithm
-import eu.stratosphere.emma.compiler.MacroCompiler
-import eu.stratosphere.emma.macros.program.comprehension.Comprehension
-import eu.stratosphere.emma.macros.program.controlflow.ControlFlow
-import eu.stratosphere.emma.runtime.{Engine, Native}
+import emma.api.Algorithm
+import emma.compiler.MacroCompiler
+import emma.macros.program.comprehension.Comprehension
+import emma.macros.program.controlflow.ControlFlow
+import emma.runtime.{Engine, Native}
+
 import scala.language.existentials
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
-class WorkflowMacros(val c: blackbox.Context) extends ControlFlow with Comprehension with SemanticChecks {
+class WorkflowMacros(val c: blackbox.Context)
+  extends ControlFlow
+  with Comprehension
+  with SemanticChecks {
 
   import universe._
   import syntax._
@@ -22,8 +28,9 @@ class WorkflowMacros(val c: blackbox.Context) extends ControlFlow with Comprehen
   def parallelize[T: c.WeakTypeTag](e: Expr[T]) = {
 
     val compiler = new MacroCompiler(c)
-
-    compiler.Source.validate(e.tree.typeChecked.asInstanceOf[compiler.universe.Tree])
+    compiler.Source.valid(e.tree.typeChecked.asInstanceOf[compiler.universe.Tree]) badMap {
+      errors => c.abort(errors.head.at.pos.asInstanceOf[Position], errors mkString "\n\n")
+    }
 
     doSemanticChecks(e.tree)
 
