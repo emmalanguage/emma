@@ -129,42 +129,33 @@ object StreamBag {
     (true, _ => false, (b1, b2) => b1 && b2)
 
   /**
-    * Monad join of Stream[M] where M is a commutative monoid. Used to combine
-    * this with Bag monad.
-    *
-    * @param xss0
-    * Doubly-nested stream to flatten.
-    * @tparam A
-    * Type of stream.
-    * @return
-    * Flat stream.
-    */
+   * Monad join of Stream[M] where M is a commutative monoid. Used to combine
+   * this with Bag monad.
+   *
+   * @param xss0
+   * Doubly-nested stream to flatten.
+   * @tparam A
+   * Type of stream.
+   * @return
+   * Flat stream.
+   */
   def monoidStreamFlatten[A](xss0: Stream[Stream[DataBag[A]]]): Stream[DataBag[A]] = {
+    Stream.unfold[DataBag[A], (Stream[Stream[DataBag[A]]], Stream[DataBag[A]], Stream[DataBag[A]])](
+      (xss0, StreamBag.empty[A], StreamBag.empty[A]),
+      {
+        case (xss, row, col) => {
+          val hh = xss.head.head
+            .plus(row.head)
+            .plus(col.head)
 
-    val curr: Stream[Stream[DataBag[A]]] => DataBag[A] = _.head.head
+          val xss2 = xss.map(_.tail).tail
+          val row2 = row.tail.plus(xss.head.tail)
+          val col2 = col.tail.plus(xss.map(_.head).tail)
 
-    def next(xss: Stream[Stream[DataBag[A]]]): Stream[Stream[DataBag[A]]] = {
-      val tt: Stream[Stream[DataBag[A]]] = xss.map(_.tail).tail
-      val fstRow: Stream[DataBag[A]] = xss.head.tail
-      val fstCol: Stream[DataBag[A]] = xss.map(_.head).tail
-
-      val addRow: Stream[Stream[DataBag[A]]] = Stream.unfold[Stream[DataBag[A]], (Boolean, Stream[Stream[DataBag[A]]])](
-        (true, tt), {
-          case (true, yss) => (yss.head.plus(fstRow), (false, yss.tail))
-          case (false, yss) => (yss.head, (false, yss.tail))
-        })
-
-      val addCol: Stream[Stream[DataBag[A]]] = fstCol.zipWith[Stream[DataBag[A]], Stream[DataBag[A]]](
-        { case (x0, xs0) => Stream.unfold[DataBag[A], (Boolean, Stream[DataBag[A]])](
-          (true, xs0), {
-            case (true, xs) => (xs.head.plus(x0), (false, xs.tail))
-            case (false, xs) => (xs.head, (false, xs.tail))
-          })
-        })(addRow)
-
-      addCol
-    }
-
-    Stream.unfold[DataBag[A], Stream[Stream[DataBag[A]]]](xss0, xss => (curr(xss), next(xss)))
+          (hh, (xss2, row2, col2))
+        }
+      }
+    )
   }
+
 }

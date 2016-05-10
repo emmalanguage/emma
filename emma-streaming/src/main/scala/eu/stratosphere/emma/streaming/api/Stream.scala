@@ -26,9 +26,9 @@ trait Stream[+A] {
   def map[B](f: A => B): Stream[B] =
     unfold[B, Stream[A]](this, xs => (f(xs.head), xs.tail))
 
-  def flatten[B](xss: => Stream[Stream[B]]): Stream[B] = unfold[B, Stream[Stream[B]]](
-    xss,
-    xss1 => (xss1.head.head, xss1.map(_.tail).tail)
+  def flatten[B](xss0: => Stream[Stream[B]]): Stream[B] = unfold[B, Stream[Stream[B]]](
+    xss0,
+    xss => (xss.head.head, xss.map(_.tail).tail)
   )
 
   def take(n: Int): Seq[A] = n match {
