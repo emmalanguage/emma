@@ -8,7 +8,7 @@ import org.scalatest._
 
 class RecommendationPurchaseTest extends FlatSpec with Matchers {
 
-  "Ads " should "be matched with purchases in 3 milliseconds" in {
+  "Recommendations " should "be matched with purchases in 2 milliseconds" in {
 
     val ads = StreamBag.fromListOfBags(Seq(
       DataBag(Seq(recom0_10, recom0_30))
@@ -31,7 +31,7 @@ class RecommendationPurchaseTest extends FlatSpec with Matchers {
       , DataBag(Seq((purchase3_10, recom2_10)))
     ))
 
-    val result = RecommendationPurchase.recomPurchaseJoin(purchases, ads, 3)
+    val result = RecommendationPurchase.recomPurchaseJoin(purchases, ads, 2)
 
     result.take(4) should be (expected.take(4))
 

@@ -22,8 +22,8 @@ object RecommendationPurchase {
       p <- purchases
       a <- recoms
       if a.userId == p.userId
-      if p.time - a.time < closeness
-      if p.time > a.time
+      if p.time - a.time <= closeness
+      if p.time >= a.time
     } yield {
       (p, a)
     }
