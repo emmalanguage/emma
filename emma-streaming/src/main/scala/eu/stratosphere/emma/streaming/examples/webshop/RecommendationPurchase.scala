@@ -1,4 +1,4 @@
-package eu.stratosphere.emma.streaming.examples
+package eu.stratosphere.emma.streaming.examples.webshop
 
 import eu.stratosphere.emma.streaming.api.StreamBag
 

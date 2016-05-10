@@ -1,8 +1,8 @@
-package eu.stratosphere.emma.streaming.examples
+package eu.stratosphere.emma.streaming.examples.webshop
 
 import eu.stratosphere.emma.api.DataBag
 import eu.stratosphere.emma.streaming.api.StreamBag
-import eu.stratosphere.emma.streaming.examples.RecommendationPurchase._
+import eu.stratosphere.emma.streaming.examples.webshop.RecommendationPurchase._
 import org.scalatest._
 
 class RecommendationPurchaseTest extends FlatSpec with Matchers {
