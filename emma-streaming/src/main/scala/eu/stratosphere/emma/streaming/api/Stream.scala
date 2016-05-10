@@ -10,7 +10,8 @@ trait Stream[+A] {
   val c: S => (A, S)
 
   def head: A = c(s0)._1
-  def tail: Stream[A] = new CStream(s0, c)
+
+  def tail: Stream[A] = new CStream(c(s0)._2, c)
 
   def scan[B](z: B)(op: (B, A) => B): Stream[B] =
     unfold[B, (B, Stream[A])](
@@ -41,7 +42,7 @@ trait Stream[+A] {
   } yield (x, y)
 
 
-  def zipWith[B, C](f: (A,B) => C)(other: Stream[B]): Stream[C] = for {
+  def zipWith[B, C](f: (A, B) => C)(other: Stream[B]): Stream[C] = for {
     x <- this
     y <- other
   } yield f(x, y)
@@ -49,7 +50,7 @@ trait Stream[+A] {
   override def toString: String = take(10).mkString("[", ",", "...]")
 }
 
-case class CStream[X, +A](seed: X, f: X => (A,X)) extends Stream[A] {
+case class CStream[X, +A](seed: X, f: X => (A, X)) extends Stream[A] {
 
   override type S = X
 
