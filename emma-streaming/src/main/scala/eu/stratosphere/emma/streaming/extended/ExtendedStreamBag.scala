@@ -7,10 +7,10 @@ import eu.stratosphere.emma.streaming.extended.ExtendedStreamBag._
 import scala.collection.immutable.{Stream => _}
 
 /**
-  * This object is for StreamBag operations that should be used in the future,
-  * but are currently not important and/or hard to compile.
-  * These should be eventually moved to StreamBag, or removed.
-  */
+ * This object is for StreamBag operations that should be used in the future,
+ * but are currently not important and/or hard to compile.
+ * These should be eventually moved to StreamBag, or removed.
+ */
 class ExtendedStreamBag[+A](private val sb: StreamBag[A]) {
 
   // --------------------------------------------------------
@@ -37,29 +37,29 @@ class ExtendedStreamBag[+A](private val sb: StreamBag[A]) {
     .map { case (bagIsEmpty, t) => if (bagIsEmpty) Option.empty[Int] else Some(t) }
 
   /**
-    * Postpones a StreamBag, i.e. prefixes the stream with empty Bags.
-    *
-    * @param t
-    * Number of Bags to prefix the StreamBag with.
-    * @return
-    * Postponed stream.
-    */
+   * Postpones a StreamBag, i.e. prefixes the stream with empty Bags.
+   *
+   * @param t
+   * Number of Bags to prefix the StreamBag with.
+   * @return
+   * Postponed stream.
+   */
   def postpone(t: Int): StreamBag[A] = StreamBag(Stream.unfold[DataBag[A], (Int, Stream[DataBag[A]])](
     (t, sb.sb), {
       case (0, xs) => (xs.head, (0, xs.tail))
-      case (t, xs) => (DataBag(), (t-1, xs))
+      case (t, xs) => (DataBag(), (t - 1, xs))
     }
   ))
 
   /**
-    * Postpone expressed with monad comprehension. Placed here, to avoid creating more
-    * primitives. The default native implementation is faster.
-    *
-    * @param t
-    * Number of Bags to prefix the StreamBag with.
-    * @return
-    * Postponed stream.
-    */
+   * Postpone expressed with monad comprehension. Placed here, to avoid creating more
+   * primitives. The default native implementation is faster.
+   *
+   * @param t
+   * Number of Bags to prefix the StreamBag with.
+   * @return
+   * Postponed stream.
+   */
   private def postponeWithComprehension(t: Int): StreamBag[A] =
     for {
       x <- this.withTimestamp
@@ -72,12 +72,12 @@ class ExtendedStreamBag[+A](private val sb: StreamBag[A]) {
     sb.withTimestamp.flatMap((x: Timed[A]) => StreamBag.unit(x.v).postpone(x.t + t(x.v)))
 
   /*
-     This implementation uses the "scan" structure of Stream and the "fold"
-     structure of bags separately. It aggregates to "collection" values, i.e.
-     the aggregated value in the fold is a Bag again.
+  This implementation uses the "scan" structure of Stream and the "fold"
+  structure of bags separately. It aggregates to "collection" values, i.e.
+  the aggregated value in the fold is a Bag again.
 
-     Using this might not be beneficial.
-    */
+  Using this might not be beneficial.
+   */
   def stateful[S, B](init: S)(op: (S, A) => (S, B)): StreamBag[B] = {
     val stateTrans: StreamBag[(S => (S, B))] = sb.map(a => s => op(s, a))
     val zeroStateBag = (s: S) => (s, DataBag())
