@@ -170,6 +170,23 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
       }
     }
 
+    /** `this` references to enclosing classes / objects. */
+    object this_ {
+
+      /** Set `qual = true` when referencing an outer class. */
+      def apply(sym: Symbol, qual: Boolean = true): This = {
+        assert(sym.isClass || sym.isModule)
+        val this_ =
+          if (sym.isClass && qual) This(sym.name.toTypeName)
+          else This(TypeName(""))
+        setType(this_, Type this_ sym)
+        setSymbol(this_, sym)
+      }
+
+      def unapply(this_ : This): Option[Symbol] =
+        Some(this_.symbol)
+    }
+
     /** Term references (Idents). */
     object ref {
 
@@ -210,7 +227,7 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
 
       /** Returns `target` applied to the (type) arguments. */
       @tailrec
-      def apply(target: Tree, types: Type*)(argss: Seq[Tree]*): Apply = {
+      def apply(target: Tree, types: Type*)(argss: Seq[Tree]*): Tree = {
         assert(Has tpe target, s"Untyped target:\n$target")
         assert(types forall Is.defined, "Unspecified type arguments")
         assert(argss.flatten forall Has.tpe, "Untyped arguments")
@@ -223,20 +240,21 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
             setType(app, Type result target)
           }.asInstanceOf[Apply]
         } else {
-          val typeApp = Type.app(target, types: _*)
-          apply(typeApp)(argss: _*)
+          val targs = types.map(Type quote _).toList
+          val typeApp = TypeApply(target, targs)
+          setType(typeApp, Type(target.tpe, types: _*))
+          if (argss.isEmpty) typeApp
+          else apply(typeApp)(argss: _*)
         }
       }
 
-      def unapplySeq(tree: Apply): Option[(Tree, Seq[Type], Seq[Seq[Tree]])] = tree match {
-        case Apply(TypeApply(fn, targs), args) =>
-          Some(fn, targs map Type.of, Seq(args))
-        case Apply(app: Apply, args) => unapplySeq(app) match {
-          case Some((fn, targs, argss)) => Some(fn, targs, argss :+ args)
-          case None => None
-        }
-        case Apply(fn, args) =>
-          Some(fn, Nil, Seq(args))
+      def unapplySeq(tree: Tree): Option[(Tree, Seq[Type], Seq[Seq[Tree]])] = tree match {
+        case Apply(app(target, targs, argss@_*), args) =>
+          Some(target, targs, argss :+ args)
+        case Apply(target, args) =>
+          Some(target, Nil, Seq(args))
+        case TypeApply(target, targs) =>
+          Some(target, targs map Type.of, Nil)
         case _ => None
       }
     }

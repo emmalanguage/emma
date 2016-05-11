@@ -30,7 +30,7 @@ private[source] trait SourceValidate extends Common {
         tree is valid.term otherwise "Not a term"
 
       lazy val this_ : Validator = {
-        case This(_) => pass
+        case src.this_(_) => pass
       }
 
       lazy val lit: Validator = {

@@ -106,7 +106,7 @@ private[core] trait LNF extends Common {
           }
 
         case TypeApply(Block(stats, target), types) =>
-          val expr = Type.app(target, types map Type.of: _*)
+          val expr = Term.app(target, types map Type.of: _*)()
           block(stats, expr)
 
         case app@Apply(Block(stats, target), args) =>

@@ -144,6 +144,12 @@ trait Types extends Util { this: Trees with Symbols =>
         if (Has typeSym sel) Some(sel.qualifier, Type sym sel) else None
     }
 
+    /** Returns the `this` type of a class or singleton object. */
+    def this_(sym: Symbol): ThisType = {
+      assert(sym.isClass || sym.isModule)
+      internal.thisType(sym).asInstanceOf[ThisType]
+    }
+
     /** Returns a new tuple type of specific elements. */
     def tuple(first: Type, rest: Type*): Type = {
       val n = rest.size + 1
@@ -344,24 +350,6 @@ trait Types extends Util { this: Trees with Symbols =>
 
       if (Has pos sym) sym.pos
       else NoPosition
-    }
-
-    /** Type application. */
-    object app {
-
-      /** Returns `target` instantiated with the type arguments. */
-      def apply(target: Tree, types: Type*): Tree = {
-        assert(Has tpe target, s"Untyped target:\n$target")
-        assert(types forall Is.defined, "Unspecified type arguments")
-        if (types.isEmpty) target else {
-          val typeArgs =  types.map(Type quote _).toList
-          val typeApp = TypeApply(target, typeArgs)
-          setType(typeApp, Type(target.tpe, types: _*))
-        }
-      }
-
-      def unapplySeq(app: TypeApply): Option[(Tree, Seq[Type])] =
-        Some(app.fun, app.args map Type.of)
     }
 
     /** Type ascriptions. */

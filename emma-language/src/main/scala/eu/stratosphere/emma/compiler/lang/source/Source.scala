@@ -66,6 +66,7 @@ trait Source extends Common
       //@formatter:off
 
       // atomics
+      val this_   = Term.this_          // this references
       val lit     = Term.lit            // literals
       val ref     = Term.ref            // references
 
