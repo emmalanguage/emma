@@ -1,55 +1,120 @@
-package eu.stratosphere.emma.compiler.lang.core
-
-import eu.stratosphere.emma.compiler.Common
+package eu.stratosphere
+package emma.compiler
+package lang
+package core
 
 /** Validation for the Core language. */
 private[core] trait CoreValidate extends Common {
   self: Core =>
 
   import universe._
+  import Validation._
+  import Core.{Language => core}
 
   private[core] object CoreValidate {
 
-    /** Validate that a Scala [[Tree]] belongs to the supported LNF language. */
-    def validate(tree: Tree): Boolean = tree match {
-      case EmptyTree =>
-        true
-      case This(qual) =>
-        true
-      case Literal(Constant(value)) =>
-        true
-      case Ident(name) =>
-        true
-      case tpe: TypeTree =>
-        tpe.original == null || validate(tpe.original)
-      case Annotated(annot, arg) =>
-        validate(annot) && validate(arg)
-      case AppliedTypeTree(tpt, args) =>
-        validate(tpt) && args.forall(validate)
-      case Typed(expr, tpt) =>
-        validate(expr) && validate(tpt)
-      case Select(qualifier, name) =>
-        validate(qualifier)
-      case Block(stats, expr) =>
-        stats.forall(validate) && validate(expr)
-      case ValDef(mods, name, tpt, rhs) if !mods.hasFlag(Flag.MUTABLE) =>
-        validate(tpt) && validate(rhs)
-      case DefDef(mods, name, tparams, vparamss, tpt, rhs) =>
-        tparams.forall(validate) && vparamss.flatten.forall(validate) && validate(tpt) && validate(rhs)
-      case Function(vparams, body) =>
-        vparams.forall(validate) && validate(body)
-      case TypeApply(fun, args) =>
-        validate(fun)
-      case Apply(fun, args) =>
-        validate(fun) && args.forall(validate)
-      case New(tpt) =>
-        validate(tpt)
-      case If(cond, thenp, elsep) =>
-        validate(cond) && validate(thenp) && validate(elsep)
-      case _ =>
-        abort(tree.pos, s"Unsupported Scala node ${tree.getClass} in quoted Emma LNF code")
-        false
+    implicit private class Is(tree: Tree) {
+      case class is(expected: Validator) {
+        def otherwise(violation: => String): Verdict =
+          validateAs(expected, tree, violation)
+      }
+    }
+
+    object valid {
+
+      /** Validate that a Scala tree belongs to the supported core language. */
+      // TODO: Narrow scope of valid top-level trees
+      def apply(tree: Tree): Verdict =
+        tree is oneOf(term, lambda, let) otherwise "Unexpected tree"
+
+      lazy val this_ : Validator = {
+        case core.this_(_) => pass
+      }
+
+      lazy val lit: Validator = {
+        case core.lit(_) => pass
+      }
+
+      lazy val ref: Validator = {
+        case core.ref(_) => pass
+      }
+
+      private lazy val pkg: Validator = {
+        case core.ref(sym) if sym.isPackage => pass
+        case core.qref(qualifier, member) if member.isPackage =>
+          qualifier is pkg otherwise "Invalid package qualifier"
+      }
+
+      lazy val qref: Validator = {
+        case core.qref(qualifier, _) =>
+          qualifier is pkg otherwise "Invalid reference qualifier"
+      }
+
+      lazy val atomic: Validator =
+        oneOf(this_, lit, ref, qref)
+
+      lazy val sel: Validator = { case core.sel(target, _) =>
+        target is atomic otherwise "Invalid select target"
+      }
+
+      lazy val app: Validator = {
+        case core.app(target, _, argss@_*) =>
+          all (argss.flatten) are atomic otherwise "Invalid application argument"
+      }
+
+      lazy val call: Validator = {
+        case core.call(target, _, _, argss@_*) => {
+          target is valid.atomic otherwise "Invalid method call target"
+        } and {
+          all (argss.flatten) are atomic otherwise "Invalid method call argument"
+        }
+      }
+
+      lazy val inst: Validator = {
+        case core.inst(_, _, argss@_*) =>
+          all (argss.flatten) are atomic otherwise "Invalid instantiation argument"
+      }
+
+      lazy val lambda: Validator = {
+        case core.lambda(_, _, body) =>
+          body is let otherwise "Invalid lambda function body"
+      }
+
+      lazy val typed: Validator = {
+        case core.typed(expr, _) =>
+          expr is atomic otherwise "Invalid typed expression"
+      }
+
+      lazy val if_ : Validator = {
+        case core.if_(cond, thn, els) => {
+          cond is atomic otherwise "Invalid branch condition"
+        } and {
+          all (thn, els) are oneOf(atomic, app) otherwise "Invalid branch"
+        }
+      }
+
+      lazy val term: Validator =
+        oneOf(atomic, sel, inst, call, app, lambda, typed)
+
+      lazy val val_ : Validator = {
+        case core.val_(_, rhs, _) =>
+          rhs is term otherwise "Invalid val rhs"
+      }
+
+      lazy val let: Validator = {
+        case core.let(vals, defs, expr) => {
+          all (vals) are val_ otherwise "Invalid let binding"
+        } and {
+          all (defs) are def_ otherwise "Invalid let local method"
+        } and {
+          expr is oneOf(term, if_) otherwise "Invalid let expression"
+        }
+      }
+
+      lazy val def_ : Validator = {
+        case core.def_(_, _, _, body) =>
+          body is let otherwise "Invalid method body"
+      }
     }
   }
-
 }
