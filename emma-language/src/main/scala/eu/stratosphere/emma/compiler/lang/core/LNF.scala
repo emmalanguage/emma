@@ -70,6 +70,7 @@ private[core] trait LNF extends Common {
         // Already in ANF
         case EmptyTree => EmptyTree
         case lit: Literal => block(lit)
+        case ths: This => block(ths)
         case id: Ident if id.isTerm => block(id)
         case value: ValDef if Is param value => value
 
