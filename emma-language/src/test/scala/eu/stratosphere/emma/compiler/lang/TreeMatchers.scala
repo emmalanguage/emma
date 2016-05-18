@@ -22,7 +22,7 @@ trait TreeMatchers {
            |Left tree ${if (negated) "was" else "was not"} alpha equivalent to right tree.
            |
            |${asSource("lhs")(lhs)}
-           |${asSource("rhs")(lhs)}
+           |${asSource("rhs")(rhs)}
            |
            |due to the following difference
            |
