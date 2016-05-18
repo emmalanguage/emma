@@ -234,17 +234,20 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
         if (types.isEmpty) {
           if (argss.isEmpty) {
             val app = Apply(target, Nil)
-            setType(app, Type result target)
+            setType(app, Type.of(target).resultType)
           } else argss.foldLeft(target) { (tgt, args) =>
             val app = Apply(tgt, args.toList)
-            setType(app, Type result target)
+            setType(app, Type.of(target).resultType)
           }.asInstanceOf[Apply]
         } else {
           val targs = types.map(Type quote _).toList
-          val typeApp = TypeApply(target, targs)
-          setType(typeApp, Type(target.tpe, types: _*))
-          if (argss.isEmpty) typeApp
-          else apply(typeApp)(argss: _*)
+          val tapp = TypeApply(target, targs)
+          Type(target.tpe, types: _*) match {
+            case NullaryMethodType(result) => setType(tapp, result)
+            case tpe => setType(tapp, tpe)
+          }
+          if (argss.isEmpty) tapp
+          else apply(tapp)(argss: _*)
         }
       }
 
