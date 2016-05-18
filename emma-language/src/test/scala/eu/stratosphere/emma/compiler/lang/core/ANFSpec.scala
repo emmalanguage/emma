@@ -277,4 +277,32 @@ class ANFSpec extends BaseCompilerSpec {
       act shouldBe alphaEqTo(exp)
     }
   }
+
+  "method calls" in {
+    val act = typeCheckAndANF(reify(
+      x.asInstanceOf[Long],
+      List(1, 2, 3).foldLeft(1) { _ + _ },
+      42.toChar,
+      t._2.indexOf('f')
+    ))
+
+    val exp = typeCheck(reify {
+      val x$1 = this.x
+      val asInstanceOf$1 = x$1.asInstanceOf[Long]
+      val List$1 = List(1, 2, 3)
+      val sum$1 = (x: Int, y: Int) => {
+        val sum$2 = x + y
+        sum$2
+      }
+      val foldLeft$1 = List$1.foldLeft(1)(sum$1)
+      val toChar$1 = 42.toChar
+      val t$1 = this.t
+      val _2$1 = t$1._2
+      val indexOf$1 = _2$1.indexOf('f')
+      val Tuple$1 = (asInstanceOf$1, foldLeft$1, toChar$1, indexOf$1)
+      Tuple$1
+    })
+
+    act shouldBe alphaEqTo(exp)
+  }
 }

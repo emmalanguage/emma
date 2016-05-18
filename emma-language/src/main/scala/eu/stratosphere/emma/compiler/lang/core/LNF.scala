@@ -95,10 +95,7 @@ private[core] trait LNF extends Common {
           val x = Term sym sel
           val T = Type of sel
           val rhs = Term.sel(target, x, T)
-          if (x.isPackage || // Parameter lists follow
-            (x.isMethod && x.asMethod.paramLists.nonEmpty) ||
-            IR.comprehensionOps.contains(x)) {
-
+          if (x.isPackage || Is.method(T) || IR.comprehensionOps.contains(x)) {
             block(stats, rhs)
           } else {
             val lhs = Term.sym.free(fresh(member), T)
@@ -106,8 +103,15 @@ private[core] trait LNF extends Common {
           }
 
         case TypeApply(Block(stats, target), types) =>
-          val expr = Term.app(target, types map Type.of: _*)()
-          block(stats, expr)
+          val rhs = Term.app(target, types map Type.of: _*)()
+          val T = Type of rhs
+          if (Is.method(T) || IR.comprehensionOps.contains(Term sym target)) {
+            block(stats, rhs)
+          } else {
+            val x = fresh(nameOf(target))
+            val lhs = Term.sym.free(x, T)
+            block(stats, val_(lhs, rhs), Term ref lhs)
+          }
 
         case app@Apply(Block(stats, target), args) =>
           if (IR.comprehensionOps contains Term.sym(target)) {
