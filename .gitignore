@@ -10,3 +10,7 @@ target
 *.class
 *.iml
 dependency-reduced-pom.xml
+
+# Ensime specific
+.ensime
+.ensime_cache
