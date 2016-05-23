@@ -237,7 +237,7 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
             setType(app, Type.of(target).resultType)
           } else argss.foldLeft(target) { (tgt, args) =>
             val app = Apply(tgt, args.toList)
-            setType(app, Type.of(target).resultType)
+            setType(app, Type.of(tgt).resultType)
           }.asInstanceOf[Apply]
         } else {
           val targs = types.map(Type quote _).toList
