@@ -10,6 +10,7 @@ trait Types extends Util { this: Trees with Symbols =>
   import universe._
   import internal.reificationSupport._
   import Const._
+  import Flag._
 
   object Type {
 
@@ -190,10 +191,11 @@ trait Types extends Util { this: Trees with Symbols =>
 
     /** Applies a type constructor. */
     def apply(constructor: Type, args: Type*): Type = {
-      assert(Is defined constructor, s"Undefined type constructor: `$constructor`")
-      assert(args forall Is.defined, "Unspecified type arguments")
-      assert(constructor.takesTypeArgs, s"Type `$constructor` is not a type constructor")
-      appliedType(fix(constructor), args map fix: _*)
+      assert(Is.defined(constructor), s"Undefined type constructor: `$constructor`")
+      assert(args.forall(Is.defined), "Undefined type arguments")
+      assert(args.isEmpty || constructor.takesTypeArgs,
+        s"Type `$constructor` is not a type constructor")
+      appliedType(fix(constructor), args.map(fix): _*)
     }
 
     /** Returns the (concrete) type of `T`. */
@@ -212,9 +214,15 @@ trait Types extends Util { this: Trees with Symbols =>
     def of(sym: Symbol): Type =
       fix(sym.info)
 
-    /** Equivalent to `tpe.dealias.widen`. */
+    def signature(sym: Symbol, in: Type = NoType): Type = {
+      assert(Is.defined(sym), s"Undefined type signature of: `$sym`")
+      assert(Has.tpe(sym), s"Untyped symbol: `$sym`")
+      val tpe = fix(if (Is.defined(in)) sym.typeSignatureIn(in) else sym.typeSignature)
+      if (Is(BYNAMEPARAM, sym)) tpe.typeArgs.head else tpe
+    }
+
     def fix(tpe: Type): Type = {
-      assert(Is defined tpe, s"Undefined type: `$tpe`")
+      assert(Is.defined(tpe), s"Undefined type: `$tpe`")
       tpe.dealias.widen
     }
 

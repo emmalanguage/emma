@@ -279,7 +279,7 @@ trait Terms extends Util { this: Trees with Types with Symbols =>
         val tpt = New(Type.quote(tpe))
         setType(tpt, tpe)
 
-        val inst = app(sel(tpt, constructor))(argss: _*)
+        val inst = Method.call(tpt, constructor)(argss: _*)
 
         setSymbol(inst, constructor)
         setType(inst, tpe)

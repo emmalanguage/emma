@@ -603,13 +603,54 @@ trait Trees extends Util { this: Terms with Types with Symbols =>
     object call {
 
       /** Returns a new method invocation. */
-      def apply(target: Tree, method: TermSymbol, types: Type*)(argss: Seq[Tree]*): Tree =
-        if (types.isEmpty && argss.isEmpty) {
-          val T = method.infoIn(Type of target).finalResultType
-          sel(target, method, T)
-        } else {
-          app(Term.sel(target, method), types: _*)(argss: _*)
+      def apply(target: Tree, method: TermSymbol, targs: Type*)(argss: Seq[Tree]*): Tree = {
+        assert(Has.tpe(target),
+          s"Untyped method call target\n${showCode(target, printTypes = true)}")
+        assert(Is.defined(method), s"Undefined method: `$method`")
+        assert(targs.forall(Is.defined), "Undefined type arguments supplied")
+        assert(argss.flatten.forall(Has.tpe), "Untyped arguments supplied")
+
+        val targetType = Type.of(target)
+        val matching = method.alternatives.filter { alt =>
+          val signature = Type.signature(alt, in = targetType)
+          signature.typeParams.size == targs.size && {
+            val methodType = Type(signature, targs: _*)
+            val paramss = methodType.paramLists
+            paramss.size == argss.size && paramss.zip(argss).forall { case (params, args) =>
+              params.size == args.size && params.zip(args).forall { case (param, arg) =>
+                Type.of(arg) weak_<:< Type.signature(param)
+              }
+            }
+          }
         }
+
+        assert(matching.nonEmpty, s"Cannot find method `$method` with matching type signature")
+        assert(matching.size == 1, s"Ambiguous resolution of overloaded method `$method`")
+        val resolved = matching.head
+        assert(resolved.isMethod, s"Member `$resolved` is not a method")
+
+        val methodType = Type.signature(resolved, in = targetType)
+        val sel = Select(target, resolved.name)
+        setSymbol(sel, resolved)
+        if (targs.isEmpty && argss.isEmpty) {
+          setType(sel, Type.fix(methodType.resultType))
+        } else {
+          setType(sel, methodType)
+          val fun = if (targs.isEmpty) sel else {
+            val tapp = TypeApply(sel, targs.map(Type.quote(_)).toList)
+            setSymbol(tapp, resolved)
+          }
+
+          val concreteType = Type(methodType, targs: _*)
+          if (argss.isEmpty) {
+            setType(fun, Type.fix(concreteType.resultType))
+          } else argss.foldLeft(setType(fun, concreteType)) { (tgt, args) =>
+            val app = Apply(tgt, args.toList)
+            setSymbol(app, resolved)
+            setType(app, Type.fix(Type.of(tgt).resultType))
+          }
+        }
+      }
 
       def unapplySeq(tree: Tree): Option[(Tree, TermSymbol, Seq[Type], Seq[Seq[Tree]])] =
         tree match {
