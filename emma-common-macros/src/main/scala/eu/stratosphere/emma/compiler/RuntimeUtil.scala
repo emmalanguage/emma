@@ -15,7 +15,7 @@ import scala.tools.reflect.ToolBox
  */
 trait RuntimeUtil extends ReflectUtil {
 
-  val universe: JavaUniverse = new JavaUniverse
+  val universe: JavaUniverse = scala.reflect.runtime.universe.asInstanceOf[JavaUniverse]
   val tb: ToolBox[universe.type]
   import universe._
 
