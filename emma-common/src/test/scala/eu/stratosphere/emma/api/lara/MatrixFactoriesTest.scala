@@ -59,11 +59,25 @@ class MatrixFactoriesTest extends BaseTest {
       matrixFillRows.numCols shouldBe 3
     }
     "fields" in {
-      for (i <- 0 until 5 ; j <- 0 until 3) {
-        matrix.get(i, j) shouldBe matrixValues(i*3 + j)
-        matrixFill.get(i, j) shouldBe matrixValues(i*3 + j)
-        matrixFillCols.get(i, j) shouldBe matrixValues(i*3 + j)
-        matrixFillRows.get(i, j) shouldBe matrixValues(i*3 + j)
+      for (i <- 0 until 5; j <- 0 until 3) {
+        matrix.get(i, j) shouldBe matrixValues(i * 3 + j)
+        matrixFill.get(i, j) shouldBe matrixValues(i * 3 + j)
+        matrixFillCols.get(i, j) shouldBe matrixValues(i * 3 + j)
+        matrixFillRows.get(i, j) shouldBe matrixValues(i * 3 + j)
+      }
+    }
+    "correct vector length in gen function" in {
+      a[IllegalArgumentException] should be thrownBy {
+        Matrix.fillColumns(5,3)(i => Vector.zeros[Int](6))
+      }
+      a[IllegalArgumentException] should be thrownBy {
+        Matrix.fillRows(5,3)(i => Vector.zeros[Int](6))
+      }
+      a[IllegalArgumentException] should be thrownBy {
+        Matrix.fillColumns(5,3)(i => Vector.zeros[Int](2))
+      }
+      a[IllegalArgumentException] should be thrownBy {
+        Matrix.fillRows(5,3)(i => Vector.zeros[Int](2))
       }
     }
   }

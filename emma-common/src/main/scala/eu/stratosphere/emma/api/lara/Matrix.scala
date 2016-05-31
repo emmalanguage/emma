@@ -129,6 +129,7 @@ object Matrix {
     val array = new Array[A](rows * cols)
     for (i <-0 until rows) {
       val row = rowGen(i)
+      require(row.length == cols)
       for (j <- 0 until cols) {
         array((i * cols) + j) = row.get(j)
       }
@@ -141,6 +142,7 @@ object Matrix {
     val array = new Array[A](rows * cols)
     for (j <- 0 until cols) {
       val col = columnGen(j)
+      require(col.length == rows)
       for (i <- 0 until rows) {
         array((i * cols) + j) = col.get(i)
       }
