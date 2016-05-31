@@ -124,6 +124,31 @@ object Matrix {
     new DenseMatrix[A](rows, cols, array)
   }
 
+  def fillRows[A: Numeric : ClassTag](rows: Int, cols: Int)(rowGen: Int => Vector[A]): Matrix[A] = {
+    require(rows * cols < Int.MaxValue)
+    val array = new Array[A](rows * cols)
+    for (i <-0 until rows) {
+      val row = rowGen(i)
+      for (j <- 0 until cols) {
+        array((i * cols) + j) = row.get(j)
+      }
+    }
+    new DenseMatrix[A](rows, cols, array)
+  }
+
+  def fillColumns[A: Numeric : ClassTag](rows: Int, cols: Int)(columnGen: Int => Vector[A]): Matrix[A] = {
+    require(rows * cols < Int.MaxValue)
+    val array = new Array[A](rows * cols)
+    for (j <- 0 until cols) {
+      val col = columnGen(j)
+      for (i <- 0 until rows) {
+        array((i * cols) + j) = col.get(i)
+      }
+    }
+    new DenseMatrix[A](rows, cols, array)
+  }
+
+
   def zeros[A: Numeric : ClassTag](rows: Int, cols: Int): Matrix[A] = {
     new DenseMatrix[A](rows, cols, Array.fill(rows * cols)(implicitly[Numeric[A]].zero))
   }
