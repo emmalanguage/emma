@@ -17,4 +17,17 @@ trait Compiler extends AlphaEq with Source with Core {
 
   /** The underlying universe object. */
   override val universe: Universe
+
+  import universe._
+
+  lazy val unqualifyStaticSels: Tree => Tree = transform {
+    case sel: Select if sel.symbol.isStatic =>
+      Ident(sel.symbol)
+  }
+
+  lazy val qualifyStaticRefs: Tree => Tree = transform {
+    case id: Ident if id.symbol.isStatic =>
+      Tree.resolve(id.symbol)
+  }
+
 }
