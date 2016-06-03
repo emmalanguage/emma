@@ -305,4 +305,47 @@ class ANFSpec extends BaseCompilerSpec {
 
     act shouldBe alphaEqTo(exp)
   }
+
+  "conditionals" - {
+    "with simple branches" in {
+      val act = typeCheckAndANF(reify {
+        if (t._1 < 42) "less" else "more"
+      })
+
+      val exp = typeCheck(reify {
+        val t$1 = t
+        val t_1$1 = t$1._1
+        val less$1 = t_1$1 < 42
+        val if$1 = if (less$1) "less" else "more"
+        if$1
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+
+    "with complex branches" in {
+      val act = typeCheckAndANF(reify {
+        if (t._1 < 42) x + 10 else x - 10.0
+      })
+
+      val exp = typeCheck(reify {
+        val t$1 = t
+        val t_1$1 = t$1._1
+        val less$1 = t_1$1 < 42
+        val if$1 = if (less$1) {
+          val x$1 = x
+          val sum$1 = x$1 + 10
+          val d$1 = sum$1.toDouble
+          d$1
+        } else {
+          val x$2 = x
+          val diff$1 = x$2 - 10.0
+          diff$1
+        }
+        if$1
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+  }
 }

@@ -46,9 +46,6 @@ trait RuntimeUtil extends ReflectUtil {
   private[compiler] override lazy val enclosingOwner =
     Type.check(q"val x = 42").symbol.owner
 
-  private[compiler] override def getFlags(sym: Symbol): FlagSet =
-    internal.flags(sym)
-
   private[compiler] override def setFlags(sym: Symbol, flags: FlagSet): Unit =
     internal.setFlag(sym, flags)
 
@@ -57,6 +54,9 @@ trait RuntimeUtil extends ReflectUtil {
 
   private[compiler] override def setOwner(sym: Symbol, owner: Symbol): Unit =
     sym.owner = owner
+
+  private[compiler] override def setPos(sym: Symbol, pos: Position): Unit =
+    sym.pos = pos
 
   private[compiler] override def setPos(tree: Tree, pos: Position): Unit =
     tree.pos = pos

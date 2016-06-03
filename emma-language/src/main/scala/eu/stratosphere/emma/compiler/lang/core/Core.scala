@@ -315,6 +315,10 @@ trait Core extends Common
     def anf(tree: Tree): Tree =
       LNF.anf(tree)
 
+    /** Delegates to [[LNF.foreach2loop()]]. */
+    def foreach2loop(tree: Tree): Tree =
+      LNF.foreach2loop(tree)
+
     /** Delegates to [[LNF.flatten()]]. */
     def flatten(tree: Tree): Tree =
       LNF.flatten(tree)

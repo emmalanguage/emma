@@ -53,9 +53,6 @@ trait MacroUtil extends ReflectUtil {
   private[compiler] override def enclosingOwner: Symbol =
     c.internal.enclosingOwner
 
-  private[compiler] override def getFlags(sym: Symbol): FlagSet =
-    internal.flags(sym)
-
   private[compiler] override def setFlags(sym: Symbol, flags: FlagSet): Unit =
     internal.setFlag(sym, flags)
 
@@ -64,6 +61,9 @@ trait MacroUtil extends ReflectUtil {
 
   private[compiler] override def setOwner(sym: Symbol, owner: Symbol): Unit =
     internal.setOwner(sym, owner)
+
+  private[compiler] override def setPos(sym: Symbol, pos: Position): Unit =
+    internal.updateAttachment(sym, pos)
 
   private[compiler] override def setPos(tree: Tree, pos: Position): Unit =
     internal.setPos(tree, pos)
