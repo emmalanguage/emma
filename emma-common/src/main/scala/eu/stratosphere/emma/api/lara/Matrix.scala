@@ -1,5 +1,6 @@
 package eu.stratosphere.emma.api.lara
 
+import eu.stratosphere.emma.api.linalg.ir.Idx
 import spire.math.Numeric
 
 import scala.reflect.ClassTag
@@ -77,9 +78,17 @@ trait Matrix[A] {
 
   def rows[B: Numeric : ClassTag](f: Vector[A] => Vector[B]): Matrix[B]
 
+  def indexedRows[B: Numeric : ClassTag](f: Idx[Int, Vector[A]] => B): Vector[B]
+
+  def indexedRows[B: Numeric : ClassTag](f: Idx[Int, Vector[A]] => Vector[B]): Matrix[B]
+
   def cols[B: Numeric : ClassTag](f: Vector[A] => B): Vector[B]
 
   def cols[B: Numeric : ClassTag](f: Vector[A] => Vector[B]): Matrix[B]
+
+  def indexedCols[B: Numeric : ClassTag](f: Idx[Int, Vector[A]] => B): Vector[B]
+
+  def indexedCols[B: Numeric : ClassTag](f: Idx[Int, Vector[A]] => Vector[B]): Matrix[B]
 
   // No order guarantees
   def elements[B](z: B)(s: A => B, p: (B, B) => B): B
