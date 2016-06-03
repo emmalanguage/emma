@@ -94,6 +94,35 @@ class VectorTest extends BaseTest {
         values.foldLeft[Double](0.0)((d, i) => d * i * 3.0)
       }
     }
+    "fold with index" in {
+      val v = Vector(Array(5,2,3,1,6,1))
+      val (firstMinIdx,firstMin) = v.indexedFold[(Int,Double)]((-1,Int.MaxValue))(
+        s => (s.id,s.value),
+        (l,r) =>
+          if (l._2 < r._2) {l}
+          else if (r._2 < l._2) {r}
+          else if (l._1 < r._1) {l}
+          else {r}
+      )
+      val (lastMinIdx,lastMin) = v.indexedFold[(Int,Double)]((-1,Int.MaxValue))(
+        s => (s.id,s.value),
+        (l,r) =>
+          if (l._2 < r._2) {l}
+          else if (r._2 < l._2) {r}
+          else if (l._1 < r._1) {r}
+          else {l}
+      )
+      val (maxIdx, max) = v.indexedFold[(Int,Double)]((-1,Int.MinValue))(
+        s => (s.id, s.value),
+        (l,r) => if (l._2 > r._2) l else r
+      )
+      firstMinIdx shouldBe 3
+      firstMin shouldBe 1
+      lastMinIdx shouldBe 5
+      lastMin shouldBe 1
+      maxIdx shouldBe 4
+      max shouldBe 6
+    }
     "transpose" in {
       vector.rowVector should be(false)
       val transposed = vector.transpose()

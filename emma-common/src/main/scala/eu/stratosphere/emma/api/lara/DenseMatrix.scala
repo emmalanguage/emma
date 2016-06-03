@@ -1,5 +1,6 @@
 package eu.stratosphere.emma.api.lara
 
+import eu.stratosphere.emma.api.linalg.ir.{VIdx, Idx}
 import spire.implicits._
 import spire.math._
 
@@ -158,6 +159,29 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](override val numRows: Int
     val arr = Array.ofDim[B](numRows * numCols)
     for (i <- rRange) {
       val newVec = f(row(i))
+      require(newVec.length == numCols)
+      for (j <- newVec.Range) {
+        arr(index(i, j)) = newVec.get(j)
+      }
+    }
+    Matrix[B](numRows, numCols, arr)
+  }
+
+  override
+  def indexedRows[B: Numeric : ClassTag](f: Idx[Int, Vector[A]] => B): Vector[B] = {
+    val arr = Array.ofDim[B](numRows)
+    for (i <- rRange) {
+      arr(i) = f(VIdx(i, row(i)))
+    }
+    Vector[B](arr, isRowVector = true)
+  }
+
+  override
+  def indexedRows[B: Numeric : ClassTag](f: Idx[Int, Vector[A]] => Vector[B]): Matrix[B] = {
+    val arr = Array.ofDim[B](numRows * numCols)
+    for (i <- rRange) {
+      val newVec = f(VIdx(i,row(i)))
+      require(newVec.length == numCols)
       for (j <- newVec.Range) {
         arr(index(i, j)) = newVec.get(j)
       }
@@ -179,6 +203,29 @@ private[emma] class DenseMatrix[A: Numeric : ClassTag](override val numRows: Int
     val arr = Array.ofDim[B](numRows * numCols)
     for (j <- cRange) {
       val newVec = f(column(j))
+      require(newVec.length == numRows)
+      for (i <- newVec.Range) {
+        arr(index(i, j)) = newVec.get(i)
+      }
+    }
+    Matrix[B](numRows, numCols, arr)
+  }
+
+  override
+  def indexedCols[B: Numeric : ClassTag](f: Idx[Int, Vector[A]] => B): Vector[B] = {
+    val arr = Array.ofDim[B](numCols)
+    for (i <- cRange) {
+      arr(i) = f(VIdx(i, column(i)))
+    }
+    Vector[B](arr, isRowVector = false)
+  }
+
+  override
+  def indexedCols[B: Numeric : ClassTag](f: Idx[Int, Vector[A]] => Vector[B]): Matrix[B] = {
+    val arr = Array.ofDim[B](numRows * numCols)
+    for (j <- cRange) {
+      val newVec = f(VIdx(j,column(j)))
+      require(newVec.length == numRows)
       for (i <- newVec.Range) {
         arr(index(i, j)) = newVec.get(i)
       }

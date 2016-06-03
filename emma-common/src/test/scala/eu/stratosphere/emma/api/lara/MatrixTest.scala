@@ -253,6 +253,25 @@ class MatrixTest extends BaseTest {
       res.numCols shouldBe 5
       res.toArray shouldBe values.map(_ * 3)
     }
+    "indexed rows to scalar" in {
+      val res: Vector[Int] = matrix.indexedRows(idx => idx.value.get(2) + idx.id)
+      val expected : Array[Int] = Array(3,9,15)
+
+      res.rowVector shouldBe true
+      res.length shouldBe 3
+      res.toArray shouldBe expected
+    }
+    "indexed rows to vector" in {
+      val res: Matrix[Int] = matrix.indexedRows(idx => idx.id + idx.value)
+      val expected : Array[Int] = Array(
+        1, 2, 3, 4, 5,
+        7, 8, 9, 10, 11,
+        13, 14, 15, 16, 17
+      )
+      res.numRows shouldBe 3
+      res.numCols shouldBe 5
+      res.toArray shouldBe expected
+    }
     "cols to scalar" in {
       val res: Vector[Int] = matrix.cols(v => v.aggregate(_ + _))
 
@@ -269,6 +288,25 @@ class MatrixTest extends BaseTest {
       res.numRows shouldBe 3
       res.numCols shouldBe 5
       res.toArray shouldBe values.map(_ * 3)
+    }
+    "indexed cols to scalar" in {
+      val res: Vector[Int] = matrix.indexedCols(idx => idx.value.get(2) + idx.id)
+      val expected : Array[Int] = Array(11,13,15,17,19)
+
+      res.rowVector shouldBe false
+      res.length shouldBe 5
+      res.toArray shouldBe expected
+    }
+    "indexed cols to vector" in {
+      val res: Matrix[Int] = matrix.indexedCols(idx => idx.id + idx.value)
+      val expected : Array[Int] = Array(
+        1, 3, 5, 7, 9,
+        6, 8, 10, 12, 14,
+        11, 13, 15, 17, 19
+      )
+      res.numCols shouldBe 5
+      res.numRows shouldBe 3
+      res.toArray shouldBe expected
     }
     "elements" in {
       val res = matrix.elements(0)(e => e, (a, b) => a + b)

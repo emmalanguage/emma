@@ -1,5 +1,6 @@
 package eu.stratosphere.emma.api.lara
 
+import eu.stratosphere.emma.api.linalg.ir.{VIdx, Idx}
 import spire.implicits._
 import spire.math._
 
@@ -92,6 +93,11 @@ private[emma] class DenseVector[A: Numeric : ClassTag](override val length: Int,
   override
   def fold[B](z: B)(s: A => B, p: (B, B) => B): B = {
     values.foldLeft(z)((acc, x) => p(s(x), acc))
+  }
+
+  override
+  def indexedFold[B](z: B)(s: Idx[Int, A] => B, p: (B, B) => B): B = {
+    values.zipWithIndex.foldLeft(z)((acc, x) => p(acc,s(VIdx(x._2,x._1))))
   }
 
   override
