@@ -44,6 +44,10 @@ trait Symbols extends Util { this: Trees with Terms with Types =>
     /** Returns the modifiers associated with `sym`. */
     def mods(sym: Symbol): Modifiers =
       mods(flags(sym))
+
+    /** Returns a [[Symbol]]s annotation of type A, if any */
+    def annotation[A: TypeTag](sym: Symbol): Option[Annotation] =
+      sym.annotations.find { _.tree.tpe == universe.typeOf[A] }
   }
 
   /** Utility for symbol owners. */

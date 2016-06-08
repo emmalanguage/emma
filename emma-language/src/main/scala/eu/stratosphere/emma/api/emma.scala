@@ -2,7 +2,8 @@ package eu.stratosphere.emma.api
 
 import eu.stratosphere.emma.macros.program.WorkflowMacros
 import eu.stratosphere.emma.macros.utility.UtilMacros
-
+import eu.stratosphere.emma.macros.utility.InlineMacros
+import scala.annotation.{StaticAnnotation, compileTimeOnly}
 import scala.language.experimental.macros
 
 // TODO: Add more detailed documentation with examples.
@@ -26,4 +27,9 @@ object emma {
 
   final def visualize[T](e: T): T =
     macro UtilMacros.visualize[T]
+
+  @compileTimeOnly("enable macro paradise to expand macro annotations")
+  class inline extends StaticAnnotation {
+    def macroTransform(annottees: Any*): Any = macro InlineMacros.inlineImpl
+  }
 }
