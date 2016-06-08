@@ -27,6 +27,16 @@
             <artifactId>scala-compiler</artifactId>
         </dependency>
 
+        <!-- Type-level -->
+        <dependency>
+            <groupId>org.typelevel</groupId>
+            <artifactId>cats_${scala.tools.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.chuusai</groupId>
+            <artifactId>shapeless_${scala.tools.version}</artifactId>
+        </dependency>
+
         <!-- CSV -->
         <dependency>
             <groupId>net.sf.opencsv</groupId>

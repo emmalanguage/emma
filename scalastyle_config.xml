@@ -127,7 +127,7 @@
  <check level="warning" class="org.scalastyle.scalariform.EmptyClassChecker" enabled="true"/>
  <check level="warning" class="org.scalastyle.scalariform.ClassTypeParameterChecker" enabled="true">
   <parameters>
-   <parameter name="regex"><![CDATA[^[A-Z_]$]]></parameter>
+   <parameter name="regex"><![CDATA[^[A-Z_][A-Za-z_]*$]]></parameter>
   </parameters>
  </check>
  <check level="warning" class="org.scalastyle.scalariform.UnderscoreImportChecker" enabled="false"/>
