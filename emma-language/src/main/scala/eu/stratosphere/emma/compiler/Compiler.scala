@@ -2,7 +2,7 @@ package eu.stratosphere.emma
 package compiler
 
 import eu.stratosphere.emma.compiler.lang.source.Source
-import eu.stratosphere.emma.compiler.lang.AlphaEq
+import eu.stratosphere.emma.compiler.lang.{AlphaEq, PrettyPrint}
 import eu.stratosphere.emma.compiler.lang.core.Core
 
 import scala.reflect.api.Universe
@@ -13,7 +13,7 @@ import scala.reflect.api.Universe
  * This trait has to be instantiated with an underlying universe and works for both runtime and
  * compile time reflection.
  */
-trait Compiler extends AlphaEq with Source with Core {
+trait Compiler extends AlphaEq with Source with Core with PrettyPrint {
 
   /** The underlying universe object. */
   override val universe: Universe
