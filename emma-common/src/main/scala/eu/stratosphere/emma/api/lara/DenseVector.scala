@@ -95,6 +95,11 @@ private[emma] class DenseVector[A: Numeric : ClassTag](override val length: Int,
   }
 
   override
+  def indexedFold[B](z: B)(s: Idx[Int, A] => B, p: (B, B) => B): B = {
+    values.zipWithIndex.foldLeft(z)((acc, x) => p(acc,s(VIdx(x._2,x._1))))
+  }
+
+  override
   def map[B: Numeric : ClassTag](f: (A) => B): Vector[B] = {
     new DenseVector[B](length, values.map(f(_)), rowVector)
   }

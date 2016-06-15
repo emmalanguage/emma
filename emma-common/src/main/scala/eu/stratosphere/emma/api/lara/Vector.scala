@@ -81,6 +81,8 @@ trait Vector[A] {
 
   def fold[B](z: B)(s: A => B, p: (B, B) => B): B
 
+  def indexedFold[B](z: B)(s: Idx[Int, A] => B, p: (B, B) => B): B
+
   def map[B: Numeric : ClassTag](f: (A) => B): Vector[B]
 
   private[emma] def plus(other: Vector[A]): Vector[A]
