@@ -53,6 +53,12 @@
             <groupId>org.apache.flink</groupId>
             <artifactId>flink-java_${scala.tools.version}</artifactId>
             <scope>${runtime.scope}</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>javax.servlet</groupId>
+                    <artifactId>servlet-api</artifactId>
+                </exclusion>
+            </exclusions>
         </dependency>
         <dependency>
             <groupId>org.apache.flink</groupId>

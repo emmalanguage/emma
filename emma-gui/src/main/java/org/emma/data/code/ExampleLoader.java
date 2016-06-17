@@ -52,7 +52,8 @@ public abstract class ExampleLoader {
     public String loadExampleSourceCode(String filePath) throws FileNotFoundException {
         StringBuilder sourceCode = new StringBuilder();
 
-        InputStream is = Thread.currentThread().getClass().getResourceAsStream(filePath);
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        InputStream is = cl.getResourceAsStream("." + filePath);
 
         if (is == null)
             throw new FileNotFoundException(filePath + " not found.");
