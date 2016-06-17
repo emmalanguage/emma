@@ -1,6 +1,8 @@
 package org.emma.server
 
-import java.io.PrintStream
+import java.io.{File, PrintStream}
+import java.net.{URL, URLClassLoader}
+import java.nio.file.Paths
 
 import org.apache.log4j.Logger
 import org.eclipse.jetty.server.Server
@@ -33,7 +35,14 @@ object HttpServer {
   def start(): Unit = {
     this.server = new Server(ConfigReader.getInt("port"))
     val context = new WebAppContext
-    context.setClassLoader(Thread.currentThread().getContextClassLoader)
+
+    HttpServer.addFile(Paths.get(System.getProperty("user.dir"))
+      .resolve("../emma-examples/src/main/scala/").normalize().toAbsolutePath.toFile)
+    HttpServer.addFile(Paths.get("/tmp/emma/codegen")
+      .normalize().toAbsolutePath.toFile)
+    val cl = Thread.currentThread().getContextClassLoader
+
+    context.setClassLoader(cl)
     context.getInitParams.put("org.eclipse.jetty.servlet.Default.useFileMappedBuffer", "false")
     context.setContextPath("/")
     context.setResourceBase("public")
@@ -48,8 +57,28 @@ object HttpServer {
       System.out.println("Started server at port: " + ConfigReader.getString("port"))
       server.join()
     } catch { case ex: Exception =>
-        ex.printStackTrace()
+      ex.printStackTrace()
     }
   }
+
+  def addFile(f: File): Unit = {
+    addURL(f.toURI.toURL)
+  }
+
+  def addURL(u: URL): Unit = {
+    val sysloader = ClassLoader.getSystemClassLoader.asInstanceOf[URLClassLoader]
+    val sysclass = classOf[URLClassLoader]
+
+    try {
+      val method = sysclass.getDeclaredMethod("addURL", classOf[URL])
+      method.setAccessible(true)
+      method.invoke(sysloader, u)
+    } catch {
+      case t: Throwable =>
+      t.printStackTrace()
+      throw new java.io.IOException("Error, could not add URL to system classloader")
+    }//end try catch
+
+  }//end method
 
 }
