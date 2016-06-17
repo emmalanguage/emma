@@ -10,20 +10,20 @@ import org.emma.config.ConfigReader
 import org.emma.servlets.{CodeServlet, LogEventServlet}
 
 object HttpServer {
+
   private[server] var LOGGER: Logger = Logger.getRootLogger
   private var server: Server = null
 
   @throws(classOf[Exception])
-  def main(args: Array[String]) {
+  def main(args: Array[String]): Unit = {
     System.setOut(createLoggingProxy(System.out))
     System.setErr(createLoggingProxy(System.err))
-    val server: HttpServer.type = HttpServer
-    server.start()
+    HttpServer.start()
   }
 
   def createLoggingProxy(realPrintStream: PrintStream): PrintStream = {
     new PrintStream(realPrintStream) {
-      override def print(string: String) {
+      override def print(string: String): Unit = {
         realPrintStream.print(string)
         LOGGER.info(string)
       }
@@ -32,7 +32,8 @@ object HttpServer {
 
   def start(): Unit = {
     this.server = new Server(ConfigReader.getInt("port"))
-    val context: WebAppContext = new WebAppContext
+    val context = new WebAppContext
+    context.setClassLoader(Thread.currentThread().getContextClassLoader)
     context.getInitParams.put("org.eclipse.jetty.servlet.Default.useFileMappedBuffer", "false")
     context.setContextPath("/")
     context.setResourceBase("public")

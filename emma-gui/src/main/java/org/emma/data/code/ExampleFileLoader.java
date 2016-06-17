@@ -4,10 +4,7 @@ import com.google.gson.*;
 import net.sourceforge.argparse4j.inf.Namespace;
 import org.emma.config.ConfigReader;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileReader;
-import java.io.IOException;
+import java.io.*;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -97,9 +94,11 @@ public class ExampleFileLoader extends ExampleLoader {
         examples = new HashMap<>();
         String examplesPath = ConfigReader.getString(exampleConfigPathKey);
 
+        ClassLoader cl = Thread.currentThread().getContextClassLoader();
         Gson gson = new Gson();
 
-        try (BufferedReader br = new BufferedReader(new FileReader(new File(examplesPath)))){
+
+        try (BufferedReader br = new BufferedReader(new InputStreamReader(cl.getResourceAsStream(examplesPath)))){
             JsonArray examples = gson.fromJson(br, JsonArray.class);
 
             for (JsonElement example : examples) {
