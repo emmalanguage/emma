@@ -42,36 +42,21 @@ object KMeansMatrix {
       )
 
       //computation of the matrix indicating where the points belong
-      var z : Matrix[Double] = Matrix.fill(m,k)((i,j) => if (j == minIdx.get(i)) 1.0 else 0.0)
+      val z : Matrix[Double] = Matrix.fill(m,k)((i,j) => if (j == minIdx.get(i)) 1.0 else 0.0)
       //vector indicating the size of each cluster
-      val clusterSizes = Vector.fill(k)(i => z.column(i).fold(0.0)(s => s, (l,r) => l + r))
+      val clusterSizes = Vector.fill(k)(i => z.column(i).aggregate( _ + _ ))
 
-      //build the list of alone centroids
-      val emptyClusters = clusterSizes.indexedFold(List[Int]())(s =>
-        if (s.value == 0) List(s.id) else List(),
-        (l,r) => l:::r)
-
-      //if there are empty clusters, the corresponding centroids are replaced by random points
-      if (emptyClusters.nonEmpty) {
-        z = Matrix.fillColumns(m,k)(j =>
-          if (emptyClusters.contains(j)) {
-            val c = Random.nextInt(m)
-            Vector.fill(m)(v => if (v==c) 1.0 else 0.0)
-          }
-          else z.column(j)
-        )
-      }
       //compute new centroids
       centroids = newCentroids
       newCentroids = (x.transpose() %*% z).indexedCols(idx =>
-        if (clusterSizes.get(idx.id) == 0.0) idx.value else idx.value / clusterSizes.get(idx.id)
+        if (clusterSizes.get(idx.id) == 0.0) x.row(Random.nextInt(m)) else idx.value / clusterSizes.get(idx.id)
       )
       currentIteration += 1
 
       //compute change
       change = Vector.fill(k)(i => (centroids.column(i) - newCentroids.column(i)).fold(0.0)(
         s => s * s, (l,r) => l + r)
-        ).fold(0.0)( s => s, (l,r) => l + r)
+        ).aggregate( _ + _ )
 
     } while (change > epsilon && currentIteration < maxIterations )
 
