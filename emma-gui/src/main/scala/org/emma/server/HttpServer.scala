@@ -28,6 +28,13 @@ import org.emma.servlets.{CodeServlet, LogEventServlet}
 
 object HttpServer {
 
+  private final val EXAMPLE_DIR_DEFAULT = Paths
+    .get(System.getProperty("user.dir"), "..", "emma-examples", "src", "main", "scala")
+    .normalize().toAbsolutePath.toString
+  private final val CODEGEN_DIR_DEFAULT = Paths
+    .get(System.getProperty("java.io.tmpdir"), "emma", "codegen")
+    .normalize().toAbsolutePath.toString
+
   private[server] var LOGGER: Logger = Logger.getRootLogger
   private var server: Server = null
 
@@ -48,13 +55,21 @@ object HttpServer {
   }
 
   def start(): Unit = {
+    val exampleDir = Paths.get(System.getProperty("emma.example.dir", EXAMPLE_DIR_DEFAULT))
+      .normalize().toAbsolutePath.toFile
+    val codegenDir = Paths.get(System.getProperty("emma.codegen.dir", CODEGEN_DIR_DEFAULT))
+      .normalize().toAbsolutePath.toFile
+
+    codegenDir.mkdirs()
+
+    require(exampleDir.isDirectory, s"Example folder `$exampleDir` does not exist")
+    require(codegenDir.isDirectory, s"Codegen folder `$codegenDir` does not exist")
+
+    HttpServer.addFile(codegenDir)
+    HttpServer.addFile(exampleDir)
+
     this.server = new Server(ConfigReader.getInt("port"))
     val context = new WebAppContext
-
-    HttpServer.addFile(Paths.get(System.getProperty("user.dir"))
-      .resolve("../emma-examples/src/main/scala/").normalize().toAbsolutePath.toFile)
-    HttpServer.addFile(Paths.get("/tmp/emma/codegen")
-      .normalize().toAbsolutePath.toFile)
     val cl = Thread.currentThread().getContextClassLoader
 
     context.setClassLoader(cl)
@@ -71,8 +86,9 @@ object HttpServer {
       server.start()
       System.out.println("Started server at port: " + ConfigReader.getString("port"))
       server.join()
-    } catch { case ex: Exception =>
-      ex.printStackTrace()
+    } catch {
+      case ex: Exception =>
+        ex.printStackTrace()
     }
   }
 
@@ -90,10 +106,9 @@ object HttpServer {
       method.invoke(sysloader, u)
     } catch {
       case t: Throwable =>
-      t.printStackTrace()
-      throw new java.io.IOException("Error, could not add URL to system classloader")
-    }//end try catch
+        throw new java.io.IOException("Error, could not add URL to system classloader", t)
+    }
 
-  }//end method
+  }
 
 }
