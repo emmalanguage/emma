@@ -34,21 +34,21 @@ class TransitiveClosure(input: String, output: String, rt: Engine) extends Algor
   val algorithm = emma.parallelize {
     // read in a directed graph
     var edges = read(input, new CSVInputFormat[Edge[V]]).distinct()
-    var count = edges.size
-    var added = 0l
 
-    do {
+    var sizeO = 0L         // old size
+    var sizeN = edges.size // new size
+
+    while (sizeN - sizeO > 0) {
       val closure = for {
         e1 <- edges
         e2 <- edges
         if e1.dst == e2.src
       } yield Edge(e1.src, e2.dst)
-      edges = edges.plus(closure).distinct()
-      val oldCount = count
-      count = edges.size
-      added = count - oldCount
-      println(s"Added $added edges")
-    } while (added > 0)
+      edges = (edges plus closure).distinct()
+      sizeO = sizeN
+      sizeN = edges.size
+      println(s"Added ${sizeN - sizeO} edges")
+    }
 
     write(output, new CSVOutputFormat[Edge[V]]) { edges }
     edges
