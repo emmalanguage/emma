@@ -57,7 +57,7 @@ class ResolveSpec extends BaseCompilerSpec {
       org.example.foo.Baz
       ()
     }) match {
-      case Block(stats, expr: Tree) => stats
+      case u.Block(stats, expr: Tree) => stats
       case _ => Nil
     }) collect {
       case sel: Select => sel
@@ -77,7 +77,7 @@ class ResolveSpec extends BaseCompilerSpec {
       val bar2 = Baz
       apply(1).x == bar2(1).x
     }) match {
-      case Block(stats, expr: Tree) => stats
+      case u.Block(stats, expr: Tree) => stats
       case _ => Nil
     }) collect {
       case Import(tree, selectors) => tree

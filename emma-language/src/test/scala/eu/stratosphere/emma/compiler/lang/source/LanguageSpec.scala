@@ -31,7 +31,7 @@ class LanguageSpec extends BaseCompilerSpec {
   def `type-check and extract from`[A](expr: Expr[A]) =
     Type.check(expr.tree) match {
       case Apply(_, args) => args
-      case Block(stats, _) => stats
+      case u.Block(stats, _) => stats
     }
 
   // ---------------------------------------------------------------------------
@@ -197,7 +197,7 @@ class LanguageSpec extends BaseCompilerSpec {
       (x: Int, y: Int) => x + y,
       "ellipsis".charAt _
     )) flatMap {
-      case Block(stats, _) => stats
+      case u.Block(stats, _) => stats
       case tree => tree :: Nil
     }
 

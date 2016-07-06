@@ -1,13 +1,15 @@
-package eu.stratosphere.emma
-package compiler
+package eu.stratosphere
+package emma.compiler
 
 import java.net.URLClassLoader
 import java.nio.file.{Files, Paths}
 
+import emma.ast.JavaAST
+
 import scala.tools.reflect.ToolBoxFactory
 
-/** A reflection-based [[eu.stratosphere.emma.compiler.Compiler]]. */
-class RuntimeCompiler extends Compiler with RuntimeUtil {
+/** A reflection-based [[Compiler]]. */
+class RuntimeCompiler extends Compiler with JavaAST {
 
   import RuntimeCompiler._
   import universe._
@@ -20,7 +22,6 @@ class RuntimeCompiler extends Compiler with RuntimeUtil {
     path.toAbsolutePath.toString
   }
 
-  // FIXME: As constructor parameter.
   /** The generating Scala toolbox. */
   override val tb = {
     val cl = getClass.getClassLoader
@@ -43,11 +44,13 @@ class RuntimeCompiler extends Compiler with RuntimeUtil {
 
 object RuntimeCompiler {
 
+  /** [[RuntimeCompiler]] defaults. */
   object default {
 
     val runMethod = "run"
-    lazy val codeGenDir =
-      Paths.get(sys.props("java.io.tmpdir"), "emma", "codegen")
-        .toAbsolutePath.toString
+
+    lazy val codeGenDir = Paths
+      .get(sys.props("java.io.tmpdir"), "emma", "codegen")
+      .toAbsolutePath.toString
   }
 }

@@ -1,11 +1,13 @@
 package eu.stratosphere
 package emma.compiler
 
+import emma.ast.AST
+
 import org.scalactic._
 import org.scalactic.Accumulation._
 
 /** Common IR tools. */
-trait Common extends ReflectUtil {
+trait Common extends ReflectUtil with AST {
 
   import universe._
 
