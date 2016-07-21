@@ -1,46 +1,32 @@
 package eu.stratosphere.emma.compiler
 
+import eu.stratosphere.emma.ast.AST
+
 import scala.annotation.tailrec
 
 /** Common rule-based rewrite logic. */
-trait Rewrite extends ReflectUtil {
-
-  import universe._
+trait Rewrite extends AST {
 
   trait Rule {
-
-    /** The type of the rule match, usually a case class marking the relevant [[Tree]] parts. */
-    type RuleMatch
-
-    /** A binding function that produces syntactically viable [[RuleMatch]] objects. */
-    protected def bind(root: Tree): Traversable[RuleMatch]
-
-    /** A guarding condition that semantically validates the [[RuleMatch]]. */
-    protected def guard(rm: RuleMatch): Boolean
-
-    /** The rewrite logic. */
-    protected def fire(rm: RuleMatch): Tree
-
     /**
-     * Fire the [[Rule]] once, using the first [[RuleMatch]] that satisfies the [[guard]].
+     * Fire the [[Rule]] once, using the first possible match.
      *
      * @param root The [[Tree]] to transform.
-     * @return Optionally, the transformed [[Tree]].
+     * @return Optionally, the transformed [[u.Tree]] or [[None]] if no match was found.
      */
-    final def apply(root: Tree): Option[Tree] =
-      for (rm <- bind(root).find(guard)) yield fire(rm)
+    def apply(root: u.Tree): Option[u.Tree]
   }
 
   object Engine {
 
     /** Post-walk a tree and exhaustively apply the given sequence of [[Rule]] objects at each subtree. */
-    def postWalk(rules: Seq[Rule]): Tree => Tree = Rewrite.this.postWalk {
+    def bottomUp(rules: Seq[Rule]): u.Tree => u.Tree = tree => api.BottomUp.transform {
       case t => exhaust(rules)(t)
-    }
+    }(tree).tree
 
     /** Exhaustively apply the given set of [[Rule]] objects at each subtree. */
     @tailrec
-    def exhaust(rules: Seq[Rule])(tree: Tree): Tree = {
+    def exhaust(rules: Seq[Rule])(tree: u.Tree): u.Tree = {
       // get the result of the first possible rule application
       val rsltOpt = (for {
         rule <- rules.view

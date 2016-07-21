@@ -61,11 +61,11 @@ trait Common extends ReflectUtil with AST {
   protected[emma] object IR {
     val module /*          */ = rootMirror.staticModule("eu.stratosphere.emma.compiler.ir.package").asModule
 
-    val flatten /*         */ = module.info.decl(TermName("flatten")).asTerm
-    val generator /*       */ = module.info.decl(TermName("generator")).asTerm
-    val comprehension /*   */ = module.info.decl(TermName("comprehension")).asTerm
-    val guard /*           */ = module.info.decl(TermName("guard")).asTerm
-    val head /*            */ = module.info.decl(TermName("head")).asTerm
+    val flatten /*         */ = module.info.decl(TermName("flatten")).asMethod
+    val generator /*       */ = module.info.decl(TermName("generator")).asMethod
+    val comprehension /*   */ = module.info.decl(TermName("comprehension")).asMethod
+    val guard /*           */ = module.info.decl(TermName("guard")).asMethod
+    val head /*            */ = module.info.decl(TermName("head")).asMethod
 
     val comprehensionOps /**/ = Set(flatten, generator, comprehension, guard, head)
   }

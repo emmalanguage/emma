@@ -18,24 +18,28 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // Helper methods
   // ---------------------------------------------------------------------------
 
-  def anfPipeline[T]: Expr[T] => Tree =
+  val anf: Expr[Any] => Tree =
     compiler.pipeline(typeCheck = true)(
       Core.resolveNameClashes,
       Core.anf,
       Core.simplify
     ).compose(_.tree)
 
-  lazy val resugar: Tree => Tree = {
-    time(Comprehension.resugar(API.bagSymbol)(_), "resugar")
-  } andThen {
-    api.Owner.at(get.enclosingOwner)
-  }
+  val resugar: Expr[Any] => Tree =
+    compiler.pipeline(typeCheck = true)(
+      Core.resolveNameClashes,
+      Core.anf,
+      tree => time(Comprehension.resugar(API.bagSymbol)(tree), "resugar"),
+      Core.simplify
+    ).compose(_.tree)
 
-  lazy val desugar: Tree => Tree = {
-    time(Comprehension.desugar(API.bagSymbol)(_), "desugar")
-  } andThen {
-    api.Owner.at(get.enclosingOwner)
-  }
+  val desugar: Expr[Any] => Tree =
+    compiler.pipeline(typeCheck = true)(
+      Core.resolveNameClashes,
+      Core.anf,
+      tree => time(Comprehension.desugar(API.bagSymbol)(tree), "desugar"),
+      Core.simplify
+    ).compose(_.tree)
 
   // ---------------------------------------------------------------------------
   // Spec data: a collection of (desugared, resugared) trees
@@ -44,13 +48,13 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // map
   val (des1, res1) = {
 
-    val des = anfPipeline(reify {
+    val des = reify {
       val names = users
         .map(u => (u.name.first, u.name.last))
       names
-    })
+    }
 
-    val res = anfPipeline(reify {
+    val res = reify {
       val users$1 = users
       comprehension[(String, String), DataBag] {
         val u = generator(users$1)
@@ -58,7 +62,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
           (u.name.first, u.name.last)
         }
       }
-    })
+    }
 
     (des, res)
   }
@@ -66,13 +70,13 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // flatMap
   val (des2, res2) = {
 
-    val des = anfPipeline(reify {
+    val des = reify {
       val names = users
         .flatMap(u => DataBag(Seq(u.name.first, u.name.last)))
       names
-    })
+    }
 
-    val res = anfPipeline(reify {
+    val res = reify {
       val users$1 = users
       flatten[String, DataBag] {
         comprehension[DataBag[String], DataBag] {
@@ -82,7 +86,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
           }
         }
       }
-    })
+    }
 
     (des, res)
   }
@@ -90,13 +94,13 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // withFilter
   val (des3, res3) = {
 
-    val des = anfPipeline(reify {
+    val des = reify {
       val names = users
         .withFilter(u => u.name.first != "John")
       names
-    })
+    }
 
-    val res = anfPipeline(reify {
+    val res = reify {
       val users$1 = users
       comprehension[User, DataBag] {
         val u = generator(users$1)
@@ -110,7 +114,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
           u
         }
       }
-    })
+    }
 
     (des, res)
   }
@@ -118,14 +122,14 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // nested (flat)maps - 2 generators
   val (des4, res4) = {
 
-    val des = anfPipeline(reify {
+    val des = reify {
       val names = users
         .flatMap(u => clicks
           .map(c => (u, c)))
       names
-    })
+    }
 
-    val res = anfPipeline(reify {
+    val res = reify {
       val users$1 = users
       flatten[(User, Click), DataBag] {
         comprehension[DataBag[(User, Click)], DataBag] {
@@ -141,7 +145,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
           }
         }
       }
-    })
+    }
 
     (des, res)
   }
@@ -149,15 +153,15 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // nested (flat)maps - 3 generators
   val (des5, res5) = {
 
-    val des = anfPipeline(reify {
+    val des = reify {
       val names = users
         .flatMap(u => clicks
           .flatMap(c => ads
             .map(a => (a, u, c))))
       names
-    })
+    }
 
-    val res = anfPipeline(reify {
+    val res = reify {
       val users$1 = users
       val names = flatten[(Ad, User, Click), DataBag] {
         comprehension[DataBag[(Ad, User, Click)], DataBag] {
@@ -184,7 +188,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
         }
       }
       names
-    })
+    }
 
     (des, res)
   }
@@ -192,15 +196,15 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // nested (flat)maps - 3 generators and a filter
   val (des6, res6) = {
 
-    val des = anfPipeline(reify {
+    val des = reify {
       val names = users
         .flatMap(u => clicks
           .withFilter(_.userID == u.id)
           .flatMap(c => ads.map(a => (a, u, c))))
       names
-    })
+    }
 
-    val res = anfPipeline(reify {
+    val res = reify {
       val users$1 = users
       val names = flatten[(Ad, User, Click), DataBag] {
         comprehension[DataBag[(Ad, User, Click)], DataBag] {
@@ -237,7 +241,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
         }
       }
       names
-    })
+    }
 
     (des, res)
   }
@@ -249,23 +253,23 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   "resugar" - {
 
     "map" in {
-      resugar(des1) shouldBe alphaEqTo(res1)
+      resugar(des1) shouldBe alphaEqTo(anf(res1))
     }
     "flatMap" in {
-      resugar(des2) shouldBe alphaEqTo(res2)
+      resugar(des2) shouldBe alphaEqTo(anf(res2))
     }
     "withFilter" in {
-      resugar(des3) shouldBe alphaEqTo(res3)
+      resugar(des3) shouldBe alphaEqTo(anf(res3))
     }
     "nested (flat)maps" - {
       "with two generators" in {
-        resugar(des4) shouldBe alphaEqTo(res4)
+        resugar(des4) shouldBe alphaEqTo(anf(res4))
       }
       "with three generators" in {
-        resugar(des5) shouldBe alphaEqTo(res5)
+        resugar(des5) shouldBe alphaEqTo(anf(res5))
       }
       "with three generators and one filter" in {
-        resugar(des6) shouldBe alphaEqTo(res6)
+        resugar(des6) shouldBe alphaEqTo(anf(res6))
       }
     }
   }
@@ -273,23 +277,23 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   "desugar" - {
 
     "map" in {
-      desugar(res1) shouldBe alphaEqTo(des1)
+      desugar(res1) shouldBe alphaEqTo(anf(des1))
     }
     "flatMap" in {
-      desugar(res2) shouldBe alphaEqTo(des2)
+      desugar(res2) shouldBe alphaEqTo(anf(des2))
     }
     "withFilter" in {
-      desugar(res3) shouldBe alphaEqTo(des3)
+      desugar(res3) shouldBe alphaEqTo(anf(des3))
     }
     "nested (flat)maps" - {
       "with two generators" in {
-        desugar(res4) shouldBe alphaEqTo(des4)
+        desugar(res4) shouldBe alphaEqTo(anf(des4))
       }
       "with three generators" in {
-        desugar(res5) shouldBe alphaEqTo(des5)
+        desugar(res5) shouldBe alphaEqTo(anf(des5))
       }
       "with three generators and one filter" in {
-        desugar(res6) shouldBe alphaEqTo(des6)
+        desugar(res6) shouldBe alphaEqTo(anf(des6))
       }
     }
   }

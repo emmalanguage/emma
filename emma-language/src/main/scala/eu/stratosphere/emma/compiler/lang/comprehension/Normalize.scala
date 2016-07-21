@@ -7,9 +7,9 @@ private[comprehension] trait Normalize extends Common
   with Rewrite {
   self: Core with Comprehension =>
 
-  import universe._
-  import Comprehension.{Syntax, asBlock}
-  import Tree._
+  import UniverseImplicits._
+  import Comprehension.{Syntax, asLet}
+  import Core.{Lang => core}
 
   private[comprehension] object Normalize {
 
@@ -20,26 +20,26 @@ private[comprehension] trait Normalize extends Common
      * @param tree  The [[Tree]] to be resugared.
      * @return The input [[Tree]] with resugared comprehensions.
      */
-    def normalize(monad: Symbol)(tree: Tree): Tree = {
+    def normalize(monad: u.Symbol)(tree: u.Tree): u.Tree = {
       // construct comprehension syntax helper for the given monad
-      val cs = new Syntax(monad: Symbol) with NormalizationRules
+      val cs = new Syntax(monad: u.Symbol) with NormalizationRules
 
       ({
         // apply UnnestHead and UnnestGenerator rules exhaustively
-        Engine.postWalk(List(cs.UnnestHead, cs.UnnestGenerator))
+        Engine.bottomUp(List(cs.UnnestHead, cs.UnnestGenerator))
       } andThen {
         // elminiate dead code produced by normalization
         Core.dce
       } andThen {
         // elminiate trivial guards produced by normalization
-        postWalk {
-          case cs.comprehension(qs, hd) =>
-            cs.comprehension(
+        tree => api.BottomUp.transform {
+          case cs.Comprehension(qs, hd) =>
+            cs.Comprehension(
               qs filterNot {
-                case t@cs.guard(block(_, Literal(Constant(true)))) => true
+                case t@cs.Guard(core.Let(_, _, core.Lit(true))) => true
                 case t => false
               }, hd)
-        }
+        }(tree).tree
       }) (tree)
     }
   }
@@ -55,273 +55,346 @@ private[comprehension] trait Normalize extends Common
      * Unnests a comprehended head in its parent.
      *
      * ==Matching Pattern==
+     *
+     * (1) A `flatten` expression occurring in the `expr` position in the enclosing `let` block.
+     *
      * {{{
      * {
-     *   $bs1
-     *   val c = flatten {
-     *     $bs2
+     *   $vals1
+     *   flatten {
+     *     $vals2
      *     comprehension {
      *       $qs1
      *       head {
-     *         $bs3
+     *         $vals3
      *         comprehension {
      *           $qs2
-     *           head $hd
+     *           head $hd2
      *         } // child comprehension
      *       }
      *     } // outer comprehension
      *   } // parent expression
-     *   $bs4
      * } // enclosing block
      * }}}
      *
-     * ==Guard==
-     * None.
-     *
-     * ==Rewrite==
-     *
-     * Let $bs3 decompose into the following two subsets:
-     * - $bs3i (transitively) depends on symbols defined in $qs1, and
-     * - $bs3o is the independent complement $bs3 \ $bs3o.
+     * (2) A `flatten` expression occurring in the `rhs` opsition of some binding in the enclosing `let` block.
      *
      * {{{
      * {
-     *   $bs1
-     *   $bs2
-     *   $bs3o
-     *   val c = comprehension {
+     *   $vals1a
+     *   val x = flatten {
+     *     $vals2
+     *     comprehension {
+     *       $qs1
+     *       head {
+     *         $vals3
+     *         comprehension {
+     *           $qs2
+     *           head $hd2
+     *         } // child comprehension
+     *       }
+     *     } // outer comprehension
+     *   } // parent valdef
+     *   $vals1b
+     *   $expr1 // parent expression
+     * } // enclosing block
+     * }}}
+     *
+     * ==Rewrite==
+     *
+     * Let $vals3 decompose into the following two subsets:
+     * - $vals3i (transitively) depends on symbols defined in $qs1, and
+     * - $vals3o is the independent complement $vals3 \ $vals3o.
+     *
+     * For a match of type (1):
+     *
+     * {{{
+     * {
+     *   $vals1
+     *   $vals2
+     *   $vals3o
+     *   comprehension {
      *     $qs1
-     *     $qs2' // where let blocks are prefixed with $bs3i
-     *     head $hd' // where let blocks are prefixed with $bs3i
+     *     $qs2' // where let blocks are prefixed with $vals3i
+     *     head $hd' // where let blocks are prefixed with $vals3i
      *   } // flattened result comprehension
-     *   $bs4
+     * } // enclosing block
+     * }}}
+     *
+     * For a match of type (2):
+     *
+     * {{{
+     * {
+     *   $vals1a
+     *   $vals2
+     *   $vals3o
+     *   val x = comprehension {
+     *     $qs1
+     *     $qs2' // where let blocks are prefixed with $vals3i
+     *     head $hd' // where let blocks are prefixed with $vals3i
+     *   } // flattened result comprehension
+     *   $vals1b
+     *   $expr1
      * } // enclosing block
      * }}}
      */
     object UnnestHead extends Rule {
 
-      case class RuleMatch(enclosing: Block, parent: Tree, child: Block) {
-        lazy val bs1 = enclosing.children.takeWhile(_ != parent)
-        lazy val bs2 = parent match {
-          case val_(_, flatten(block(bs, comprehension(_, _))), _) => bs
-          case flatten(block(bs, comprehension(_, _))) => bs
-        }
-        lazy val bs3 = child.stats
-        lazy val bs4 = enclosing.children.reverse.takeWhile(_ != parent).reverse
-        lazy val qs1 = parent match {
-          case val_(_, flatten(block(Nil, comprehension(qs, _))), _) => qs
-          case flatten(block(Nil, comprehension(qs, _))) => qs
-        }
-        lazy val (qs2, hd) = child.expr match {
-          case comprehension(_qs2, head(_hd)) => (_qs2, _hd)
-        }
-        lazy val (bs3i, bs3o) = {
-          val surrogateSym = (t: Tree) =>
-            Term.sym.free(Term.name.fresh("x"), t.tpe)
+      override def apply(root: u.Tree): Option[u.Tree] = root match {
+        //@formatter:off
+        case core.Let(
+          vals1,
+          defs1,
+          expr1) =>
+          //@formatter:on
 
-          val bs3refs = (bs3 map {
-            case val_(sym, rhs, _) => sym -> Tree.refs(rhs)
-            case stmt => surrogateSym(stmt) -> Tree.refs(stmt)
-          }).toMap
+          vals1.map(x => x -> x.rhs) :+ (expr1 -> expr1) collectFirst {
+            //@formatter:off
+            case (encl, Flatten(
+              core.Let(
+                vals2,
+                Nil,
+                expr2@Comprehension(
+                  qs1,
+                  Head(
+                    core.Let(
+                      vals3,
+                      Nil,
+                      expr3@Comprehension(
+                        qs2,
+                        Head(hd2)
+                      ))))))) =>
+              //@formatter:on
 
-          val qs1defs = (qs1 flatMap {
-            case generator(sym, _) => List(sym)
-            case guard(_) => List.empty[TermSymbol]
-          }).toSet
+              val (vals3i, vals3o) = split(vals3, qs1)
 
-          var bs3iSym = for {
-            sym <- bs3refs.keySet
-            if (bs3refs(sym) intersect qs1defs).nonEmpty
-          } yield sym
+              val qs2p = qs2 map {
+                case Generator(sym, rhs) =>
+                  Generator(sym, prepend(vals3i, rhs))
+                case Guard(pred) =>
+                  Guard(prepend(vals3i, pred))
+              }
 
-          var delta = Set.empty[TermSymbol]
-          do {
-            bs3iSym = bs3iSym union delta
-            delta = (for {
-              sym <- bs3refs.keySet
-              if (bs3refs(sym) intersect bs3iSym).nonEmpty
-            } yield sym) diff bs3iSym
-          } while (delta.nonEmpty)
+              val hd2p = prepend(vals3i, hd2)
 
-          val bs3oSym = bs3refs.keySet diff bs3iSym
+              val (vals, expr) = encl match {
+                case encl@core.ValDef(xsym, xrhs, xflags) =>
+                  val (vals1a, vals1b) = splitAt(encl)(vals1)
+                  val val_ = core.ValDef(xsym, Comprehension(qs1 ++ qs2p, Head(hd2p)), xflags)
+                  (vals1a ++ vals2 ++ vals3o ++ Seq(val_) ++ vals1b, expr1)
+                case _ =>
+                  (vals1 ++ vals2 ++ vals3o, Comprehension(qs1 ++ qs2p, Head(hd2p)))
+              }
 
-          val bs3i = bs3 flatMap {
-            case vd@val_(sym, _, _) if bs3iSym contains sym => List(vd)
-            case _ => Nil
-          }
-          val bs3o = bs3 flatMap {
-            case vd@val_(sym, _, _) if bs3oSym contains sym => List(vd)
-            case _ => Nil
+              // API: cumbersome syntax of Let.apply
+              core.Let(vals: _*)(defs1: _*)(expr)
           }
 
-          (bs3i, bs3o)
-        }
+        case _ =>
+          // subtree's root does not match, don't modify the subtree
+          None
       }
 
-      override def bind(root: Tree): Traversable[RuleMatch] = root match {
-        case enclosing: Block => new Traversable[RuleMatch] {
-          override def foreach[U](f: (RuleMatch) => U): Unit = {
-            val parents = (enclosing.stats collect {
-              // a ValDef statement with a `flatten(comprehension(...))` rhs
-              case parent@val_(_, flatten(block(_, outer@comprehension(_, _))), _) => (parent, outer)
-            }) ++ (enclosing.expr match {
-              // an expr with a `flatten(comprehension(...))`
-              case parent@flatten(block(_, outer@comprehension(_, _))) => List((parent, outer))
-              case _ => Nil
-            })
+      /** Splits `vals` in two subsequences: vals dependent on generators bound in `qs`, and complement. */
+      private def split(vals: Seq[u.ValDef], qs: Seq[u.Tree]): (Seq[u.ValDef], Seq[u.ValDef]) = {
+        // symbols referenced in vals
+        val vals3refs = (for {
+          core.ValDef(sym, rhs, _) <- vals
+        } yield sym -> api.Tree.refs(rhs)).toMap
 
-            for ((parent, outer) <- parents) outer match {
-              case comprehension(_, head(child@Block(_, comprehension(_, _)))) =>
-                f(RuleMatch(enclosing, parent, child))
-            }
+        // symbols defined in qs
+        val qs1Syms = (for {
+          Generator(sym, _) <- qs
+        } yield sym).toSet
+
+        // symbols defined in vals3 which directly depend on symbols from qs1
+        var vasDepSyms = (for {
+          (sym, refs) <- vals3refs
+          if (refs intersect qs1Syms).nonEmpty
+        } yield sym).toSet
+
+        // compute the transitive closure of vals3iSyms, i.e. extend with indirect dependencies
+        var delta = Set.empty[u.TermSymbol]
+        do {
+          vasDepSyms = vasDepSyms union delta
+          delta = (for {
+            (sym, refs) <- vals3refs
+            if (refs intersect vasDepSyms).nonEmpty
+          } yield sym).toSet diff vasDepSyms
+        } while (delta.nonEmpty)
+
+        // symbols defined in vals3 which do not depend on symbols from qs1
+        val valsIndSyms = vals3refs.keySet diff vasDepSyms
+
+        val vasDep = for {
+          vd@core.ValDef(sym, rhs, _) <- vals
+          if vasDepSyms contains sym
+        } yield vd
+
+        val valsInd = for {
+          vd@core.ValDef(sym, rhs, _) <- vals
+          if valsIndSyms contains sym
+        } yield vd
+
+        (vasDep, valsInd)
+      }
+
+      private def prepend(prefix: Seq[u.ValDef], blck: u.Block): u.Block = blck match {
+        case core.Let(vals, defs, expr) =>
+          val fresh = for (core.ValDef(sym, rhs, flags) <- prefix) yield {
+            core.ValDef(api.TermSym.fresh(sym), rhs, flags)
           }
-        }
-        case _ => Traversable.empty[RuleMatch]
+
+          val aliases = for {
+            (core.ValDef(from, _, _), core.ValDef(to, _, _)) <- prefix zip fresh
+          } yield from -> to
+
+          (api.Tree.rename(aliases: _*) andThen { Core.simplify _ })(
+            core.Let(fresh ++ vals: _*)(defs: _*)(expr)
+          ).asInstanceOf[u.Block]
       }
-
-      override def guard(rm: RuleMatch): Boolean =
-        true
-
-      override def fire(rm: RuleMatch): Tree = {
-        // construct a flattened version of the parent comprehension
-        val flattened = rm.parent match {
-          case val_(vsym, flatten(block(_, comprehension(_, _))), _) =>
-            val_(vsym,
-              comprehension(
-                rm.qs1 ++ rm.qs2 collect {
-                  case generator(sym, rhs) =>
-                    NormalizationRules.this.generator(sym, prepend(rm.bs3i, rhs))
-                  case guard(expr) =>
-                    NormalizationRules.this.guard(prepend(rm.bs3i, expr))
-                },
-                head(prepend(rm.bs3i, rm.hd))))
-          case flatten(block(_, comprehension(_, _))) =>
-            comprehension(
-              rm.qs1 ++ rm.qs2 collect {
-                case generator(sym, rhs) =>
-                  NormalizationRules.this.generator(sym, prepend(rm.bs3i, rhs))
-                case guard(expr) =>
-                  NormalizationRules.this.guard(prepend(rm.bs3i, expr))
-              },
-              head(prepend(rm.bs3i, rm.hd)))
-        }
-
-        // construct and return a new enclosing block
-        block(rm.bs1 ++ rm.bs2 ++ rm.bs3o ++ List(flattened) ++ rm.bs4)
-      }
-
-      private def prepend(prefix: List[ValDef], blck: Block): Block =
-        Tree.refresh(block(prefix, blck.children: _*), prefix collect {
-          case val_(sym, _, _) => sym
-        }: _*).asInstanceOf[Block]
     }
 
     /**
      * Un-nests a comprehended generator in its parent.
      *
      * ==Matching Pattern==
+     *
+     * A `parent` comprehension with a generator that binds to `x` and references a `child` comprehension
+     * that occurs in one of the previous value bindings within the enclosing `let` block.
+     *
+     * (1) The `parent` comprehension is an `expr` position in the enclosing `let` block.
+     *
      * {{{
      * {
-     *   $bs1
+     *   $vals1a
      *   val y = comprehension {
      *     $qs2
      *     head $hd2
      *   } // child comprehension
-     *   $bs2
+     *   $vals1b
      *   comprehension {
-     *     $qs1
+     *     $qs1a
      *     val x = generator(y) // gen
-     *     $qs3
+     *     $qs1b
      *     head $hd1
      *   } // parent comprehension
      * } // enclosing block
      * }}}
      *
-     * ==Guard==
-     * None.
+     * (2) The `parent` comprehension is an `rhs` position for some value definitions in the enclosing `let` block.
      *
-     * ==Rewrite==
      * {{{
      * {
-     *   $bs1
-     *   $bs2
-     *   comprehension {
-     *     $qs1
+     *   $vals1a
+     *   val y = comprehension {
      *     $qs2
-     *     $qs3 [ $hd2 \ x ]
+     *     head $hd2
+     *   } // child comprehension
+     *   $vals1b
+     *   val z = comprehension {
+     *     $qs1a
+     *     val x = generator(y) // gen
+     *     $qs1b
+     *     head $hd1
+     *   } // parent comprehension
+     *   $vals1c
+     *   $expr1
+     * } // enclosing block
+     * }}}
+     *
+     * ==Rewrite==
+     *
+     * For a match of type (1):
+     *
+     * {{{
+     * {
+     *   $vals1a
+     *   $vals1b
+     *   comprehension {
+     *     $qs1a
+     *     $qs2
+     *     $qs1b [ $hd2 \ x ]
      *     head $hd1 [ $hd2 \ x ]
      *   } // unnested result comprehension
+     * } // enclosing block
+     * }}}
+     *
+     * For a match of type (2):
+     *
+     * {{{
+     * {
+     *   $vals1a
+     *   $vals1b
+     *   val z = comprehension {
+     *     $qs1a
+     *     $qs2
+     *     $qs1b [ $hd2 \ x ]
+     *     head $hd1 [ $hd2 \ x ]
+     *   } // unnested result comprehension
+     *   $vals1c
+     *   $expr1
      * } // enclosing block
      * }}}
      */
     object UnnestGenerator extends Rule {
 
-      case class RuleMatch(enclosing: Block, parent: Tree, gen: ValDef, child: ValDef) {
-        lazy val bs1 = enclosing.stats.takeWhile(_ != child)
-        lazy val bs2 = enclosing.stats.reverse.takeWhile(_ != child).reverse
-        lazy val qs1 = parent match {
-          case comprehension(qs, _) => qs.takeWhile(_ != gen)
-        }
-        lazy val qs2 = child match {
-          case val_(_, comprehension(qs, _), _) => qs
-        }
-        lazy val qs3 = parent match {
-          case comprehension(qs, _) => qs.reverse.takeWhile(_ != gen).reverse
-        }
-        lazy val hd1 = parent match {
-          case comprehension(_, head(hd)) => hd match {
-            case block(Nil, expr) => expr
-            case other => other
-          }
-        }
-        lazy val hd2 = child match {
-          case val_(_, comprehension(_, head(hd)), _) => hd match {
-            case block(Nil, expr) => expr
-            case other => other
-          }
-        }
-      }
+      override def apply(root: u.Tree): Option[u.Tree] = root match {
+        //@formatter:off
+        case core.Let(
+          vals1,
+          defs1,
+          expr1) =>
+          //@formatter:on
 
-      def bind(root: Tree): Traversable[RuleMatch] = root match {
-        case enclosing: Block => new Traversable[RuleMatch] {
-          override def foreach[U](f: (RuleMatch) => U): Unit = {
-            // compute a lookup table for comprehensions
-            // defined in the current enclosing bock
-            val lookup = (enclosing.stats collect {
-              case vd@val_(sym, rhs@comprehension(_, _), _) => sym -> vd
-            }).toMap
+          (vals1 collectFirst {
+            case vd@core.ValDef(y, Comprehension(qs2, Head(hd2)), _) =>
+              val (vals1a, vals1r) = splitAt(vd)(vals1)
+              val encls = vals1r.map(x => x -> x.rhs) :+ (expr1 -> expr1)
+              encls collectFirst {
+                case (encl, Comprehension(qs1, Head(hd1))) =>
+                  qs1 collectFirst {
+                    case gen@Generator(x, core.Let(Nil, Nil, core.ValRef(`y`))) =>
 
-            if (lookup.nonEmpty) enclosing.expr match {
-              case parent@comprehension(qs, hd) => qs collect {
-                case gen@generator(sym, block(_, rhs: Ident)) =>
-                  for (child <- lookup.get(Term sym rhs))
-                    f(RuleMatch(enclosing, parent, gen, child))
+                      // define a substitution function `· [ $hd2 \ x ]`
+                      val subst = hd2 match {
+                        case core.Let(Nil, Nil, expr2) => api.Tree.subst(x -> expr2)
+                        case _ => api.Tree.subst(x -> hd2)
+                      }
+
+                      // compute prefix and suffix for qs1 and vals1
+                      val (qs1a, qs1b) = splitAt[u.Tree](gen)(qs1)
+
+                      val comp = Comprehension(
+                        qs1a ++ qs2 ++ (qs1b map subst),
+                        Head(asLet(subst(hd1))))
+
+                      val (vals, expr) = encl match {
+                        case encl@core.ValDef(zsym, zrhs, zflags) =>
+                          val (vals1b, vals1c) = splitAt(encl)(vals1r)
+                          val val_ = core.ValDef(zsym, comp, zflags)
+                          (vals1a ++ vals1b ++ Seq(val_) ++ vals1c, expr1)
+                        case _ =>
+                          (vals1a ++ vals1r, comp)
+                      }
+
+                      // API: cumbersome syntax of Let.apply
+                      core.Let(vals: _*)(defs1: _*)(expr)
+                  }
               }
-              case _ => Unit
-            }
-          }
-        }
-        case _ => Traversable.empty[RuleMatch]
-      }
+          }).flatten.flatten
 
-      def guard(rm: RuleMatch): Boolean =
-        true
-
-      def fire(rm: RuleMatch): Tree = {
-        // define a substitution function `· [ $hd2 \ x ]`
-        val subst: Tree => Tree = Tree.subst(_, Map(rm.gen.symbol -> rm.hd2))
-
-        // construct an unnested version of the parent comprehension
-        val unnested = comprehension(
-          rm.qs1 ++ rm.qs2 ++ (rm.qs3 map subst),
-          head(asBlock(subst(rm.hd1)))
-        )
-
-        // construct and return a new enclosing block
-        block(rm.bs1 ++ rm.bs2 ++ List(unnested))
+        case _ =>
+          None
       }
     }
 
+    /* Splits a `Seq[A]` into a prefix and suffix. */
+    private def splitAt[A](e: A): Seq[A] => (Seq[A], Seq[A]) = {
+      (_: Seq[A]).span(_ != e)
+    } andThen {
+      case (pre, _ :: suf) => (pre, suf)
+    }
   }
 
 }
