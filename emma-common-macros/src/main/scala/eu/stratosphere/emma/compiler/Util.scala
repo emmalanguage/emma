@@ -322,6 +322,7 @@ trait Util {
   private[compiler] def enclosingOwner: Symbol
   private[compiler] def getFlags(sym: Symbol): FlagSet
   private[compiler] def setFlags(sym: Symbol, flags: FlagSet): Unit
+  private[compiler] def resetFlags(sym: Symbol, flags: FlagSet): Unit
   private[compiler] def setName(sym: Symbol, name: Name): Unit
   private[compiler] def setOwner(sym: Symbol, owner: Symbol): Unit
   private[compiler] def setPos(tree: Tree, pos: Position): Unit

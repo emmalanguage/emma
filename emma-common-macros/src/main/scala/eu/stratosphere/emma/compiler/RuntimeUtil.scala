@@ -52,6 +52,9 @@ trait RuntimeUtil extends ReflectUtil {
   private[compiler] override def setFlags(sym: Symbol, flags: FlagSet): Unit =
     internal.setFlag(sym, flags)
 
+  private[compiler] def resetFlags(sym: Symbol, flags: FlagSet): Unit =
+    internal.resetFlag(sym, flags)
+
   private[compiler] override def setName(sym: Symbol, name: Name): Unit =
     sym.name = name
 
