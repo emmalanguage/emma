@@ -12,6 +12,18 @@ import scala.language.higherKinds
 /** Missing instances of [[cats.Monoid]]. */
 object Monoids {
 
+  /** Conjunctive boolean monoid. */
+  val conj: Monoid[Boolean] = new Monoid[Boolean] {
+    override def empty: Boolean = true
+    override def combine(x: Boolean, y: Boolean): Boolean = x && y
+  }
+
+  /** Disjunctive boolean monoid. */
+  val disj: Monoid[Boolean] = new Monoid[Boolean] {
+    override def empty: Boolean = false
+    override def combine(x: Boolean, y: Boolean): Boolean = x || y
+  }
+
   /** Monoid for [[shapeless]] fields with an underlying monoid. */
   implicit def kv[K, V](implicit M: Monoid[V]): Monoid[K ->> V] = new Monoid[K ->> V] {
     override lazy val empty: FieldType[K, V] = field[K](M.empty)

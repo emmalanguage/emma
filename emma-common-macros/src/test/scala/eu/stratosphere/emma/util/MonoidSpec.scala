@@ -32,6 +32,17 @@ class MonoidSpec extends FreeSpec with Checkers with ShapelessEq with ShapelessA
         check(GroupLaws[String].monoid(right("")).all)
       }
     }
+    
+    "for booleans" - {
+      
+      "conjunctive" in {
+        check(GroupLaws[Boolean].monoid(conj).all)
+      }
+      
+      "disjunctive" in {
+        check(GroupLaws[Boolean].monoid(disj).all)
+      }
+    }
 
     "for maps" - {
 
