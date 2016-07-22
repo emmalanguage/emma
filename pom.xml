@@ -344,6 +344,7 @@
                         <arg>-deprecation</arg>
                         <arg>-feature</arg>
                         <arg>-Yrangepos</arg>
+                        <!--<arg>-Xdisable-assertions</arg>-->
                     </args>
                 </configuration>
             </plugin>
