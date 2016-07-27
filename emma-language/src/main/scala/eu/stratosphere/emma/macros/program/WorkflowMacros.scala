@@ -3,7 +3,6 @@ package emma.macros
 package program
 
 import emma.api.Algorithm
-import emma.compiler.MacroCompiler
 import emma.macros.program.comprehension.Comprehension
 import emma.macros.program.controlflow.ControlFlow
 import emma.runtime.{Engine, Native}
@@ -26,11 +25,6 @@ class WorkflowMacros(val c: blackbox.Context)
   /** Translate an Emma expression to an [[Algorithm]]. */
   // TODO: Add more comprehensive ScalaDoc
   def parallelize[T: c.WeakTypeTag](e: Expr[T]) = {
-
-    val compiler = new MacroCompiler(c)
-    compiler.Source.valid(e.tree.typeChecked.asInstanceOf[compiler.universe.Tree]) badMap {
-      errors => c.abort(errors.head.at.pos.asInstanceOf[Position], errors mkString "\n\n")
-    }
 
     doSemanticChecks(e.tree)
 

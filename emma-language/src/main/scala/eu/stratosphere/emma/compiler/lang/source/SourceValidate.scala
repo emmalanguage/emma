@@ -3,197 +3,261 @@ package emma.compiler
 package lang
 package source
 
-/** Validation for the Source language. */
+/** Validation for the [[Source]] language. */
 private[source] trait SourceValidate extends Common {
   self: Source =>
 
   import universe._
   import Validation._
-  import Source.{Language => src}
+  import Source.{Lang => src}
 
+  /** Validation for the [[Source]] language. */
   private[source] object SourceValidate {
 
-    implicit private class Is(tree: Tree) {
+    /** Fluid [[Validator]] builder. */
+    implicit private class Check(tree: u.Tree) {
+
+      /** Provide [[Validator]] to test. */
       case class is(expected: Validator) {
+
+        /** Provide error message in case of validation failure. */
         def otherwise(violation: => String): Verdict =
           validateAs(expected, tree, violation)
       }
     }
 
+    /** Validators for the [[Source]] language. */
     object valid {
 
-      private val foreach = Type[TraversableOnce[Nothing]]
-        .member(Term name "foreach").asTerm
+      /** Validates that a Scala AST belongs to the supported [[Source]] language. */
+      def apply(tree: u.Tree): Verdict =
+        tree is valid.Term otherwise "Not a term"
 
-      /** Validate that a Scala tree belongs to the supported source language. */
-      def apply(tree: Tree): Verdict =
-        tree is valid.term otherwise "Not a term"
+      // ---------------------------------------------------------------------------
+      // Atomics
+      // ---------------------------------------------------------------------------
 
-      lazy val this_ : Validator = {
-        case src.this_(_) => pass
+      lazy val Lit: Validator = {
+        case src.Lit(_) => pass
       }
 
-      lazy val lit: Validator = {
-        case src.lit(_) => pass
+      lazy val Ref: Validator =
+        oneOf(BindingRef, ModuleRef)
+
+      lazy val This: Validator = {
+        case src.This(_) => pass
       }
 
-      lazy val ref: Validator = {
-        case src.ref(_) => pass
+      lazy val Atomic: Validator =
+        oneOf(Lit, This, Ref)
+
+      // ---------------------------------------------------------------------------
+      // Parameters
+      // ---------------------------------------------------------------------------
+
+      lazy val ParRef: Validator = {
+        case src.ParRef(_) => pass
       }
 
-      lazy val atomic: Validator =
-        oneOf(this_, lit, ref)
-
-      lazy val sel: Validator = {
-        case src.sel(target, _) =>
-          target is valid.term otherwise "Invalid select target"
+      lazy val ParDef: Validator = {
+        case src.ParDef(_, api.Tree.empty, _) => pass
       }
 
-      lazy val app: Validator = {
-        case src.app(target, _, argss@_*) => {
-          target is valid.term otherwise "Invalid application target"
+      // ---------------------------------------------------------------------------
+      // Values
+      // ---------------------------------------------------------------------------
+
+      lazy val ValRef: Validator = {
+        case src.ValRef(_) => pass
+      }
+
+      lazy val ValDef: Validator = {
+        case src.ValDef(_, rhs, _) =>
+          rhs is Term otherwise s"Invalid ${src.ValDef} RHS"
+      }
+
+      // ---------------------------------------------------------------------------
+      // Variables
+      // ---------------------------------------------------------------------------
+
+      lazy val VarRef: Validator = {
+        case src.VarRef(_) => pass
+      }
+
+      lazy val VarDef: Validator = {
+        case src.VarDef(_, rhs, _) =>
+          rhs is Term otherwise s"Invalid ${src.VarDef} RHS"
+      }
+
+      lazy val VarMut: Validator = {
+        case src.VarMut(_, rhs) =>
+          rhs is Term otherwise s"Invalid ${src.VarMut} RHS"
+      }
+
+      // ---------------------------------------------------------------------------
+      // Bindings
+      // ---------------------------------------------------------------------------
+
+      lazy val BindingRef: Validator =
+        oneOf(ValRef, VarRef, ParRef)
+
+      lazy val BindingDef: Validator =
+        oneOf(ValDef, VarDef, ParDef)
+
+      // ---------------------------------------------------------------------------
+      // Modules
+      // ---------------------------------------------------------------------------
+
+      lazy val ModuleRef: Validator = {
+        case src.ModuleRef(_) => pass
+      }
+
+      lazy val ModuleAcc: Validator = {
+        case src.ModuleAcc(target, _) =>
+          target is Term otherwise s"Invalid ${src.ModuleAcc} target"
+      }
+
+      // ---------------------------------------------------------------------------
+      // Methods
+      // ---------------------------------------------------------------------------
+
+      lazy val DefCall: Validator = {
+        case src.DefCall(None, _, _, argss@_*) =>
+          all (argss.flatten) are Term otherwise s"Invalid ${src.DefCall} argument"
+        case src.DefCall(Some(target), _, _, argss@_*) => {
+          target is Term otherwise s"Invalid ${src.DefCall} target"
         } and {
-          all (argss.flatten) are valid.term otherwise "Invalid application argument"
+          all (argss.flatten) are Term otherwise s"Invalid ${src.DefCall} argument"
         }
       }
 
-      lazy val inst: Validator = {
-        case src.inst(_, _, argss@_*) =>
-          all (argss.flatten) are valid.term otherwise "Invalid instantiation argument"
-      }
+      // ---------------------------------------------------------------------------
+      // Loops
+      // ---------------------------------------------------------------------------
 
-      lazy val lambda: Validator = {
-        case src.lambda(_, _, body) =>
-          body is valid.term otherwise "Invalid lambda function body"
-      }
-
-      lazy val typed: Validator = {
-        case src.typed(expr, _) =>
-          expr is valid.term otherwise "Invalid typed expression"
-      }
-
-      lazy val block: Validator = {
-        case src.block(stats, expr) => {
-          all (stats) are valid.stat otherwise "Invalid block statement"
+      lazy val While: Validator = {
+        case src.While(cond, body) => {
+          cond is Term otherwise s"Invalid ${src.While} condition"
         } and {
-          expr is valid.term otherwise "Invalid last block expression"
+          body is Stat otherwise s"Invalid ${src.While} body"
         }
       }
 
-      lazy val pattern: Validator = {
-        lazy val wildcard: Validator = {
-          case Ident(Term.name.wildcard) => pass
+      lazy val DoWhile: Validator = {
+        case src.DoWhile(cond, body) => {
+          cond is Term otherwise s"Invalid ${src.DoWhile} condition"
+        } and {
+          body is Stat otherwise s"Invalid ${src.DoWhile} body"
+        }
+      }
+
+      lazy val Loop: Validator =
+        oneOf(While, DoWhile)
+
+      // ---------------------------------------------------------------------------
+      // Patterns
+      // ---------------------------------------------------------------------------
+
+      lazy val Pat: Validator = {
+        lazy val Wildcard: Validator = {
+          case u.Ident(api.TermName.wildcard) => pass
         }
 
-        lazy val selPat: Validator = valid.ref orElse {
-          case src.sel(target, _) =>
-            target is selPat otherwise "Invalid select pattern"
+        lazy val Sel: Validator = valid.Ref orElse {
+          case u.Select(target, _) =>
+            target is Sel otherwise "Invalid Select pattern"
         }
 
-        lazy val appPat: Validator = {
-          case src.app(_: TypeTree, Nil, args) =>
-            all (args) are valid.pattern otherwise "Invalid extractor subpattern"
-          case src.app(target, Nil, args) => {
-            target is selPat otherwise "Invalid extractor"
+        lazy val Extractor: Validator = {
+          case u.Apply(api.TypeQuote(_), args) =>
+            all (args) are Pat otherwise "Invalid Extractor subpattern"
+        }
+
+        lazy val Typed: Validator = {
+          case u.Typed(expr, _) =>
+            expr is Pat otherwise "Invalid Typed pattern"
+        }
+
+        oneOf(Lit, Wildcard, Ref, Sel, Extractor, Typed, PatAt)
+      }
+
+      lazy val PatAt: Validator = {
+        case src.PatAt(_, rhs) =>
+          rhs is Pat otherwise s"Invalid ${src.PatAt} pattern"
+      }
+
+      lazy val PatCase: Validator = {
+        case src.PatCase(pat, api.Tree.empty, body) => {
+          pat is Pat otherwise s"Invalid ${src.PatCase} pattern"
+        } and {
+          body is Term otherwise s"Invalid ${src.PatCase} body"
+        }
+      }
+
+      lazy val PatMat: Validator = {
+        case src.PatMat(target, cases@_*) => {
+          target is Term otherwise s"Invalid ${src.PatMat} target"
+        } and {
+          all (cases) are PatCase otherwise s"Invalid ${src.PatMat} case"
+        }
+      }
+
+      // ---------------------------------------------------------------------------
+      // Terms
+      // ---------------------------------------------------------------------------
+
+      lazy val Block: Validator = {
+        case src.Block(stats, expr) => {
+          all (stats) are Stat otherwise s"Invalid ${src.Block} statement"
+        } and {
+          expr is Term otherwise s"Invalid last ${src.Block} expression"
+        }
+      }
+
+      lazy val Branch: Validator = {
+        case src.Branch(cond, thn, els) => {
+          cond is Term otherwise s"Invalid ${src.Branch} condition"
+        } and {
+          all (thn, els) are Term otherwise s"Invalid ${src.Branch} expression"
+        }
+      }
+
+      lazy val Inst: Validator = {
+        case src.Inst(_, _, argss@_*) =>
+          all (argss.flatten) are Term otherwise s"Invalid ${src.Inst} argument"
+      }
+
+      lazy val Lambda: Validator = {
+        case src.Lambda(_, params, body) => {
+          all (params) are ParDef otherwise s"Invalid ${src.Lambda} parameter"
+        } and {
+          body is Term otherwise s"Invalid ${src.Lambda} body"
+        }
+      }
+
+      lazy val TypeAscr: Validator = {
+        case src.TypeAscr(expr, _) =>
+          expr is Term otherwise s"Invalid ${src.TypeAscr} expression"
+      }
+
+      lazy val Term: Validator =
+        oneOf(Atomic, ModuleAcc, Inst, DefCall, Block, Branch, Lambda, TypeAscr, PatMat)
+
+      // ---------------------------------------------------------------------------
+      // Statements
+      // ---------------------------------------------------------------------------
+
+      lazy val For: Validator = {
+        case src.DefCall(Some(xs), method, _, Seq(src.Lambda(_, Seq(_), body)))
+          if method == api.Sym.foreach || method.overrides.contains(api.Sym.foreach) => {
+            xs is Term otherwise "Invalid For loop generator"
           } and {
-            all (args) are valid.pattern otherwise "Invalid extractor subpattern"
-          }
-        }
-
-        lazy val typedPat: Validator = {
-          case src.typed(expr, _) =>
-            expr is valid.pattern otherwise "Invalid typed pattern"
-        }
-
-        oneOf(wildcard, lit, ref, selPat, appPat, typedPat, bind)
-      }
-
-      lazy val bind: Validator = {
-        case src.bind(_, rhs) =>
-          rhs is valid.pattern otherwise "Invalid binding pattern"
-      }
-
-      lazy val case_ : Validator = {
-        case src.case_(header, EmptyTree, body) => {
-          header is valid.pattern otherwise "Invalid pattern"
-        } and {
-          body is valid.term otherwise "Invalid case body"
-        }
-      }
-
-      lazy val match_ : Validator = {
-        case src.match_(target, cases) => {
-          target is valid.term otherwise "Invalid match target"
-        } and {
-          all (cases) are valid.case_ otherwise "Invalid case"
-        }
-      }
-
-      lazy val term: Validator =
-        oneOf(atomic, inst, sel, app, lambda, typed, block, branch, match_)
-
-      lazy val val_ : Validator = {
-        case src.val_(_, rhs, _) =>
-          rhs is valid.term otherwise "Invalid val rhs"
-      }
-
-      lazy val assign: Validator = {
-        case src.assign(lhs, rhs) => {
-          lhs is valid.ref otherwise "Invalid assignment lhs"
-        } and {
-          rhs is valid.term otherwise "Invalid assignment rhs"
-        }
-      }
-
-      lazy val branch: Validator = {
-        case src.branch(cond, thn, els) => {
-          cond is valid.term otherwise "Invalid branch condition"
-        } and {
-          all (thn, els) are valid.term otherwise "Invalid branch statement"
-        }
-      }
-
-      lazy val dowhile: Validator = {
-        case src.dowhile(cond, body) => {
-          cond is valid.term otherwise "Invalid do-while condition"
-        } and {
-          body is valid.stat otherwise "Invalid do-while body"
-        }
-      }
-
-      lazy val whiledo: Validator = {
-        case src.whiledo(cond, body) => {
-          cond is valid.term otherwise "Invalid while condition"
-        } and {
-          body is valid.stat otherwise "Invalid while body"
-        }
-      }
-
-      lazy val for_ : Validator = {
-        case src.app(src.sel(xs, method), _, Seq(src.lambda(_, Seq(_), body)))
-          if method == foreach || method.overrides.contains(foreach) => {
-            xs is valid.term otherwise "Invalid for loop generator"
-          } and {
-            body is valid.stat otherwise "Invalid for loop body"
+            body is Term otherwise "Invalid For loop body"
           }
       }
 
-      lazy val stat: Validator = {
-        lazy val blockStat: Validator = {
-          case src.block(stats, expr) =>
-            all (stats :+ expr) are valid.stat otherwise "Invalid block statement"
-        }
-
-        lazy val branchStat: Validator = {
-          case src.branch(cond, thn, els) => {
-            cond is valid.term otherwise "Invalid branch condition"
-          } and {
-            all (thn, els) are valid.stat otherwise "Invalid branch term"
-          }
-        }
-
-        oneOf(assign, val_, blockStat, branchStat, dowhile, whiledo, for_, term)
-      }
+      lazy val Stat: Validator =
+        oneOf(ValDef, VarDef, VarMut, Loop, For, Term)
     }
   }
 }

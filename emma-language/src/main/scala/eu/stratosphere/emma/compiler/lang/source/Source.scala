@@ -3,123 +3,143 @@ package emma.compiler
 package lang
 package source
 
-/** Core language. */
+/** Source language. */
 trait Source extends Common
   with SourceValidate {
 
-  import universe._
+  // -------------------------------------------------------------------------
+  // Source language
+  // -------------------------------------------------------------------------
 
+  /** Source language. */
   object Source {
 
-    // -------------------------------------------------------------------------
-    // Language
-    // -------------------------------------------------------------------------
-
     /**
-     * The grammar associated with the [[Language]] objects and accepted by the
-     * [[Source.valid]] method is as follows.
+     * The grammar associated with the [[Lang]] objects and accepted by the [[Source.valid]] method
+     * is as follows.
      *
      * {{{
+     * Sym = TermSym
+     *     | TypeSym
      *
-     * Atomic  = This
-     *         | Lit[A](v: A)
-     *         | Ref(sym: TermSymbol)
+     * TermSym = BindingSym
+     *         | MethodSym
+     *         | ModuleSym
      *
-     * Term    = Atomic
-     *         | Sel(target: Term', member: TermSymbol)
-     *         | App(target: Term', targs: Seq[Type], argss: Seq[Seq[Term']])
-     *         | Inst(target: TypeSymbol, targs: Seq[Type], argss: Seq[Seq[Term']])
-     *         | Lambda(args: Seq[TermSymbol], body: Term')
-     *         | Typed(expr: Term', type: Type)
+     * BindingSym = ParSym
+     *            | ValSym
+     *            | VarSym
      *
-     * Term'   = Term
-     *         | Block(stats: Seq[Stat'], expr: Term')
-     *         | Branch(cond: Term, thn: Term, els: Term)
-     *         | Match(target: Term', cases: Seq[Case])
+     * Atomic = Lit[A](value: A)
+     *        | Ref(target: TermSym)
+     *        | This(target: Sym)
      *
-     * Stat    = Val(lhs: TermSymbol, rhs: Term')
-     *         | Assign(lhs: Term', rhs: Term')
+     * Ref = BindingRef(target: BindingSym)
+     *     | ModuleRef(target: ModuleSym)
      *
-     * Stat'   = Stat
-     *         | Term'
-     *         | Block'(stats: Seq[Stat'])
-     *         | Branch'(cond: Term', thn: Stat', els: Stat')
-     *         | DoWhile(cond: Term', body: Stat')
-     *         | WhileDo(cond: Term', body: Stat')
-     *         | For(i: TermSymbol, range: Range, body: Stat')
+     * BindingRef = ParRef(target: ParSym)
+     *            | ValRef(target: ValSym)
+     *            | VarRef(target: VarSym)
      *
-     * Case    = Case(pat: Pattern, body: Term')
+     * BindingDef = ParDef(lhs: ParSym)
+     *            | ValDef(lhs: ValSym, rhs: Term)
+     *            | VarDef(lhs: VarSym, rhs: Term)
      *
-     * SelP    = Ref(sym: TermSymbol)
-     *         | SelP(target: SelP, member: TermSymbol)
+     * Term = Atomic
+     *      | Block(stats: Stat*, expr: Term)
+     *      | Branch(cond: Term, thn: Term, els: Term)
+     *      | DefCall(target: Term?, method: MethodSym, targs: Type*, argss: Term**)
+     *      | Inst(clazz: Type, targs: Type*, argss: Term**)
+     *      | Lambda(params: ParDef*, body: Term)
+     *      | ModuleAcc(target: Term, member: ModuleSym)
+     *      | PatMat(target: Term, cases: Case*)
+     *      | TypeAscr(expr: Term, tpe: Type)
      *
-     * Pattern = Wildcard
-     *         | Lit[A](v: A)
-     *         | SelP
-     *         | AppP(target: SelP, targs: Seq[Type], argss: Seq[Seq[Pattern]])
-     *         | TypedP(expr: Pattern, type: Type)
-     *         | Bind(lhs: TermSymbol, rhs: Pattern)
+     * Loop = DoWhile(cond: Term, body: Stat)
+     *      | While(cond: Term, body: Stat)
      *
+     * Stat = BindingDef(lhs: BindingSym, rhs: Term)
+     *      | Loop(cond: Term, body: Stat)
+     *      | VarMut(lhs: VarSym, rhs: Term)
+     *      | Term
+     *
+     * Case = Case(pat: Pat, body: Term)
+     *
+     * Select = Ref(target: TermSym)
+     *        | Select(target: Select, member: TermSym)
+     *
+     * Pat = Extractor(target: Type, args: Pat*)
+     *     | Lit[A](value: A)
+     *     | PatAt(lhs: ValSym, rhs: Pat)
+     *     | Select
+     *     | Typed(expr: Pat, tpe: Type)
+     *     | Wildcard
      * }}}
      */
-    object Language {
+    object Lang {
       //@formatter:off
 
-      // -----------------------------------------------------------------------
-      // atomics
-      // -----------------------------------------------------------------------
+      // Atomics
+      val Atomic = api.Atomic
+      val Lit    = api.Lit
+      val Ref    = api.TermRef
+      val This   = api.This
 
-      val this_   = Term.this_          // this references
-      val lit     = Term.lit            // literals
-      val ref     = Term.ref            // references
+      // Bindings
+      val BindingRef = api.BindingRef
+      val BindingDef = api.BindingDef
 
-      // -----------------------------------------------------------------------
-      // terms
-      // -----------------------------------------------------------------------
+      // Parameters
+      val ParRef = api.ParRef
+      val ParDef = api.ParDef
 
-      val sel     = Term.sel            // selections
-      val app     = Term.app            // function applications
-      val inst    = Term.inst           // class instantiation
-      val lambda  = Term.lambda         // lambdas
-      val typed   = Type.ascription     // type ascriptions
+      // Values
+      val ValRef = api.ValRef
+      val ValDef = api.ValDef
 
-      // -----------------------------------------------------------------------
-      // state
-      // -----------------------------------------------------------------------
+      // Variables
+      val VarRef = api.VarRef
+      val VarDef = api.VarDef
+      val VarMut = api.VarMut
 
-      val val_    = Tree.val_           // val and var definitions
-      val assign  = Tree.assign         // assignments
-      val block   = Tree.block          // blocks
+      // Modules
+      val ModuleRef = api.ModuleRef
+      val ModuleAcc = api.ModuleAcc
 
-      // -----------------------------------------------------------------------
-      // control flow
-      // -----------------------------------------------------------------------
+      // Methods
+      val DefCall = api.DefCall
 
-      val branch  = Tree.branch         // conditionals
-      val whiledo = Tree.while_         // while loop
-      val dowhile = Tree.doWhile        // do while loop
+      // Loops
+      val Loop    = api.Loop
+      val While   = api.While
+      val DoWhile = api.DoWhile
 
-      // -----------------------------------------------------------------------
-      // pattern matching
-      // -----------------------------------------------------------------------
+      // Patterns
+      val Pat     = api.Pat
+      val PatAt   = api.PatAt
+      val PatCase = api.PatCase
+      val PatMat  = api.PatMat
 
-      val match_  = Tree.match_         // pattern match
-      val case_   = Tree.case_          // case
-      val bind    = Tree.bind           // bind
+      // Terms
+      val Term     = api.Term
+      val Block    = api.Block
+      val Branch   = api.Branch
+      val Inst     = api.Inst
+      val Lambda   = api.Lambda
+      val TypeAscr = api.TypeAscr
 
       //@formatter:on
     }
 
     // -------------------------------------------------------------------------
-    // Validate API
+    // Validation API
     // -------------------------------------------------------------------------
 
     /** Delegates to [[SourceValidate.valid]]. */
-    val valid = SourceValidate.valid
+    lazy val valid = SourceValidate.valid
 
     /** Delegates to [[SourceValidate.valid]]. */
-    def validate(tree: Tree): Boolean =
+    def validate(tree: u.Tree): Boolean =
       valid(tree).isGood
   }
-
 }
