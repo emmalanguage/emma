@@ -3,117 +3,177 @@ package emma.compiler
 package lang
 package core
 
-/** Validation for the Core language. */
+/** Validation for the [[Core]] language. */
 private[core] trait CoreValidate extends Common {
   self: Core =>
 
   import universe._
   import Validation._
-  import Core.{Language => core}
+  import Core.{Lang => core}
 
+  /** Validation for the [[Core]] language. */
   private[core] object CoreValidate {
 
-    implicit private class Is(tree: Tree) {
+    /** Fluid [[Validator]] builder. */
+    implicit private class Check(tree: u.Tree) {
+
+      /** Provide [[Validator]] to test. */
       case class is(expected: Validator) {
+
+        /** Provide error message in case of validation failure. */
         def otherwise(violation: => String): Verdict =
-          validateAs(expected, tree, violation)
+        validateAs(expected, tree, violation)
       }
     }
 
+    /** Validators for the [[Core]] language. */
     object valid {
 
-      /** Validate that a Scala tree belongs to the supported core language. */
+      /** Validates that a Scala AST belongs to the supported [[Core]] language. */
       // TODO: Narrow scope of valid top-level trees
       def apply(tree: Tree): Verdict =
-        tree is oneOf(term, lambda, let) otherwise "Unexpected tree"
+        tree is oneOf(Term, Let) otherwise "Unexpected tree"
 
-      lazy val this_ : Validator = {
-        case core.this_(_) => pass
+      // ---------------------------------------------------------------------------
+      // Atomics
+      // ---------------------------------------------------------------------------
+
+      lazy val Lit: Validator = {
+        case core.Lit(_) => pass
       }
 
-      lazy val lit: Validator = {
-        case core.lit(_) => pass
+      lazy val Ref: Validator =
+        oneOf(BindingRef, ModuleRef)
+
+      lazy val This: Validator = {
+        case core.This(_) => pass
       }
 
-      lazy val ref: Validator = {
-        case core.ref(_) => pass
+      lazy val Atomic: Validator =
+        oneOf(Lit, Ref, This)
+
+      // ---------------------------------------------------------------------------
+      // Parameters
+      // ---------------------------------------------------------------------------
+
+      lazy val ParRef: Validator = {
+        case core.ParRef(_) => pass
       }
 
-      private lazy val pkg: Validator = {
-        case core.ref(sym) if sym.isPackage => pass
-        case core.qref(qualifier, member) if member.isPackage =>
-          qualifier is pkg otherwise "Invalid package qualifier"
+      lazy val ParDef: Validator = {
+        case core.ParDef(_, api.Tree.empty, _) => pass
       }
 
-      lazy val qref: Validator = {
-        case core.qref(qualifier, _) =>
-          qualifier is pkg otherwise "Invalid reference qualifier"
+      // ---------------------------------------------------------------------------
+      // Values
+      // ---------------------------------------------------------------------------
+
+      lazy val ValRef: Validator = {
+        case core.ValRef(_) => pass
       }
 
-      lazy val atomic: Validator =
-        oneOf(this_, lit, ref, qref)
-
-      lazy val sel: Validator = { case core.sel(target, _) =>
-        target is atomic otherwise "Invalid select target"
+      lazy val ValDef: Validator = {
+        case core.ValDef(_, rhs, _) =>
+          rhs is Term otherwise s"Invalid ${core.ValDef} RHS"
       }
 
-      lazy val app: Validator = {
-        case core.app(target, _, argss@_*) =>
-          all (argss.flatten) are atomic otherwise "Invalid application argument"
+      // ---------------------------------------------------------------------------
+      // Bindings
+      // ---------------------------------------------------------------------------
+
+      lazy val BindingRef: Validator =
+        oneOf(ValRef, ParRef)
+
+      lazy val BindingDef: Validator =
+        oneOf(ValDef, ParDef)
+
+      // ---------------------------------------------------------------------------
+      // Modules
+      // ---------------------------------------------------------------------------
+
+      lazy val ModuleRef: Validator = {
+        case core.ModuleRef(_) => pass
       }
 
-      lazy val call: Validator = {
-        case core.call(target, _, _, argss@_*) => {
-          target is valid.atomic otherwise "Invalid method call target"
+      lazy val ModuleAcc: Validator = {
+        case core.ModuleAcc(target, _) =>
+          target is Atomic otherwise s"Invalid ${core.ModuleAcc} target"
+      }
+
+      // ---------------------------------------------------------------------------
+      // Methods
+      // ---------------------------------------------------------------------------
+
+      lazy val DefCall: Validator = {
+        case core.DefCall(None, _, _, argss@_*) =>
+          all (argss.flatten) are Atomic otherwise s"Invalid ${core.DefCall} argument"
+        case core.DefCall(Some(target), _, _, argss@_*) => {
+          target is Atomic otherwise s"Invalid ${core.DefCall} target"
         } and {
-          all (argss.flatten) are atomic otherwise "Invalid method call argument"
+          all (argss.flatten) are Atomic otherwise s"Invalid ${core.DefCall} argument"
         }
       }
 
-      lazy val inst: Validator = {
-        case core.inst(_, _, argss@_*) =>
-          all (argss.flatten) are atomic otherwise "Invalid instantiation argument"
-      }
-
-      lazy val lambda: Validator = {
-        case core.lambda(_, _, body) =>
-          body is let otherwise "Invalid lambda function body"
-      }
-
-      lazy val typed: Validator = {
-        case core.typed(expr, _) =>
-          expr is atomic otherwise "Invalid typed expression"
-      }
-
-      lazy val if_ : Validator = {
-        case core.if_(cond, thn, els) => {
-          cond is atomic otherwise "Invalid branch condition"
+      lazy val DefDef: Validator = {
+        case core.DefDef(_, _, _, paramss, body) => {
+          all (paramss.flatten) are ParDef otherwise s"Invalid ${core.DefDef} parameter"
         } and {
-          all (thn, els) are oneOf(atomic, app) otherwise "Invalid branch"
+          body is Let otherwise s"Invalid ${core.DefDef} body"
         }
       }
 
-      lazy val term: Validator =
-        oneOf(atomic, sel, inst, call, app, lambda, typed)
+      // ---------------------------------------------------------------------------
+      // Definitions
+      // ---------------------------------------------------------------------------
 
-      lazy val val_ : Validator = {
-        case core.val_(_, rhs, _) =>
-          rhs is term otherwise "Invalid val rhs"
-      }
+      lazy val TermDef: Validator =
+        oneOf(BindingDef, DefDef)
 
-      lazy val let: Validator = {
-        case core.let(vals, defs, expr) => {
-          all (vals) are val_ otherwise "Invalid let binding"
+      // ---------------------------------------------------------------------------
+      // Terms
+      // ---------------------------------------------------------------------------
+
+      lazy val Branch: Validator = {
+        case core.Branch(cond, thn, els) => {
+          cond is Atomic otherwise s"Invalid ${core.Branch} condition"
         } and {
-          all (defs) are def_ otherwise "Invalid let local method"
-        } and {
-          expr is oneOf(term, if_) otherwise "Invalid let expression"
+          all (thn, els) are oneOf(Atomic, DefCall) otherwise s"Invalid ${core.Branch} expression"
         }
       }
 
-      lazy val def_ : Validator = {
-        case core.def_(_, _, _, body) =>
-          body is let otherwise "Invalid method body"
+      lazy val Inst: Validator = {
+        case core.Inst(_, _, argss@_*) =>
+          all (argss.flatten) are Atomic otherwise s"Invalid ${core.Inst} argument"
+      }
+
+      lazy val Lambda: Validator = {
+        case core.Lambda(_, params, body) => {
+          all (params) are ParDef otherwise s"Invalid ${core.Lambda} parameter"
+        } and {
+          body is Let otherwise s"Invalid ${core.Lambda} body"
+        }
+      }
+
+      lazy val TypeAscr: Validator = {
+        case core.TypeAscr(expr, _) =>
+          expr is Atomic otherwise s"Invalid ${core.TypeAscr} expression"
+      }
+
+      lazy val Term: Validator =
+        oneOf(Atomic, ModuleAcc, Inst, DefCall, Branch, Lambda, TypeAscr)
+
+      // ---------------------------------------------------------------------------
+      // Let-in blocks
+      // ---------------------------------------------------------------------------
+
+      lazy val Let: Validator = {
+        case core.Let(vals, defs, expr) => {
+          all (vals) are ValDef otherwise s"Invalid ${core.Let} binding"
+        } and {
+          all (defs) are DefDef otherwise s"Invalid ${core.Let} function"
+        } and {
+          expr is oneOf(Atomic, DefCall, Branch) otherwise s"Invalid ${core.Let} expression"
+        }
       }
     }
   }
