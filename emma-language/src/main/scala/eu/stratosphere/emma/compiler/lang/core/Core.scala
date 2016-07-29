@@ -11,6 +11,7 @@ trait Core extends Common
   with CSE
   with DCE
   with LNF
+  with Pickling
   with PatternMatching
   with CoreValidate
   with Comprehension {
@@ -297,6 +298,13 @@ trait Core extends Common
     /** Delegates to [[PatternMatching.destructPatternMatches]]. */
     lazy val destructPatternMatches: u.Tree => u.Tree =
     PatternMatching.destructPatternMatches
+
+    // -------------------------------------------------------------------------
+    // Pickling API
+    // -------------------------------------------------------------------------
+
+    /** Delegates to [[Pickle.prettyPrint]]. */
+    val prettyPrint = Pickle.prettyPrint
 
     // -------------------------------------------------------------------------
     // Meta Information API
