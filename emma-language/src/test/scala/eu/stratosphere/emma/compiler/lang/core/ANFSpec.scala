@@ -1,10 +1,12 @@
-package eu.stratosphere.emma.compiler.lang.core
+package eu.stratosphere
+package emma.compiler
+package lang.core
 
-import eu.stratosphere.emma.api.DataBag
-import eu.stratosphere.emma.compiler.BaseCompilerSpec
-import eu.stratosphere.emma.compiler.ir._
-import eu.stratosphere.emma.testschema.Marketing._
-import eu.stratosphere.emma.testschema.Math._
+import emma.api.DataBag
+import emma.compiler.ir._
+import emma.testschema.Marketing._
+import emma.testschema.Math._
+
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -15,28 +17,24 @@ class ANFSpec extends BaseCompilerSpec {
   import compiler._
   import universe._
 
-  def typeCheckAndANF[T]: Expr[T] => Tree = {
-    (_: Expr[T]).tree
-  } andThen {
-    Type.check(_)
-  } andThen {
-    Core.destructPatternMatches
-  } andThen {
-    Core.resolveNameClashes
-  } andThen {
-    time(Core.anf(_), "anf")
-  } andThen {
-    Owner.at(Owner.enclosing)
-  }
+  val anfPipeline: Expr[Any] => Tree =
+    compiler.pipeline(typeCheck = true)(
+      Core.resolveNameClashes,
+      tree => time(Core.anf(tree), "anf")
+    ).compose(_.tree)
+
+  val idPipeline: Expr[Any] => Tree =
+    compiler.identity(typeCheck = true)
+      .compose(_.tree)
 
   "field selections" - {
 
     "as argument" in {
-      val act = typeCheckAndANF(reify {
+      val act = anfPipeline(reify {
         15 * t._1
       })
 
-      val exp = typeCheck(reify {
+      val exp = idPipeline(reify {
         val x$1 = t
         val x$2 = x$1._1
         val x$3 = 15 * x$2
@@ -47,11 +45,11 @@ class ANFSpec extends BaseCompilerSpec {
     }
 
     "as selection" in {
-      val act = typeCheckAndANF(reify {
+      val act = anfPipeline(reify {
         (t._1 * 15).toDouble
       })
 
-      val exp = typeCheck(reify {
+      val exp = idPipeline(reify {
         val t$1 = t
         val t_1$1 = t$1._1
         val prod$1 = t_1$1 * 15
@@ -63,12 +61,12 @@ class ANFSpec extends BaseCompilerSpec {
     }
 
     "package selections" in {
-      val act = typeCheckAndANF(reify {
+      val act = anfPipeline(reify {
         val bag = eu.stratosphere.emma.api.DataBag(Seq(1, 2, 3))
         scala.Predef.println(bag.fetch())
       })
 
-      val exp = typeCheck(reify {
+      val exp = idPipeline(reify {
         val x$1 = Seq(1, 2, 3)
         val bag = eu.stratosphere.emma.api.DataBag(x$1)
         val x$2 = bag.fetch()
@@ -82,11 +80,11 @@ class ANFSpec extends BaseCompilerSpec {
 
   "complex arguments" - {
     "lhs" in {
-      val act = typeCheckAndANF(reify {
+      val act = anfPipeline(reify {
         y.substring(y.indexOf('l') + 1)
       })
 
-      val exp = typeCheckAndANF(reify {
+      val exp = idPipeline(reify {
         val y$1 = y
         val y$2 = y
         val x$1 = y$2.indexOf('l')
@@ -99,11 +97,11 @@ class ANFSpec extends BaseCompilerSpec {
     }
 
     "with multiple parameter lists" in {
-      val act = typeCheckAndANF(reify {
+      val act = anfPipeline(reify {
         List(1, 2, 3).foldLeft(0)(_ * _)
       })
 
-      val exp = typeCheckAndANF(reify {
+      val exp = idPipeline(reify {
         val list$1 = List(1, 2, 3)
         val mult$1 = (x: Int, y: Int) => {
           val prod$1 = x * y
@@ -118,7 +116,7 @@ class ANFSpec extends BaseCompilerSpec {
   }
 
   "nested blocks" in {
-    val act = typeCheckAndANF(reify {
+    val act = anfPipeline(reify {
       val a = {
         val b = y.indexOf('T')
         b + 15
@@ -129,7 +127,7 @@ class ANFSpec extends BaseCompilerSpec {
       }
     })
 
-    val exp = typeCheck(reify {
+    val exp = idPipeline(reify {
       val y$1 = y
       val b$1 = y$1.indexOf('T')
       val a = b$1 + 15
@@ -142,13 +140,13 @@ class ANFSpec extends BaseCompilerSpec {
   }
 
   "type ascriptions" in {
-    val act = typeCheckAndANF(reify {
+    val act = anfPipeline(reify {
       val a = x: Int
       val b = a + 5
       b
     })
 
-    val exp = typeCheck(reify {
+    val exp = idPipeline(reify {
       val a$1 = x
       val a$2 = a$1: Int
       val b$1 = a$2 + 5
@@ -160,7 +158,7 @@ class ANFSpec extends BaseCompilerSpec {
 
   "bypass mock comprehensions" in {
 
-    val act = typeCheckAndANF(reify {
+    val act = anfPipeline(reify {
       val res = comprehension {
         val u = generator(users)
         val a = generator(ads)
@@ -172,19 +170,19 @@ class ANFSpec extends BaseCompilerSpec {
       res
     })
 
-    val exp = typeCheck(reify {
+    val exp = idPipeline(reify {
       val res = comprehension {
         val u = generator[User, DataBag] {
-          val u$1 = users
-          u$1
+          val users$1 = users
+          users$1
         }
         val a = generator[Ad, DataBag] {
-          val a$1 = ads
-          a$1
+          val ads$1 = ads
+          ads$1
         }
         val c = generator[Click, DataBag] {
-          val c$1 = clicks
-          c$1
+          val clicks$1 = clicks
+          clicks$1
         }
         guard {
           val x$1 = u.id
@@ -213,14 +211,14 @@ class ANFSpec extends BaseCompilerSpec {
 
   "irrefutable pattern matching" - {
     "of tuples" in {
-      val act = typeCheckAndANF(reify {
+      val act = anfPipeline(reify {
         ("life", 42) match {
           case (s: String, i: Int) =>
             s + i
         }
       })
 
-      val exp = typeCheck(reify {
+      val exp = idPipeline(reify {
         val x$1 = ("life", 42)
         val s = x$1._1
         val i = x$1._2
@@ -232,18 +230,17 @@ class ANFSpec extends BaseCompilerSpec {
     }
 
     "of case classes" in {
-      val act = typeCheckAndANF(reify {
+      val act = anfPipeline(reify {
         Point(1, 2) match {
           case Point(i, j) =>
             i + j
         }
       })
 
-      val exp = typeCheck(reify {
-        val p$1 = Point
-        val x$1 = p$1(1, 2)
-        val i = x$1.x
-        val j = x$1.y
+      val exp = idPipeline(reify {
+        val p$1 = Point(1, 2)
+        val i = p$1.x
+        val j = p$1.y
         val x$2 = i + j
         x$2
       })
@@ -252,18 +249,17 @@ class ANFSpec extends BaseCompilerSpec {
     }
 
     "of nested product types" in {
-      val act = typeCheckAndANF(reify {
+      val act = anfPipeline(reify {
         (Point(1, 2), (3, 4)) match {
           case (a@Point(i, j), b@(k, _)) =>
             i + j + k
         }
       })
 
-      val exp = typeCheck(reify {
-        val p$1 = Point
-        val x$1 = p$1(1, 2)
+      val exp = idPipeline(reify {
+        val p$1 = Point(1, 2)
         val x$2 = (3, 4)
-        val x$3 = (x$1, x$2)
+        val x$3 = (p$1, x$2)
         val a = x$3._1
         val i = a.x
         val j = a.y
@@ -279,14 +275,14 @@ class ANFSpec extends BaseCompilerSpec {
   }
 
   "method calls" in {
-    val act = typeCheckAndANF(reify(
+    val act = anfPipeline(reify(
       x.asInstanceOf[Long],
       List(1, 2, 3).foldLeft(1) { _ + _ },
       42.toChar,
       t._2.indexOf('f')
     ))
 
-    val exp = typeCheck(reify {
+    val exp = idPipeline(reify {
       val x$1 = this.x
       val asInstanceOf$1 = x$1.asInstanceOf[Long]
       val List$1 = List(1, 2, 3)
@@ -304,5 +300,48 @@ class ANFSpec extends BaseCompilerSpec {
     })
 
     act shouldBe alphaEqTo(exp)
+  }
+
+  "conditionals" - {
+    "with simple branches" in {
+      val act = anfPipeline(reify {
+        if (t._1 < 42) "less" else "more"
+      })
+
+      val exp = typeCheck(reify {
+        val t$1 = t
+        val t_1$1 = t$1._1
+        val less$1 = t_1$1 < 42
+        val if$1 = if (less$1) "less" else "more"
+        if$1
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+
+    "with complex branches" in {
+      val act = anfPipeline(reify {
+        if (t._1 < 42) x + 10 else x - 10.0
+      })
+
+      val exp = typeCheck(reify {
+        val t$1 = t
+        val t_1$1 = t$1._1
+        val less$1 = t_1$1 < 42
+        val if$1 = if (less$1) {
+          val x$1 = x
+          val sum$1 = x$1 + 10
+          val d$1 = sum$1.toDouble
+          d$1
+        } else {
+          val x$2 = x
+          val diff$1 = x$2 - 10.0
+          diff$1
+        }
+        if$1
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
   }
 }

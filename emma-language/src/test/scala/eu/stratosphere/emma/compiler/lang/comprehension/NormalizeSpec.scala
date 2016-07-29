@@ -20,39 +20,19 @@ class NormalizeSpec extends BaseCompilerSpec {
   // Helper methods
   // ---------------------------------------------------------------------------
 
-  /** Pipeline for this spec. */
-  def typeCheckAndANF[T]: Expr[T] => Tree = {
-    (_: Expr[T]).tree
-  } andThen {
-    Type.check(_: Tree)
-  } andThen {
-    Core.destructPatternMatches
-  } andThen {
-    Core.resolveNameClashes
-  } andThen {
-    Core.anf
-  } andThen {
-    Core.simplify
-  } andThen {
-    Comprehension.resugar(API.bagSymbol)
-  } andThen {
-    Owner.at(Owner.enclosing)
-  }
-
-  /** Normalize mock-comprehension selection chains. */
-  def fix: Tree => Tree = tree => {
-    val moduleSel = Tree.resolve(IR.module)
-    preWalk(tree) {
-      case s@Select(_, name) if IR.comprehensionOps contains s.symbol.asTerm =>
-        Term.sel(moduleSel, s.symbol.asTerm)
-    }
-  }
-
-  def normalize: Tree => Tree = {
+  lazy val normalize: Tree => Tree = {
     time(Comprehension.normalize(API.bagSymbol)(_), "normalize")
   } andThen {
-    Owner.at(Owner.enclosing)
+    api.Owner.at(get.enclosingOwner)
   }
+
+  lazy val anfPipeline: Expr[Any] => Tree =
+    compiler.pipeline(typeCheck = true)(
+      Core.resolveNameClashes,
+      Core.anf,
+      Core.simplify,
+      Comprehension.resugar(API.bagSymbol)
+    ).compose(_.tree)
 
   // ---------------------------------------------------------------------------
   // Spec data: a collection of (desugared, resugared) trees
@@ -61,7 +41,7 @@ class NormalizeSpec extends BaseCompilerSpec {
   // hard coded: 2 generators
   val (inp1, exp1) = {
 
-    val inp = (typeCheckAndANF andThen fix) (reify {
+    val inp = anfPipeline(reify {
       val users$1 = users
       val names = flatten[(User, Click), DataBag] {
         comprehension[DataBag[(User, Click)], DataBag] {
@@ -81,7 +61,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       names
     })
 
-    val exp = (typeCheckAndANF andThen fix) (reify {
+    val exp = anfPipeline(reify {
       val users$1 = users
       val clicks$1 = clicks
       val names = comprehension[(User, Click), DataBag] {
@@ -100,7 +80,7 @@ class NormalizeSpec extends BaseCompilerSpec {
   // hard coded: 3 generators
   val (inp2, exp2) = {
 
-    val inp = (typeCheckAndANF andThen fix) (reify {
+    val inp = anfPipeline(reify {
       val users$1 = users
       val names = flatten[(Ad, User, Click), DataBag] {
         comprehension[DataBag[(Ad, User, Click)], DataBag] {
@@ -129,7 +109,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       names
     })
 
-    val exp = (typeCheckAndANF andThen fix) (reify {
+    val exp = anfPipeline(reify {
       val users$1 = users
       val clicks$1 = clicks
       val ads$1 = ads
@@ -150,7 +130,7 @@ class NormalizeSpec extends BaseCompilerSpec {
   // hard-coded: 3 generators and a filter
   val (inp3, exp3) = {
 
-    val inp = (typeCheckAndANF andThen fix) (reify {
+    val inp = anfPipeline(reify {
       val users$1 = users
       val names = flatten[(Ad, User, Click), DataBag] {
         comprehension[DataBag[(Ad, User, Click)], DataBag] {
@@ -189,7 +169,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       names
     })
 
-    val exp = (typeCheckAndANF andThen fix) (reify {
+    val exp = anfPipeline(reify {
       val users$1 = users
       val clicks$1 = clicks
       val ads$1 = ads
@@ -216,7 +196,7 @@ class NormalizeSpec extends BaseCompilerSpec {
   // resugared: three generators and two filters at the end
   val (inp4, exp4) = {
 
-    val inp = typeCheckAndANF(reify {
+    val inp = anfPipeline(reify {
       for {
         u <- users
         a <- ads
@@ -226,7 +206,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       } yield (c.time, a.`class`)
     })
 
-    val exp = (typeCheckAndANF andThen fix) (reify {
+    val exp = anfPipeline(reify {
       val users$1 = users
       val ads$1 = ads
       val clicks$1 = clicks
@@ -246,7 +226,7 @@ class NormalizeSpec extends BaseCompilerSpec {
   // resugared: three generators and two interleaved filters
   val (inp5, exp5) = {
 
-    val inp = (typeCheckAndANF andThen fix) (reify {
+    val inp = anfPipeline(reify {
       for {
         c <- clicks
         u <- users
@@ -256,7 +236,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       } yield (c.time, a.`class`)
     })
 
-    val exp = (typeCheckAndANF andThen fix) (reify {
+    val exp = anfPipeline(reify {
       val clicks$1 = clicks
       val users$1 = users
       val ads$1 = ads
@@ -276,13 +256,13 @@ class NormalizeSpec extends BaseCompilerSpec {
   // resugared: one patmat generator and no filters
   val (inp6, exp6) = {
 
-    val inp = (typeCheckAndANF andThen fix) (reify {
+    val inp = anfPipeline(reify {
       for {
         Click(adID, userID, time) <- clicks
       } yield (adID, time)
     })
 
-    val exp = (typeCheckAndANF andThen fix) (reify {
+    val exp = anfPipeline(reify {
       val clicks$11: DataBag[Click] = clicks;
       comprehension[(Long, Instant), DataBag]({
         val check$ifrefutable$1: Click = generator[Click, DataBag](clicks$11);
@@ -301,7 +281,7 @@ class NormalizeSpec extends BaseCompilerSpec {
   // resugared: patmat with two generators and one filter
   val (inp7, exp7) = {
 
-    val inp = (typeCheckAndANF andThen fix) (reify {
+    val inp = anfPipeline(reify {
       for {
         Click(adID, userID, time) <- clicks
         Ad(id, name, _) <- ads
@@ -309,7 +289,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       } yield (adID, time)
     })
 
-    val exp = (typeCheckAndANF andThen fix) (reify {
+    val exp = anfPipeline(reify {
       val clicks$1 = clicks;
       val ads$1 = ads;
       comprehension[(Long, Instant), DataBag]({
