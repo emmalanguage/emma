@@ -7,6 +7,7 @@ import lang.source.Source
 
 /** Core language. */
 trait Core extends Common
+  with ANF
   with CSE
   with DCE
   with LNF
@@ -155,21 +156,21 @@ trait Core extends Common
     def lower(tree: u.Tree): u.Tree =
       LNF.lift(tree)
 
-    /** Delegates to [[LNF.resolveNameClashes()]]. */
+    /** Delegates to [[ANF.resolveNameClashes()]]. */
     def resolveNameClashes(tree: u.Tree): u.Tree =
-      LNF.resolveNameClashes(tree)
+      ANF.resolveNameClashes(tree)
 
-    /** Delegates to [[LNF.anf()]]. */
+    /** Delegates to [[ANF.anf()]]. */
     def anf(tree: u.Tree): u.Tree =
-      LNF.anf(tree)
+      ANF.anf(tree)
 
-    /** Delegates to [[LNF.flatten()]]. */
+    /** Delegates to [[ANF.flatten()]]. */
     def flatten(tree: u.Tree): u.Tree =
-      LNF.flatten(tree)
+      ANF.flatten(tree)
 
-    /** Delegates to [[LNF.simplify()]]. */
+    /** Delegates to [[ANF.simplify()]]. */
     def simplify(tree: u.Tree): u.Tree =
-      LNF.simplify(tree)
+      ANF.simplify(tree)
 
     // -------------------------------------------------------------------------
     // DCE API
