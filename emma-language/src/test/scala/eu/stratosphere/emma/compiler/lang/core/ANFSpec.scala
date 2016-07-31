@@ -1,11 +1,11 @@
-package eu.stratosphere
-package emma.compiler
-package lang.core
+package eu.stratosphere.emma
+package compiler.lang.core
 
-import emma.api.DataBag
-import emma.compiler.ir._
-import emma.testschema.Marketing._
-import emma.testschema.Math._
+import api.DataBag
+import compiler.BaseCompilerSpec
+import compiler.ir._
+import testschema.Marketing._
+import testschema.Math._
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner

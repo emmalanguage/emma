@@ -1,7 +1,9 @@
-package eu.stratosphere.emma.compiler
+package eu.stratosphere.emma
+package compiler
 
-import eu.stratosphere.emma.api.DataBag
-import eu.stratosphere.emma.compiler.lang.TreeMatchers
+import api.DataBag
+import lang.TreeMatchers
+
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 

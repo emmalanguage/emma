@@ -1,7 +1,7 @@
-package eu.stratosphere
-package emma.compiler
-package lang
-package core
+package eu.stratosphere.emma
+package compiler.lang.core
+
+import compiler.Common
 
 /** Validation for the [[Core]] language. */
 private[core] trait CoreValidate extends Common {

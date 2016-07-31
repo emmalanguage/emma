@@ -1,9 +1,9 @@
-package eu.stratosphere
-package emma.compiler
-package lang.core
+package eu.stratosphere.emma
+package compiler.lang.core
 
-import lang.comprehension.Comprehension
-import lang.source.Source
+import compiler.lang.comprehension.Comprehension
+import compiler.lang.source.Source
+import compiler.Common
 
 /** Core language. */
 trait Core extends Common
@@ -15,7 +15,7 @@ trait Core extends Common
   with CoreValidate
   with Comprehension { this: Source =>
 
-  import universe._
+  import UniverseImplicits._
 
   /** Core language. */
   object Core {
@@ -209,12 +209,12 @@ trait Core extends Common
     class Meta(tree: u.Tree) {
 
       val defs: Map[u.Symbol, u.ValDef] = tree.collect {
-        case value: ValDef if !Is.param(value) =>
+        case value: u.ValDef if !Is.param(value) =>
           value.symbol -> value
       }.toMap
 
       val uses: Map[u.Symbol, Int] =
-        tree.collect { case id: Ident => id.symbol }
+        tree.collect { case id: u.Ident => id.symbol }
           .view.groupBy(identity)
           .mapValues(_.size)
           .withDefaultValue(0)

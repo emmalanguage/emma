@@ -1,6 +1,7 @@
-package eu.stratosphere.emma.compiler
+package eu.stratosphere.emma
+package compiler
 
-import eu.stratosphere.emma.ast.AST
+import ast.AST
 
 import scala.annotation.tailrec
 

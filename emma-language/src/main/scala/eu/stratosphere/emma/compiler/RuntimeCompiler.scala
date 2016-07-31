@@ -1,10 +1,10 @@
-package eu.stratosphere
-package emma.compiler
+package eu.stratosphere.emma
+package compiler
+
+import ast.JavaAST
 
 import java.net.URLClassLoader
 import java.nio.file.{Files, Paths}
-
-import emma.ast.JavaAST
 
 import scala.tools.reflect.ToolBoxFactory
 

@@ -1,7 +1,8 @@
-package eu.stratosphere.emma.compiler.lang.comprehension
+package eu.stratosphere.emma
+package compiler.lang.comprehension
 
-import eu.stratosphere.emma.compiler.Common
-import eu.stratosphere.emma.compiler.lang.core.Core
+import compiler.Common
+import compiler.lang.core.Core
 
 trait Comprehension extends Common
   with ReDeSugar

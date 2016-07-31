@@ -1,6 +1,7 @@
-package eu.stratosphere
-package emma.compiler
-package lang
+package eu.stratosphere.emma
+package compiler.lang
+
+import compiler.Common
 
 import org.scalactic.{Bad, Good, Or}
 
@@ -36,7 +37,7 @@ trait AlphaEq extends Common {
 
       /** Provide a reason message. */
       def because(msg: String): Eq Or Neq =
-        Bad(new Neq(lhs, rhs, msg))
+        Bad(Neq(lhs, rhs, msg))
     }
   }
 

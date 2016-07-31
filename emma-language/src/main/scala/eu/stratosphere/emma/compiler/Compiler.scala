@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.compiler
+package eu.stratosphere.emma
+package compiler
 
 import lang.AlphaEq
 import lang.core.Core

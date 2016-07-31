@@ -1,10 +1,11 @@
-package eu.stratosphere.emma.compiler.util
+package eu.stratosphere.emma
+package compiler.util
 
-import eu.stratosphere.emma.compiler.BaseCompilerSpec
+import compiler.BaseCompilerSpec
+
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import org.scalactic.Equality
-
 import scala.annotation.tailrec
 
 /** A spec defining the core fragment of Scala supported by Emma. */

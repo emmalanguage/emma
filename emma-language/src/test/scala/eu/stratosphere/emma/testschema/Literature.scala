@@ -1,4 +1,5 @@
-package eu.stratosphere.emma.testschema
+package eu.stratosphere.emma
+package testschema
 
 object Literature {
 

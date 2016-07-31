@@ -1,7 +1,8 @@
-package eu.stratosphere
-package emma.compiler
-package lang
-package source
+package eu.stratosphere.emma
+package compiler.lang.source
+
+import compiler.Common
+
 
 /** Source language. */
 trait Source extends Common

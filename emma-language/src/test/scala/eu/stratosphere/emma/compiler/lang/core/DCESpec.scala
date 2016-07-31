@@ -1,6 +1,8 @@
-package eu.stratosphere.emma.compiler.lang.core
+package eu.stratosphere.emma
+package compiler.lang.core
 
-import eu.stratosphere.emma.compiler.BaseCompilerSpec
+import compiler.BaseCompilerSpec
+
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 

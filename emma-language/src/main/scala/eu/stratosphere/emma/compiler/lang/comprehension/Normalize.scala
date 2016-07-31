@@ -1,7 +1,8 @@
-package eu.stratosphere.emma.compiler.lang.comprehension
+package eu.stratosphere.emma
+package compiler.lang.comprehension
 
-import eu.stratosphere.emma.compiler.lang.core.Core
-import eu.stratosphere.emma.compiler.{Common, Rewrite}
+import compiler.lang.core.Core
+import compiler.{Common, Rewrite}
 
 private[comprehension] trait Normalize extends Common
   with Rewrite {

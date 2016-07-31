@@ -1,6 +1,7 @@
-package eu.stratosphere.emma.compiler.lang.core
+package eu.stratosphere.emma
+package compiler.lang.core
 
-import eu.stratosphere.emma.compiler.Common
+import compiler.Common
 
 /** Pattern matching destructuring for the Core language. */
 private[core] trait PatternMatching extends Common {

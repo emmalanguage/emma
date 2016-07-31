@@ -1,13 +1,15 @@
-package eu.stratosphere.emma.compiler.lang.comprehension
+package eu.stratosphere.emma
+package compiler.lang.comprehension
 
-import java.time.Instant
+import api.DataBag
+import compiler.BaseCompilerSpec
+import compiler.ir._
+import testschema.Marketing._
 
-import eu.stratosphere.emma.api.DataBag
-import eu.stratosphere.emma.compiler.BaseCompilerSpec
-import eu.stratosphere.emma.compiler.ir._
-import eu.stratosphere.emma.testschema.Marketing._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
+
+import java.time.Instant
 
 /** A spec for comprehension normalization. */
 @RunWith(classOf[JUnitRunner])

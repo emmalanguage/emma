@@ -1,9 +1,8 @@
-package eu.stratosphere
-package emma.compiler
-package lang
-package core
+package eu.stratosphere.emma
+package compiler.lang.core
 
-import emma.testschema.Marketing._
+import compiler.BaseCompilerSpec
+import testschema.Marketing._
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -75,7 +74,7 @@ class LanguageSpec extends BaseCompilerSpec {
     val (z, v, w) = (42, 3.14, "string")
 
     val examples = extractFrom(reify(
-      z, v, w, mutable.Seq, emma.util.Monoids
+      z, v, w, mutable.Seq, util.Monoids
     ))
 
     val negatives = extractFrom(reify {

@@ -1,7 +1,7 @@
-package eu.stratosphere
-package emma.compiler
+package eu.stratosphere.emma
+package compiler
 
-import emma.ast.MacroAST
+import ast.MacroAST
 
 import scala.reflect.macros.blackbox
 

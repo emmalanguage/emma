@@ -1,7 +1,7 @@
-package eu.stratosphere
-package emma.compiler
+package eu.stratosphere.emma
+package compiler
 
-import emma.ast.AST
+import ast.AST
 
 import org.scalactic._
 import org.scalactic.Accumulation._
