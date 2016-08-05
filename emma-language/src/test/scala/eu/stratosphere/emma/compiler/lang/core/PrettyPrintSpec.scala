@@ -3,9 +3,8 @@ package compiler.lang.core
 
 import api.DataBag
 import compiler.BaseCompilerSpec
-import testschema.Marketing
-import testschema.Marketing._
 import compiler.ir._
+import testschema.Marketing._
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -138,15 +137,17 @@ class PrettyPrintSpec extends BaseCompilerSpec {
 
       val pi = 3.14
 
-      val acts = id(reify {
-        42: Int // literal
-        pi: Double // reference
-        "string": CharSequence // upcast
-        42: Long // coercion
+      val acts = (id(reify {
+        val x = 42: Int // literal
+        val y = pi: Double // reference
+        val u = "string": CharSequence // upcast
+        val v = 42: Long // coercion
         ()
-      }) match {
-        case u.Block(stats, _) => stats map prettyPrint
-      }
+      }) collect {
+        case u.Block(stats, _) => stats collect {
+          case u.ValDef(_, _, _, rhs) => prettyPrint(rhs)
+        }
+      }).flatten
 
       val exps =
         s"""
@@ -169,25 +170,27 @@ class PrettyPrintSpec extends BaseCompilerSpec {
       val c = clicks.fetch().head
       val a = ads.fetch().head
 
-      val acts = id(reify {
+      val acts = (id(reify {
         def summon[A] = implicitly[(Double, String)]
         //@formatter:off
-        Predef.println("string")                  // literal
-        n - 2                                     // reference in target position
-        2 - n                                     // reference in argument position
-        -n                                        // unary operator
-        Seq.fill(n)('!')                          // multiple parameter lists
-        3.14.toString                             // 0-arg method
-        scala.collection.Set.empty[(String, Int)] // type-args only, with target
-        summon[(String, Int)]                     // type-args only, no target
-        Predef.implicitly[(Double, String)]       // implicit args
-        (c.time, a.`class`)                       // Tuple constructor, keywords
-        // this.wait(5)                           // `this` reference FIXME: does not work
+        val x$01 = Predef.println("string")                  // literal
+        val x$02 = n - 2                                     // reference in target position
+        val x$03 = 2 - n                                     // reference in argument position
+        val x$04 = -n                                        // unary operator
+        val x$05 = Seq.fill(n)('!')                          // multiple parameter lists
+        val x$06 = 3.14.toString                             // 0-arg method
+        val x$07 = scala.collection.Set.empty[(String, Int)] // type-args only, with target
+        val x$08 = summon[(String, Int)]                     // type-args only, no target
+        val x$09 = Predef.implicitly[(Double, String)]       // implicit args
+        val x$10 = (c.time, a.`class`)                       // Tuple constructor, keywords
+        // this.wait(5)                                      // `this` reference FIXME: does not work
         ()
         //@formatter:on
-      }) match {
-        case u.Block(stats, _) => stats.tail map prettyPrint
-      }
+      }) collect {
+        case u.Block(stats, _) => stats.tail collect {
+          case u.ValDef(_, _, _, rhs) => prettyPrint(rhs)
+        }
+      }).flatten
 
       val exps =
         s"""
