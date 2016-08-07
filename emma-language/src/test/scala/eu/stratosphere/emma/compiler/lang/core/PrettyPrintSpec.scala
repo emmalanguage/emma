@@ -20,7 +20,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
   import universe._
 
   val id: u.Expr[Any] => u.Tree =
-    compiler.identity(typeCheck = true) andThen unQualifyStaticModules compose (_.tree)
+    compiler.identity(typeCheck = true) compose (_.tree)
 
   val anf: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(

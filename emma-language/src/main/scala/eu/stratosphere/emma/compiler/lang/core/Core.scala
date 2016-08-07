@@ -304,7 +304,7 @@ trait Core extends Common
     // -------------------------------------------------------------------------
 
     /** Delegates to [[Pickle.prettyPrint]]. */
-    val prettyPrint = Pickle.prettyPrint
+    val prettyPrint = unQualifyStaticModules andThen Pickle.prettyPrint
 
     // -------------------------------------------------------------------------
     // Meta Information API
