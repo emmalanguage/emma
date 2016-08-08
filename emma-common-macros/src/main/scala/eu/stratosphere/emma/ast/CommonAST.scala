@@ -187,6 +187,12 @@ trait CommonAST extends ReflectUtil {
     def defined(tpe: Type): Boolean =
       tpe != null && tpe != NoType
 
+    /** Is `tpe` the type of a case class? */
+    def caseClass(tpe: u.Type) = tpe.typeSymbol match {
+      case clazz: u.ClassSymbol => clazz.isCaseClass
+      case _ => false
+    }
+
     /** Is `name` a legal identifier (i.e. consisting only of word `\w+` characters)? */
     def encoded(name: Name): Boolean =
       name == name.encodedName
@@ -309,12 +315,15 @@ trait CommonAST extends ReflectUtil {
     /** Is `tree` a valid pattern? */
     def pattern(tree: Tree): Boolean = tree match {
       case Ident(termNames.WILDCARD) => true
-      case (_: Ident) withSym sym withType tpe => is.term(sym) && is.result(tpe)
-      case (_: Select) withSym sym withType tpe => is.tpe(sym) && is.result(tpe)
-      case (_: Apply) withType tpe => is.result(tpe)
+      case (_: Ident | _: Select) withSym sym withType tpe =>
+        is.term(sym) && sym.asTerm.isStable && is.result(tpe)
+      case Apply(target, args) withType tpe =>
+        is.tpe(target) && args.nonEmpty && is.result(tpe)
       case _: Alternative => true
       case _: Bind => true
+      case _: Literal => true
       case _: Typed => true
+      case _: UnApply => true
       case _ => false
     }
   }
@@ -344,6 +353,10 @@ trait CommonAST extends ReflectUtil {
     /** Are all `trees` quoted type-trees? */
     def types(trees: Traversable[Tree]): Boolean =
       trees.forall(is.tpe)
+
+    /** Are all `trees` valid patterns? */
+    def patterns(trees: Traversable[Tree]): Boolean =
+      trees.forall(is.pattern)
   }
 
   object has {

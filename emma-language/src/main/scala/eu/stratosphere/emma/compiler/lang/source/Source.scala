@@ -64,17 +64,23 @@ trait Source extends Common
      *      | VarMut(lhs: VarSym, rhs: Term)
      *      | Term
      *
-     * Case = Case(pat: Pat, body: Term)
+     * Case = Case(pat: Pat, guard: Term, body: Term)
      *
-     * Select = Ref(target: TermSym)
-     *        | Select(target: Select, member: TermSym)
-     *
-     * Pat = Extractor(target: Type, args: Pat*)
-     *     | Lit[A](value: A)
+     * Pat = PatAlt(alternatives: Pat*)
+     *     | PatAny
+     *     | PatAscr(target: Pat, tpe: Type)
      *     | PatAt(lhs: ValSym, rhs: Pat)
-     *     | Select
-     *     | Typed(expr: Pat, tpe: Type)
-     *     | Wildcard
+     *     | PatConst(target: TermSym)
+     *     | PatLit[A](value: A)
+     *     | PatExtr(extr: PatExtr', args: Pat*)
+     *     | PatQual(qual: PatQual', member: TermSym)
+     *     | PatVar(lhs: ValSym)
+     *
+     * PatQual' = PatConst(target: TermSym)
+     *          | PatQual(qual: PatQual', member: TermSym)
+     *
+     * PatExtr' = TypeTree(tpe: Type)
+     *          | UnApply(qual: PatQual', unApp: MethodSym)
      * }}}
      */
     object Lang {
@@ -117,7 +123,6 @@ trait Source extends Common
 
       // Patterns
       val Pat     = api.Pat
-      val PatAt   = api.PatAt
       val PatCase = api.PatCase
       val PatMat  = api.PatMat
 

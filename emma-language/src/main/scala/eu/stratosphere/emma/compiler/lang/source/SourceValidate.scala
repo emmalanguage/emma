@@ -159,31 +159,48 @@ private[source] trait SourceValidate extends Common {
       // ---------------------------------------------------------------------------
 
       lazy val Pat: Validator = {
-        lazy val Wildcard: Validator = {
-          case u.Ident(api.TermName.wildcard) => pass
+        lazy val Alt: Validator = {
+          case api.PatAlt(alternatives@_*) =>
+            all (alternatives) are Pat otherwise s"Invalid ${api.PatAlt} alternative"
         }
 
-        lazy val Sel: Validator = valid.Ref orElse {
-          case u.Select(target, _) =>
-            target is Sel otherwise "Invalid Select pattern"
+        lazy val Any: Validator = {
+          case api.PatAny(_) => pass
         }
 
-        lazy val Extractor: Validator = {
-          case u.Apply(api.TypeQuote(_), args) =>
-            all (args) are Pat otherwise "Invalid Extractor subpattern"
+        lazy val Ascr: Validator = {
+          case api.PatAscr(target, _) =>
+            target is Pat otherwise s"Invalid ${api.PatAscr} target"
         }
 
-        lazy val Typed: Validator = {
-          case u.Typed(expr, _) =>
-            expr is Pat otherwise "Invalid Typed pattern"
+        lazy val At: Validator = {
+          case api.PatAt(_, rhs) =>
+            rhs is Pat otherwise s"Invalid ${api.PatAt} pattern"
         }
 
-        oneOf(Lit, Wildcard, Ref, Sel, Extractor, Typed, PatAt)
-      }
+        lazy val Const: Validator = {
+          case api.PatConst(_) => pass
+        }
 
-      lazy val PatAt: Validator = {
-        case src.PatAt(_, rhs) =>
-          rhs is Pat otherwise s"Invalid ${src.PatAt} pattern"
+        lazy val Lit: Validator = {
+          case api.PatLit(_) => pass
+        }
+
+        lazy val Extr: Validator = {
+          case api.PatExtr(_, args@_*) =>
+            all (args) are Pat otherwise s"Invalid ${api.PatExtr} argument"
+        }
+
+        lazy val Qual: Validator = Ref orElse {
+          case api.PatQual(qual, _) =>
+            qual is Qual otherwise s"Invalid ${api.PatQual} qualifier"
+        }
+
+        lazy val Var: Validator = {
+          case api.PatVar(_) => pass
+        }
+
+        oneOf(Alt, Any, Ascr, At, Const, Lit, Extr, Qual, Var)
       }
 
       lazy val PatCase: Validator = {

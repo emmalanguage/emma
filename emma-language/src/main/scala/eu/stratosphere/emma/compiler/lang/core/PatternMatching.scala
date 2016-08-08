@@ -2,14 +2,15 @@ package eu.stratosphere.emma
 package compiler.lang.core
 
 import compiler.Common
+import compiler.lang.source.Source
+import shapeless._
 
 /** Pattern matching destructuring for the Core language. */
 private[core] trait PatternMatching extends Common {
-  self: Core =>
+  self: Core with Source =>
 
-  import universe._
-  import Tree._
-  import Term.name.fresh
+  import UniverseImplicits._
+  import Source.{Lang => src}
 
   private[core] object PatternMatching {
 
@@ -18,8 +19,8 @@ private[core] trait PatternMatching extends Common {
      * to bindings and field accesses corresponding to case class extractors.
      *
      * == Assumptions ==
-     * - The selector of `mat` is non-null;
-     * - `mat` has exactly one irrefutable case;
+     * - The selector of the pattern match is non-null;
+     * - The first pattern match case is irrefutable;
      * - No guards are used;
      *
      * == Example ==
@@ -37,17 +38,18 @@ private[core] trait PatternMatching extends Common {
      *   }
      * }}}
      */
-    val destructPatternMatches: Tree => Tree = postWalk {
-      case Match(sel, cases) =>
-        assert(cases.nonEmpty, "No cases for pattern match")
-        val CaseDef(pat, guard, body) = cases.head
-        assert(guard.isEmpty, "Emma does not support guards for pattern matches")
-        val T = Type.of(sel)
-        val lhs = Term.sym.free(fresh("x"), T)
-        val binds = irrefutable(Term ref lhs, pat)
-        assert(binds.isDefined, "Unsupported refutable pattern match case detected")
-        block(val_(lhs, sel) :: binds.get, body)
-    }
+    lazy val destructPatternMatches: u.Tree => u.Tree =
+      api.BottomUp.withOwner.transformWith {
+        case Attr.inh(
+          mat @ src.PatMat(target withType tpe, src.PatCase(pat, api.Tree.empty, body), _*),
+          api.Encl(owner) :: _) =>
+
+          val nme = api.TermName.fresh("x")
+          val lhs = api.ValSym(owner, nme, tpe)
+          val vals = irrefutable(src.Ref(lhs), pat)
+          assert(vals.isDefined, s"Unsupported refutable pattern matching:\n${api.Tree.show(mat)}")
+          src.Block(src.ValDef(lhs, target) +: vals.get: _*)(body)
+      }.andThen(_.tree)
 
     /**
      * Tests if `pattern` is irrefutable for the given selector, i.e. if it always matches. If it
@@ -65,55 +67,39 @@ private[core] trait PatternMatching extends Common {
      * Caution: Does not consider `null` refutable in contrast to the standard Scala compiler. This
      * might cause [[java.lang.NullPointerException]]s.
      */
-    private def irrefutable(sel: Tree, pattern: Tree): Option[List[ValDef]] = {
-      def isCaseClass(tree: Tree) = {
-        val sym = Type.of(tree).typeSymbol
-        sym.isClass &&
-          sym.asClass.isCaseClass &&
-          sym == Type.of(sel).typeSymbol
-      }
-
-      def isVarPattern(id: Ident) =
-        !id.isBackquoted && !id.name.toString.head.isUpper
-
+    private def irrefutable(target: u.Tree, pattern: u.Tree): Option[Seq[u.ValDef]] = {
+      val tgT = api.Type.of(target)
       pattern match {
-        case id: Ident if isVarPattern(id) =>
-          Some(Nil)
-
-        case Type.ascription(pat, tpe) if Type.of(sel) weak_<:< tpe =>
-          irrefutable(Type.ascription(sel, tpe), pat)
-
-        case bind(lhs, pat) =>
-          lazy val value = val_(lhs, sel)
-          irrefutable(Term ref lhs, pat).map(value :: _)
-
         // Alternative patterns don't allow binding
-        case Alternative(patterns) =>
-          patterns.flatMap(irrefutable(sel, _)).headOption
+        case api.PatAlt(alternatives@_*) =>
+          alternatives.flatMap(irrefutable(target, _)).headOption
 
-        case extractor@(_: Apply | _: UnApply) if isCaseClass(extractor) =>
-          val args = extractor match {
-            case app: Apply => app.args
-            case un: UnApply => un.args
-          }
+        case api.PatAny(_) =>
+          Some(Seq.empty)
 
-          val T = Type of sel
-          val clazz = Type.of(extractor).typeSymbol.asClass
-          val inst = clazz.primaryConstructor
-          val params = inst.infoIn(T).paramLists.head
-          val selects = params.map { param =>
-            val field = T.member(param.name).asTerm
-            Term.sel(sel, field, Type of param)
-          }
+        case api.PatAscr(pat, tpe) if tgT weak_<:< tpe =>
+          irrefutable(src.TypeAscr(target, tpe), pat)
 
-          val patterns = selects zip args map (irrefutable _).tupled
-          if (patterns.exists(_.isEmpty)) None
-          else Some(patterns.flatMap(_.get))
+        case api.PatAt(lhs, pat) =>
+          lazy val value = src.ValDef(lhs, target)
+          irrefutable(src.ValRef(lhs), pat).map(value +: _)
+
+        case api.PatExtr(_, args@_*) withType tpe
+          if is.caseClass(tpe) && tpe.typeSymbol == tgT.typeSymbol =>
+            val inst = tpe.typeSymbol.asClass.primaryConstructor
+            val params = inst.infoIn(tgT).paramLists.head
+            val getters = for {
+              param <- inst.infoIn(tgT).paramLists.head
+              api.DefSym(acc) <- tgT.member(param.name).alternatives
+              if acc.isGetter
+            } yield src.DefCall(Some(target))(acc)()
+            val patterns = getters zip args map (irrefutable _).tupled
+            if (patterns.exists(_.isEmpty)) None
+            else Some(patterns.flatMap(_.get))
 
         case _ =>
           None
       }
     }
   }
-
 }
