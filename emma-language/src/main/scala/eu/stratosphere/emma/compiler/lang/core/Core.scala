@@ -116,12 +116,13 @@ trait Core extends Common
 
       // Let-in blocks
       object Let {
+        import IR.head
 
         def apply(vals: u.ValDef*)(defs: u.DefDef*)(expr: u.Tree = Term.unit): u.Block =
           api.Block(vals ++ defs: _*)(expr)
 
         def unapply(let: u.Block): Option[(Seq[u.ValDef], Seq[u.DefDef], u.Tree)] = let match {
-          case api.Block(stats, Term(expr)) => for {
+          case api.Block(stats, Term(expr)) if !isComprehensionHead(expr) => for {
             (vals, stats) <- collectWhile(stats) { case value @ ValDef(_, _, _) => value }
             (defs, Seq()) <- collectWhile(stats) { case defn @ DefDef(_, _, _, _, _) => defn }
           } yield (vals, defs, expr)
@@ -132,6 +133,11 @@ trait Core extends Common
         private def collectWhile[A, B](xs: Seq[A])(pf: A =?> B): Option[(Seq[B], Seq[A])] = {
           val (init, rest) = xs.span(pf.isDefinedAt)
           Some(init.map(pf), rest)
+        }
+
+        private def isComprehensionHead(expr: u.Tree): Boolean = expr match {
+          case api.DefCall(_, `head`, _, _) => true
+          case _ => false
         }
       }
 
