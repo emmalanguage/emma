@@ -348,42 +348,40 @@ private[comprehension] trait Normalize extends Common
           expr1) =>
           //@formatter:on
 
-          (vals1 collectFirst {
-            case vd@core.ValDef(y, Comprehension(qs2, Head(hd2)), _) =>
-              val (vals1a, vals1r) = splitAt(vd)(vals1)
-              val encls = vals1r.map(x => x -> x.rhs) :+ (expr1 -> expr1)
-              encls collectFirst {
-                case (encl, Comprehension(qs1, Head(hd1))) =>
-                  qs1 collectFirst {
-                    case gen@Generator(x, core.Let(Nil, Nil, core.ValRef(`y`))) =>
+          val result = for {
+            vd@core.ValDef(y, Comprehension(qs2, Head(hd2)), _) <- vals1.view
+            (vals1a, vals1r) = splitAt(vd)(vals1)
+            encls = vals1r.map(x => x -> x.rhs) :+ (expr1 -> expr1)
+            (encl, Comprehension(qs1, Head(hd1))) <- encls
+            gen@Generator(x, core.Let(Nil, Nil, core.ValRef(`y`))) <- qs1
+          } yield {
+            // define a substitution function `· [ $hd2 \ x ]`
+            val subst = hd2 match {
+              case core.Let(Nil, Nil, expr2) => api.Tree.subst(x -> expr2)
+              case _ => api.Tree.subst(x -> hd2)
+            }
 
-                      // define a substitution function `· [ $hd2 \ x ]`
-                      val subst = hd2 match {
-                        case core.Let(Nil, Nil, expr2) => api.Tree.subst(x -> expr2)
-                        case _ => api.Tree.subst(x -> hd2)
-                      }
+            // compute prefix and suffix for qs1 and vals1
+            val (qs1a, qs1b) = splitAt[u.Tree](gen)(qs1)
 
-                      // compute prefix and suffix for qs1 and vals1
-                      val (qs1a, qs1b) = splitAt[u.Tree](gen)(qs1)
+            val comp = Comprehension(
+              qs1a ++ qs2 ++ (qs1b map subst),
+              Head(asLet(subst(hd1))))
 
-                      val comp = Comprehension(
-                        qs1a ++ qs2 ++ (qs1b map subst),
-                        Head(asLet(subst(hd1))))
+            val (vals, expr) = encl match {
+              case encl@core.ValDef(zsym, zrhs, zflags) =>
+                val (vals1b, vals1c) = splitAt(encl)(vals1r)
+                val val_ = core.ValDef(zsym, comp, zflags)
+                (vals1a ++ vals1b ++ Seq(val_) ++ vals1c, expr1)
+              case _ =>
+                (vals1a ++ vals1r, comp)
+            }
 
-                      val (vals, expr) = encl match {
-                        case encl@core.ValDef(zsym, zrhs, zflags) =>
-                          val (vals1b, vals1c) = splitAt(encl)(vals1r)
-                          val val_ = core.ValDef(zsym, comp, zflags)
-                          (vals1a ++ vals1b ++ Seq(val_) ++ vals1c, expr1)
-                        case _ =>
-                          (vals1a ++ vals1r, comp)
-                      }
+            // API: cumbersome syntax of Let.apply
+            core.Let(vals: _*)(defs1: _*)(expr)
+          }
 
-                      // API: cumbersome syntax of Let.apply
-                      core.Let(vals: _*)(defs1: _*)(expr)
-                  }
-              }
-          }).flatten.flatten
+          result.headOption
 
         case _ =>
           None
