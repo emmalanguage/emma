@@ -233,6 +233,28 @@ private[core] trait ANF extends Common {
       }.andThen(_.tree)
 
     /**
+     * Introduces `Ident` return expressions in blocks whenever the original expr is not a ref or literal.
+     * The opposite of [[simplify]].
+     *
+     * == Preconditions ==
+     * - The input `tree` is in ANF (see [[Core.anf()]]).
+     *
+     * == Postconditions ==
+     * - `Ident` return expressions in blocks have been introduced whenever possible.
+     */
+    lazy val unsimplify: u.Tree => u.Tree =
+      api.BottomUp.transform {
+        case tree@core.Let(vals, defs, core.Ref(_) | core.Lit(_)) =>
+          tree
+        case tree@core.Let(vals, defs, expr) =>
+          val exprNme = api.TermName.fresh("x")
+          val exprSym = api.TermSym.free(exprNme, expr.tpe)
+          val exprDef = api.ValDef(exprSym, expr)
+
+          core.Let(vals :+ exprDef: _*)(defs: _*)(core.Ref(exprSym))
+      }.andThen(_.tree)
+
+    /**
      * Eliminates trivial type ascriptions.
      *
      * == Preconditions ==
