@@ -233,6 +233,47 @@ private[core] trait ANF extends Common {
       }.andThen(_.tree)
 
     /**
+     * Eliminates trivial type ascriptions.
+     *
+     * == Preconditions ==
+     * - The input `tree` is in ANF (see [[Core.anf()]]).
+     *
+     * == Postconditions ==
+     * - Trivial type ascriptions have been inlined.
+     */
+    lazy val removeTrivialTypeAscrs: u.Tree => u.Tree = tree => {
+      val aliases = Map.newBuilder[u.TermSymbol, u.TermSymbol]
+
+      val result = api.BottomUp.transform {
+        case tree@core.TypeAscr(expr, tpe) if expr.tpe =:= tpe =>
+          expr
+        case tree@core.ValDef(lhs, core.Ref(rhs), _) =>
+          aliases += lhs -> rhs
+          tree
+      }.andThen(_.tree)(tree)
+
+      // compute closure of `aliases` map
+      var rslt = Map.empty[u.TermSymbol, u.TermSymbol]
+      var dlta = aliases.result()
+      while (dlta.nonEmpty) {
+        rslt = rslt ++ dlta
+        dlta = for ((s1, s2) <- rslt; s3 <- rslt.get(s2)) yield s1 -> s3
+      }
+
+      api.BottomUp.transform {
+        case tree@core.Ref(sym) =>
+          // substitute aliasses
+          core.Ref(rslt.getOrElse(sym, sym))
+        case tree@core.Let(vals, defs, expr) =>
+          // filter valdefs
+          core.Let(vals filterNot {
+            case core.ValDef(sym, _, _) => rslt.contains(sym)
+            case _ => false
+          }: _*)(defs: _*)(expr)
+      }.andThen(_.tree)(result)
+    }
+
+    /**
      * Un-nests nested blocks.
      *
      * == Preconditions ==

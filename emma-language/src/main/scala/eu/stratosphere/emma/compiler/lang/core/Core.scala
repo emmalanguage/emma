@@ -275,6 +275,10 @@ trait Core extends Common
     def simplify(tree: u.Tree): u.Tree =
     ANF.simplify(tree)
 
+    /** Delegates to [[ANF.removeTrivialTypeAscrs()]]. */
+    def removeTrivialTypeAscrs(tree: u.Tree): u.Tree =
+    ANF.removeTrivialTypeAscrs(tree)
+
     // -------------------------------------------------------------------------
     // DCE API
     // -------------------------------------------------------------------------
