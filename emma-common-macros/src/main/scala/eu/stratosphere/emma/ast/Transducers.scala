@@ -256,7 +256,7 @@ trait Transducers { this: AST =>
     /** Inherits the owner of the current node. */
     def withOwner = inherit {
       case api.Owner(sym) => sym
-    } (Monoids.right(NoSymbol))
+    } (Monoids.right(get.enclosingOwner))
 
     /** Inherits the parent of the current node. */
     def withParent = inherit {

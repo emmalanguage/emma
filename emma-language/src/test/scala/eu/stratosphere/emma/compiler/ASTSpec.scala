@@ -8,18 +8,21 @@ import org.scalatest.junit.JUnitRunner
 class ASTSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe._
-
   object Bal
 
   "method calls should" - {
     "resolve overloaded symbols" in {
-      val seq = api.Type.check(q"scala.collection.Seq")
-      val fill = api.Type.of(seq).member(api.TermName("fill")).asTerm
-      for (dim <- Seq(Seq(1), Seq(1, 2), Seq(1, 2, 3))) {
+      val seq = api.Type.check(u.reify { Seq }.tree)
+      val fill = api.Type[Seq.type].member(api.TermName("fill")).asTerm
+      val examples = api.Type.check(u.reify {(
+        Seq.fill(1)('!'),
+        Seq.fill(1, 2)('!'),
+        Seq.fill(1, 2, 3)('!')
+      )}.tree).children.tail
+
+      for ((dim, exp) <- Seq(Seq(1), Seq(1, 2), Seq(1, 2, 3)) zip examples) {
         val argss = Seq(dim.map(api.Lit(_)), Seq(api.Lit('!')))
         val act = api.DefCall(Some(seq))(fill, api.Type.char)(argss: _*)
-        val exp = api.Type.check(q"scala.collection.Seq.fill(..$dim)('!')")
         act shouldBe alphaEqTo (exp)
       }
     }
@@ -27,10 +30,9 @@ class ASTSpec extends BaseCompilerSpec {
 
   "static objects should" - {
     "be unqualified" in {
-      val Foo = api.Tree.resolveStatic(rootMirror.staticModule("org.example.Foo"))
-      val Bar = api.Type.of(Foo).member(api.TermName("Bar")).asModule
-      val ref = api.ModuleRef(Bar)
-      val qual = api.Tree.resolveStatic(rootMirror.staticModule("org.example.Foo.Bar"))
+      val bar = u.rootMirror.staticModule("org.example.Foo.Bar")
+      val ref = api.ModuleRef(bar)
+      val qual = api.Tree.resolveStatic(bar)
       unQualifyStaticModules(qual) shouldBe alphaEqTo (ref)
       qualifyStaticModules(ref) shouldBe alphaEqTo (qual)
     }
@@ -38,7 +40,7 @@ class ASTSpec extends BaseCompilerSpec {
 
   "dynamic objects should" - {
     "remain qualified" in {
-      val bal = typeCheck(reify { Bal })
+      val bal = api.Type.check(u.reify { Bal }.tree)
       val ref = api.TermRef(api.TermSym.of(bal))
       val act = unQualifyStaticModules(bal)
       act should not be alphaEqTo (ref)

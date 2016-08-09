@@ -57,10 +57,8 @@ private[core] trait ANF extends Common {
           val ref = core.ValRef(lhs)
           src.Block(dfn)(ref)
 
-        case Attr.inh( // Simplify expression
-          src.TypeAscr(src.Block(stats, expr), tpe),
-          api.Encl(owner) :: _) =>
-
+        // Simplify expression
+        case Attr.inh(src.TypeAscr(src.Block(stats, expr), tpe), owner :: _) =>
           val nme = api.TermName.fresh(nameOf(expr))
           val lhs = api.ValSym(owner, nme, tpe)
           val rhs = core.TypeAscr(expr, tpe)
@@ -68,10 +66,8 @@ private[core] trait ANF extends Common {
           val ref = core.ValRef(lhs)
           src.Block(stats :+ dfn: _*)(ref)
 
-        case Attr.inh( // Simplify target
-          src.ModuleAcc(src.Block(stats, target), module) withType tpe,
-          api.Encl(owner) :: _) =>
-
+        // Simplify target
+        case Attr.inh(src.ModuleAcc(src.Block(stats, target), module) withType tpe, owner :: _) =>
           val nme = api.TermName.fresh(module)
           val lhs = api.ValSym(owner, nme, tpe)
           val rhs = core.ModuleAcc(target, module)
@@ -86,10 +82,8 @@ private[core] trait ANF extends Common {
           val comprehension = api.DefCall(Some(ir))(method, targs: _*)(argss: _*)
           src.Block()(comprehension)
 
-        case Attr.inh( // Simplify target & arguments
-          src.DefCall(target, method, targs, argss@_*) withType tpe,
-          api.Encl(owner) :: _) =>
-
+        // Simplify target & arguments
+        case Attr.inh(src.DefCall(target, method, targs, argss@_*) withType tpe, owner :: _) =>
           val (tgtStats, tgtAtom) = target match {
             case Some(src.Block(stats, expr)) => (stats, Some(expr))
             case tgt @ Some(_) => (Seq.empty, tgt)
@@ -117,10 +111,8 @@ private[core] trait ANF extends Common {
           val ref = core.ValRef(lhs)
           src.Block(flatStats :+ dfn: _*)(ref)
 
-        case Attr.inh( // Simplify arguments
-          src.Inst(clazz, targs, argss@_*) withType tpe,
-          api.Encl(owner) :: _) =>
-
+        // Simplify arguments
+        case Attr.inh(src.Inst(clazz, targs, argss@_*) withType tpe, owner :: _) =>
           val flatStats = argss.flatten.flatMap {
             case src.Block(stats, _) => stats
             case _ => Seq.empty
@@ -138,10 +130,8 @@ private[core] trait ANF extends Common {
           val ref = core.ValRef(lhs)
           src.Block(flatStats :+ dfn: _*)(ref)
 
-        case Attr.inh( // Flatten blocks
-          src.Block(outer, src.Block(inner, expr)),
-          api.Encl(owner) :: _) =>
-
+        // Flatten blocks
+        case Attr.inh(src.Block(outer, src.Block(inner, expr)), owner :: _) =>
           def wrap(stat: u.Tree): u.Tree = stat match {
             case bind @ src.BindingDef(_, _, _) => bind
             case loop: u.LabelDef => loop
@@ -176,10 +166,8 @@ private[core] trait ANF extends Common {
           val dfn = src.BindingDef(lhs, rhs, flags)
           src.Block(stats :+ dfn: _*)()
 
-        case Attr.inh( // All branches on the RHS
-          src.Branch(src.Block(stats, cond), thn, els) withType tpe,
-          api.Encl(owner) :: _) =>
-
+        // All branches on the RHS
+        case Attr.inh(src.Branch(src.Block(stats, cond), thn, els) withType tpe, owner :: _) =>
           def unwrap(tree: u.Tree) = tree match {
             case src.Block(Seq(), core.Atomic(atom)) => atom
             case src.Block(Seq(), call @ core.DefCall(_, _, _, _*)) => call

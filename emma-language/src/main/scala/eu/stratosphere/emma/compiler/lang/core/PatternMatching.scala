@@ -42,7 +42,7 @@ private[core] trait PatternMatching extends Common {
       api.BottomUp.withOwner.transformWith {
         case Attr.inh(
           mat @ src.PatMat(target withType tpe, src.PatCase(pat, api.Tree.empty, body), _*),
-          api.Encl(owner) :: _) =>
+          owner :: _) =>
 
           val nme = api.TermName.fresh("x")
           val lhs = api.ValSym(owner, nme, tpe)
