@@ -12,8 +12,10 @@ import org.scalatest._
 import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.Checkers
 
+import scala.collection.SortedSet
+
 @RunWith(classOf[JUnitRunner])
-class MonoidSpec extends FreeSpec with Checkers with ShapelessEq with ShapelessArb {
+class MonoidSpec extends FreeSpec with Checkers with Equivalences with Arbitraries {
 
   import Monoids._
 
@@ -60,7 +62,7 @@ class MonoidSpec extends FreeSpec with Checkers with ShapelessEq with ShapelessA
       check(GroupLaws[Int :: String :: HNil].monoid.all)
     }
 
-    "for generic fields" in {
+    "for labelled fields" in {
       val key = "key".witness
       check(GroupLaws[key.T ->> Int].monoid.all)
       check(GroupLaws[key.T ->> String].monoid.all)
@@ -72,6 +74,11 @@ class MonoidSpec extends FreeSpec with Checkers with ShapelessEq with ShapelessA
       implicit val setOfN = Arbitrary(Gen.containerOfN[Set, String](n, arb[String]))
       check(GroupLaws[Vector[Int]].monoid(sliding(n)).all)
       check(GroupLaws[Set[String]].monoid(sliding(n)).all)
+    }
+
+    "for sorted sets" in {
+      check(GroupLaws[SortedSet[Int]].monoid.all)
+      check(GroupLaws[SortedSet[String]].monoid.all)
     }
   }
 }

@@ -6,6 +6,7 @@ import cats.implicits._
 import shapeless._
 import shapeless.labelled._
 
+import scala.collection.SortedSet
 import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
 
@@ -80,4 +81,10 @@ object Monoids {
       override def combine(x: Col[El], y: Col[El]): Col[El] =
         x ++ y takeRight n to Col
     }
+
+  /** Monoid for sorted sets. */
+  implicit def sortedSet[A: Ordering]: Monoid[SortedSet[A]] = new Monoid[SortedSet[A]] {
+    override def empty: SortedSet[A] = SortedSet.empty
+    override def combine(x: SortedSet[A], y: SortedSet[A]): SortedSet[A] = x | y
+  }
 }
