@@ -1,31 +1,28 @@
-package eu.stratosphere
-package emma.macros
+package eu.stratosphere.emma
+package macros
 
-import emma.compiler
+import ast.MacroAST
 
 import scala.reflect.macros.blackbox
 
 /** Automatic derivation of CSV encoding / decoding for primitives and [[scala.Product]] types. */
 // TODO: add DateTime support
-class ConvertersMacros(val c: blackbox.Context) extends compiler.MacroUtil {
+class ConvertersMacros(val c: blackbox.Context) extends MacroAST {
 
   import universe._
-  import Emma._
-  import Term._
-  import Tree._
-  import Type._
-  import Term.name.fresh
+  import api.Type._
 
-  private val iter = fresh("iter")
-  private val const = q"$Scala.Function.const"
-  private val seq = q"$Scala.Seq"
+  private val iter = api.TermName.fresh("iter")
+  private val const = q"${api.Tree.Scala}.Function.const"
+  private val seq = q"${api.Tree.Scala}.collection.Seq"
+  private val emma = q"_root_.eu.stratosphere.emma"
 
-  def materializeCSVConverters[T: c.WeakTypeTag] = Type.check {
-    val T = Type.weak[T]
-    val value = fresh("value")
-    val sep = fresh("sep")
+  def materializeCSVConverters[T: c.WeakTypeTag] = api.Type.check {
+    val T = api.Type.weak[T]
+    val value = api.TermName.fresh("value")
+    val sep = api.TermName.fresh("sep")
 
-    val from = q"""($value: ${array(string)}) => {
+    val from = q"""($value: ${arrayOf(string)}) => {
       val $iter = $value.iterator
       ${fromCSV(T, q"$iter.next")}
     }"""
@@ -38,32 +35,32 @@ class ConvertersMacros(val c: blackbox.Context) extends compiler.MacroUtil {
   }
 
   def fromCSV(T: Type, value: Tree): Tree =
-    if (T <:< Type[Product]) {
-      val method = T.decl(Term.name.init).alternatives.head.asMethod
+    if (T <:< api.Type[Product]) {
+      val method = T.decl(api.TermName.init).alternatives.head.asMethod
       val params = method.typeSignatureIn(T).paramLists.head
-      val args = for (p <- params) yield fromCSV(Type of p, value)
+      val args = for (p <- params) yield fromCSV(api.Type.of(p), value)
       q"new $T(..$args)"
     } else {
-      if (T =:= Type.unit || T =:= void) Term.unit
-      else if (T =:= bool || T =:= jBool) q"$value.toBoolean"
-      else if (T =:= char || T =:= jChar) q"$value.head"
-      else if (T =:= byte || T =:= jByte) q"$value.toByte"
-      else if (T =:= short || T =:= jShort) q"$value.toShort"
-      else if (T =:= int || T =:= jInt) q"$value.toInt"
-      else if (T =:= long || T =:= jLong) q"$value.toLong"
-      else if (T =:= float || T =:= jFloat) q"$value.toFloat"
-      else if (T =:= double || T =:= jDouble) q"$value.toDouble"
-      else if (T =:= bigInt) q"$Scala.BigInt($value)"
-      else if (T =:= bigDec) q"$Scala.BigDecimal($value)"
-      else if (T =:= jBigInt) q"new $Java.math.BigInteger($value)"
-      else if (T =:= jBigDec) q"new $Java.math.BigDecimal($value)"
+      if (T =:= unit || T =:= Java.void) api.Term.unit
+      else if (T =:= bool || T =:= Java.bool) q"$value.toBoolean"
+      else if (T =:= char || T =:= Java.char) q"$value.head"
+      else if (T =:= byte || T =:= Java.byte) q"$value.toByte"
+      else if (T =:= short || T =:= Java.short) q"$value.toShort"
+      else if (T =:= int || T =:= Java.int) q"$value.toInt"
+      else if (T =:= long || T =:= Java.long) q"$value.toLong"
+      else if (T =:= float || T =:= Java.float) q"$value.toFloat"
+      else if (T =:= double || T =:= Java.double) q"$value.toDouble"
+      else if (T =:= bigInt) q"${api.Tree.Scala}.BigInt($value)"
+      else if (T =:= bigDec) q"${api.Tree.Scala}.BigDecimal($value)"
+      else if (T =:= Java.bigInt) q"new ${api.Tree.Java}.math.BigInteger($value)"
+      else if (T =:= Java.bigDec) q"new ${api.Tree.Java}.math.BigDecimal($value)"
       else if (T =:= string) q"$value"
-      else q"$const(${null_(T)})($value)"
+      else q"$const(null.asInstanceOf[$T])($value)"
     }
 
   def toCSV(T: Type, value: Tree): Tree = {
-    if (T <:< Type[Product]) {
-      val method = T.decl(Term.name.init).alternatives.head.asMethod
+    if (T <:< api.Type[Product]) {
+      val method = T.decl(api.TermName.init).alternatives.head.asMethod
       val params = method.typeSignatureIn(T).paramLists.head
       val fields = for {
         param <- params
@@ -71,7 +68,7 @@ class ConvertersMacros(val c: blackbox.Context) extends compiler.MacroUtil {
         if method.isMethod
         if method.asMethod.isGetter
         if method.toString == param.toString
-      } yield toCSV(result(method.infoIn(T)), q"$value.$method")
+      } yield toCSV(api.Type.result(method.infoIn(T)), q"$value.$method")
 
       q"$seq(..$fields).flatten"
     } else {
