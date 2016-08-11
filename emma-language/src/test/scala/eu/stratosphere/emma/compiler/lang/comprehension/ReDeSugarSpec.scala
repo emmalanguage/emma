@@ -23,8 +23,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   val anf: Expr[Any] => Tree =
     compiler.pipeline(typeCheck = true)(
       Core.resolveNameClashes,
-      Core.anf,
-      Core.simplify
+      Core.anf
     ).compose(_.tree)
 
   val resugar: Expr[Any] => Tree = {

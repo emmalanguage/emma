@@ -109,10 +109,23 @@ private[comprehension] trait ReDeSugar extends Common {
         case let @ core.Let(vals, defs, expr) =>
           // Un-nest potentially nested simple let blocks occurring on the RHS of parent vals
           val flatVals = vals.flatMap {
-            case core.ValDef(lhs, core.Let(nestedVals, Seq(), nestedExpr), flags) =>
-              nestedVals :+ core.ValDef(lhs, nestedExpr, flags)
+            // match `val x = { nestedVals; nestedExpr }`
+            case core.ValDef(x, core.Let(nestedVals, Seq(), nestedExpr), xflags) => nestedExpr match {
+              // nestedExpr is a simple identifier `y` contained in the nestedVals
+              // rename the original `val y = ...` to `val x = ...`
+              case core.Ref(y) if nestedVals.exists(_.symbol == y) =>
+                val rm = api.Tree.rename(y -> x)
+                nestedVals.map({
+                  case core.ValDef(`y`, rhs, yflags) => core.ValDef(x, rm(rhs), yflags)
+                  case other => rm(other).asInstanceOf[u.ValDef]
+                })
+              // nestedExpr is something else
+              // emit `nestedVals; val x = nestedExpr`
+              case _ =>
+                nestedVals :+ core.ValDef(x, nestedExpr, xflags)
+            }
             case value =>
-              Some(value)
+              Seq(value)
           }
 
           // Un-nest potentially nested simple let blocks occurring in the let-expression
@@ -152,7 +165,7 @@ private[comprehension] trait ReDeSugar extends Common {
             case core.Let(Seq(), Seq(), core.Ref(`sym`)) =>
               // Trivial head expression consisting of the matched sym 'x'
               // Omit the resulting trivial mapper
-              Core.simplify(core.Let(prefix: _*)()(tailRef))
+              core.Let(prefix: _*)()(tailRef)
 
             case _ =>
               // Append a map or a flatMap to the result depending on
