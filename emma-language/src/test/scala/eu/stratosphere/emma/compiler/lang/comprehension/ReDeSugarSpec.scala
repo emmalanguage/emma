@@ -27,21 +27,23 @@ class ReDeSugarSpec extends BaseCompilerSpec {
       Core.simplify
     ).compose(_.tree)
 
-  val resugar: Expr[Any] => Tree =
+  val resugar: Expr[Any] => Tree = {
+    val resugar = Comprehension.resugar(API.bagSymbol)
     compiler.pipeline(typeCheck = true)(
       Core.resolveNameClashes,
       Core.anf,
-      tree => time(Comprehension.resugar(API.bagSymbol)(tree), "resugar"),
-      Core.simplify
+      tree => time(resugar(tree), "resugar")
     ).compose(_.tree)
+  }
 
-  val desugar: Expr[Any] => Tree =
+  val desugar: Expr[Any] => Tree = {
+    val desugar = Comprehension.desugar(API.bagSymbol)
     compiler.pipeline(typeCheck = true)(
       Core.resolveNameClashes,
       Core.anf,
-      tree => time(Comprehension.desugar(API.bagSymbol)(tree), "desugar"),
-      Core.simplify
+      tree => time(desugar(tree), "desugar")
     ).compose(_.tree)
+  }
 
   // ---------------------------------------------------------------------------
   // Spec data: a collection of (desugared, resugared) trees
@@ -58,12 +60,13 @@ class ReDeSugarSpec extends BaseCompilerSpec {
 
     val res = reify {
       val users$1 = users
-      comprehension[(String, String), DataBag] {
+      val names$1 = comprehension[(String, String), DataBag] {
         val u = generator(users$1)
         head {
           (u.name.first, u.name.last)
         }
       }
+      names$1
     }
 
     (des, res)
@@ -80,7 +83,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
 
     val res = reify {
       val users$1 = users
-      flatten[String, DataBag] {
+      val names$1 = flatten[String, DataBag] {
         comprehension[DataBag[String], DataBag] {
           val u = generator(users$1)
           head {
@@ -88,6 +91,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
           }
         }
       }
+      names$1
     }
 
     (des, res)
@@ -104,7 +108,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
 
     val res = reify {
       val users$1 = users
-      comprehension[User, DataBag] {
+      val names$1 = comprehension[User, DataBag] {
         val u = generator(users$1)
         guard {
           val name$1 = u.name
@@ -116,6 +120,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
           u
         }
       }
+      names$1
     }
 
     (des, res)
@@ -133,20 +138,22 @@ class ReDeSugarSpec extends BaseCompilerSpec {
 
     val res = reify {
       val users$1 = users
-      flatten[(User, Click), DataBag] {
+      val names$1 = flatten[(User, Click), DataBag] {
         comprehension[DataBag[(User, Click)], DataBag] {
           val u = generator(users$1)
           head {
             val clicks$1 = clicks
-            comprehension[(User, Click), DataBag] {
+            val map$1 = comprehension[(User, Click), DataBag] {
               val c = generator(clicks$1)
               head {
                 (u, c)
               }
             }
+            map$1
           }
         }
       }
+      names$1
     }
 
     (des, res)

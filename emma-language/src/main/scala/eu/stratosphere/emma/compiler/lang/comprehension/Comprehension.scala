@@ -194,12 +194,12 @@ trait Comprehension extends Common
     // -------------------------------------------------------------------------
 
     /** Delegates to [[ReDeSugar.resugar()]]. */
-    def resugar(monad: u.Symbol)(tree: u.Tree): u.Tree =
-      ReDeSugar.resugar(monad)(tree)
+    def resugar(monad: u.Symbol): u.Tree => u.Tree =
+      ReDeSugar.resugar(monad)
 
     /** Delegates to [[ReDeSugar.desugar()]]. */
-    def desugar(monad: u.Symbol)(tree: u.Tree): u.Tree =
-      ReDeSugar.desugar(monad)(tree)
+    def desugar(monad: u.Symbol): u.Tree => u.Tree =
+      ReDeSugar.desugar(monad)
 
     // -------------------------------------------------------------------------
     // Normalize API
