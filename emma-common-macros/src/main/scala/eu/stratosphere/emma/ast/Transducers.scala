@@ -1,13 +1,13 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
-import emma.util._
-
-import cats.Monoid
 import cats.implicits._
+import cats.Monoid
 import shapeless._
+import util._
 
 import scala.Function.const
+import scala.annotation.tailrec
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
 import scala.language.higherKinds
@@ -395,6 +395,24 @@ trait Transducers { this: AST =>
           : Transform[A, I, S]
           = Transform.bottomUp.break(grammar)(template)
       }
+
+      /** Bottom-up exhaust traversal / transformation. */
+      object exhaust extends TransFactory {
+
+        /** Bottom-up break traversal. */
+        override def traversal[A <: HList, I <: HList, S <: HList]
+          (grammar: AttrGrammar[A, I, S])
+          (callback: Attr[A, I, S] =?> Any)
+          : Traversal[A, I, S]
+          = Traversal.bottomUp.exhaust(grammar)(callback)
+
+        /** Bottom-up break transformation. */
+        override def transform[A <: HList, I <: HList, S <: HList]
+          (grammar: AttrGrammar[A, I, S])
+          (template: Attr[A, I, S] =?> Tree)
+          : Transform[A, I, S]
+          = Transform.bottomUp.exhaust(grammar)(template)
+      }
     }
   }
 
@@ -436,6 +454,24 @@ trait Transducers { this: AST =>
             val recur = super.transform(tree)
             accumulate(recur)
             complete(transformation)(recur)(recur)
+          }
+        }
+
+      /** Bottom-up exhaustive transformation. */
+      def exhaust[A <: HList, I <: HList, S <: HList]
+        (grammar: AttrGrammar[A, I, S])(template: Attr[A, I, S] =?> Tree)
+        : Transform[A, I, S] = new Transform[A, I, S](grammar, template) {
+          override final def transform(tree: Tree): Tree = {
+            fix(tree)
+          }
+
+          @tailrec
+          def fix(tree: Tree): Tree = {
+            val recur = super.transform(tree)
+            accumulate(recur)
+            val compl = complete(transformation)(recur)(recur)
+            if (compl != recur) fix(compl)
+            else recur
           }
         }
 
@@ -502,6 +538,26 @@ trait Transducers { this: AST =>
             super.traverse(tree)
             accumulate(tree)
             traversal.applyOrElse(tree, unit[Tree])
+          }
+        }
+
+      /** Bottom-up exhaust traversal. */
+      def exhaust[A <: HList, I <: HList, S <: HList]
+        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Any)
+        : Traversal[A, I, S] = new Traversal[A, I, S](grammar, callback) {
+          override final def traverse(tree: Tree): Unit = {
+            fix(tree)
+          }
+
+          @tailrec
+          def fix(tree: Tree): Unit = {
+            super.traverse(tree)
+            accumulate(tree)
+            traversal.applyOrElse(tree, unit[Tree])
+            if (traversal.isDefinedAt(tree)) {
+              traversal(tree)
+              fix(tree)
+            }
           }
         }
 
@@ -627,6 +683,11 @@ trait Transducers { this: AST =>
       object break extends Strategy[HNil, HNil, HNil](
           new AttrGrammar[HNil, HNil, HNil](),
           TransFactory.bottomUp.break)
+
+      /** Bottom-up exhaustive traversal / transformation and attribute generation. */
+      object exhaust extends Strategy[HNil, HNil, HNil](
+          new AttrGrammar[HNil, HNil, HNil](),
+          TransFactory.bottomUp.exhaust)
     }
   }
 }
