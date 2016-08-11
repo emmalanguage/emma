@@ -404,6 +404,66 @@ class NormalizeSpec extends BaseCompilerSpec {
     (inp, exp)
   }
 
+  val (inp10, exp10) = {
+
+    val inp = reify {
+      // pre-process
+      val xs = for {
+        Ad(id, name, _) <- ads
+      } yield (id, name)
+      // self-join
+      val ys = for {
+        (id1, name1) <- xs
+        (id2, name2) <- xs
+        if id1 == id2
+      } yield (name1, name2)
+      // fetch
+      ys.fetch()
+    }
+
+    val exp = reify {
+      val ads$1 = ads
+      // pre-process
+      val xs = comprehension[(Long, String), DataBag]({
+        val check$ifrefutable$7 = generator[Ad, DataBag]({
+          ads$1
+        })
+        head[(Long, String)]({
+          val x$16 = check$ifrefutable$7: Ad
+          val id$29 = x$16.id
+          val name$19 = x$16.name
+          (id$29, name$19)
+        })
+      })
+      // self-join
+      val ys = comprehension[(String, String), DataBag]({
+        val check$ifrefutable$8 = generator[(Long, String), DataBag]({
+          xs
+        })
+        val check$ifrefutable$9 = generator[(Long, String), DataBag]({
+          xs
+        })
+        guard({
+          val x$21$1$3 = check$ifrefutable$8: (Long, String)
+          val id1$1$3 = x$21$1$3._1
+          val x$19 = check$ifrefutable$9: (Long, String)
+          val id2$2 = x$19._1
+          id1$1$3 == id2$2
+        })
+        head[(String, String)]({
+          val x$21$1$4 = check$ifrefutable$8: (Long, String)
+          val name1$1$4 = x$21$1$4._2
+          val x$20 = check$ifrefutable$9: (Long, String)
+          val name2$1 = x$20._2
+          (name1$1$4, name2$1)
+        })
+      })
+      ys.fetch()
+    }
+
+    (inp, exp)
+  }
+
   // ---------------------------------------------------------------------------
   // Spec tests
   // ---------------------------------------------------------------------------
@@ -438,6 +498,11 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
     "with two correlated generators and no filters" in {
       normalize(inp9) shouldBe alphaEqTo(resugar(exp9))
+    }
+    "with a dag-shaped self-join" in {
+      val inp10S = Core.prettyPrint(normalize(inp10))
+      val exp10S = Core.prettyPrint(resugar(exp10))
+      normalize(inp10) shouldBe alphaEqTo(resugar(exp10))
     }
   }
 }
