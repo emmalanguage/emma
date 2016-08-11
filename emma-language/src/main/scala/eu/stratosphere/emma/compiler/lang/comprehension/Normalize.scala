@@ -2,15 +2,19 @@ package eu.stratosphere.emma
 package compiler.lang.comprehension
 
 import compiler.lang.core.Core
-import compiler.{Common, Rewrite}
+import compiler.Common
 
-private[comprehension] trait Normalize extends Common
-  with Rewrite {
+import shapeless._
+
+private[comprehension] trait Normalize extends Common {
   self: Core with Comprehension =>
 
   import UniverseImplicits._
   import Comprehension.{Syntax, asLet}
   import Core.{Lang => core}
+
+  type NormAttr = Attr[normAttr.Acc, normAttr.Inh, normAttr.Syn]
+  lazy val normAttr = api.BottomUp.exhaust.withDefs.withUses
 
   private[comprehension] object Normalize {
 
@@ -27,7 +31,11 @@ private[comprehension] trait Normalize extends Common
 
       ({
         // apply UnnestHead and UnnestGenerator rules exhaustively
-        Engine.bottomUp(List(cs.UnnestHead, cs.UnnestGenerator))
+        (tree: u.Tree) => normAttr.transformWith {
+          case cs.UnnestGenerator(m: cs.UnnestGenerator.Match) => cs.UnnestGenerator(m)
+          case cs.UnnestHead(m: cs.UnnestHead.Match) => cs.UnnestHead(m)
+        }(tree).tree
+
       } andThen {
         // elminiate dead code produced by normalization
         Core.dce
@@ -139,14 +147,29 @@ private[comprehension] trait Normalize extends Common
      * } // enclosing block
      * }}}
      */
-    object UnnestHead extends Rule {
+    object UnnestHead {
 
-      override def apply(root: u.Tree): Option[u.Tree] = root match {
+      //@formatter:off
+      case class Match
+      (
+        vals1 : Seq[u.ValDef],
+        defs1 : Seq[u.DefDef],
+        expr1 : u.Tree,
+        encl  : u.Tree,
+        vals2 : Seq[u.ValDef],
+        qs1   : Seq[u.Tree],
+        vals3 : Seq[u.ValDef],
+        qs2   : Seq[u.Tree],
+        hd2   : u.Block
+      )
+      //@formatter:on
+
+      def unapply(root: NormAttr): Option[Match] = root match {
         //@formatter:off
-        case core.Let(
+        case Attr.syn(core.Let(
           vals1,
           defs1,
-          expr1) =>
+          expr1), valUses :: valDefs :: _) =>
           //@formatter:on
 
           vals1.map(x => x -> x.rhs) :+ (expr1 -> expr1) collectFirst {
@@ -166,34 +189,37 @@ private[comprehension] trait Normalize extends Common
                         Head(hd2)
                       ))))))) =>
               //@formatter:on
-
-              val (vals3i, vals3o) = split(vals3, qs1)
-
-              val qs2p = qs2 map {
-                case Generator(sym, rhs) =>
-                  Generator(sym, prepend(vals3i, rhs))
-                case Guard(pred) =>
-                  Guard(prepend(vals3i, pred))
-              }
-
-              val hd2p = prepend(vals3i, hd2)
-
-              val (vals, expr) = encl match {
-                case encl@core.ValDef(xsym, xrhs, xflags) =>
-                  val (vals1a, vals1b) = splitAt(encl)(vals1)
-                  val val_ = core.ValDef(xsym, Comprehension(qs1 ++ qs2p, Head(hd2p)), xflags)
-                  (vals1a ++ vals2 ++ vals3o ++ Seq(val_) ++ vals1b, expr1)
-                case _ =>
-                  (vals1 ++ vals2 ++ vals3o, Comprehension(qs1 ++ qs2p, Head(hd2p)))
-              }
-
-              // API: cumbersome syntax of Let.apply
-              core.Let(vals: _*)(defs1: _*)(expr)
+              Match(vals1, defs1, expr1, encl, vals2, qs1, vals3, qs2, hd2)
           }
 
         case _ =>
           // subtree's root does not match, don't modify the subtree
           None
+      }
+
+      def apply(m: Match): u.Tree = m match {
+        case Match(vals1, defs1, expr1, encl, vals2, qs1, vals3, qs2, hd2) =>
+          val (vals3i, vals3o) = split(vals3, qs1)
+
+          val qs2p = qs2 map {
+            case Generator(sym, rhs) =>
+              Generator(sym, prepend(vals3i, rhs))
+            case Guard(pred) =>
+              Guard(prepend(vals3i, pred))
+          }
+
+          val hd2p = prepend(vals3i, hd2)
+
+          val (vals, expr) = encl match {
+            case encl@core.ValDef(xsym, xrhs, xflags) =>
+              val (vals1a, vals1b) = splitAt(encl)(vals1)
+              val val_ = core.ValDef(xsym, Comprehension(qs1 ++ qs2p, Head(hd2p)), xflags)
+              (vals1a ++ vals2 ++ vals3o ++ Seq(val_) ++ vals1b, expr1)
+            case _ =>
+              (vals1 ++ vals2 ++ vals3o, Comprehension(qs1 ++ qs2p, Head(hd2p)))
+          }
+
+          core.Let(vals: _*)(defs1: _*)(expr)
       }
 
       /** Splits `vals` in two subsequences: vals dependent on generators bound in `qs`, and complement. */
@@ -338,53 +364,73 @@ private[comprehension] trait Normalize extends Common
      * } // enclosing block
      * }}}
      */
-    object UnnestGenerator extends Rule {
+    object UnnestGenerator {
 
-      override def apply(root: u.Tree): Option[u.Tree] = root match {
+      //@formatter:off
+      case class Match
+      (
+        vals1a : Seq[u.ValDef],
+        vals1r : Seq[u.ValDef],
+        defs1  : Seq[u.DefDef],
+        expr1  : u.Tree,
+        encl   : u.Tree,
+        qs1    : Seq[u.Tree],
+        hd1    : u.Block,
+        gen    : u.Tree,
+        x      : u.TermSymbol,
+        qs2    : Seq[u.Tree],
+        hd2    : u.Block
+      )
+      //@formatter:on
+
+      def unapply(root: NormAttr): Option[Match] = root match {
         //@formatter:off
-        case core.Let(
+        case Attr.syn(core.Let(
           vals1,
           defs1,
-          expr1) =>
+          expr1), valUses :: valDefs :: _) =>
           //@formatter:on
 
-          val result = for {
+          (for {
             vd@core.ValDef(y, Comprehension(qs2, Head(hd2)), _) <- vals1.view
+            if valUses(y) == 1
             (vals1a, vals1r) = splitAt(vd)(vals1)
             encls = vals1r.map(x => x -> x.rhs) :+ (expr1 -> expr1)
             (encl, Comprehension(qs1, Head(hd1))) <- encls
             gen@Generator(x, core.Let(Nil, Nil, core.ValRef(`y`))) <- qs1
           } yield {
-            // define a substitution function `· [ $hd2 \ x ]`
-            val subst = hd2 match {
-              case core.Let(Nil, Nil, expr2) => api.Tree.subst(x -> expr2)
-              case _ => api.Tree.subst(x -> hd2)
-            }
-
-            // compute prefix and suffix for qs1 and vals1
-            val (qs1a, qs1b) = splitAt[u.Tree](gen)(qs1)
-
-            val comp = Comprehension(
-              qs1a ++ qs2 ++ (qs1b map subst),
-              Head(asLet(subst(hd1))))
-
-            val (vals, expr) = encl match {
-              case encl@core.ValDef(zsym, zrhs, zflags) =>
-                val (vals1b, vals1c) = splitAt(encl)(vals1r)
-                val val_ = core.ValDef(zsym, comp, zflags)
-                (vals1a ++ vals1b ++ Seq(val_) ++ vals1c, expr1)
-              case _ =>
-                (vals1a ++ vals1r, comp)
-            }
-
-            // API: cumbersome syntax of Let.apply
-            core.Let(vals: _*)(defs1: _*)(expr)
-          }
-
-          result.headOption
+            Match(vals1a, vals1r, defs1, expr1, encl, qs1, hd1, gen, x, qs2, hd2)
+          }).headOption
 
         case _ =>
           None
+      }
+
+      def apply(m: Match): u.Tree = m match {
+        case Match(vals1a, vals1r, defs1, expr1, encl, qs1, hd1, gen, x, qs2, hd2) =>
+          // define a substitution function `· [ $hd2 \ x ]`
+          val subst = hd2 match {
+            case core.Let(Nil, Nil, expr2) => api.Tree.subst(x -> expr2)
+            case _ => api.Tree.subst(x -> hd2)
+          }
+
+          // compute prefix and suffix for qs1 and vals1
+          val (qs1a, qs1b) = splitAt[u.Tree](gen)(qs1)
+
+          val comp = Comprehension(
+            qs1a ++ qs2 ++ (qs1b map subst),
+            Head(asLet(subst(hd1))))
+
+          val (vals, expr) = encl match {
+            case encl@core.ValDef(zsym, zrhs, zflags) =>
+              val (vals1b, vals1c) = splitAt(encl)(vals1r)
+              val val_ = core.ValDef(zsym, comp, zflags)
+              (vals1a ++ vals1b ++ Seq(val_) ++ vals1c, expr1)
+            case _ =>
+              (vals1a ++ vals1r, comp)
+          }
+
+          core.Let(vals: _*)(defs1: _*)(expr)
       }
     }
 
@@ -392,7 +438,7 @@ private[comprehension] trait Normalize extends Common
     private def splitAt[A](e: A): Seq[A] => (Seq[A], Seq[A]) = {
       (_: Seq[A]).span(_ != e)
     } andThen {
-      case (pre, _ :: suf) => (pre, suf)
+      case (pre, Seq(_, suf@_*)) => (pre, suf)
     }
   }
 
