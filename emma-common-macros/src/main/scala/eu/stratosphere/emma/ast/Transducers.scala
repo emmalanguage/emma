@@ -120,7 +120,8 @@ trait Transducers { this: AST =>
 
     private lazy val synMemo: Tree => Syn = Memo.recur[Tree, Syn]({ syn => tree =>
       val prev = tree.children.map(syn).foldLeft(MSyn.empty)(MSyn.combine)
-      complete(grammar.synthesis)(Attr(tree, prev))(prev)
+      val curr = complete(grammar.synthesis)(Attr(tree, prev))(MSyn.empty)
+      MSyn.combine(prev, curr)
     }, cache)
 
     protected lazy val accumulation: Tree =?> Acc = {
