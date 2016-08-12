@@ -1,6 +1,7 @@
 package eu.stratosphere.emma
 package compiler.lang.core
 
+import api._
 import compiler.BaseCompilerSpec
 import testschema.Marketing._
 
@@ -383,13 +384,16 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `Inst` objects in `Core.Lang`
     // - `Apply(tpt: New, args)` nodes in Scala ASTs
 
+    implicit val converter = materializeCSVConverters[(Int, String, Int)]
+
     val services = AdClass.SERVICES
     val examples = extractFrom(reify(
       new Ad(1, "Uber AD", services),
       new Tuple2(3.14, "pi"), // inferred type-args
       new Array[Int](10), // explicit type-args
       new mutable.ListBuffer[String], // type-args only
-      new Object // no-args
+      new Object, // no-args
+      new CSVOutputFormat[(Int, String, Int)]
     ))
 
     val negatives = extractFrom(reify(

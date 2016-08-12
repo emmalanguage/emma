@@ -377,8 +377,8 @@ trait Terms { this: AST =>
         assert(have.tpe(argss.flatten), s"Not all $this args have type")
 
         val clazz = Type.fix(target).typeConstructor
-        val constructor = clazz.decl(TermName.init).asMethod
-        val init = Sym.resolveOverloaded(clazz)(constructor, targs: _*)(argss: _*)
+        val constructor = clazz.decl(TermName.init)
+        val init = Sym.resolveOverloaded(appliedType(clazz, targs: _*))(constructor)(argss: _*)
         val tpe = Type(clazz, targs: _*)
         val tpt = u.New(TypeQuote(tpe))
         set(tpt, tpe = tpe)
