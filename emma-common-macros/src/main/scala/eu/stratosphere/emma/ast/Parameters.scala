@@ -75,7 +75,7 @@ trait Parameters { this: AST =>
        * @return `(..flags lhs [= rhs])`.
        */
       def apply(lhs: u.TermSymbol,
-        rhs: u.Tree = Tree.empty,
+        rhs: u.Tree = Empty(),
         flags: u.FlagSet = u.NoFlags): u.ValDef = {
 
         assert(is.defined(lhs), s"$this LHS `$lhs` is not defined")

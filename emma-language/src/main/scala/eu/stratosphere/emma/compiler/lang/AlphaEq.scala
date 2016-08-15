@@ -149,7 +149,7 @@ trait AlphaEq extends Common {
         case _ if lhs == rhs =>
           pass
 
-        case (EmptyTree, EmptyTree) =>
+        case _ if lhs.isEmpty && rhs.isEmpty =>
           pass
 
         case ( // Annotated trees

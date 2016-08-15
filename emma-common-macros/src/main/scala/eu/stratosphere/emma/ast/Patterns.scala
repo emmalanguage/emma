@@ -210,7 +210,7 @@ trait Patterns { this: AST =>
        * @return `case pattern => body`.
        */
       def apply(pat: u.Tree, body: u.Tree): u.CaseDef =
-        apply(pat, Tree.empty, body)
+        apply(pat, Empty(), body)
 
       /**
        * Creates a type-checked `case` definition with a guard.
@@ -232,7 +232,7 @@ trait Patterns { this: AST =>
           assert(has.tpe(guard), s"$this guard has no type:\n${Tree.showTypes(guard)}")
           assert(guardT =:= Type.bool, s"$this guard is not boolean:\n${Tree.showTypes(guard)}")
           guard
-        } else Tree.empty
+        } else Empty()
 
         val cse = u.CaseDef(pat, grd, body)
         set(cse, tpe = bodyT)
@@ -240,7 +240,7 @@ trait Patterns { this: AST =>
       }
 
       def unapply(cse: u.CaseDef): Option[(u.Tree, u.Tree, u.Tree)] = cse match {
-        case u.CaseDef(Pat(pat), guard @ (api.Tree.empty | Term(_)), Term(body)) =>
+        case u.CaseDef(Pat(pat), guard @ (Empty(_) | Term(_)), Term(body)) =>
           Some(pat, guard, body)
         case _ =>
           None

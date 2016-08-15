@@ -16,7 +16,6 @@ trait Trees { this: AST =>
     object Tree extends Node {
 
       // Predefined trees
-      lazy val empty = u.EmptyTree
       lazy val Root = Id(u.rootMirror.RootPackage)
       lazy val Java = Sel(Root, u.definitions.JavaLangPackage)
       lazy val Scala = Sel(Root, u.definitions.ScalaPackage)
@@ -217,6 +216,16 @@ trait Trees { this: AST =>
         case TypeAscr(expr, _) => unAscribe(expr)
         case _ => tree
       }
+    }
+
+    /** The empty tree (instance independent). */
+    object Empty extends Node {
+
+      def apply(): u.Tree =
+        u.EmptyTree
+
+      def unapply(tree: u.Tree): Option[u.Tree] =
+        Option(tree).filter(_.isEmpty)
     }
 
     /** Identifiers (for internal use). */

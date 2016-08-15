@@ -41,7 +41,7 @@ private[core] trait PatternMatching extends Common {
     lazy val destructPatternMatches: u.Tree => u.Tree =
       api.BottomUp.withOwner.transformWith {
         case Attr.inh(
-          mat @ src.PatMat(target withType tpe, src.PatCase(pat, api.Tree.empty, body), _*),
+          mat @ src.PatMat(target withType tpe, src.PatCase(pat, src.Empty(_), body), _*),
           owner :: _) =>
 
           val nme = api.TermName.fresh("x")

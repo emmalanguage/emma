@@ -262,7 +262,7 @@ trait Transducers { this: AST =>
     /** Inherits the parent of the current node. */
     def withParent = inherit {
       case parent => parent
-    } (Monoids.right(EmptyTree))
+    } (Monoids.right(api.Empty()))
   }
 
   /** An abstract transformation (default is top-down break). */

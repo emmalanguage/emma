@@ -79,7 +79,7 @@ trait Bindings { this: AST =>
        * @return `..flags [val|var] lhs [= rhs]`.
        */
       def apply(lhs: u.TermSymbol,
-        rhs: u.Tree = u.EmptyTree,
+        rhs: u.Tree = Empty(),
         flags: u.FlagSet = u.NoFlags): u.ValDef = {
 
         assert(is.defined(lhs), s"$this LHS `$lhs` is not defined")
@@ -96,7 +96,7 @@ trait Bindings { this: AST =>
           lazy val rhT = Type.of(rhs)
           assert(rhT weak_<:< lhT, s"$this LH type `$lhT` is not a supertype of RH type `$rhT`")
           Owner.at(lhs)(rhs)
-        } else Tree.empty
+        } else Empty()
 
         val tpt = TypeQuote(lhT)
         val bind = u.ValDef(mods, name, tpt, body)

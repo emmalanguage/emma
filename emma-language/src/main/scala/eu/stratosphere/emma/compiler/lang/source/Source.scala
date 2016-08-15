@@ -86,6 +86,9 @@ trait Source extends Common
     object Lang {
       //@formatter:off
 
+      // Empty
+      val Empty = api.Empty
+
       // Atomics
       val Atomic = api.Atomic
       val Lit    = api.Lit

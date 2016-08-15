@@ -61,7 +61,7 @@ private[core] trait CoreValidate extends Common {
       }
 
       lazy val ParDef: Validator = {
-        case core.ParDef(_, api.Tree.empty, _) => pass
+        case core.ParDef(_, core.Empty(_), _) => pass
       }
 
       // ---------------------------------------------------------------------------

@@ -60,7 +60,7 @@ private[source] trait SourceValidate extends Common {
       }
 
       lazy val ParDef: Validator = {
-        case src.ParDef(_, api.Tree.empty, _) => pass
+        case src.ParDef(_, src.Empty(_), _) => pass
       }
 
       // ---------------------------------------------------------------------------
@@ -204,7 +204,7 @@ private[source] trait SourceValidate extends Common {
       }
 
       lazy val PatCase: Validator = {
-        case src.PatCase(pat, api.Tree.empty, body) => {
+        case src.PatCase(pat, src.Empty(_), body) => {
           pat is Pat otherwise s"Invalid ${src.PatCase} pattern"
         } and {
           body is Term otherwise s"Invalid ${src.PatCase} body"
