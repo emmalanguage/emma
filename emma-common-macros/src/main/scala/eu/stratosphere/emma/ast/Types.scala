@@ -175,17 +175,18 @@ trait Types { this: AST =>
 
       /** Reifies a type of kind `* -> *`. */
       def kind1[F[_]](arg: u.Type)
-        (implicit tag: u.TypeTag[F[Nothing]]): u.Type = {
-
-        apply(apply(tag).typeConstructor, arg)
-      }
+        (implicit tag: u.TypeTag[F[Nothing]]): u.Type
+        = apply(apply(tag).typeConstructor, arg)
 
       /** Reifies a type of kind `* -> * -> *`. */
       def kind2[F[_, _]](arg1: u.Type, arg2: u.Type)
-        (implicit tag: u.TypeTag[F[Nothing, Nothing]]): u.Type = {
+        (implicit tag: u.TypeTag[F[Nothing, Nothing]]): u.Type
+        = apply(apply(tag).typeConstructor, arg1, arg2)
 
-        apply(apply(tag).typeConstructor, arg1, arg2)
-      }
+      /** Reifies a type of kind `* -> * -> * -> *`. */
+      def kind3[F[_, _, _]](arg1: u.Type, arg2: u.Type, arg3: u.Type)
+        (implicit tag: u.TypeTag[F[Nothing, Nothing, Nothing]]): u.Type
+        = apply(apply(tag).typeConstructor, arg1, arg2, arg3)
 
       /** Creates a new array type. */
       def arrayOf(elements: u.Type): u.Type =
@@ -319,6 +320,13 @@ trait Types { this: AST =>
         assert(has.tpe(sym), s"Symbol `$sym` has no type")
         val sign = fix(if (is.defined(in)) sym.typeSignatureIn(in) else sym.typeSignature)
         if (is(BYNAMEPARAM)(sym)) sign.typeArgs.head else sign
+      }
+
+      /** Infers an implicit value from the enclosing context (if possible). */
+      def inferImplicit(tpe: u.Type): Option[u.Tree] = {
+        val opt = Option(Types.this.inferImplicit(tpe)).filter(is.defined)
+        for (value withType NullaryMethodType(result) <- opt) set.tpe(value, result)
+        opt
       }
 
       /** Extractor for result types (legal for terms). */

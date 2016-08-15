@@ -46,6 +46,9 @@ trait JavaAST extends RuntimeUtil with AST {
   private[emma] override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
     if (typeMode) tb.typecheck(tree, tb.TYPEmode) else tb.typecheck(tree)
 
+  private[emma] override def inferImplicit(tpe: Type): Tree =
+    tb.inferImplicitValue(tpe)
+
   // ------------------------
   // Abstract wrapper methods
   // ------------------------

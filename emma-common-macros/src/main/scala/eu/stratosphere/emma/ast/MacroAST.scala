@@ -50,6 +50,9 @@ trait MacroAST extends MacroUtil with AST {
   private[emma] override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
     if (typeMode) c.typecheck(tree, c.TYPEmode) else c.typecheck(tree)
 
+  private[emma] override def inferImplicit(tpe: Type): Tree =
+    c.inferImplicitValue(tpe)
+
   // ------------------------
   // Abstract wrapper methods
   // ------------------------

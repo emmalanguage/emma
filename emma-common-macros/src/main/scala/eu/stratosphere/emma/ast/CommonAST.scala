@@ -57,6 +57,9 @@ trait CommonAST extends ReflectUtil {
   private[emma] override def unTypeCheck(tree: Tree): Tree =
     parse(showCode(tree, printRootPkg = true))
 
+  /** Infers an implicit value from the enclosing context (if possible). */
+  private[emma] def inferImplicit(tpe: Type): Tree
+
   // ------------------------------
   // Abstract getters and setters
   // ------------------------------
