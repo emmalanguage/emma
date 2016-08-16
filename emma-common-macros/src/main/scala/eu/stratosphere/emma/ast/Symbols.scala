@@ -43,7 +43,6 @@ trait Symbols { this: AST =>
         assert(is.defined(sym), s"Undefined symbol `$sym` cannot be copied")
         assert(!is.pkg(sym), s"Package symbol `$sym` cannot be copied")
         assert(is.defined(name), s"Undefined name `$name`")
-        assert(is.defined(owner), s"Undefined owner `$owner`")
         assert(is.defined(tpe), s"Undefined type `$tpe`")
 
         val encoded = name.encodedName
@@ -153,24 +152,22 @@ trait Symbols { this: AST =>
           Map(broken -> fixed)
         }
 
-        def encl(sym: u.Symbol) =
-          if (is.defined(sym)) sym else owner
-
-        TopDown.withOwner.accumulateWith[Map[u.Symbol, u.Symbol]] {
-          case Attr(Owner(broken), fixed :: _, current :: _, _)
-            if fixed.contains(current) && broken.owner != fixed(current) =>
-              fix(broken, fixed(current), fixed)
-          case Attr(Owner(broken), fixed :: _, current :: _, _)
-            if broken.owner != encl(current) =>
-              fix(broken, encl(current), fixed)
-        }.traverseAny.andThen {
-          case Attr.acc(tree, fixed :: _) =>
-            if (fixed.isEmpty) tree else {
-              val dup = api.Tree.copy(tree)()
-              val (from, to) = fixed.toList.unzip
-              substituteSymbols(dup, from, to)
-            }
-        }
+        TopDown.inherit { case Owner(sym) => sym } (Monoids.right(owner))
+          .accumulateWith[Map[u.Symbol, u.Symbol]] {
+            case Attr(Owner(broken), fixed :: _, current :: _, _)
+              if fixed.contains(current) && broken.owner != fixed(current) =>
+                fix(broken, fixed(current), fixed)
+            case Attr(Owner(broken), fixed :: _, current :: _, _)
+              if broken.owner != current =>
+                fix(broken, current, fixed)
+          }.traverseAny.andThen {
+            case Attr.acc(tree, fixed :: _) =>
+              if (fixed.isEmpty) tree else {
+                val dup = api.Tree.copy(tree)()
+                val (from, to) = fixed.toList.unzip
+                substituteSymbols(dup, from, to)
+              }
+          }
       }
 
       def unapply(tree: u.Tree): Option[u.Symbol] = for {
