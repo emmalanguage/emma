@@ -214,6 +214,8 @@ trait AlphaEq extends Common {
           Block(stats$r, expr$r)
           ) => for {
             eq <- size(stats$l, stats$r, "block statements")
+            _ = dict ++= (for ((l: DefDef, r: DefDef) <- stats$l zip stats$r)
+              yield l.symbol -> r.symbol)
             eq <- all(stats$l, stats$r)
             eq <- trees(expr$l, expr$r)
           } yield eq
