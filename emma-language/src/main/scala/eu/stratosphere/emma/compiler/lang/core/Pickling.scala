@@ -74,6 +74,7 @@ private[core] trait Pickling extends Common {
           case value: Float  => s"${value}F"
           case value: Char   => s"'$value'"
           case value: String => s""""${escape(value)}""""
+          case null          => "null"
           case _             => value.toString
           //@formatter:on
         }
