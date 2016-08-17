@@ -15,15 +15,17 @@ trait Common extends ReflectUtil with AST {
   // Emma API
   // --------------------------------------------------------------------------
 
+  val rootPkg = "eu.stratosphere.emma"
+
   /** A set of API method symbols to be comprehended. */
   protected[emma] object API {
     //@formatter:off
-    val moduleSymbol          = rootMirror.staticModule("eu.stratosphere.emma.api.package")
-    val bagSymbol             = rootMirror.staticClass("eu.stratosphere.emma.api.DataBag")
-    val groupSymbol           = rootMirror.staticClass("eu.stratosphere.emma.api.Group")
-    val statefulSymbol        = rootMirror.staticClass("eu.stratosphere.emma.api.Stateful.Bag")
-    val inputFmtSymbol        = rootMirror.staticClass("eu.stratosphere.emma.api.InputFormat")
-    val outputFmtSymbol       = rootMirror.staticClass("eu.stratosphere.emma.api.OutputFormat")
+    val moduleSymbol          = rootMirror.staticModule(s"$rootPkg.api.package")
+    val bagSymbol             = rootMirror.staticClass(s"$rootPkg.api.DataBag")
+    val groupSymbol           = rootMirror.staticClass(s"$rootPkg.api.Group")
+    val statefulSymbol        = rootMirror.staticClass(s"$rootPkg.api.Stateful.Bag")
+    val inputFmtSymbol        = rootMirror.staticClass(s"$rootPkg.api.InputFormat")
+    val outputFmtSymbol       = rootMirror.staticClass(s"$rootPkg.api.OutputFormat")
 
     val apply                 = bagSymbol.companion.info.decl(TermName("apply"))
     val read                  = moduleSymbol.info.decl(TermName("read"))
@@ -62,7 +64,7 @@ trait Common extends ReflectUtil with AST {
 
   protected[emma] object ComprehensionSyntax {
     //@formatter:off
-    val module                = rootMirror.staticModule("eu.stratosphere.emma.compiler.ir.ComprehensionSyntax").asModule
+    val module                = rootMirror.staticModule(s"$rootPkg.compiler.ir.ComprehensionSyntax").asModule
 
     val flatten               = module.info.decl(TermName("flatten")).asMethod
     val generator             = module.info.decl(TermName("generator")).asMethod
@@ -71,6 +73,15 @@ trait Common extends ReflectUtil with AST {
     val head                  = module.info.decl(TermName("head")).asMethod
 
     val ops                   = Set(flatten, generator, comprehension, guard, head)
+    //@formatter:on
+  }
+
+  protected[emma] object ComprehensionCombinators {
+    //@formatter:off
+    val module                = rootMirror.staticModule(s"$rootPkg.compiler.ir.ComprehensionCombinators").asModule
+
+    val cross                 = module.info.decl(TermName("cross")).asMethod
+    val equiJoin              = module.info.decl(TermName("equiJoin")).asMethod
     //@formatter:on
   }
 
@@ -124,7 +135,7 @@ trait Common extends ReflectUtil with AST {
   }
 
   // --------------------------------------------------------------------------
-  // Universe API that needs to be importet
+  // Universe API that needs to be imported
   // --------------------------------------------------------------------------
 
 

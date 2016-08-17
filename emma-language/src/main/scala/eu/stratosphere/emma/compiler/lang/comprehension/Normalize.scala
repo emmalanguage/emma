@@ -9,7 +9,7 @@ import shapeless._
 private[comprehension] trait Normalize extends Common {
   self: Core with Comprehension =>
 
-  import Comprehension.{Syntax, asLet}
+  import Comprehension.{Syntax, asLet, splitAt}
   import Core.{Lang => core}
   import UniverseImplicits._
 
@@ -112,7 +112,7 @@ private[comprehension] trait Normalize extends Common {
      *
      * Let $vals3 decompose into the following two subsets:
      * - $vals3i (transitively) depends on symbols defined in $qs1, and
-     * - $vals3o is the independent complement $vals3 \ $vals3o.
+     * - $vals3o is the independent complement $vals3 \ $vals3i.
      *
      * For a match of type (1):
      *
@@ -385,13 +385,5 @@ private[comprehension] trait Normalize extends Common {
       case _ =>
         None
     })
-
-    /* Splits a `Seq[A]` into a prefix and suffix. */
-    private def splitAt[A](e: A): Seq[A] => (Seq[A], Seq[A]) = {
-      (_: Seq[A]).span(_ != e)
-    } andThen {
-      case (pre, Seq(_, suf@_*)) => (pre, suf)
-    }
   }
-
 }

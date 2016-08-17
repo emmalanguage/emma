@@ -58,7 +58,7 @@ private[core] trait DCE extends Common {
               expr)
         }
 
-        /** Check if the current tree is a child fo a `comprehension` application. */
+        /** Check if the current tree is a child of a `comprehension` application. */
         private def comprehensionChild(): Boolean = ancestors.headOption.exists {
           case Method.call(_, `comprehension`, _, _) => true
           case _ => false
