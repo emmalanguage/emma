@@ -272,6 +272,12 @@ trait Core extends Common
     /** Delegates to [[ANF.flatten]]. */
     lazy val flatten = ANF.flatten
 
+    /** Delegates to [[ANF.resolveNameClashes()]]. */
+    private[lang] lazy val resolveNameClashes = ANF.resolveNameClashes
+
+    /** Delegates to [[ANF.transform()]]. */
+    private[lang] lazy val anf = ANF.transform
+
     /** Delegates to [[ANF.inlineLetExprs]]. */
     lazy val inlineLetExprs = ANF.inlineLetExprs
 
@@ -336,6 +342,17 @@ trait Core extends Common
         uses(sym)
     }
 
+    // -------------------------------------------------------------------------
+    // Miscellaneous utilities
+    // -------------------------------------------------------------------------
+
+    /**
+     * Gets the type argument of the DataBag type that is the type of the given expression.
+     */
+    def bagElemTpe(xs: u.Tree): u.Type = {
+      assert(xs.tpe.typeConstructor == API.DATA_BAG)
+      api.Type.arg(1, xs.tpe)
+    }
   }
 
 }

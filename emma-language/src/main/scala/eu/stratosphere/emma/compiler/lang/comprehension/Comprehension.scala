@@ -3,10 +3,13 @@ package compiler.lang.comprehension
 
 import compiler.Common
 import compiler.lang.core.Core
+import compiler.lang.combinators.Combinators
 
 trait Comprehension extends Common
   with ReDeSugar
-  with Normalize {
+  with Normalize
+  with Combination
+  with Combinators {
   self: Core =>
 
   import UniverseImplicits._
@@ -46,8 +49,10 @@ trait Comprehension extends Common
         override val symbol =
           api.Term.member(monad, api.TermName("map")).asMethod // API: access method directly
 
-        override def apply(xs: u.Tree)(f: u.Tree): u.Tree =
+        override def apply(xs: u.Tree)(f: u.Tree): u.Tree = {
+          assert(xs.tpe.typeConstructor == API.DATA_BAG)
           core.DefCall(Some(xs))(symbol, elemTpe(f))(f :: Nil)
+        }
 
         override def unapply(apply: u.Tree): Option[(u.Tree, u.Tree)] = apply match {
           case core.DefCall(Some(xs), `symbol`, _, Seq(f)) => Some(xs, f)
@@ -64,8 +69,10 @@ trait Comprehension extends Common
         override val symbol =
           api.Term.member(monad, api.TermName("flatMap")).asMethod // API: access method directly
 
-        override def apply(xs: u.Tree)(f: u.Tree): u.Tree =
+        override def apply(xs: u.Tree)(f: u.Tree): u.Tree = {
+          assert(api.Type.arg(2, f.tpe).typeConstructor == API.DATA_BAG)
           core.DefCall(Some(xs))(symbol, elemTpe(f))(f :: Nil)
+        }
 
         override def unapply(tree: u.Tree): Option[(u.Tree, u.Tree)] = tree match {
           case core.DefCall(Some(xs), `symbol`, _, Seq(f)) => Some(xs, f)
@@ -210,12 +217,27 @@ trait Comprehension extends Common
       Normalize.normalize(monad)(tree)
 
     // -------------------------------------------------------------------------
+    // Combine API
+    // -------------------------------------------------------------------------
+
+    /** Delegates to [[Combination.combine()]]. */
+    def combine(tree: u.Tree): u.Tree =
+      Combination.combine(tree)
+
+    // -------------------------------------------------------------------------
     // General helpers
     // -------------------------------------------------------------------------
 
     def asLet(tree: u.Tree): u.Block = tree match {
       case let @ core.Let(_, _, _) => let
       case other => core.Let()()(other)
+    }
+
+    /* Splits a `Seq[A]` into a prefix and suffix. */
+    def splitAt[A](e: A): Seq[A] => (Seq[A], Seq[A]) = {
+      (_: Seq[A]).span(_ != e)
+    } andThen {
+      case (pre, Seq(_, suf@_*)) => (pre, suf)
     }
   }
 
