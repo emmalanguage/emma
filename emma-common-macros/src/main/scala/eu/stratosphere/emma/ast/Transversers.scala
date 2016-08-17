@@ -13,7 +13,7 @@ import scala.collection.mutable
 import scala.language.higherKinds
 
 /** Utility for traversing and transforming trees. */
-trait Transducers { this: AST =>
+trait Transversers { this: AST =>
 
   import universe._
   import Monoids._
@@ -661,7 +661,7 @@ trait Transducers { this: AST =>
   }
 
   /** Fluent tree traversal / transformation APIs. */
-  trait TransducerAPI { this: API =>
+  trait TransverserAPI { this: API =>
 
     /** Top-down traversal / transformation and attribute generation. */
     object TopDown extends Strategy[HNil, HNil, HNil](

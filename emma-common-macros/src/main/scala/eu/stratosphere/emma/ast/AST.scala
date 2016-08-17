@@ -13,7 +13,7 @@ trait AST extends CommonAST
   with Patterns
   with Symbols
   with Terms
-  with Transducers
+  with Transversers
   with Trees
   with Types
   with Values
@@ -29,7 +29,7 @@ trait AST extends CommonAST
     with PatternAPI
     with SymbolAPI
     with TermAPI
-    with TransducerAPI
+    with TransverserAPI
     with TreeAPI
     with TypeAPI
     with ValueAPI
