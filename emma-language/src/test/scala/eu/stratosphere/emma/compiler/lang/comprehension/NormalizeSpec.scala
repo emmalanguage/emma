@@ -22,7 +22,8 @@ class NormalizeSpec extends BaseCompilerSpec {
     compiler.pipeline(typeCheck = true)(
       Core.resolveNameClashes,
       Core.anf,
-      Core.simplify
+      Core.simplify,
+      normalizeLet
     ).compose(_.tree)
 
   val resugar: Expr[Any] => Tree =
@@ -37,6 +38,7 @@ class NormalizeSpec extends BaseCompilerSpec {
     compiler.pipeline(typeCheck = true)(
       Core.resolveNameClashes,
       Core.anf,
+      Core.lift,
       Core.simplify,
       Comprehension.resugar(API.bagSymbol),
       tree => time(Comprehension.normalize(API.bagSymbol)(tree), "normalize")
@@ -500,9 +502,84 @@ class NormalizeSpec extends BaseCompilerSpec {
       normalize(inp9) shouldBe alphaEqTo(resugar(exp9))
     }
     "with a dag-shaped self-join" in {
-      val inp10S = Core.prettyPrint(normalize(inp10))
-      val exp10S = Core.prettyPrint(resugar(exp10))
       normalize(inp10) shouldBe alphaEqTo(resugar(exp10))
     }
+  }
+
+  "complete examples" - {
+
+    "Transitive closure" in {
+      import eu.stratosphere.emma.api._
+      import NormalizeSpec.Edge
+
+      val input = "input"
+      val output = "output"
+      implicit val csv = implicitly[CSVConverters[Edge[Long]]]
+
+      val act = normalize(u.reify {
+        // read in a directed graph
+        var edges = read(input, new CSVInputFormat[Edge[Long]]).distinct()
+        var count = edges.size
+        var added = 0l
+
+        do {
+          val closure = for {
+            e1 <- edges
+            e2 <- edges
+            if e1.dst == e2.src
+          } yield Edge(e1.src, e2.dst)
+          edges = edges.plus(closure).distinct()
+          val oldCount = count
+          count = edges.size
+          added = count - oldCount
+        } while (added > 0)
+
+        write(output, new CSVOutputFormat[Edge[Long]])(edges)
+      })
+
+      val exp = anf(u.reify {
+        // read in a directed graph
+        val edges$1 = read(input, new CSVInputFormat[Edge[Long]]).distinct()
+        val count$1 = edges$1.size
+        val added$1 = 0l
+        def doWhile$1(added$3: Long, count$3: Long, edges$3: DataBag[Edge[Long]]): Unit = {
+          val closure = comprehension[Edge[Long], DataBag] {
+            val e1 = generator[Edge[Long], DataBag]({ edges$3 })
+            val e2 = generator[Edge[Long], DataBag]({ edges$3 })
+            guard {
+              val dst$1 = e1.dst
+              val src$1 = e2.src
+              dst$1 == src$1
+            }
+            head {
+              val src$2 = e1.src
+              val dst$2 = e2.dst
+              Edge(src$2, dst$2)
+            }
+          }
+          val edges$2 = edges$3.plus(closure).distinct()
+          val oldCount = count$3
+          val count$2 = edges$2.size
+          val added$2 = count$2 - oldCount
+          val greater$1 = added$2 > 0
+          def suffix$1(): Unit = {
+            write(output, new CSVOutputFormat()(csv))(edges$2)
+          }
+          if (greater$1) doWhile$1(added$2, count$2, edges$2)
+          else suffix$1()
+        }
+        doWhile$1(added$1, count$1, edges$1)
+      })
+
+      act shouldBe alphaEqTo (exp)
+    }
+  }
+}
+
+object NormalizeSpec {
+  import api.model._
+
+  case class Edge[VT](@id src: VT, @id dst: VT) extends Identity[Edge[VT]] {
+    def identity = Edge(src, dst)
   }
 }
