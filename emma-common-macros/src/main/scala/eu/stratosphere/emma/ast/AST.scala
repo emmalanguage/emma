@@ -51,24 +51,24 @@ trait AST extends CommonAST
   /** Normalizes all statements in term position by wrapping them in a block. */
   lazy val normalizeStatements: u.Tree => u.Tree =
     api.BottomUp.withParent.transformWith {
-      case Attr.inh(MutOrLoop(mol), (_: u.Block) :: _) =>
+      case Attr.inh(mol @ (api.VarMut(_, _) | api.Loop(_, _)), (_: u.Block) :: _) =>
         mol
-      case Attr.none(MutOrLoop(mol)) =>
+      case Attr.none(mol @ (api.VarMut(_, _) | api.Loop(_, _))) =>
         api.Block(mol)()
-      case Attr.none(u.Block(stats, MutOrLoop(mol))) =>
+      case Attr.none(u.Block(stats, mol @ (api.VarMut(_, _) | api.Loop(_, _)))) =>
         api.Block(stats :+ mol: _*)()
-      case Attr.inh(norm @ api.WhileBody(_, api.Block(_, api.Lit(())), _), (_: u.LabelDef) :: _) =>
+      case Attr.none(norm @ api.WhileBody(_, _, api.Block(_, api.Lit(())))) =>
         norm
-      case Attr.inh(norm @ api.DoWhileBody(api.Block(_, api.Lit(())), _), (_: u.LabelDef) :: _) =>
+      case Attr.none(norm @ api.DoWhileBody(_, _, api.Block(_, api.Lit(())))) =>
         norm
-      case Attr.inh(api.WhileBody(cond, api.Block(stats, stat), goto), (_: u.LabelDef) :: _) =>
-        api.WhileBody(cond, api.Block(stats :+ stat: _*)(), goto)
-      case Attr.inh(api.DoWhileBody(api.Block(stats, stat), goto), (_: u.LabelDef) :: _) =>
-        api.DoWhileBody(api.Block(stats :+ stat: _*)(), goto)
-      case Attr.inh(api.WhileBody(cond, stat, goto), (_: u.LabelDef) :: _) =>
-        api.WhileBody(cond, api.Block(stat)(), goto)
-      case Attr.inh(api.DoWhileBody(stat, goto), (_: u.LabelDef) :: _) =>
-        api.DoWhileBody(api.Block(stat)(), goto)
+      case Attr.none(api.WhileBody(label, cond, api.Block(stats, stat))) =>
+        api.WhileBody(label, cond, api.Block(stats :+ stat: _*)())
+      case Attr.none(api.DoWhileBody(label, cond, api.Block(stats, stat))) =>
+        api.DoWhileBody(label, cond, api.Block(stats :+ stat: _*)())
+      case Attr.none(api.WhileBody(label, cond, stat)) =>
+        api.WhileBody(label, cond, api.Block(stat)())
+      case Attr.none(api.DoWhileBody(label, cond, stat)) =>
+        api.DoWhileBody(label, cond, api.Block(stat)())
     }.andThen(_.tree)
 
   /** Removes the qualifiers from references to static symbols. */
@@ -115,14 +115,5 @@ trait AST extends CommonAST
       .append("\n")
     // Grab the result
     sb.result()
-  }
-
-  /** Extractor for variable mutations or loops in one. */
-  private object MutOrLoop {
-    def unapply(tree: Tree): Option[u.Tree] = tree match {
-      case mut: u.Assign => Some(mut)
-      case loop: u.LabelDef => Some(loop)
-      case _ => None
-    }
   }
 }

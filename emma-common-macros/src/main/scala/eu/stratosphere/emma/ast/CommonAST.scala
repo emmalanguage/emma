@@ -25,6 +25,7 @@ trait CommonAST extends ReflectUtil {
   import internal._
   import decorators._
   import reificationSupport._
+  import u.Flag._
 
   /** Raises an error and terminates compilation. */
   def abort(msg: String, pos: Position = NoPosition): Nothing
@@ -248,9 +249,13 @@ trait CommonAST extends ReflectUtil {
     def clazz(sym: Symbol): Boolean =
       sym.isClass
 
+    /** Is `sym` a label (loop) symbol? */
+    def label(sym: Symbol): Boolean =
+      sym.isMethod && is(CONTRAVARIANT)(sym)
+
     /** Is `sym` a method (`def`) symbol? */
     def method(sym: Symbol): Boolean =
-      sym.isMethod
+      sym.isMethod && is.not(CONTRAVARIANT)(sym)
 
     /** Is `sym` a module (`object`) symbol? */
     def module(sym: Symbol): Boolean =

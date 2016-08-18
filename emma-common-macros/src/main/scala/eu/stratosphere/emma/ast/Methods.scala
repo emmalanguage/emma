@@ -66,6 +66,7 @@ trait Methods { this: AST =>
         (paramss: Seq[u.TermSymbol]*)
         (result: u.Type): u.MethodSymbol = {
 
+        assert(are.not(CONTRAVARIANT)(flags), s"$this `$name` cannot be a label")
         val method = newMethodSymbol(owner, TermName(name), pos, flags)
         val tps = tparams.map(Sym.copy(_)(owner = method, flags = DEFERRED | PARAM).asType)
         val pss = paramss.map(_.map(Sym.copy(_)(owner = method, flags = PARAM).asTerm))
@@ -74,7 +75,7 @@ trait Methods { this: AST =>
       }
 
       def unapply(sym: u.MethodSymbol): Option[u.MethodSymbol] =
-        Option(sym)
+        Option(sym).filter(is.method)
     }
 
     /** Method (`def`) calls. */
@@ -109,9 +110,9 @@ trait Methods { this: AST =>
         : Option[(Option[u.Tree], u.MethodSymbol, Seq[u.Type], Seq[Seq[u.Tree]])] = call match {
 
         case Id(DefSym(method)) withType Type.Result(_) =>
-          Some(None, method, Nil, Nil)
+          Some(None, method, Seq.empty, Seq.empty)
         case Sel(Term(target), DefSym(method)) withType Type.Result(_) =>
-          Some(Some(target), method, Nil, Nil)
+          Some(Some(target), method, Seq.empty, Seq.empty)
         case TermApp(Id(DefSym(method)), targs, argss@_*) withType Type.Result(_) =>
           Some(None, method, targs, argss)
         case TermApp(Sel(Term(target), DefSym(method)), targs, argss@_*) withType Type.Result(_) =>
@@ -138,6 +139,7 @@ trait Methods { this: AST =>
         (body: u.Tree): u.DefDef = {
 
         assert(is.defined(sym), s"$this symbol `$sym` is not defined")
+        assert(is.method(sym), s"$this symbol `$sym` is not a method")
         assert(has.name(sym), s"$this symbol `$sym` has no name")
         assert(is.encoded(sym), s"$this symbol `$sym` is not encoded")
         assert(has.tpe(sym), s"$this symbol `$sym` has no type")

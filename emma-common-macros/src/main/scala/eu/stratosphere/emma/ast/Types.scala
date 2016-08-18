@@ -150,6 +150,9 @@ trait Types { this: AST =>
         lazy val bigDec = Type[java.math.BigDecimal]
       }
 
+      // Other
+      lazy val loop = Type.method()(Seq.empty)(unit)
+
       /** Applies a type `constructor` to the supplied arguments. */
       def apply(constructor: u.Type, args: u.Type*): u.Type =
         if (args.isEmpty) constructor else {

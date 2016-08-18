@@ -187,7 +187,7 @@ trait Terms { this: AST =>
     /** Term applications (for internal use). */
     private[ast] object TermApp extends Node {
 
-      def apply(target: u.Tree, args: List[u.Tree]): u.Apply = {
+      def apply(target: u.Tree, args: Seq[u.Tree]): u.Apply = {
         assert(is.defined(target), s"$this target is not defined: $target")
         assert(has.sym(target), s"$this target has no symbol:\n${Tree.showSymbols(target)}")
         assert(has.tpe(target), s"$this target has no type:\n${Tree.showTypes(target)}")
@@ -195,7 +195,7 @@ trait Terms { this: AST =>
         assert(are.terms(args), s"Not all $this args are terms")
         assert(have.tpe(args), s"Not all $this args have type")
 
-        val app = u.Apply(target, args)
+        val app = u.Apply(target, args.toList)
         set(app, sym = Sym.of(target), tpe = Type.of(target).resultType)
         app
       }
@@ -206,7 +206,7 @@ trait Terms { this: AST =>
 
         if (targs.isEmpty) {
           if (argss.isEmpty) Tree.copy(target)(tpe = Type.of(target).resultType)
-          else argss.map(_.toList).foldLeft(target)(apply)
+          else argss.foldLeft(target)(apply)
         } else apply(TypeApp(target, targs: _*))(argss: _*)
       }
 
@@ -452,6 +452,9 @@ trait Terms { this: AST =>
       }
 
       def unapply(block: u.Block): Option[(Seq[u.Tree], u.Tree)] = block match {
+        // Avoid matching loop bodies
+        case DoWhileBody(_, _, _) => None
+        case u.Block(_ :: Nil, TermApp(Id(LabelSym(_)), Seq(), Seq())) => None
         case u.Block(stats, Term(expr)) => Some(stats, expr)
         case _ => None
       }
@@ -486,6 +489,9 @@ trait Terms { this: AST =>
       }
 
       def unapply(branch: u.If): Option[(u.Tree, u.Tree, u.Tree)] = branch match {
+        // Avoid matching loop branches
+        case WhileBody(_, _, _) => None
+        case u.If(_, TermApp(Id(LabelSym(_)), Seq(), Seq()), Lit(())) => None
         case u.If(Term(cond), Term(thn), Term(els)) => Some(cond, thn, els)
         case _ => None
       }
