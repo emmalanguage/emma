@@ -14,7 +14,7 @@ private[comprehension] trait Normalize extends Common {
   import Core.{Lang => core}
 
   type NormAttr = Attr[normAttr.Acc, normAttr.Inh, normAttr.Syn]
-  lazy val normAttr = api.BottomUp.exhaust.withDefs.withUses
+  lazy val normAttr = api.BottomUp.exhaust.withValDefs.withValUses
 
   private[comprehension] object Normalize {
 

@@ -239,14 +239,54 @@ trait Transversers { this: AST =>
         if template.isDefinedAt(t) => template(t)
       }
 
+    /** Inherits the parent of the current node. */
+    def withParent = inherit {
+      case parent => parent
+    } (Monoids.right(api.Empty()))
+
     /** Inherits all ancestors of the current node in a vector. */
     def withAncestors = inherit(Attr.collect[Vector, Tree] {
       case ancestor => ancestor
     })
 
-    /** Synthesizes all binding definitions contained in the current node and its children. */
+    /** Inherits the owner of the current node. */
+    def withOwner = inherit {
+      case api.Owner(sym) => sym
+    } (Monoids.right(get.enclosingOwner))
+
+    /** Inherits the owner chain of the current node. */
+    def withOwnerChain = inherit(Attr.collect[Vector, Symbol] {
+      case api.Owner(sym) => sym
+    })
+
+    /** Synthesizes all term definitions contained in the current node and its children. */
     def withDefs = synthesize(Attr.group {
+      case defn @ api.TermDef(sym) => sym -> defn
+    })
+
+    /** Synthesizes all binding definitions contained in the current node and its children. */
+    def withBindDefs = synthesize(Attr.group {
       case bind @ api.BindingDef(lhs, _, _) => lhs -> bind
+    })
+
+    /** Synthesizes all value definitions contained in the current node and its children. */
+    def withValDefs = synthesize(Attr.group {
+      case value @ api.ValDef(lhs, _, _) => lhs -> value
+    })
+
+    /** Synthesizes all variable definitions contained in the current node and its children. */
+    def withVarDefs = synthesize(Attr.group {
+      case variable @ api.VarDef(lhs, _, _) => lhs -> variable
+    })
+
+    /** Synthesizes all parameter definitions contained in the current node and its children. */
+    def withParDefs = synthesize(Attr.group {
+      case param @ api.ParDef(lhs, _, _) => lhs -> param
+    })
+
+    /** Synthesizes all method definitions contained in the current node and its children. */
+    def withDefDefs = synthesize(Attr.group {
+      case defn @ api.DefDef(method, _, _, _, _) => method -> defn
     })
 
     /** Counts all term references contained in the current node and its children. */
@@ -254,15 +294,35 @@ trait Transversers { this: AST =>
       case api.TermRef(target) => target -> 1
     })(Monoids.merge)
 
-    /** Inherits the owner of the current node. */
-    def withOwner = inherit {
-      case api.Owner(sym) => sym
-    } (Monoids.right(get.enclosingOwner))
+    /** Counts all binding references contained in the current node and its children. */
+    def withBindUses = synthesize(Attr.group {
+      case api.BindingRef(target) => target -> 1
+    })(Monoids.merge)
 
-    /** Inherits the parent of the current node. */
-    def withParent = inherit {
-      case parent => parent
-    } (Monoids.right(api.Empty()))
+    /** Counts all value references contained in the current node and its children. */
+    def withValUses = synthesize(Attr.group {
+      case api.ValRef(target) => target -> 1
+    })(Monoids.merge)
+
+    /** Counts all variable references contained in the current node and its children. */
+    def withVarUses = synthesize(Attr.group {
+      case api.VarRef(target) => target -> 1
+    })(Monoids.merge)
+
+    /** Counts all parameter references contained in the current node and its children. */
+    def withParUses = synthesize(Attr.group {
+      case api.ParRef(target) => target -> 1
+    })(Monoids.merge)
+
+    /** Counts all variable assignments contained in the current node and its children. */
+    def withAssignments = synthesize(Attr.group {
+      case api.VarMut(lhs, _) => lhs -> 1
+    })(Monoids.merge)
+
+    /** Counts all method calls contained in the current node and its children. */
+    def withDefCalls = synthesize(Attr.group {
+      case api.DefCall(_, method, _, _*) => method -> 1
+    })(Monoids.merge)
   }
 
   /** An abstract transformation (default is top-down break). */
