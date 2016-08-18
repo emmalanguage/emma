@@ -6,7 +6,6 @@ import cats.Monoid
 import shapeless._
 import util._
 
-import scala.Function.const
 import scala.annotation.tailrec
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
@@ -17,9 +16,6 @@ trait Transversers { this: AST =>
 
   import universe._
   import Monoids._
-
-  private def unit[A]: A => Unit =
-    const(())
 
   private def complete[A, R](pf: A =?> R)(args: A)(default: => R): R =
     pf.applyOrElse(args, (_: A) => default)
@@ -348,6 +344,17 @@ trait Transversers { this: AST =>
       case _ =>
         super.transform(tree)
     })
+
+    protected final def accTransform(tree: Tree): Tree = {
+      accumulate(tree)
+      complete(transformation)(tree)(tree)
+    }
+
+    @tailrec
+    protected final def fixTransform(tree: Tree): Tree = {
+      val recur = accTransform(tree)
+      if (tree == recur) tree else fixTransform(recur)
+    }
   }
 
   /** An abstract traversal (default is top-down break). */
@@ -366,6 +373,17 @@ trait Transversers { this: AST =>
       case tpt: TypeTree if tpt.original != null => traverse(tpt.original)
       case _ => super.traverse(tree)
     })
+
+    protected final def accTraverse(tree: Tree): Unit = {
+      accumulate(tree)
+      complete(traversal)(tree)(())
+    }
+
+    protected final def fixTraverse(tree: Tree): Unit =
+      while (true) {
+        accumulate(tree)
+        traversal.applyOrElse(tree, return)
+      }
   }
 
   /** A traversal / transformation factory. */
@@ -419,6 +437,24 @@ trait Transversers { this: AST =>
           : Transform[A, I, S]
           = Transform.topDown.break(grammar)(template)
       }
+
+      /** Top-down exhaustive traversal / transformation. */
+      object exhaust extends TransFactory {
+
+        /** Top-down exhaustive traversal. */
+        override def traversal[A <: HList, I <: HList, S <: HList]
+          (grammar: AttrGrammar[A, I, S])
+          (callback: Attr[A, I, S] =?> Any)
+          : Traversal[A, I, S]
+          = Traversal.topDown.exhaust(grammar)(callback)
+
+        /** Top-down exhaustive transformation. */
+        override def transform[A <: HList, I <: HList, S <: HList]
+          (grammar: AttrGrammar[A, I, S])
+          (template: Attr[A, I, S] =?> Tree)
+          : Transform[A, I, S]
+          = Transform.topDown.exhaust(grammar)(template)
+      }
     }
 
     /** Bottom-up traversal / transformation. */
@@ -456,17 +492,17 @@ trait Transversers { this: AST =>
           = Transform.bottomUp.break(grammar)(template)
       }
 
-      /** Bottom-up exhaust traversal / transformation. */
+      /** Bottom-up exhaustive traversal / transformation. */
       object exhaust extends TransFactory {
 
-        /** Bottom-up break traversal. */
+        /** Bottom-up exhaustive traversal. */
         override def traversal[A <: HList, I <: HList, S <: HList]
           (grammar: AttrGrammar[A, I, S])
           (callback: Attr[A, I, S] =?> Any)
           : Traversal[A, I, S]
           = Traversal.bottomUp.exhaust(grammar)(callback)
 
-        /** Bottom-up break transformation. */
+        /** Bottom-up exhaustive transformation. */
         override def transform[A <: HList, I <: HList, S <: HList]
           (grammar: AttrGrammar[A, I, S])
           (template: Attr[A, I, S] =?> Tree)
@@ -486,10 +522,16 @@ trait Transversers { this: AST =>
       def apply[A <: HList, I <: HList, S <: HList]
         (grammar: AttrGrammar[A, I, S])(template: Attr[A, I, S] =?> Tree)
         : Transform[A, I, S] = new Transform[A, I, S](grammar, template) {
-          override final def transform(tree: Tree): Tree = {
-            accumulate(tree)
-            super.transform(complete(transformation)(tree)(tree))
-          }
+          override final def transform(tree: Tree): Tree =
+            super.transform(accTransform(tree))
+        }
+
+      /** Top-down exhaustive transformation. */
+      def exhaust[A <: HList, I <: HList, S <: HList]
+        (grammar: AttrGrammar[A, I, S])(template: Attr[A, I, S] =?> Tree)
+        : Transform[A, I, S] = new Transform[A, I, S](grammar, template) {
+          override final def transform(tree: Tree): Tree =
+            super.transform(fixTransform(tree))
         }
 
       /** Top-down break transformation. */
@@ -510,29 +552,16 @@ trait Transversers { this: AST =>
       def apply[A <: HList, I <: HList, S <: HList]
         (grammar: AttrGrammar[A, I, S])(template: Attr[A, I, S] =?> Tree)
         : Transform[A, I, S] = new Transform[A, I, S](grammar, template) {
-          override final def transform(tree: Tree): Tree = {
-            val recur = super.transform(tree)
-            accumulate(recur)
-            complete(transformation)(recur)(recur)
-          }
+          override final def transform(tree: Tree): Tree =
+            accTransform(super.transform(tree))
         }
 
       /** Bottom-up exhaustive transformation. */
       def exhaust[A <: HList, I <: HList, S <: HList]
         (grammar: AttrGrammar[A, I, S])(template: Attr[A, I, S] =?> Tree)
         : Transform[A, I, S] = new Transform[A, I, S](grammar, template) {
-          override final def transform(tree: Tree): Tree = {
-            fix(tree)
-          }
-
-          @tailrec
-          def fix(tree: Tree): Tree = {
-            val recur = super.transform(tree)
-            accumulate(recur)
-            val compl = complete(transformation)(recur)(recur)
-            if (compl != recur) fix(compl)
-            else recur
-          }
+          override final def transform(tree: Tree): Tree =
+            fixTransform(super.transform(tree))
         }
 
       /** Bottom-up break transformation. */
@@ -570,8 +599,17 @@ trait Transversers { this: AST =>
         (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Any)
         : Traversal[A, I, S] = new Traversal[A, I, S](grammar, callback) {
           override final def traverse(tree: Tree): Unit = {
-            accumulate(tree)
-            traversal.applyOrElse(tree, unit[Tree])
+            accTraverse(tree)
+            super.traverse(tree)
+          }
+        }
+
+      /** Top-down exhaustive traversal. */
+      def exhaust[A <: HList, I <: HList, S <: HList]
+        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Any)
+        : Traversal[A, I, S] = new Traversal[A, I, S](grammar, callback) {
+          override final def traverse(tree: Tree): Unit = {
+            fixTraverse(tree)
             super.traverse(tree)
           }
         }
@@ -596,28 +634,17 @@ trait Transversers { this: AST =>
         : Traversal[A, I, S] = new Traversal[A, I, S](grammar, callback) {
           override final def traverse(tree: Tree): Unit = {
             super.traverse(tree)
-            accumulate(tree)
-            traversal.applyOrElse(tree, unit[Tree])
+            accTraverse(tree)
           }
         }
 
-      /** Bottom-up exhaust traversal. */
+      /** Bottom-up exhaustive traversal. */
       def exhaust[A <: HList, I <: HList, S <: HList]
         (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Any)
         : Traversal[A, I, S] = new Traversal[A, I, S](grammar, callback) {
           override final def traverse(tree: Tree): Unit = {
-            fix(tree)
-          }
-
-          @tailrec
-          def fix(tree: Tree): Unit = {
             super.traverse(tree)
-            accumulate(tree)
-            traversal.applyOrElse(tree, unit[Tree])
-            if (traversal.isDefinedAt(tree)) {
-              traversal(tree)
-              fix(tree)
-            }
+            fixTraverse(tree)
           }
         }
 
@@ -732,6 +759,11 @@ trait Transversers { this: AST =>
       object break extends Strategy[HNil, HNil, HNil](
           new AttrGrammar[HNil, HNil, HNil](),
           TransFactory.topDown.break)
+
+      /** Top-down exhaustive traversal / transformation and attribute generation. */
+      object exhaust extends Strategy[HNil, HNil, HNil](
+          new AttrGrammar[HNil, HNil, HNil](),
+          TransFactory.topDown.exhaust)
     }
 
     /** Bottom-up traversal / transformation and attribute generation. */
