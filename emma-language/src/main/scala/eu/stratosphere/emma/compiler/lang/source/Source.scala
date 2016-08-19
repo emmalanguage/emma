@@ -6,6 +6,7 @@ import compiler.Common
 
 /** Source language. */
 trait Source extends Common
+  with Foreach2Loop
   with SourceValidate {
 
   // -------------------------------------------------------------------------
@@ -150,5 +151,13 @@ trait Source extends Common
     /** Delegates to [[SourceValidate.valid]]. */
     def validate(tree: u.Tree): Boolean =
       valid(tree).isGood
+
+    // -------------------------------------------------------------------------
+    // Source -> Source transformations API
+    // -------------------------------------------------------------------------
+
+    /** Delegates to [[Foreach2Loop.transform()]]. */
+    def foreach2loop(tree: u.Tree): u.Tree =
+      Foreach2Loop.transform(tree)
   }
 }
