@@ -1,8 +1,8 @@
 package eu.stratosphere.emma
 package compiler.lang.core
 
-import compiler.lang.source.Source
 import compiler.Common
+import compiler.lang.source.Source
 import util.Monoids
 
 import shapeless._

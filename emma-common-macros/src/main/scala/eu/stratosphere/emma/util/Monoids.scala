@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.util
+package eu.stratosphere.emma
+package util
 
 import cats.Monoid
 import cats.implicits._
