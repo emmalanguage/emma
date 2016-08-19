@@ -16,7 +16,7 @@ private[core] trait DCE extends Common {
      * Eliminates unused valdefs (dead code) from a [[Tree]].
      *
      * == Preconditions ==
-     * - The input `tree` is in ANF (see [[Core.anf()]]).
+     * - The input `tree` is in ANF (see [[ANF.transform]]).
      *
      * == Postconditions ==
      * - All unused valdefs are pruned.

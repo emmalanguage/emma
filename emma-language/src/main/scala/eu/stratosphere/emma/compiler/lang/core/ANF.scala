@@ -21,7 +21,7 @@ private[core] trait ANF extends Common {
   private[core] object ANF {
 
     /** Ensures that all definitions within `tree` have unique names. */
-    def resolveNameClashes(tree: u.Tree): u.Tree =
+    val resolveNameClashes: u.Tree => u.Tree = (tree: u.Tree) =>
       api.Tree.refresh(nameClashes(tree): _*)(tree)
 
     /** Attributes required by the ANF transformation. */
@@ -163,26 +163,25 @@ private[core] trait ANF extends Common {
      * - Introduces dedicated symbols for chains of length greater than one.
      * - Ensures that all function arguments are trivial identifiers.
      *
-     * @param tree The tree to be converted.
      * @return An ANF version of the input tree.
      */
-    def anf(tree: u.Tree): u.Tree = {
+    lazy val transform: u.Tree => u.Tree = (tree: u.Tree) => {
       lazy val clashes = nameClashes(tree)
       assert(clashes.isEmpty, s"Tree has name clashes:\n${clashes.mkString(", ")}")
       anfTransform(tree)
     }
 
     /**
-     * Inlines `Ident` return expressions in blocks whenever referred symbol is used only once.
+     * Inlines `Ident` return expressions in blocks whenever the referred symbol is used only once.
      * The resulting tree is said to be in ''simplified ANF'' form.
      *
      * == Preconditions ==
-     * - The input `tree` is in ANF (see [[Core.anf()]]).
+     * - The input `tree` is in ANF (see [[transform]]).
      *
      * == Postconditions ==
      * - `Ident` return expressions in blocks have been inlined whenever possible.
      */
-    lazy val simplify: u.Tree => u.Tree =
+    lazy val inlineLetExprs: u.Tree => u.Tree =
       api.BottomUp.withValDefs.withValUses.transformWith {
         case Attr.syn(src.Block(stats, src.ValRef(target)), uses :: defs :: _)
           if defs.contains(target) && uses(target) == 1 =>
@@ -192,17 +191,18 @@ private[core] trait ANF extends Common {
 
     /**
      * Introduces `Ident` return expressions in blocks whenever the original expr is not a ref or
-     * literal.The opposite of [[simplify]].
+     * literal.The opposite of [[inlineLetExprs]].
      *
      * == Preconditions ==
-     * - The input `tree` is in ANF (see [[Core.anf()]]).
+     * - The input `tree` is in ANF (see [[transform]]).
      *
      * == Postconditions ==
      * - `Ident` return expressions in blocks have been introduced whenever possible.
      */
-    lazy val unsimplify: u.Tree => u.Tree =
+    lazy val uninlineLetExprs: u.Tree => u.Tree =
       api.BottomUp.withOwner.transformWith {
-        case Attr.none(let @ core.Let(_, _, core.Ref(_) | core.Lit(_))) => let
+        case Attr.none(let @ core.Let(_, _, core.Ref(_) | core.Lit(_))) =>
+          let
         case Attr.inh(core.Let(vals, defs, expr), owner :: _) =>
           val nme = api.TermName.fresh("x")
           val lhs = api.ValSym(owner, nme, expr.tpe)
@@ -215,7 +215,7 @@ private[core] trait ANF extends Common {
      * Eliminates trivial type ascriptions.
      *
      * == Preconditions ==
-     * - The input `tree` is in ANF (see [[Core.anf()]]).
+     * - The input `tree` is in ANF (see [[transform]]).
      *
      * == Postconditions ==
      * - Trivial type ascriptions have been inlined.
@@ -256,8 +256,8 @@ private[core] trait ANF extends Common {
      * Un-nests nested blocks.
      *
      * == Preconditions ==
-     * - Except the nested blocks, the input tree is in simplified ANF form (see [[anf()]] and
-     * [[simplify()]]).
+     * - Except the nested blocks, the input tree is in simplified ANF form (see [[transform]] and
+     * [[inlineLetExprs]]).
      *
      * == Postconditions ==
      * - A simplified ANF tree where all nested blocks have been flattened.

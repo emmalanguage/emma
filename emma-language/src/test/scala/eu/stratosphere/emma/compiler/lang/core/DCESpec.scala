@@ -13,31 +13,26 @@ class DCESpec extends BaseCompilerSpec {
   import compiler._
   import universe._
 
-  def typeCheckAndDCE[T]: Expr[T] => Tree = {
-    (_: Expr[T]).tree
-  } andThen {
-    Type.check(_)
-  } andThen {
-    Core.destructPatternMatches
-  } andThen {
-    Core.resolveNameClashes
-  } andThen {
-    Core.anf
-  } andThen {
-    time(Core.dce(_), "dce")
-  } andThen {
-    Owner.at(Owner.enclosing)
-  }
+  val dcePipeline: u.Expr[Any] => u.Tree =
+    compiler.pipeline(typeCheck = true)(
+      ANF.resolveNameClashes,
+      ANF.transform,
+      tree => time(DCE.dce(tree), "dce")
+    ).compose(_.tree)
+
+  val idPipeline: u.Expr[Any] => u.Tree =
+    compiler.identity(typeCheck = true)
+      .compose(_.tree)
 
   "eliminate unused valdefs" - {
 
     "directly" in {
-      val act = typeCheckAndDCE(reify {
+      val act = dcePipeline(reify {
         val x = 15
         15 * t._1
       })
 
-      val exp = typeCheck(reify {
+      val exp = idPipeline(reify {
         val x$1 = t
         val x$2 = x$1._1
         val x$3 = 15 * x$2
@@ -48,13 +43,13 @@ class DCESpec extends BaseCompilerSpec {
     }
 
     "transitively" in {
-      val act = typeCheckAndDCE(reify {
+      val act = dcePipeline(reify {
         val x = 15
         val y = 2 * x
         15 * t._1
       })
 
-      val exp = typeCheck(reify {
+      val exp = idPipeline(reify {
         val x$1 = t
         val x$2 = x$1._1
         val x$3 = 15 * x$2

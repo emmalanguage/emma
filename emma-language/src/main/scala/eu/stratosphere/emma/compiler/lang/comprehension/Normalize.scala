@@ -252,9 +252,7 @@ private[comprehension] trait Normalize extends Common {
           (core.ValDef(from, _, _), core.ValDef(to, _, _)) <- prefix zip fresh
         } yield from -> to
 
-        (api.Tree.rename(aliases: _*) andThen {
-          Core.simplify _
-        }) (
+        (api.Tree.rename(aliases: _*) andThen Core.inlineLetExprs) (
           core.Let(fresh ++ vals: _*)(defs: _*)(expr)
         ).asInstanceOf[u.Block]
     }

@@ -18,28 +18,24 @@ class NormalizeSpec extends BaseCompilerSpec {
   import compiler._
   import universe._
 
-  val anf: Expr[Any] => Tree =
+  val liftPipeline: Expr[Any] => Tree =
     compiler.pipeline(typeCheck = true)(
-      Core.resolveNameClashes,
-      Core.anf,
-      Core.simplify
-    ).compose(_.tree)
-
-  val resugar: Expr[Any] => Tree =
-    compiler.pipeline(typeCheck = true)(
-      Core.resolveNameClashes,
-      Core.anf,
-      Comprehension.resugar(API.bagSymbol),
-      Core.simplify
-    ).compose(_.tree)
-
-  val normalize: Expr[Any] => Tree =
-    compiler.pipeline(typeCheck = true)(
-      Core.resolveNameClashes,
-      Core.anf,
       Core.lift,
-      Core.simplify,
+      Core.inlineLetExprs
+    ).compose(_.tree)
+
+  val resugarPipeline: Expr[Any] => Tree =
+    compiler.pipeline(typeCheck = true)(
+      Core.lift,
       Comprehension.resugar(API.bagSymbol),
+      Core.inlineLetExprs
+    ).compose(_.tree)
+
+  val normalizePipeline: Expr[Any] => Tree =
+    compiler.pipeline(typeCheck = true)(
+      Core.lift,
+      Comprehension.resugar(API.bagSymbol),
+      Core.inlineLetExprs,
       tree => time(Comprehension.normalize(API.bagSymbol)(tree), "normalize")
     ).compose(_.tree)
 
@@ -471,37 +467,37 @@ class NormalizeSpec extends BaseCompilerSpec {
 
   "normalize hard-coded comprehensions" - {
     "with two generators" in {
-      normalize(inp1) shouldBe alphaEqTo(anf(exp1))
+      normalizePipeline(inp1) shouldBe alphaEqTo(liftPipeline(exp1))
     }
     "with three generators" in {
-      normalize(inp2) shouldBe alphaEqTo(anf(exp2))
+      normalizePipeline(inp2) shouldBe alphaEqTo(liftPipeline(exp2))
     }
     "with three generators and two filters" in {
-      normalize(inp3) shouldBe alphaEqTo(anf(exp3))
+      normalizePipeline(inp3) shouldBe alphaEqTo(liftPipeline(exp3))
     }
   }
 
   "normalize resugared comprehensions" - {
     "with three generators and two filters at the end" in {
-      normalize(inp4) shouldBe alphaEqTo(resugar(exp4))
+      normalizePipeline(inp4) shouldBe alphaEqTo(resugarPipeline(exp4))
     }
     "with three generators and two interleaved filters" in {
-      normalize(inp5) shouldBe alphaEqTo(resugar(exp5))
+      normalizePipeline(inp5) shouldBe alphaEqTo(resugarPipeline(exp5))
     }
     "with one patmat generator and no filters" in {
-      normalize(inp6) shouldBe alphaEqTo(resugar(exp6))
+      normalizePipeline(inp6) shouldBe alphaEqTo(resugarPipeline(exp6))
     }
     "with two patmat generators and one filter (at the end)" in {
-      normalize(inp7) shouldBe alphaEqTo(resugar(exp7))
+      normalizePipeline(inp7) shouldBe alphaEqTo(resugarPipeline(exp7))
     }
     "with two patmat generators and one filter (itermediate result)" in {
-      normalize(inp8) shouldBe alphaEqTo(resugar(exp8))
+      normalizePipeline(inp8) shouldBe alphaEqTo(resugarPipeline(exp8))
     }
     "with two correlated generators and no filters" in {
-      normalize(inp9) shouldBe alphaEqTo(resugar(exp9))
+      normalizePipeline(inp9) shouldBe alphaEqTo(resugarPipeline(exp9))
     }
     "with a dag-shaped self-join" in {
-      normalize(inp10) shouldBe alphaEqTo(resugar(exp10))
+      normalizePipeline(inp10) shouldBe alphaEqTo(resugarPipeline(exp10))
     }
   }
 
@@ -515,7 +511,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       val output = "output"
       implicit val csv = implicitly[CSVConverters[Edge[Long]]]
 
-      val act = normalize(u.reify {
+      val act = normalizePipeline(u.reify {
         // read in a directed graph
         var edges = read(input, new CSVInputFormat[Edge[Long]]).distinct()
         var count = edges.size
@@ -536,7 +532,7 @@ class NormalizeSpec extends BaseCompilerSpec {
         write(output, new CSVOutputFormat[Edge[Long]])(edges)
       })
 
-      val exp = anf(u.reify {
+      val exp = liftPipeline(u.reify {
         // read in a directed graph
         val edges$1 = read(input, new CSVInputFormat[Edge[Long]]).distinct()
         val count$1 = edges$1.size

@@ -11,22 +11,22 @@ class Foreach2LoopSpec extends BaseCompilerSpec {
 
   import compiler._
 
-  val foreach2loop: u.Expr[Any] => u.Tree =
+  val foreach2loopPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true) {
       tree => time(Foreach2Loop.transform(tree), "foreach -> loop")
     }.compose(_.tree)
 
-  val id: u.Expr[Any] => u.Tree =
+  val idPipeline: u.Expr[Any] => u.Tree =
     compiler.identity(typeCheck = true)
       .compose(_.tree)
 
   "foreach" - {
     "without closure modification" in {
-      val act = foreach2loop(u.reify {
+      val act = foreach2loopPipeline(u.reify {
         for (i <- 1 to 5) println(i)
       })
 
-      val exp = id(u.reify {
+      val exp = idPipeline(u.reify {
         for (i <- 1 to 5) println(i)
       })
 
@@ -34,12 +34,12 @@ class Foreach2LoopSpec extends BaseCompilerSpec {
     }
 
     "without argument access" in {
-      val act = foreach2loop(u.reify {
+      val act = foreach2loopPipeline(u.reify {
         var x = 42
         for (_ <- 1 to 5) x += 1
       })
 
-      val exp = id(u.reify {
+      val exp = idPipeline(u.reify {
         var x = 42; {
           val iter$1 = 1.to(5).toIterator
           var _$1 = null.asInstanceOf[Int]
@@ -54,12 +54,12 @@ class Foreach2LoopSpec extends BaseCompilerSpec {
     }
 
     "with argument access" in {
-      val act = foreach2loop(u.reify {
+      val act = foreach2loopPipeline(u.reify {
         var x = 42
         for (i <- 1 to 5) x += i
       })
 
-      val exp = id(u.reify {
+      val exp = idPipeline(u.reify {
         var x = 42; {
           val iter$1 = 1.to(5).toIterator
           var i$1 = null.asInstanceOf[Int]
@@ -74,12 +74,12 @@ class Foreach2LoopSpec extends BaseCompilerSpec {
     }
 
     "with monadic filter" in {
-      val act = foreach2loop(u.reify {
+      val act = foreach2loopPipeline(u.reify {
         var x = 42
         for (i <- 1 to 10 if i % 2 == 0) x += i
       })
 
-      val exp = id(u.reify {
+      val exp = idPipeline(u.reify {
         var x = 42; {
           val iter$1 = 1.to(10)
             .withFilter(_ % 2 == 0)

@@ -1,18 +1,19 @@
 package eu.stratosphere.emma
-package compiler.lang.core
+package compiler.lang.source
 
 import compiler.Common
-import compiler.lang.source.Source
+import compiler.lang.core.Core
+
 import shapeless._
 
 /** Pattern matching destructuring for the Core language. */
-private[core] trait PatternMatching extends Common {
-  self: Core with Source =>
+private[source] trait PatternMatching extends Common {
+  self: Source =>
 
-  import UniverseImplicits._
   import Source.{Lang => src}
+  import UniverseImplicits._
 
-  private[core] object PatternMatching {
+  private[source] object PatternMatching {
 
     /**
      * Eliminates irrefutable pattern matches by replacing them with value definitions corresponding
@@ -38,7 +39,7 @@ private[core] trait PatternMatching extends Common {
      *   }
      * }}}
      */
-    lazy val destructPatternMatches: u.Tree => u.Tree =
+    lazy val destruct: u.Tree => u.Tree =
       api.BottomUp.withOwner.transformWith {
         case Attr.inh(
           mat @ src.PatMat(target withType tpe, src.PatCase(pat, src.Empty(_), body), _*),

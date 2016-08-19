@@ -23,7 +23,7 @@ trait Compiler extends AlphaEq with Source with Core {
     fixLambdaTypes
       .andThen(unQualifyStaticModules)
       .andThen(normalizeStatements)
-      .andThen(Core.destructPatternMatches)
+      .andThen(Source.normalize)
 
   /** Brings a tree into a form acceptable for `scalac` after being transformed. */
   lazy val postProcess: u.Tree => u.Tree =

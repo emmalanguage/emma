@@ -15,18 +15,17 @@ class DSCFSpec extends BaseCompilerSpec {
 
   val dscfPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
-      Source.foreach2loop,
       ANF.resolveNameClashes,
-      ANF.anf,
+      ANF.transform,
       tree => time(DSCF.transform(tree), "dscf"),
-      ANF.simplify
+      ANF.inlineLetExprs
     ).compose(_.tree)
 
   val anfPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
       ANF.resolveNameClashes,
-      ANF.anf,
-      ANF.simplify
+      ANF.transform,
+      ANF.inlineLetExprs
     ).compose(_.tree)
 
   val idPipeline: u.Expr[Any] => u.Tree =

@@ -20,26 +20,23 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // Helper methods
   // ---------------------------------------------------------------------------
 
-  val anf: Expr[Any] => Tree =
+  val anfPipeline: Expr[Any] => Tree =
     compiler.pipeline(typeCheck = true)(
-      Core.resolveNameClashes,
-      Core.anf
+      Core.lift
     ).compose(_.tree)
 
-  val resugar: Expr[Any] => Tree = {
+  val resugarPipeline: Expr[Any] => Tree = {
     val resugar = Comprehension.resugar(API.bagSymbol)
     compiler.pipeline(typeCheck = true)(
-      Core.resolveNameClashes,
-      Core.anf,
+      Core.lift,
       tree => time(resugar(tree), "resugar")
     ).compose(_.tree)
   }
 
-  val desugar: Expr[Any] => Tree = {
+  val desugarPipeline: Expr[Any] => Tree = {
     val desugar = Comprehension.desugar(API.bagSymbol)
     compiler.pipeline(typeCheck = true)(
-      Core.resolveNameClashes,
-      Core.anf,
+      Core.lift,
       tree => time(desugar(tree), "desugar")
     ).compose(_.tree)
   }
@@ -261,23 +258,23 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   "resugar" - {
 
     "map" in {
-      resugar(des1) shouldBe alphaEqTo(anf(res1))
+      resugarPipeline(des1) shouldBe alphaEqTo(anfPipeline(res1))
     }
     "flatMap" in {
-      resugar(des2) shouldBe alphaEqTo(anf(res2))
+      resugarPipeline(des2) shouldBe alphaEqTo(anfPipeline(res2))
     }
     "withFilter" in {
-      resugar(des3) shouldBe alphaEqTo(anf(res3))
+      resugarPipeline(des3) shouldBe alphaEqTo(anfPipeline(res3))
     }
     "nested (flat)maps" - {
       "with two generators" in {
-        resugar(des4) shouldBe alphaEqTo(anf(res4))
+        resugarPipeline(des4) shouldBe alphaEqTo(anfPipeline(res4))
       }
       "with three generators" in {
-        resugar(des5) shouldBe alphaEqTo(anf(res5))
+        resugarPipeline(des5) shouldBe alphaEqTo(anfPipeline(res5))
       }
       "with three generators and one filter" in {
-        resugar(des6) shouldBe alphaEqTo(anf(res6))
+        resugarPipeline(des6) shouldBe alphaEqTo(anfPipeline(res6))
       }
     }
   }
@@ -285,23 +282,23 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   "desugar" - {
 
     "map" in {
-      desugar(res1) shouldBe alphaEqTo(anf(des1))
+      desugarPipeline(res1) shouldBe alphaEqTo(anfPipeline(des1))
     }
     "flatMap" in {
-      desugar(res2) shouldBe alphaEqTo(anf(des2))
+      desugarPipeline(res2) shouldBe alphaEqTo(anfPipeline(des2))
     }
     "withFilter" in {
-      desugar(res3) shouldBe alphaEqTo(anf(des3))
+      desugarPipeline(res3) shouldBe alphaEqTo(anfPipeline(des3))
     }
     "nested (flat)maps" - {
       "with two generators" in {
-        desugar(res4) shouldBe alphaEqTo(anf(des4))
+        desugarPipeline(res4) shouldBe alphaEqTo(anfPipeline(des4))
       }
       "with three generators" in {
-        desugar(res5) shouldBe alphaEqTo(anf(des5))
+        desugarPipeline(res5) shouldBe alphaEqTo(anfPipeline(des5))
       }
       "with three generators and one filter" in {
-        desugar(res6) shouldBe alphaEqTo(anf(des6))
+        desugarPipeline(res6) shouldBe alphaEqTo(anfPipeline(des6))
       }
     }
   }

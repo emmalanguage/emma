@@ -19,7 +19,7 @@ private[core] trait CSE extends Common {
      * Eliminates common subexpressions from a [[Tree]].
      *
      * == Preconditions ==
-     * - The input `tree` is in ANF (see [[Core.anf()]]).
+     * - The input `tree` is in ANF (see [[ANF.transform]]).
      *
      * == Postconditions ==
      * - All common subexpressions and corresponding intermediate values are pruned.

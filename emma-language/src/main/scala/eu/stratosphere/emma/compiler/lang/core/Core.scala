@@ -12,7 +12,6 @@ trait Core extends Common
   with DCE
   with DSCF
   with Pickling
-  with PatternMatching
   with CoreValidate
   with Comprehension {
   this: Source =>
@@ -247,11 +246,10 @@ trait Core extends Common
     // -------------------------------------------------------------------------
 
     /** Delegates to [[CoreValidate.valid]]. */
-    val valid = CoreValidate.valid
+    lazy val valid = CoreValidate.valid
 
     /** Delegates to [[CoreValidate.valid]]. */
-    def validate(tree: u.Tree): Boolean =
-      valid(tree).isGood
+    lazy val validate = (tree: u.Tree) => valid(tree).isGood
 
     // -------------------------------------------------------------------------
     // LNF API
@@ -260,36 +258,28 @@ trait Core extends Common
     /**
      * Delegates to [[DSCF.transform()]].
      **/
-    def lift(tree: u.Tree): u.Tree =
-      DSCF.transform(tree)
+    lazy val lift: u.Tree => u.Tree = {
+      ANF.resolveNameClashes
+    } andThen {
+      ANF.transform
+    } andThen {
+      DSCF.transform
+    }
 
     /** TODO. */
-    def lower(tree: u.Tree): u.Tree =
-      tree
+    lazy val lower = identity[u.Tree] _
 
-    /** Delegates to [[ANF.resolveNameClashes()]]. */
-    def resolveNameClashes(tree: u.Tree): u.Tree =
-      ANF.resolveNameClashes(tree)
+    /** Delegates to [[ANF.flatten]]. */
+    lazy val flatten = ANF.flatten
 
-    /** Delegates to [[ANF.anf()]]. */
-    def anf(tree: u.Tree): u.Tree =
-      ANF.anf(tree)
+    /** Delegates to [[ANF.inlineLetExprs]]. */
+    lazy val inlineLetExprs = ANF.inlineLetExprs
 
-    /** Delegates to [[ANF.flatten()]]. */
-    def flatten(tree: u.Tree): u.Tree =
-      ANF.flatten(tree)
+    /** Delegates to [[ANF.uninlineLetExprs]]. */
+    lazy val uninlineLetExprs = ANF.uninlineLetExprs
 
-    /** Delegates to [[ANF.simplify()]]. */
-    def simplify(tree: u.Tree): u.Tree =
-      ANF.simplify(tree)
-
-    /** Delegates to [[ANF.unsimplify()]]. */
-    def unsimplify(tree: u.Tree): u.Tree =
-      ANF.unsimplify(tree)
-
-    /** Delegates to [[ANF.removeTrivialTypeAscrs()]]. */
-    def removeTrivialTypeAscrs(tree: u.Tree): u.Tree =
-      ANF.removeTrivialTypeAscrs(tree)
+    /** Delegates to [[ANF.removeTrivialTypeAscrs]]. */
+    lazy val removeTrivialTypeAscrs = ANF.removeTrivialTypeAscrs
 
     // -------------------------------------------------------------------------
     // DCE API
@@ -306,14 +296,6 @@ trait Core extends Common
     /** Delegates to [[DCE.dce()]]. */
     def cse(tree: u.Tree): u.Tree =
       CSE.cse(tree)
-
-    // -------------------------------------------------------------------------
-    // PatternMatching API
-    // -------------------------------------------------------------------------
-
-    /** Delegates to [[PatternMatching.destructPatternMatches]]. */
-    lazy val destructPatternMatches: u.Tree => u.Tree =
-      PatternMatching.destructPatternMatches
 
     // -------------------------------------------------------------------------
     // Pickling API

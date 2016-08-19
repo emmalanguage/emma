@@ -7,6 +7,7 @@ import compiler.Common
 /** Source language. */
 trait Source extends Common
   with Foreach2Loop
+  with PatternMatching
   with SourceValidate {
 
   // -------------------------------------------------------------------------
@@ -149,15 +150,23 @@ trait Source extends Common
     lazy val valid = SourceValidate.valid
 
     /** Delegates to [[SourceValidate.valid]]. */
-    def validate(tree: u.Tree): Boolean =
-      valid(tree).isGood
+    lazy val validate = (tree: u.Tree) => valid(tree).isGood
 
     // -------------------------------------------------------------------------
     // Source -> Source transformations API
     // -------------------------------------------------------------------------
 
-    /** Delegates to [[Foreach2Loop.transform()]]. */
-    def foreach2loop(tree: u.Tree): u.Tree =
-      Foreach2Loop.transform(tree)
+    /**
+     * Applies the following chain of transformations in order to bring the
+     * Source tree into a regular form.
+     *
+     * - [[PatternMatching.destruct]]
+     * - [[Foreach2Loop.transform]]
+     */
+    lazy val normalize = {
+      PatternMatching.destruct
+    } andThen {
+      Foreach2Loop.transform
+    }
   }
 }

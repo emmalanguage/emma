@@ -10,7 +10,7 @@ import testschema.Math._
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-/** A spec for the `ANF.anf` transformation. */
+/** A spec for the `ANF.transform` transformation. */
 @RunWith(classOf[JUnitRunner])
 class ANFSpec extends BaseCompilerSpec {
 
@@ -20,7 +20,7 @@ class ANFSpec extends BaseCompilerSpec {
   val anfPipeline: Expr[Any] => Tree =
     compiler.pipeline(typeCheck = true)(
       ANF.resolveNameClashes,
-      tree => time(ANF.anf(tree), "anf")
+      tree => time(ANF.transform(tree), "anf")
     ).compose(_.tree)
 
   val idPipeline: Expr[Any] => Tree =
