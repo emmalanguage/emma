@@ -10,7 +10,7 @@ trait Core extends Common
   with ANF
   with CSE
   with DCE
-  with LNF
+  with DSCF
   with Pickling
   with PatternMatching
   with CoreValidate
@@ -257,13 +257,15 @@ trait Core extends Common
     // LNF API
     // -------------------------------------------------------------------------
 
-    /** Delegates to [[LNF.lift()]]. */
+    /**
+     * Delegates to [[DSCF.transform()]].
+     **/
     def lift(tree: u.Tree): u.Tree =
-      LNF.lift(tree)
+      DSCF.transform(tree)
 
-    /** Delegates to [[LNF.lower()]]. */
+    /** TODO. */
     def lower(tree: u.Tree): u.Tree =
-      LNF.lift(tree)
+      tree
 
     /** Delegates to [[ANF.resolveNameClashes()]]. */
     def resolveNameClashes(tree: u.Tree): u.Tree =
