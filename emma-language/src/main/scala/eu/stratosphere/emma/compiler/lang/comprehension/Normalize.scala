@@ -9,12 +9,12 @@ import shapeless._
 private[comprehension] trait Normalize extends Common {
   self: Core with Comprehension =>
 
-  import UniverseImplicits._
   import Comprehension.{Syntax, asLet}
   import Core.{Lang => core}
+  import UniverseImplicits._
 
-  type NormAttr = Attr[normAttr.Acc, normAttr.Inh, normAttr.Syn]
-  lazy val normAttr = api.BottomUp.exhaust.withValDefs.withValUses
+  type NormStrategy = Attr[normStrategy.Acc, normStrategy.Inh, normStrategy.Syn]
+  lazy val normStrategy = api.BottomUp.exhaust.withValDefs.withValUses
 
   private[comprehension] object Normalize {
 
@@ -31,9 +31,8 @@ private[comprehension] trait Normalize extends Common {
 
       ({
         // apply UnnestHead and UnnestGenerator rules exhaustively
-        (tree: u.Tree) => normAttr.transformWith {
-          case cs.UnnestGenerator(m: cs.UnnestGenerator.Match) => cs.UnnestGenerator(m)
-          case cs.UnnestHead(m: cs.UnnestHead.Match) => cs.UnnestHead(m)
+        (tree: u.Tree) => normStrategy.transformWith {
+          cs.UnnestGenerator orElse cs.UnnestHead
         }(tree).tree
 
       } andThen {
@@ -147,139 +146,117 @@ private[comprehension] trait Normalize extends Common {
      * } // enclosing block
      * }}}
      */
-    object UnnestHead {
-
+    val UnnestHead: NormStrategy =?> u.Tree = Function.unlift((root: NormStrategy) => root match {
       //@formatter:off
-      case class Match
-      (
-        vals1 : Seq[u.ValDef],
-        defs1 : Seq[u.DefDef],
-        expr1 : u.Tree,
-        encl  : u.Tree,
-        vals2 : Seq[u.ValDef],
-        qs1   : Seq[u.Tree],
-        vals3 : Seq[u.ValDef],
-        qs2   : Seq[u.Tree],
-        hd2   : u.Block
-      )
-      //@formatter:on
+      case Attr.syn(core.Let(
+        vals1,
+        defs1,
+        expr1), valUses :: valDefs :: _) =>
+        //@formatter:on
 
-      def unapply(root: NormAttr): Option[Match] = root match {
-        //@formatter:off
-        case Attr.syn(core.Let(
-          vals1,
-          defs1,
-          expr1), valUses :: valDefs :: _) =>
-          //@formatter:on
+        vals1.map(x => x -> x.rhs) :+ (expr1 -> expr1) collectFirst {
+          //@formatter:off
+          case (encl, Flatten(
+            core.Let(
+              vals2,
+              Nil,
+              expr2@Comprehension(
+                qs1,
+                Head(
+                  core.Let(
+                    vals3,
+                    Nil,
+                    expr3@Comprehension(
+                      qs2,
+                      Head(hd2)
+                    ))))))) =>
+            //@formatter:on
+            val (vals3i, vals3o) = split(vals3, qs1)
 
-          vals1.map(x => x -> x.rhs) :+ (expr1 -> expr1) collectFirst {
-            //@formatter:off
-            case (encl, Flatten(
-              core.Let(
-                vals2,
-                Nil,
-                expr2@Comprehension(
-                  qs1,
-                  Head(
-                    core.Let(
-                      vals3,
-                      Nil,
-                      expr3@Comprehension(
-                        qs2,
-                        Head(hd2)
-                      ))))))) =>
-              //@formatter:on
-              Match(vals1, defs1, expr1, encl, vals2, qs1, vals3, qs2, hd2)
-          }
+            val qs2p = qs2 map {
+              case Generator(sym, rhs) =>
+                Generator(sym, prepend(vals3i, rhs))
+              case Guard(pred) =>
+                Guard(prepend(vals3i, pred))
+            }
 
-        case _ =>
-          // subtree's root does not match, don't modify the subtree
-          None
-      }
+            val hd2p = prepend(vals3i, hd2)
 
-      def apply(m: Match): u.Tree = m match {
-        case Match(vals1, defs1, expr1, encl, vals2, qs1, vals3, qs2, hd2) =>
-          val (vals3i, vals3o) = split(vals3, qs1)
+            val (vals, expr) = encl match {
+              case encl@core.ValDef(xsym, xrhs, xflags) =>
+                val (vals1a, vals1b) = splitAt(encl)(vals1)
+                val val_ = core.ValDef(xsym, Comprehension(qs1 ++ qs2p, Head(hd2p)), xflags)
+                (vals1a ++ vals2 ++ vals3o ++ Seq(val_) ++ vals1b, expr1)
+              case _ =>
+                (vals1 ++ vals2 ++ vals3o, Comprehension(qs1 ++ qs2p, Head(hd2p)))
+            }
 
-          val qs2p = qs2 map {
-            case Generator(sym, rhs) =>
-              Generator(sym, prepend(vals3i, rhs))
-            case Guard(pred) =>
-              Guard(prepend(vals3i, pred))
-          }
+            core.Let(vals: _*)(defs1: _*)(expr)
+        }
 
-          val hd2p = prepend(vals3i, hd2)
+      case _ =>
+        None
+    })
 
-          val (vals, expr) = encl match {
-            case encl@core.ValDef(xsym, xrhs, xflags) =>
-              val (vals1a, vals1b) = splitAt(encl)(vals1)
-              val val_ = core.ValDef(xsym, Comprehension(qs1 ++ qs2p, Head(hd2p)), xflags)
-              (vals1a ++ vals2 ++ vals3o ++ Seq(val_) ++ vals1b, expr1)
-            case _ =>
-              (vals1 ++ vals2 ++ vals3o, Comprehension(qs1 ++ qs2p, Head(hd2p)))
-          }
+    /** Splits `vals` in two subsequences: vals dependent on generators bound in `qs`, and complement. */
+    private def split(vals: Seq[u.ValDef], qs: Seq[u.Tree]): (Seq[u.ValDef], Seq[u.ValDef]) = {
+      // symbols referenced in vals
+      val vals3refs = (for {
+        core.ValDef(sym, rhs, _) <- vals
+      } yield sym -> api.Tree.refs(rhs)).toMap
 
-          core.Let(vals: _*)(defs1: _*)(expr)
-      }
+      // symbols defined in qs
+      val qs1Syms = (for {
+        Generator(sym, _) <- qs
+      } yield sym).toSet
 
-      /** Splits `vals` in two subsequences: vals dependent on generators bound in `qs`, and complement. */
-      private def split(vals: Seq[u.ValDef], qs: Seq[u.Tree]): (Seq[u.ValDef], Seq[u.ValDef]) = {
-        // symbols referenced in vals
-        val vals3refs = (for {
-          core.ValDef(sym, rhs, _) <- vals
-        } yield sym -> api.Tree.refs(rhs)).toMap
+      // symbols defined in vals3 which directly depend on symbols from qs1
+      var vasDepSyms = (for {
+        (sym, refs) <- vals3refs
+        if (refs intersect qs1Syms).nonEmpty
+      } yield sym).toSet
 
-        // symbols defined in qs
-        val qs1Syms = (for {
-          Generator(sym, _) <- qs
-        } yield sym).toSet
-
-        // symbols defined in vals3 which directly depend on symbols from qs1
-        var vasDepSyms = (for {
+      // compute the transitive closure of vals3iSyms, i.e. extend with indirect dependencies
+      var delta = Set.empty[u.TermSymbol]
+      do {
+        vasDepSyms = vasDepSyms union delta
+        delta = (for {
           (sym, refs) <- vals3refs
-          if (refs intersect qs1Syms).nonEmpty
-        } yield sym).toSet
+          if (refs intersect vasDepSyms).nonEmpty
+        } yield sym).toSet diff vasDepSyms
+      } while (delta.nonEmpty)
 
-        // compute the transitive closure of vals3iSyms, i.e. extend with indirect dependencies
-        var delta = Set.empty[u.TermSymbol]
-        do {
-          vasDepSyms = vasDepSyms union delta
-          delta = (for {
-            (sym, refs) <- vals3refs
-            if (refs intersect vasDepSyms).nonEmpty
-          } yield sym).toSet diff vasDepSyms
-        } while (delta.nonEmpty)
+      // symbols defined in vals3 which do not depend on symbols from qs1
+      val valsIndSyms = vals3refs.keySet diff vasDepSyms
 
-        // symbols defined in vals3 which do not depend on symbols from qs1
-        val valsIndSyms = vals3refs.keySet diff vasDepSyms
+      val vasDep = for {
+        vd@core.ValDef(sym, rhs, _) <- vals
+        if vasDepSyms contains sym
+      } yield vd
 
-        val vasDep = for {
-          vd@core.ValDef(sym, rhs, _) <- vals
-          if vasDepSyms contains sym
-        } yield vd
+      val valsInd = for {
+        vd@core.ValDef(sym, rhs, _) <- vals
+        if valsIndSyms contains sym
+      } yield vd
 
-        val valsInd = for {
-          vd@core.ValDef(sym, rhs, _) <- vals
-          if valsIndSyms contains sym
-        } yield vd
+      (vasDep, valsInd)
+    }
 
-        (vasDep, valsInd)
-      }
+    private def prepend(prefix: Seq[u.ValDef], blck: u.Block): u.Block = blck match {
+      case core.Let(vals, defs, expr) =>
+        val fresh = for (core.ValDef(sym, rhs, flags) <- prefix) yield {
+          core.ValDef(api.TermSym.fresh(sym), rhs, flags)
+        }
 
-      private def prepend(prefix: Seq[u.ValDef], blck: u.Block): u.Block = blck match {
-        case core.Let(vals, defs, expr) =>
-          val fresh = for (core.ValDef(sym, rhs, flags) <- prefix) yield {
-            core.ValDef(api.TermSym.fresh(sym), rhs, flags)
-          }
+        val aliases = for {
+          (core.ValDef(from, _, _), core.ValDef(to, _, _)) <- prefix zip fresh
+        } yield from -> to
 
-          val aliases = for {
-            (core.ValDef(from, _, _), core.ValDef(to, _, _)) <- prefix zip fresh
-          } yield from -> to
-
-          (api.Tree.rename(aliases: _*) andThen { Core.simplify _ })(
-            core.Let(fresh ++ vals: _*)(defs: _*)(expr)
-          ).asInstanceOf[u.Block]
-      }
+        (api.Tree.rename(aliases: _*) andThen {
+          Core.simplify _
+        }) (
+          core.Let(fresh ++ vals: _*)(defs: _*)(expr)
+        ).asInstanceOf[u.Block]
     }
 
     /**
@@ -364,50 +341,23 @@ private[comprehension] trait Normalize extends Common {
      * } // enclosing block
      * }}}
      */
-    object UnnestGenerator {
-
+    val UnnestGenerator: NormStrategy =?> u.Tree = Function.unlift((root: NormStrategy) => root match {
       //@formatter:off
-      case class Match
-      (
-        vals1a : Seq[u.ValDef],
-        vals1r : Seq[u.ValDef],
-        defs1  : Seq[u.DefDef],
-        expr1  : u.Tree,
-        encl   : u.Tree,
-        qs1    : Seq[u.Tree],
-        hd1    : u.Block,
-        gen    : u.Tree,
-        x      : u.TermSymbol,
-        qs2    : Seq[u.Tree],
-        hd2    : u.Block
-      )
-      //@formatter:on
+      case Attr.syn(core.Let(
+        vals1,
+        defs1,
+        expr1), valUses :: valDefs :: _) =>
+        //@formatter:on
 
-      def unapply(root: NormAttr): Option[Match] = root match {
-        //@formatter:off
-        case Attr.syn(core.Let(
-          vals1,
-          defs1,
-          expr1), valUses :: valDefs :: _) =>
-          //@formatter:on
+        (for {
+          vd@core.ValDef(y, Comprehension(qs2, Head(hd2)), _) <- vals1.view
+          if valUses(y) == 1
+          (vals1a, vals1r) = splitAt(vd)(vals1)
+          encls = vals1r.map(x => x -> x.rhs) :+ (expr1 -> expr1)
+          (encl, Comprehension(qs1, Head(hd1))) <- encls
+          gen@Generator(x, core.Let(Nil, Nil, core.ValRef(`y`))) <- qs1
+        } yield {
 
-          (for {
-            vd@core.ValDef(y, Comprehension(qs2, Head(hd2)), _) <- vals1.view
-            if valUses(y) == 1
-            (vals1a, vals1r) = splitAt(vd)(vals1)
-            encls = vals1r.map(x => x -> x.rhs) :+ (expr1 -> expr1)
-            (encl, Comprehension(qs1, Head(hd1))) <- encls
-            gen@Generator(x, core.Let(Nil, Nil, core.ValRef(`y`))) <- qs1
-          } yield {
-            Match(vals1a, vals1r, defs1, expr1, encl, qs1, hd1, gen, x, qs2, hd2)
-          }).headOption
-
-        case _ =>
-          None
-      }
-
-      def apply(m: Match): u.Tree = m match {
-        case Match(vals1a, vals1r, defs1, expr1, encl, qs1, hd1, gen, x, qs2, hd2) =>
           // define a substitution function `· [ $hd2 \ x ]`
           val subst = hd2 match {
             case core.Let(Nil, Nil, expr2) => api.Tree.subst(x -> expr2)
@@ -431,8 +381,12 @@ private[comprehension] trait Normalize extends Common {
           }
 
           core.Let(vals: _*)(defs1: _*)(expr)
-      }
-    }
+
+        }).headOption
+
+      case _ =>
+        None
+    })
 
     /* Splits a `Seq[A]` into a prefix and suffix. */
     private def splitAt[A](e: A): Seq[A] => (Seq[A], Seq[A]) = {
