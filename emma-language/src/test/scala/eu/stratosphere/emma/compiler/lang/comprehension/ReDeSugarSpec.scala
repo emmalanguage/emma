@@ -251,6 +251,76 @@ class ReDeSugarSpec extends BaseCompilerSpec {
     (des, res)
   }
 
+  // with two correlated generators
+  val (des7, res7) = {
+
+    val des = reify {
+      val res = xs
+        .flatMap(x =>  DataBag(Seq(x, x))
+          .map(y => (x, y)))
+      res
+    }
+
+    val res = reify {
+      val xs$1 = xs
+      val res = flatten[(Int, Int), DataBag] {
+        comprehension[DataBag[(Int, Int)], DataBag] {
+          val x = generator[Int, DataBag] { xs$1 }
+          head {
+            val xs$2 = DataBag(Seq(x, x))
+            val xs$1 = comprehension[(Int, Int), DataBag] {
+              val y = generator[Int, DataBag] {
+                xs$2
+              }
+              head {
+                val r = (x, y)
+                r
+              }
+            }
+            xs$1
+          }
+        }
+      }
+      res
+    }
+
+    (des, res)
+  }
+
+  // with two correlated generators and a filter
+  val (des8, res8) = {
+
+    val des = reify {
+      val names = users
+        .flatMap(u =>  DataBag(Seq(u.name.first, u.name.last))
+          .withFilter(_.contains(u.id.toString)))
+      names
+    }
+
+    val res = reify {
+      val users$1 = users
+      val names = flatten[String, DataBag] {
+        comprehension[DataBag[String], DataBag] {
+          val u = generator[User, DataBag] { users$1 }
+          head {
+            val xs$2 = DataBag(Seq(u.name.first, u.name.last))
+            val xs$1 = comprehension[String, DataBag] {
+              val s = generator[String, DataBag] {
+                xs$2
+              }
+              guard { s.contains(u.id.toString) }
+              head { s }
+            }
+            xs$1
+          }
+        }
+      }
+      names
+    }
+
+    (des, res)
+  }
+
   // ---------------------------------------------------------------------------
   // Spec tests
   // ---------------------------------------------------------------------------
@@ -276,6 +346,12 @@ class ReDeSugarSpec extends BaseCompilerSpec {
       "with three generators and one filter" in {
         resugarPipeline(des6) shouldBe alphaEqTo(anfPipeline(res6))
       }
+      "with two correlated generators" in {
+        resugarPipeline(des7) shouldBe alphaEqTo(anfPipeline(res7))
+      }
+      "with two correlated generators and a filter" in {
+        resugarPipeline(des8) shouldBe alphaEqTo(anfPipeline(res8))
+      }
     }
   }
 
@@ -299,6 +375,12 @@ class ReDeSugarSpec extends BaseCompilerSpec {
       }
       "with three generators and one filter" in {
         desugarPipeline(res6) shouldBe alphaEqTo(anfPipeline(des6))
+      }
+      "with two correlated generators" in {
+        desugarPipeline(res7) shouldBe alphaEqTo(anfPipeline(des7))
+      }
+      "with two correlated generators and a filter" in {
+        desugarPipeline(res8) shouldBe alphaEqTo(anfPipeline(des8))
       }
     }
   }
