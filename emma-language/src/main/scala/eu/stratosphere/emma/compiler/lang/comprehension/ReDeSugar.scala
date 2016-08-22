@@ -105,51 +105,26 @@ private[comprehension] trait ReDeSugar extends Common {
       // construct comprehension syntax helper for the given monad
       val cs = new Comprehension.Syntax(monad)
 
-      api.BottomUp.transform {
-        case let @ core.Let(vals, defs, expr) =>
-          // Un-nest potentially nested simple let blocks occurring on the RHS of parent vals
-          val flatVals = vals.flatMap {
-            // match `val x = { nestedVals; nestedExpr }`
-            case core.ValDef(x, core.Let(nestedVals, Seq(), nestedExpr), xflags) => nestedExpr match {
-              // nestedExpr is a simple identifier `y` contained in the nestedVals
-              // rename the original `val y = ...` to `val x = ...`
-              case core.Ref(y) if nestedVals.exists(_.symbol == y) =>
-                val rm = api.Tree.rename(y -> x)
-                nestedVals.map({
-                  case core.ValDef(`y`, rhs, yflags) => core.ValDef(x, rm(rhs), yflags)
-                  case other => rm(other).asInstanceOf[u.ValDef]
-                })
-              // nestedExpr is something else
-              // emit `nestedVals; val x = nestedExpr`
-              case _ =>
-                nestedVals :+ core.ValDef(x, nestedExpr, xflags)
-            }
-            case value =>
-              Seq(value)
-          }
+      val desugarTransform = api.TopDown.transform {
+        // Match: `for { x <- { $vals; $rhs}; $qs*; } yield $expr`
+        //@formatter:off
+        case cs.Comprehension(
+          Seq(
+            cs.Generator(x, core.Let(vals, Seq(), core.Ref(rhs))),
+            qs@_*),
+          cs.Head(expr)) =>
+          //@formatter:on
 
-          // Un-nest potentially nested simple let blocks occurring in the let-expression
-          val (exprVals, exprAtom) = expr match {
-            case core.Let(nestedVals, Seq(), nestedExpr) =>
-              (nestedVals, nestedExpr)
-            case _ =>
-              (Seq.empty, expr)
-          }
-
-          if (vals.size == flatVals.size + exprVals.size) let
-          else core.Let(flatVals ++ exprVals: _*)(defs: _*)(exprAtom)
-
-        case cs.Comprehension(Seq(cs.Generator(sym, core.Let(_, _, rhs)), qs@_*), cs.Head(expr)) =>
           val (guards, rest) = qs.span {
             case cs.Guard(_) => true
             case _ => false
           }
 
           // Accumulate filters in a prefix of values and keep track of the tail value symbol
-          val (tail, prefix) = guards.foldLeft(api.TermSym.of(rhs), Vector.empty[u.ValDef]) {
+          val (tail, prefix) = guards.foldLeft(rhs, Vector.empty[u.ValDef]) {
             case ((currSym, currPfx), cs.Guard(p)) =>
               val currRef = core.Ref(currSym)
-              val funcRhs = core.Lambda(sym)(p)
+              val funcRhs = core.Lambda(x)(p)
               val funcNme = api.TermName.fresh("guard")
               val funcSym = api.TermSym.free(funcNme, funcRhs.tpe)
               val funcRef = core.Ref(funcSym)
@@ -162,10 +137,10 @@ private[comprehension] trait ReDeSugar extends Common {
 
           val tailRef = core.Ref(tail)
           expr match {
-            case core.Let(Seq(), Seq(), core.Ref(`sym`)) =>
+            case core.Let(Seq(), Seq(), core.Ref(`x`)) =>
               // Trivial head expression consisting of the matched sym 'x'
               // Omit the resulting trivial mapper
-              core.Let(prefix: _*)()(tailRef)
+              core.Let(vals ++ prefix: _*)()(tailRef)
 
             case _ =>
               // Append a map or a flatMap to the result depending on
@@ -174,15 +149,28 @@ private[comprehension] trait ReDeSugar extends Common {
                 if (rest.isEmpty) (cs.Map, expr)
                 else (cs.FlatMap, cs.Comprehension(rest, cs.Head(expr)))
 
-              val func = core.Lambda(sym)(body)
+              val func = core.Lambda(x)({
+                val bodyNme = api.TermName.fresh("x")
+                val bodySym = api.TermSym.free(bodyNme, body.tpe)
+                core.Let(core.ValDef(bodySym, body))()(core.Ref(bodySym))
+              })
               val term = api.TermSym.free(api.TermName.lambda, func.tpe)
               val call = op(tailRef)(core.Ref(term))
-              core.Let(prefix :+ core.ValDef(term, func): _*)()(call)
+              core.Let(vals ++ prefix :+ core.ValDef(term, func): _*)()(call)
           }
 
-        case cs.Flatten(core.Let(vals, defs, cs.Map(xs, f))) =>
-          core.Let(vals: _*)(defs: _*)(cs.FlatMap(xs)(f))
-      }.andThen(_.tree)
+        // Match: `flatten { $vals; $defs; for { $qs } yield $head }`
+        case cs.Flatten(core.Let(vals, defs, cs.Comprehension(qs, cs.Head(hd)))) =>
+          val genNme = api.TermName.fresh("x")
+          val genSym = api.TermSym.free(genNme, api.Type.arg(1, hd.tpe))
+          // Return: { $vals; $defs; for { $qs; x <- $head } yield x }
+          core.Let(vals: _*)(defs: _*)(cs.Comprehension(
+            qs :+ cs.Generator(genSym, hd),
+            cs.Head(core.Let()()(core.Ref(genSym)))
+          ))
+      }
+
+      desugarTransform andThen (_.tree) andThen Core.flatten
     }
   }
 }

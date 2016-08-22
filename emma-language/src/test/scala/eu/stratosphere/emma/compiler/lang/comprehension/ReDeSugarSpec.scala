@@ -123,22 +123,24 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   }
 
   // nested (flat)maps - 2 generators
-  val (des4, res4) = {
+  val (des4, res4, nor4) = {
 
     val des = reify {
-      val names = users
-        .flatMap(u => clicks
+      val users$1 = users
+      val clicks$1 = clicks
+      val names = users$1
+        .flatMap(u => clicks$1
           .map(c => (u, c)))
       names
     }
 
     val res = reify {
       val users$1 = users
+      val clicks$1 = clicks
       val names$1 = flatten[(User, Click), DataBag] {
         comprehension[DataBag[(User, Click)], DataBag] {
           val u = generator(users$1)
           head {
-            val clicks$1 = clicks
             val map$1 = comprehension[(User, Click), DataBag] {
               val c = generator(clicks$1)
               head {
@@ -152,7 +154,20 @@ class ReDeSugarSpec extends BaseCompilerSpec {
       names$1
     }
 
-    (des, res)
+    val nor = reify {
+      val users$1 = users
+      val clicks$1 = clicks
+      val names = comprehension[(User, Click), DataBag] {
+        val u = generator(users$1)
+        val c = generator(clicks$1)
+        head {
+          (u, c)
+        }
+      }
+      names
+    }
+
+    (des, res, nor)
   }
 
   // nested (flat)maps - 3 generators
@@ -252,7 +267,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   }
 
   // with two correlated generators
-  val (des7, res7) = {
+  val (des7, res7, nor7) = {
 
     val des = reify {
       val res = xs
@@ -284,7 +299,21 @@ class ReDeSugarSpec extends BaseCompilerSpec {
       res
     }
 
-    (des, res)
+    val nor = reify {
+      val xs$1 = xs
+      val res = comprehension[(Int, Int), DataBag] {
+        val x = generator[Int, DataBag] { xs$1 }
+        val y = generator[Int, DataBag] {
+          DataBag(Seq(x, x))
+        }
+        head {
+          (x, y)
+        }
+      }
+      res
+    }
+
+    (des, res, nor)
   }
 
   // with two correlated generators and a filter
@@ -382,6 +411,15 @@ class ReDeSugarSpec extends BaseCompilerSpec {
       "with two correlated generators and a filter" in {
         desugarPipeline(res8) shouldBe alphaEqTo(anfPipeline(des8))
       }
+    }
+  }
+
+  "desugar normalized" - {
+    "with two generators" in {
+      desugarPipeline(nor4) shouldBe alphaEqTo(anfPipeline(des4))
+    }
+    "with two correlated generators" in {
+      desugarPipeline(nor7) shouldBe alphaEqTo(anfPipeline(des7))
     }
   }
 }
