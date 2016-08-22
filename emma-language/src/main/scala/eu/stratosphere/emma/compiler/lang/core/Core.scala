@@ -115,7 +115,7 @@ trait Core extends Common
 
       // Let-in blocks
       object Let {
-        import IR.head
+        import ComprehensionSyntax.head
 
         def apply(vals: u.ValDef*)(defs: u.DefDef*)(expr: u.Tree = Term.unit): u.Block =
           api.Block(vals ++ defs: _*)(expr)

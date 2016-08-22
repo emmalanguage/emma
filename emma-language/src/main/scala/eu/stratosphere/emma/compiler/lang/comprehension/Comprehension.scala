@@ -34,7 +34,7 @@ trait Comprehension extends Common
 
       //@formatter:off
       val monadTpe  = monad.asType.toType.typeConstructor
-      val moduleSel = api.Tree.resolveStatic(IR.module)
+      val moduleSel = api.Tree.resolveStatic(ComprehensionSyntax.module)
       //@formatter:on
 
       // -----------------------------------------------------------------------
@@ -97,7 +97,7 @@ trait Comprehension extends Common
 
       /** Con- and destructs a comprehension from/to a list of qualifiers `qs` and a head expression `hd`. */
       object Comprehension {
-        val symbol = IR.comprehension
+        val symbol = ComprehensionSyntax.comprehension
 
         def apply(qs: Seq[u.Tree], hd: u.Tree): u.Tree =
           core.DefCall(Some(moduleSel))(symbol, elemTpe(hd), monadTpe)(api.Block(qs:_*)(hd) :: Nil)
@@ -116,7 +116,7 @@ trait Comprehension extends Common
 
       /** Con- and destructs a generator from/to a [[Tree]]. */
       object Generator {
-        val symbol = IR.generator
+        val symbol = ComprehensionSyntax.generator
 
         def apply(lhs: u.TermSymbol, rhs: u.Block): u.Tree = core.ValDef(
           lhs,
@@ -136,7 +136,7 @@ trait Comprehension extends Common
 
       /** Con- and destructs a guard from/to a [[Tree]]. */
       object Guard {
-        val symbol = IR.guard
+        val symbol = ComprehensionSyntax.guard
 
         def apply(expr: u.Block): u.Tree =
           core.DefCall(Some(moduleSel))(symbol)(expr :: Nil)
@@ -151,7 +151,7 @@ trait Comprehension extends Common
 
       /** Con- and destructs a head from/to a [[Tree]]. */
       object Head {
-        val symbol = IR.head
+        val symbol = ComprehensionSyntax.head
 
         def apply(expr: u.Block): u.Tree =
           core.DefCall(Some(moduleSel))(symbol, elemTpe(expr))(expr :: Nil)
@@ -170,7 +170,7 @@ trait Comprehension extends Common
 
       /** Con- and destructs a flatten from/to a [[Tree]]. */
       object Flatten {
-        val symbol = IR.flatten
+        val symbol = ComprehensionSyntax.flatten
 
         def apply(expr: u.Block): u.Tree =
           core.DefCall(Some(moduleSel))(symbol, elemTpe(expr), monadTpe)(expr :: Nil)

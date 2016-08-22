@@ -1,10 +1,10 @@
 package eu.stratosphere.emma
-package compiler
+package compiler.ir
 
 import scala.language.higherKinds
 
-/** Dummy IR nodes to be used in the Emma IR. */
-package object ir {
+/** Dummy IR nodes that model comprehension syntax in the Emma IR. */
+object ComprehensionSyntax {
 
   def flatten[A, M[_]](in: M[M[A]]): M[A] = ???
 

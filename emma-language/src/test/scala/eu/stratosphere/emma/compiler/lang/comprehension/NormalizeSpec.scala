@@ -3,7 +3,7 @@ package compiler.lang.comprehension
 
 import api.DataBag
 import compiler.BaseCompilerSpec
-import compiler.ir._
+import compiler.ir.ComprehensionSyntax._
 import testschema.Marketing._
 
 import org.junit.runner.RunWith
@@ -535,8 +535,8 @@ class NormalizeSpec extends BaseCompilerSpec {
   "complete examples" - {
 
     "Transitive closure" in {
-      import eu.stratosphere.emma.api._
       import NormalizeSpec.Edge
+      import eu.stratosphere.emma.api._
 
       val input = "input"
       val output = "output"

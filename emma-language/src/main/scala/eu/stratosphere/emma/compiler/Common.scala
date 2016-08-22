@@ -60,7 +60,7 @@ trait Common extends ReflectUtil with AST {
     //@formatter:on
   }
 
-  protected[emma] object IR {
+  protected[emma] object ComprehensionSyntax {
     //@formatter:off
     val module                = rootMirror.staticModule("eu.stratosphere.emma.compiler.ir.ComprehensionSyntax").asModule
 
@@ -70,7 +70,7 @@ trait Common extends ReflectUtil with AST {
     val guard                 = module.info.decl(TermName("guard")).asMethod
     val head                  = module.info.decl(TermName("head")).asMethod
 
-    val comprehensionOps      = Set(flatten, generator, comprehension, guard, head)
+    val ops                   = Set(flatten, generator, comprehension, guard, head)
     //@formatter:on
   }
 

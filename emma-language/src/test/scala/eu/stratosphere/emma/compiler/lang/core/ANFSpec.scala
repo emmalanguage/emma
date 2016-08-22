@@ -3,7 +3,7 @@ package compiler.lang.core
 
 import api.DataBag
 import compiler.BaseCompilerSpec
-import compiler.ir._
+import compiler.ir.ComprehensionSyntax._
 import testschema.Marketing._
 import testschema.Math._
 

@@ -42,7 +42,7 @@ private[core] trait DCE extends Common {
 
       val transform = new postWalk(true) {
 
-        import IR.comprehension
+        import ComprehensionSyntax.comprehension
 
         override def template = {
           // Skip comprehension blocks
