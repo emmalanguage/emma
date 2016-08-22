@@ -461,6 +461,34 @@ class NormalizeSpec extends BaseCompilerSpec {
     (inp, exp)
   }
 
+  // with two correlated generators
+  val (inp11, exp11) = {
+
+    val inp = reify {
+      for {
+        x <- xs
+        y <- DataBag(Seq(x, x))
+      } yield (x, y)
+    }
+
+    val exp = reify {
+      val xs$1 = xs
+      comprehension[(Int, Int), DataBag] {
+        val x = generator[Int, DataBag] {
+          xs$1
+        }
+        val y = generator[Int, DataBag] {
+          DataBag(Seq(x, x))
+        }
+        head {
+          (x, y)
+        }
+      }
+    }
+
+    (inp, exp)
+  }
+
   // ---------------------------------------------------------------------------
   // Spec tests
   // ---------------------------------------------------------------------------
@@ -498,6 +526,9 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
     "with a dag-shaped self-join" in {
       normalizePipeline(inp10) shouldBe alphaEqTo(resugarPipeline(exp10))
+    }
+    "with two correlated generators" in {
+      normalizePipeline(inp11) shouldBe alphaEqTo(resugarPipeline(exp11))
     }
   }
 
