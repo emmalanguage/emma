@@ -256,40 +256,46 @@ private[core] trait ANF extends Common {
      * Un-nests nested blocks.
      *
      * == Preconditions ==
-     * - Except the nested blocks, the input tree is in simplified ANF form (see [[transform]] and
-     * [[inlineLetExprs]]).
+     * - Except the nested blocks, the input tree is in ANF form.
      *
      * == Postconditions ==
-     * - A simplified ANF tree where all nested blocks have been flattened.
+     * - An ANF tree where all nested blocks have been flattened.
      */
     lazy val flatten: u.Tree => u.Tree =
       api.BottomUp.transform {
-        case parent @ src.Block(stats, expr) if hasNestedBlocks(parent) =>
-          // Flatten (potentially) nested block expr
-          val (exprStats, flatExpr) = decompose(expr, simplify = false)
-          // Flatten (potentially) nested block stats
-          val flatStats = stats.flatMap {
-            case src.ValDef(lhs, src.Block(nestedStats, nestedExpr), flags) =>
-              nestedStats :+ src.ValDef(lhs, nestedExpr, flags)
-            case stat =>
-              Seq(stat)
+        case parent@core.Let(vals, defs, expr) if hasNestedLets(parent) =>
+
+          // Flatten nested let expressions in valdef position without control flow
+          val flatVals = vals.flatMap {
+            case core.ValDef(x, LetValsAndExpr(nestedVals, nestedExpr), flags) =>
+              nestedVals :+ core.ValDef(x, nestedExpr, flags)
+            case valDef =>
+              Seq(valDef)
           }
 
-          src.Block(flatStats ++ exprStats: _*)(flatExpr)
+          // Flatten nested let expressions in expr position without control flow
+          val (exprVals, flatExpr) = expr match {
+            case core.Let(nestedVals, Seq(), nestedExpr) =>
+              (nestedVals, nestedExpr)
+            case _ =>
+              (Seq.empty, expr)
+          }
+
+          core.Let(flatVals ++ exprVals: _*)(defs: _*)(flatExpr)
       }.andThen(_.tree)
 
     // ---------------
     // Helper methods
     // ---------------
 
-    /** Does `block` contain nested blocks? */
-    private def hasNestedBlocks(block: u.Block): Boolean = {
-      lazy val inStats = block.stats.exists {
-        case src.ValDef(_, src.Block(_, _), _) => true
+    /** Does the input `let` block contain nested `let` expressions? */
+    private def hasNestedLets(let: u.Block): Boolean = {
+      lazy val inStats = let.stats.exists {
+        case core.ValDef(_, core.Let(_, Seq(), _), _) => true
         case _ => false
       }
-      lazy val inExpr = block.expr match {
-        case src.Block(_, _) => true
+      lazy val inExpr = let.expr match {
+        case core.Let(_, _, _) => true
         case _ => false
       }
       inStats || inExpr
@@ -349,6 +355,18 @@ private[core] trait ANF extends Common {
         case src.DefCall(Some(_), method, _, _*)
           if IR.comprehensionOps(method) => Some(tree)
         case _ => None
+      }
+    }
+
+    /** Extractor for vals and expr from `let` blocks without control flow. Unifies `expr` extraction. */
+    private object LetValsAndExpr {
+      def unapply(tree: u.Block): Option[(Seq[u.ValDef], u.Tree)] = tree match {
+        // Match: `{ $vals; val x = $expr; x }`
+        case core.Let(vals :+ core.ValDef(x1, expr, _), Seq(), core.Ref(x2)) if x1 == x2 =>
+          Some(vals, expr)
+        // Match: `{ $vals; $expr; }`
+        case core.Let(vals, Seq(), expr) =>
+          Some(vals, expr)
       }
     }
   }
