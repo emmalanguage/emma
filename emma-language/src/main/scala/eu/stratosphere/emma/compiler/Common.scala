@@ -68,6 +68,9 @@ trait Common extends ReflectUtil with AST {
     val head /*            */ = module.info.decl(TermName("head")).asMethod
 
     val comprehensionOps /**/ = Set(flatten, generator, comprehension, guard, head)
+
+    val cross /*           */ = module.info.decl(TermName("cross")).asMethod
+    val equiJoin /*        */ = module.info.decl(TermName("equiJoin")).asMethod
   }
 
   /** Common validation helpers. */
@@ -120,7 +123,7 @@ trait Common extends ReflectUtil with AST {
   }
 
   // --------------------------------------------------------------------------
-  // Universe API that needs to be importet
+  // Universe API that needs to be imported
   // --------------------------------------------------------------------------
 
 
