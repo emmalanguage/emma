@@ -22,8 +22,7 @@ class NormalizeSpec extends BaseCompilerSpec {
     compiler.pipeline(typeCheck = true)(
       Core.resolveNameClashes,
       Core.anf,
-      Core.simplify,
-      normalizeLet
+      Core.simplify
     ).compose(_.tree)
 
   val resugar: Expr[Any] => Tree =

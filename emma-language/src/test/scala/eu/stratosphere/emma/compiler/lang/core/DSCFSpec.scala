@@ -26,8 +26,7 @@ class DSCFSpec extends BaseCompilerSpec {
     compiler.pipeline(typeCheck = true)(
       ANF.resolveNameClashes,
       ANF.anf,
-      ANF.simplify,
-      normalizeLet
+      ANF.simplify
     ).compose(_.tree)
 
   val idPipeline: u.Expr[Any] => u.Tree =
