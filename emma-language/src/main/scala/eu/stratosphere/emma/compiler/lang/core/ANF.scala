@@ -281,7 +281,22 @@ private[core] trait ANF extends Common {
               (Seq.empty, expr)
           }
 
-          core.Let(flatVals ++ exprVals: _*)(defs: _*)(flatExpr)
+          // Handle degenerate case where the suffix is of the form
+          // { ...; val x2 = x3; val x1 = x2; val x1}
+          val (trimmedVals, trimmedExpr) = {
+
+            @tailrec
+            def trim(vals: Seq[u.ValDef], expr: u.Tree): (Seq[u.ValDef], u.Tree) = (vals, expr) match {
+              case (pre :+ core.ValDef(x1, rhs@core.Ref(x2), _), core.Ref(ref)) if ref == x1 =>
+                trim(pre, rhs)
+              case (_, _) =>
+                (vals, expr)
+            }
+
+            trim(flatVals ++ exprVals, flatExpr)
+          }
+
+          core.Let(trimmedVals: _*)(defs: _*)(trimmedExpr)
       }.andThen(_.tree)
 
     // ---------------
