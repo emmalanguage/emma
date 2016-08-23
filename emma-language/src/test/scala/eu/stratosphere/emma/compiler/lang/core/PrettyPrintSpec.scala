@@ -218,6 +218,10 @@ class PrettyPrintSpec extends BaseCompilerSpec {
           val z = needle.toInt
           haystack indexOf z
         }
+        val fn2 = (xs: DataBag[(Int, Int)], fn: ((Int, Int)) => Int) => {
+          val ys = xs map fn
+          ys
+        }
         ()
       }) match {
         case u.Block(stats, _) => for (u.ValDef(_, _, _, rhs) <- stats) yield prettyPrint(rhs)
@@ -229,8 +233,14 @@ class PrettyPrintSpec extends BaseCompilerSpec {
            |  val z = needle.toInt
            |  haystack indexOf z
            |}
-         """.stripMargin.trim
-      )
+         """,
+        s"""
+           |(xs: DataBag[(Int, Int)], fn: ((Int, Int)) => Int) => {
+           |  val ys = xs map fn
+           |  ys
+           |}
+         """
+      ).map(_.stripMargin.trim)
 
       (acts zip exps) foreach { case (act, exp) =>
         act shouldEqual exp

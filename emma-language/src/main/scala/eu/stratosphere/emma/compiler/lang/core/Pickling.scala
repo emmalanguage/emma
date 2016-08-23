@@ -9,8 +9,8 @@ import compiler.lang.source.Source
 private[core] trait Pickling extends Common {
   this: Source with Core =>
 
-  import UniverseImplicits._
   import Core.{Lang => core}
+  import UniverseImplicits._
 
   private[core] object Pickle {
 
@@ -19,7 +19,15 @@ private[core] trait Pickling extends Common {
 
     val prettyPrint: u.Tree => String  = (tree: u.Tree) => {
 
-      val kws = Set("class", "object", "type", "val", "def", "private", "public", "protected", "lazy", "for")
+      val kws = Set(
+        "abstract", "case", "catch", "class", "def",
+        "do", "else", "extends", "false", "final", "finally",
+        "for", "if", "implicit", "import", "match", "mixin",
+        "new", "null", "object", "override", "package",
+        "private", "protected", "requires", "return", "sealed",
+        "super", "this", "throw", "trait", "true", "try",
+        "type", "val", "var", "while", "with", "yield"
+      )
       val ops = Set('=', '+', '-', '*', '/', '%', '<', '>', '&', '|', '!', '?', '^', '\\', '@', '#', '~')
 
       val printSym = (sym: u.Symbol) => {
@@ -48,9 +56,19 @@ private[core] trait Pickling extends Common {
       val printParamss = (paramss: Seq[Seq[D]], offset: Int) =>
         (paramss map (params => printParams(params, offset))).mkString
 
-      val printTpe = (tpe: u.Type) =>
-        if (!(api.Sym.tuples contains tpe.typeConstructor.typeSymbol)) printSym(tpe.typeSymbol)
-        else (tpe.typeArgs map (targ => printSym(targ.typeSymbol))).mkString("(", ", ", ")")
+      def printTpe(tpe: u.Type): String = {
+        val tpeCons = tpe.typeConstructor
+        val tpeArgs = tpe.typeArgs
+        if (api.Sym.tuples contains tpeCons.typeSymbol) /* tuple type */ {
+          (tpe.typeArgs map printTpe).mkString("(", ", ", ")")
+        } else if (api.Sym.fun(Math.max(0, tpeArgs.size - 1)) == tpeCons.typeSymbol) /* function type */ {
+          s"(${(tpe.typeArgs.init map printTpe).mkString(", ")}) => ${printTpe(tpe.typeArgs.last)}"
+        } else if (tpeArgs.nonEmpty) /* applied higher-order type */ {
+          s"${printSym(tpeCons.typeSymbol)}[${(tpe.typeArgs map printTpe).mkString(", ")}]"
+        } else /* simple type */ {
+          printSym(tpeCons.typeSymbol)
+        }
+      }
 
       val escape = (str: String) => str
         .replace("\b", "\\b")
