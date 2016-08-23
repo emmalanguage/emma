@@ -149,14 +149,20 @@ private[comprehension] trait ReDeSugar extends Common {
                 if (rest.isEmpty) (cs.Map, expr)
                 else (cs.FlatMap, cs.Comprehension(rest, cs.Head(expr)))
 
-              val func = core.Lambda(x)({
+              val fnRhs = core.Lambda(x)({
                 val bodyNme = api.TermName.fresh("x")
                 val bodySym = api.TermSym.free(bodyNme, body.tpe)
                 core.Let(core.ValDef(bodySym, body))()(core.Ref(bodySym))
               })
-              val term = api.TermSym.free(api.TermName.lambda, func.tpe)
-              val call = op(tailRef)(core.Ref(term))
-              core.Let(vals ++ prefix :+ core.ValDef(term, func): _*)()(call)
+              val fnNme = api.TermName.fresh(api.TermName.lambda)
+              val fnSym = api.TermSym.free(fnNme, fnRhs.tpe)
+              val fnVal = core.ValDef(fnSym, fnRhs)
+
+              val opRhs = op(tailRef)(core.Ref(fnSym))
+              val opSym = api.TermSym.free(op.symbol.name, opRhs.tpe)
+              val opVal = core.ValDef(opSym, opRhs)
+
+              core.Let(vals ++ prefix ++ Seq(fnVal, opVal): _*)()(core.Ref(opSym))
           }
 
         // Match: `flatten { $vals; $defs; for { $qs } yield $head }`
