@@ -195,10 +195,20 @@ private[core] trait ANF extends Common {
      * == Postconditions ==
      * - `Ident` return expressions in blocks have been introduced whenever possible.
      */
-    lazy val uninlineLetExprs: u.Tree => u.Tree =
-      api.BottomUp.withOwner.transformWith {
-        case Attr.none(let @ core.Let(_, _, core.Ref(_) | core.Lit(_))) =>
-          let
+    lazy val uninlineLetExprs: u.Tree => u.Tree = api.BottomUp
+      // Inherit all method definitions from the root.
+      .withDefDefs.inheritWith[Map[u.MethodSymbol, u.Tree]] {
+        case Attr.syn(_, methods :: _) => methods
+      } (Monoids.left(Map.empty))
+      .withOwner.transformWith {
+        case Attr.inh(let @ core.Let(_, _, expr), _ :: local :: _)
+          if (expr match { // Bypass
+            case core.Lit(_) => true
+            case core.Ref(_) => true
+            case core.DefCall(_, method, _, _*) =>
+              local contains method
+          }) => let
+
         case Attr.inh(core.Let(vals, defs, expr), owner :: _) =>
           val nme = api.TermName.fresh("x")
           val lhs = api.ValSym(owner, nme, expr.tpe)
