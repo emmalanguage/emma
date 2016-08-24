@@ -17,7 +17,6 @@ class PrettyPrintSpec extends BaseCompilerSpec {
 
   import compiler._
   import Core.{Lang => core}
-  import universe._
 
   val idPipeline: u.Expr[Any] => u.Tree =
     compiler.identity(typeCheck = true) compose (_.tree)
@@ -34,7 +33,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
   "Atomics:" - {
 
     "Lit" in {
-      val acts = idPipeline(reify(
+      val acts = idPipeline(u.reify(
         42, 42L, 3.14, 3.14F, .1e6, 'c', "string"
       )) collect {
         case act@core.Lit(_) => prettyPrint(act)
@@ -50,7 +49,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
     }
 
     "Ref" in {
-      val acts = idPipeline(reify {
+      val acts = idPipeline(u.reify {
         val x = 1
         val y = 2
         val * = 3
@@ -73,7 +72,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
 
     "This" in {
 
-      val acts = idPipeline(reify {
+      val acts = idPipeline(u.reify {
         class Unqualified {
           println(this)
         }
@@ -105,7 +104,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
 
     "DefDef" in {
 
-      val acts = idPipeline(reify {
+      val acts = idPipeline(u.reify {
         def fn1(needle: Char, haystack: String): Int = {
           val z = needle.toInt
           haystack indexOf z
@@ -136,7 +135,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
 
       val pi = 3.14
 
-      val acts = (idPipeline(reify {
+      val acts = (idPipeline(u.reify {
         val x = 42: Int // literal
         val y = pi: Double // reference
         val u = "string": CharSequence // upcast
@@ -169,7 +168,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
       val c = clicks.fetch().head
       val a = ads.fetch().head
 
-      val acts = (idPipeline(reify {
+      val acts = (idPipeline(u.reify {
         def summon[A] = implicitly[(Double, String)]
         //@formatter:off
         val x$01 = Predef.println("string")                  // literal
@@ -213,7 +212,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
 
     "Lambda" in {
 
-      val acts = idPipeline(reify {
+      val acts = idPipeline(u.reify {
         val fn1 = (needle: Char, haystack: String) => {
           val z = needle.toInt
           haystack indexOf z
@@ -280,7 +279,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
 
       val pi = 3.14
 
-      val acts = idPipeline(reify {
+      val acts = idPipeline(u.reify {
         //@formatter:off
         def then$1(x: Int, y: Double) = 2 * x * y
         def else$1(x: Int, y: Double) = 2 * x * y
@@ -303,7 +302,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
 
     "Let" in {
 
-      val act = prettyPrint(idPipeline(reify {
+      val act = prettyPrint(idPipeline(u.reify {
         val x = 15
         val y = {
           val a = 15
@@ -349,7 +348,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
 
     "with three generators and two interleaved filters" in {
 
-      val act = prettyPrint(liftPipeline(reify {
+      val act = prettyPrint(liftPipeline(u.reify {
         val clicks$1 = clicks
         val users$1 = users
         val ads$1 = ads

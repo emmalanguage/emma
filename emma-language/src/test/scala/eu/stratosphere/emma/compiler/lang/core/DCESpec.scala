@@ -11,7 +11,6 @@ import org.scalatest.junit.JUnitRunner
 class DCESpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe._
 
   val dcePipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
@@ -26,12 +25,12 @@ class DCESpec extends BaseCompilerSpec {
   "eliminate unused valdefs" - {
 
     "directly" in {
-      val act = dcePipeline(reify {
+      val act = dcePipeline(u.reify {
         val x = 15
         15 * t._1
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val x$1 = t
         val x$2 = x$1._1
         val x$3 = 15 * x$2
@@ -42,13 +41,13 @@ class DCESpec extends BaseCompilerSpec {
     }
 
     "transitively" in {
-      val act = dcePipeline(reify {
+      val act = dcePipeline(u.reify {
         val x = 15
         val y = 2 * x
         15 * t._1
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val x$1 = t
         val x$2 = x$1._1
         val x$3 = 15 * x$2

@@ -11,7 +11,6 @@ import org.scalatest.junit.JUnitRunner
 class CSESpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe._
 
   val csePipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
@@ -26,11 +25,11 @@ class CSESpec extends BaseCompilerSpec {
   "field selections" - {
 
     "as argument" in {
-      val act = csePipeline(reify {
+      val act = csePipeline(u.reify {
         15 * t._1
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val x$1 = t
         val x$2 = x$1._1
         val x$3 = 15 * x$2
@@ -41,11 +40,11 @@ class CSESpec extends BaseCompilerSpec {
     }
 
     "as selection" in {
-      val act = csePipeline(reify {
+      val act = csePipeline(u.reify {
         t._1 * 15
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val x$1 = t
         val x$2 = x$1._1
         val x$3 = x$2 * 15
@@ -56,12 +55,12 @@ class CSESpec extends BaseCompilerSpec {
     }
 
     "package selections" in {
-      val act = csePipeline(reify {
+      val act = csePipeline(u.reify {
         val bag = eu.stratosphere.emma.api.DataBag(Seq(1, 2, 3))
         scala.Predef.println(bag.fetch())
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val x$1 = Seq(1, 2, 3)
         val bag = eu.stratosphere.emma.api.DataBag(x$1)
         val x$2 = bag.fetch()
@@ -75,11 +74,11 @@ class CSESpec extends BaseCompilerSpec {
 
   "complex arguments" - {
     "lhs" in {
-      val act = csePipeline(reify {
+      val act = csePipeline(u.reify {
         y.substring(y.indexOf('l') + 1)
       })
 
-      val exp = csePipeline(reify {
+      val exp = csePipeline(u.reify {
         val y$1 = y
         val x$1 = y$1.indexOf('l')
         val x$2 = x$1 + 1
@@ -92,7 +91,7 @@ class CSESpec extends BaseCompilerSpec {
   }
 
   "nested blocks" in {
-    val act = csePipeline(reify {
+    val act = csePipeline(u.reify {
       val z = y
       val a = {
         val b = y.indexOf('a')
@@ -105,7 +104,7 @@ class CSESpec extends BaseCompilerSpec {
       a + c
     })
 
-    val exp = idPipeline(reify {
+    val exp = idPipeline(u.reify {
       val y$1 = y
       val b$1 = y$1.indexOf('a')
       val a = b$1 + 15
@@ -117,14 +116,14 @@ class CSESpec extends BaseCompilerSpec {
   }
 
   "constant propagation" in {
-    val act = csePipeline(reify {
+    val act = csePipeline(u.reify {
       val a = 42
       val b = a
       val c = b
       c
     })
 
-    val exp = idPipeline(reify {
+    val exp = idPipeline(u.reify {
       42
     })
 

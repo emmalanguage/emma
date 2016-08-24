@@ -15,25 +15,24 @@ import org.scalatest.junit.JUnitRunner
 class ANFSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe._
-
-  val anfPipeline: Expr[Any] => Tree =
+  
+  val anfPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
       tree => time(ANF.transform(tree), "anf")
     ).compose(_.tree)
 
-  val idPipeline: Expr[Any] => Tree =
+  val idPipeline: u.Expr[Any] => u.Tree =
     compiler.identity(typeCheck = true)
       .compose(_.tree)
 
   "field selections" - {
 
     "as argument" in {
-      val act = anfPipeline(reify {
+      val act = anfPipeline(u.reify {
         15 * t._1
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val x$1 = t
         val x$2 = x$1._1
         val x$3 = 15 * x$2
@@ -44,11 +43,11 @@ class ANFSpec extends BaseCompilerSpec {
     }
 
     "as selection" in {
-      val act = anfPipeline(reify {
+      val act = anfPipeline(u.reify {
         (t._1 * 15).toDouble
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val t$1 = t
         val t_1$1 = t$1._1
         val prod$1 = t_1$1 * 15
@@ -60,12 +59,12 @@ class ANFSpec extends BaseCompilerSpec {
     }
 
     "package selections" in {
-      val act = anfPipeline(reify {
+      val act = anfPipeline(u.reify {
         val bag = eu.stratosphere.emma.api.DataBag(Seq(1, 2, 3))
         scala.Predef.println(bag.fetch())
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val x$1 = Seq(1, 2, 3)
         val bag = eu.stratosphere.emma.api.DataBag(x$1)
         val x$2 = bag.fetch()
@@ -79,11 +78,11 @@ class ANFSpec extends BaseCompilerSpec {
 
   "complex arguments" - {
     "lhs" in {
-      val act = anfPipeline(reify {
+      val act = anfPipeline(u.reify {
         y.substring(y.indexOf('l') + 1)
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val y$1 = y
         val y$2 = y
         val x$1 = y$2.indexOf('l')
@@ -96,11 +95,11 @@ class ANFSpec extends BaseCompilerSpec {
     }
 
     "with multiple parameter lists" in {
-      val act = anfPipeline(reify {
+      val act = anfPipeline(u.reify {
         List(1, 2, 3).foldLeft(0)(_ * _)
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val list$1 = List(1, 2, 3)
         val mult$1 = (x: Int, y: Int) => {
           val prod$1 = x * y
@@ -115,7 +114,7 @@ class ANFSpec extends BaseCompilerSpec {
   }
 
   "nested blocks" in {
-    val act = anfPipeline(reify {
+    val act = anfPipeline(u.reify {
       val a = {
         val b = y.indexOf('T')
         b + 15
@@ -126,7 +125,7 @@ class ANFSpec extends BaseCompilerSpec {
       }
     })
 
-    val exp = idPipeline(reify {
+    val exp = idPipeline(u.reify {
       val y$1 = y
       val b$1 = y$1.indexOf('T')
       val a = b$1 + 15
@@ -139,13 +138,13 @@ class ANFSpec extends BaseCompilerSpec {
   }
 
   "type ascriptions" in {
-    val act = anfPipeline(reify {
+    val act = anfPipeline(u.reify {
       val a = x: Int
       val b = a + 5
       b
     })
 
-    val exp = idPipeline(reify {
+    val exp = idPipeline(u.reify {
       val a$1 = x
       val a$2 = a$1: Int
       val b$1 = a$2 + 5
@@ -157,7 +156,7 @@ class ANFSpec extends BaseCompilerSpec {
 
   "bypass mock comprehensions" in {
 
-    val act = anfPipeline(reify {
+    val act = anfPipeline(u.reify {
       val res = comprehension {
         val u = generator(users)
         val a = generator(ads)
@@ -169,7 +168,7 @@ class ANFSpec extends BaseCompilerSpec {
       res
     })
 
-    val exp = idPipeline(reify {
+    val exp = idPipeline(u.reify {
       val res = comprehension {
         val u = generator[User, DataBag] {
           val users$1 = users
@@ -210,14 +209,14 @@ class ANFSpec extends BaseCompilerSpec {
 
   "irrefutable pattern matching" - {
     "of tuples" in {
-      val act = anfPipeline(reify {
+      val act = anfPipeline(u.reify {
         ("life", 42) match {
           case (s: String, i: Int) =>
             s + i
         }
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val x$1 = ("life", 42)
         val s = x$1._1
         val i = x$1._2
@@ -229,14 +228,14 @@ class ANFSpec extends BaseCompilerSpec {
     }
 
     "of case classes" in {
-      val act = anfPipeline(reify {
+      val act = anfPipeline(u.reify {
         Point(1, 2) match {
           case Point(i, j) =>
             i + j
         }
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val p$1 = Point(1, 2)
         val i = p$1.x
         val j = p$1.y
@@ -248,14 +247,14 @@ class ANFSpec extends BaseCompilerSpec {
     }
 
     "of nested product types" in {
-      val act = anfPipeline(reify {
+      val act = anfPipeline(u.reify {
         (Point(1, 2), (3, 4)) match {
           case (a@Point(i, j), b@(k, _)) =>
             i + j + k
         }
       })
 
-      val exp = idPipeline(reify {
+      val exp = idPipeline(u.reify {
         val p$1 = Point(1, 2)
         val x$2 = (3, 4)
         val x$3 = (p$1, x$2)
@@ -274,14 +273,14 @@ class ANFSpec extends BaseCompilerSpec {
   }
 
   "method calls" in {
-    val act = anfPipeline(reify(
+    val act = anfPipeline(u.reify(
       x.asInstanceOf[Long],
       List(1, 2, 3).foldLeft(1) { _ + _ },
       42.toChar,
       t._2.indexOf('f')
     ))
 
-    val exp = idPipeline(reify {
+    val exp = idPipeline(u.reify {
       val x$1 = this.x
       val asInstanceOf$1 = x$1.asInstanceOf[Long]
       val List$1 = List(1, 2, 3)
@@ -303,11 +302,11 @@ class ANFSpec extends BaseCompilerSpec {
 
   "conditionals" - {
     "with simple branches" in {
-      val act = anfPipeline(reify {
+      val act = anfPipeline(u.reify {
         if (t._1 < 42) "less" else "more"
       })
 
-      val exp = typeCheck(reify {
+      val exp = typeCheck(u.reify {
         val t$1 = t
         val t_1$1 = t$1._1
         val less$1 = t_1$1 < 42
@@ -319,11 +318,11 @@ class ANFSpec extends BaseCompilerSpec {
     }
 
     "with complex branches" in {
-      val act = anfPipeline(reify {
+      val act = anfPipeline(u.reify {
         if (t._1 < 42) x + 10 else x - 10.0
       })
 
-      val exp = typeCheck(reify {
+      val exp = typeCheck(u.reify {
         val t$1 = t
         val t_1$1 = t$1._1
         val less$1 = t_1$1 < 42

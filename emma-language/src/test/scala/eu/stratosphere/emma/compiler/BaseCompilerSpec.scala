@@ -4,8 +4,6 @@ package compiler
 import api.DataBag
 import lang.TreeMatchers
 
-import shapeless._
-
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -17,17 +15,15 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
   val compiler = new RuntimeCompiler()
 
   import compiler._
-  import universe._
-  import Core.{Lang => core}
 
   // ---------------------------------------------------------------------------
   // Common transformation pipelines
   // ---------------------------------------------------------------------------
 
-  def typeCheck[T]: Expr[T] => Tree = {
-    (_: Expr[T]).tree
+  def typeCheck[T]: u.Expr[T] => u.Tree = {
+    (_: u.Expr[T]).tree
   } andThen {
-    Type.check(_: Tree)
+    Type.check(_: u.Tree)
   }
 
   // ---------------------------------------------------------------------------

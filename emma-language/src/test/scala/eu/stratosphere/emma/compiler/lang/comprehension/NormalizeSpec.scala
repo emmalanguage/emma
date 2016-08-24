@@ -16,22 +16,21 @@ import java.time.Instant
 class NormalizeSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe._
 
-  val liftPipeline: Expr[Any] => Tree =
+  val liftPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
       Core.lnf,
       Core.inlineLetExprs
     ).compose(_.tree)
 
-  val resugarPipeline: Expr[Any] => Tree =
+  val resugarPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
       Core.lnf,
       Comprehension.resugar(API.bagSymbol),
       Core.inlineLetExprs
     ).compose(_.tree)
 
-  val normalizePipeline: Expr[Any] => Tree =
+  val normalizePipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
       Core.lnf,
       Comprehension.resugar(API.bagSymbol),
@@ -46,7 +45,7 @@ class NormalizeSpec extends BaseCompilerSpec {
   // hard coded: 2 generators
   val (inp1, exp1) = {
 
-    val inp = reify {
+    val inp = u.reify {
       val users$1 = users
       val names = flatten[(User, Click), DataBag] {
         comprehension[DataBag[(User, Click)], DataBag] {
@@ -66,7 +65,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       names
     }
 
-    val exp = reify {
+    val exp = u.reify {
       val users$1 = users
       val clicks$1 = clicks
       val names = comprehension[(User, Click), DataBag] {
@@ -85,7 +84,7 @@ class NormalizeSpec extends BaseCompilerSpec {
   // hard coded: 3 generators
   val (inp2, exp2) = {
 
-    val inp = reify {
+    val inp = u.reify {
       val users$1 = users
       val names = flatten[(Ad, User, Click), DataBag] {
         comprehension[DataBag[(Ad, User, Click)], DataBag] {
@@ -114,7 +113,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       names
     }
 
-    val exp = reify {
+    val exp = u.reify {
       val users$1 = users
       val clicks$1 = clicks
       val ads$1 = ads
@@ -135,7 +134,7 @@ class NormalizeSpec extends BaseCompilerSpec {
   // hard-coded: 3 generators and a filter
   val (inp3, exp3) = {
 
-    val inp = reify {
+    val inp = u.reify {
       val users$1 = users
       val names = flatten[(Ad, User, Click), DataBag] {
         comprehension[DataBag[(Ad, User, Click)], DataBag] {
@@ -174,7 +173,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       names
     }
 
-    val exp = reify {
+    val exp = u.reify {
       val users$1 = users
       val clicks$1 = clicks
       val ads$1 = ads
@@ -201,7 +200,7 @@ class NormalizeSpec extends BaseCompilerSpec {
   // resugared: three generators and two filters at the end
   val (inp4, exp4) = {
 
-    val inp = reify {
+    val inp = u.reify {
       for {
         u <- users
         a <- ads
@@ -211,7 +210,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       } yield (c.time, a.`class`)
     }
 
-    val exp = reify {
+    val exp = u.reify {
       val users$1 = users
       val ads$1 = ads
       val clicks$1 = clicks
@@ -231,7 +230,7 @@ class NormalizeSpec extends BaseCompilerSpec {
   // resugared: three generators and two interleaved filters
   val (inp5, exp5) = {
 
-    val inp = reify {
+    val inp = u.reify {
       for {
         c <- clicks
         u <- users
@@ -241,7 +240,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       } yield (c.time, a.`class`)
     }
 
-    val exp = reify {
+    val exp = u.reify {
       val clicks$1 = clicks
       val users$1 = users
       val ads$1 = ads
@@ -261,13 +260,13 @@ class NormalizeSpec extends BaseCompilerSpec {
   // resugared: one patmat generator and no filters
   val (inp6, exp6) = {
 
-    val inp = reify {
+    val inp = u.reify {
       for {
         Click(adID, userID, time) <- clicks
       } yield (adID, time)
     }
 
-    val exp = reify {
+    val exp = u.reify {
       val clicks$11: DataBag[Click] = clicks;
       comprehension[(Long, Instant), DataBag]({
         val check$ifrefutable$1: Click = generator[Click, DataBag](clicks$11);
@@ -286,7 +285,7 @@ class NormalizeSpec extends BaseCompilerSpec {
   // resugared: patmat with two generators and one filter
   val (inp7, exp7) = {
 
-    val inp = reify {
+    val inp = u.reify {
       for {
         Click(adID, userID, time) <- clicks
         Ad(id, name, _) <- ads
@@ -294,7 +293,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       } yield (adID, time)
     }
 
-    val exp = reify {
+    val exp = u.reify {
       val clicks$1 = clicks;
       val ads$1 = ads;
       comprehension[(Long, Instant), DataBag]({
@@ -327,7 +326,7 @@ class NormalizeSpec extends BaseCompilerSpec {
 
   val (inp8, exp8) = {
 
-    val inp = reify {
+    val inp = u.reify {
       val xs = for {
         Click(adID, userID, time) <- clicks
         Ad(id, name, _) <- ads
@@ -336,7 +335,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       xs.fetch()
     }
 
-    val exp = reify {
+    val exp = u.reify {
       val clicks$1 = clicks;
       val ads$1 = ads;
       val xs = comprehension[Long, DataBag]({
@@ -369,7 +368,7 @@ class NormalizeSpec extends BaseCompilerSpec {
 
   val (inp9, exp9) = {
 
-    val inp = reify {
+    val inp = u.reify {
       val xs = for {
         Ad(id, name, _) <- ads
         token <- DataBag(name.split("\\s+"))
@@ -377,7 +376,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       xs.fetch()
     }
 
-    val exp = reify {
+    val exp = u.reify {
       val ads$1 = ads;
       val xs = comprehension[String, DataBag]({
         val ad$1 = generator[Ad, DataBag]({
@@ -403,7 +402,7 @@ class NormalizeSpec extends BaseCompilerSpec {
 
   val (inp10, exp10) = {
 
-    val inp = reify {
+    val inp = u.reify {
       // pre-process
       val xs = for {
         Ad(id, name, _) <- ads
@@ -418,7 +417,7 @@ class NormalizeSpec extends BaseCompilerSpec {
       ys.fetch()
     }
 
-    val exp = reify {
+    val exp = u.reify {
       val ads$1 = ads
       // pre-process
       val xs = comprehension[(Long, String), DataBag]({
@@ -464,14 +463,14 @@ class NormalizeSpec extends BaseCompilerSpec {
   // with two correlated generators
   val (inp11, exp11) = {
 
-    val inp = reify {
+    val inp = u.reify {
       for {
         x <- xs
         y <- DataBag(Seq(x, x))
       } yield (x, y)
     }
 
-    val exp = reify {
+    val exp = u.reify {
       val xs$1 = xs
       comprehension[(Int, Int), DataBag] {
         val x = generator[Int, DataBag] {

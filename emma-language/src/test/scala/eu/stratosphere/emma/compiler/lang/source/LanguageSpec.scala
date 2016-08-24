@@ -15,7 +15,6 @@ import org.scalatest.junit.JUnitRunner
 class LanguageSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe._
   import Source.{Lang => src}
   import Source.valid
   import Validation._
@@ -55,7 +54,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `Lit` objects in `Source.Lang`
     // - `Literal(Constant(value))` nodes in Scala ASTs
 
-    val examples = extractFrom(reify(42, 4.2, "42", '!'))
+    val examples = extractFrom(u.reify(42, 4.2, "42", '!'))
     examples should not be empty
 
     "are valid language constructs" in {
@@ -74,7 +73,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `Ref` objects in `Source.Lang`
     // - `Ident(sym)` nodes where `sym` is a (free) `TermSymbol` in Scala ASTs
 
-    val examples = extractFrom(reify {
+    val examples = extractFrom(u.reify {
       val u = 42
       val v = 4.2
       var w = "42"
@@ -102,7 +101,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `This` objects in `Source.Lang`
     // - `This(qual)` nodes in Scala ASTs
 
-    val examples = extractFrom(reify {
+    val examples = extractFrom(u.reify {
       class Unqualified { println(this.toString) }
       class Qualified { println(LanguageSpec.this.x) }
       object Module { println(this.hashCode) }
@@ -133,7 +132,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `BindingDef` objects in `Source.Lang`
     // - `ValDef(lhs, rhs)` nodes nodes in Scala ASTs
 
-    val examples = extractFrom(reify {
+    val examples = extractFrom(u.reify {
       val u = s"$x is $y"
       val v = 42
       var w = "42"
@@ -165,7 +164,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `DefCall` objects in `Source.Lang`
     // - `Apply(fun, args)` nodes in Scala ASTs
 
-    val examples = extractFrom(reify(
+    val examples = extractFrom(u.reify(
       t._2,
       DEFAULT_CLASS,
       x == 42,
@@ -200,7 +199,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `While` objects in `Source.Lang`
     // - `LabelDef(...)` nodes nodes in Scala ASTs
 
-    val examples = extractFrom(reify {
+    val examples = extractFrom(u.reify {
       var r = 0
       var i = 0
       while (i < x) {
@@ -230,7 +229,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `DoWhile` objects in `Source.Lang`
     // - `LabelDef(...)` nodes nodes in Scala ASTs
 
-    val examples = extractFrom(reify {
+    val examples = extractFrom(u.reify {
       var i = 0
       var r = 0
       do {
@@ -264,7 +263,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `PatMat` objects in `Source.Lang`
     // - `Match(selector, cases)` nodes nodes in Scala ASTs
 
-    val examples = extractFrom(reify(
+    val examples = extractFrom(u.reify(
       ((1, 2): Any) match {
         case (x: Int, _) => x
         case Ad(id, name, _) => id
@@ -300,7 +299,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `Block` objects in `Source.Lang`
     // - `Block(stats, expr)` nodes nodes in Scala ASTs
 
-    val examples = extractFrom(reify(
+    val examples = extractFrom(u.reify(
       { val z = 5; x + z },
       t._2 + "implicit unit": Unit
     )).map(api.Tree.unAscribe)
@@ -323,7 +322,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `Branch` objects in `Source.Lang`
     // - `If(cond, thn, els)` nodes nodes in Scala ASTs
 
-    val examples = extractFrom(reify(
+    val examples = extractFrom(u.reify(
       if (x == 42) x else x / 42,
       if (x < 42) "only one branch"
     ))
@@ -346,7 +345,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `Inst` objects in `Source.Lang`
     // - `Apply(tpt: New, _)` nodes in Scala ASTs
 
-    val examples = extractFrom(reify(
+    val examples = extractFrom(u.reify(
       new Ad(1, "Uber AD", AdClass.SERVICES),
       new Baz(x),
       new Bar[Int](x)
@@ -370,7 +369,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `Lambda` objects in `Source.Lang`
     // - `Function(args, body)` nodes nodes in Scala ASTs
 
-    val examples = extractFrom(reify(
+    val examples = extractFrom(u.reify(
       (x: Int, y: Int) => x + y,
       "ellipsis".charAt _
     )).flatMap {
@@ -396,7 +395,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `inst` objects in `Source.Language`
     // - `Typed(expr, tpt)` nodes nodes in Scala ASTs
 
-    val examples = extractFrom(reify(
+    val examples = extractFrom(u.reify(
       x: Number,
       t: (Any, String)
     ))
@@ -423,7 +422,7 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `val_` objects in `Source.Language`
     // - `Assign(lhs, rhs)` nodes nodes in Scala ASTs
 
-    val examples = extractFrom(reify {
+    val examples = extractFrom(u.reify {
       var u = "still a ValDef but mutable"
       var w = 42
       u = "an updated ValDef"

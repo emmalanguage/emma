@@ -14,18 +14,17 @@ import org.scalatest.junit.JUnitRunner
 class ReDeSugarSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe._
 
   // ---------------------------------------------------------------------------
   // Helper methods
   // ---------------------------------------------------------------------------
 
-  val anfPipeline: Expr[Any] => Tree =
+  val anfPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
       Core.lnf
     ).compose(_.tree)
 
-  val resugarPipeline: Expr[Any] => Tree = {
+  val resugarPipeline: u.Expr[Any] => u.Tree = {
     val resugar = Comprehension.resugar(API.bagSymbol)
     compiler.pipeline(typeCheck = true)(
       Core.lnf,
@@ -33,7 +32,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
     ).compose(_.tree)
   }
 
-  val desugarPipeline: Expr[Any] => Tree = {
+  val desugarPipeline: u.Expr[Any] => u.Tree = {
     val desugar = Comprehension.desugar(API.bagSymbol)
     compiler.pipeline(typeCheck = true)(
       Core.lnf,
@@ -48,13 +47,13 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // map
   val (des1, res1) = {
 
-    val des = reify {
+    val des = u.reify {
       val names = users
         .map(u => (u.name.first, u.name.last))
       names
     }
 
-    val res = reify {
+    val res = u.reify {
       val users$1 = users
       val names$1 = comprehension[(String, String), DataBag] {
         val u = generator(users$1)
@@ -71,13 +70,13 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // flatMap
   val (des2, res2) = {
 
-    val des = reify {
+    val des = u.reify {
       val names = users
         .flatMap(u => DataBag(Seq(u.name.first, u.name.last)))
       names
     }
 
-    val res = reify {
+    val res = u.reify {
       val users$1 = users
       val names$1 = flatten[String, DataBag] {
         comprehension[DataBag[String], DataBag] {
@@ -96,13 +95,13 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // withFilter
   val (des3, res3) = {
 
-    val des = reify {
+    val des = u.reify {
       val names = users
         .withFilter(u => u.name.first != "John")
       names
     }
 
-    val res = reify {
+    val res = u.reify {
       val users$1 = users
       val names$1 = comprehension[User, DataBag] {
         val u = generator(users$1)
@@ -125,7 +124,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // nested (flat)maps - 2 generators
   val (des4, res4, nor4) = {
 
-    val des = reify {
+    val des = u.reify {
       val users$1 = users
       val clicks$1 = clicks
       val names = users$1
@@ -134,7 +133,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
       names
     }
 
-    val res = reify {
+    val res = u.reify {
       val users$1 = users
       val clicks$1 = clicks
       val names$1 = flatten[(User, Click), DataBag] {
@@ -154,7 +153,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
       names$1
     }
 
-    val nor = reify {
+    val nor = u.reify {
       val users$1 = users
       val clicks$1 = clicks
       val names = comprehension[(User, Click), DataBag] {
@@ -173,7 +172,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // nested (flat)maps - 3 generators
   val (des5, res5) = {
 
-    val des = reify {
+    val des = u.reify {
       val names = users
         .flatMap(u => clicks
           .flatMap(c => ads
@@ -181,7 +180,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
       names
     }
 
-    val res = reify {
+    val res = u.reify {
       val users$1 = users
       val names = flatten[(Ad, User, Click), DataBag] {
         comprehension[DataBag[(Ad, User, Click)], DataBag] {
@@ -216,7 +215,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // nested (flat)maps - 3 generators and a filter
   val (des6, res6) = {
 
-    val des = reify {
+    val des = u.reify {
       val names = users
         .flatMap(u => clicks
           .withFilter(_.userID == u.id)
@@ -224,7 +223,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
       names
     }
 
-    val res = reify {
+    val res = u.reify {
       val users$1 = users
       val names = flatten[(Ad, User, Click), DataBag] {
         comprehension[DataBag[(Ad, User, Click)], DataBag] {
@@ -269,14 +268,14 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // with two correlated generators
   val (des7, res7, nor7) = {
 
-    val des = reify {
+    val des = u.reify {
       val res = xs
         .flatMap(x =>  DataBag(Seq(x, x))
           .map(y => (x, y)))
       res
     }
 
-    val res = reify {
+    val res = u.reify {
       val xs$1 = xs
       val res = flatten[(Int, Int), DataBag] {
         comprehension[DataBag[(Int, Int)], DataBag] {
@@ -299,7 +298,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
       res
     }
 
-    val nor = reify {
+    val nor = u.reify {
       val xs$1 = xs
       val res = comprehension[(Int, Int), DataBag] {
         val x = generator[Int, DataBag] { xs$1 }
@@ -319,14 +318,14 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // with two correlated generators and a filter
   val (des8, res8) = {
 
-    val des = reify {
+    val des = u.reify {
       val names = users
         .flatMap(u =>  DataBag(Seq(u.name.first, u.name.last))
           .withFilter(_.contains(u.id.toString)))
       names
     }
 
-    val res = reify {
+    val res = u.reify {
       val users$1 = users
       val names = flatten[String, DataBag] {
         comprehension[DataBag[String], DataBag] {

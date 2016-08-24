@@ -11,10 +11,9 @@ trait TreeMatchers {
   val compiler: Compiler
 
   import compiler._
-  import universe._
 
   /** Test that the LHS tree is alpha-equivalent to the RHS tree. */
-  def alphaEqTo[T <: Tree](rhs: T) =
+  def alphaEqTo[T <: u.Tree](rhs: T) =
     new AlphaEqMatcher(rhs)
 
   /** [[u.Tree]] matcher for alpha equivalence. */

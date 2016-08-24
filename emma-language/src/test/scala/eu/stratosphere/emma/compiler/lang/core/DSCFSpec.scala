@@ -11,7 +11,6 @@ import org.scalatest.junit.JUnitRunner
 class DSCFSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe._
 
   val dscfPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
@@ -32,7 +31,7 @@ class DSCFSpec extends BaseCompilerSpec {
 
   "Talor Series expansion for sin(x) around x = 0" in {
 
-    val act = dscfPipeline(reify {
+    val act = dscfPipeline(u.reify {
       val sin = (x: Double) => {
         val K = 13
         val xsq = x * x
@@ -57,7 +56,7 @@ class DSCFSpec extends BaseCompilerSpec {
       sin(Math.PI / 2)
     })
 
-    val exp = anfPipeline(reify {
+    val exp = anfPipeline(u.reify {
       val sin = (x: Double) => {
         val K = 13
         val xsq = x * x
