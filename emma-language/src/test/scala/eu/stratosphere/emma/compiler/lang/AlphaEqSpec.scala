@@ -12,14 +12,18 @@ class AlphaEqSpec extends BaseCompilerSpec {
 
   import compiler._
 
+  val idPipeline: u.Expr[Any] => u.Tree =
+    compiler.identity(typeCheck = true)
+      .compose(_.tree)
+
   "simple valdefs and expressions" in {
-    val lhs = typeCheck(u.reify {
+    val lhs = idPipeline(u.reify {
       val a$01 = 42 * x
       val a$02 = a$01 * t._1
       15 * a$01 * a$02
     })
 
-    val rhs = typeCheck(u.reify {
+    val rhs = idPipeline(u.reify {
       val b$01 = 42 * x
       val b$02 = b$01 * t._1
       15 * b$01 * b$02
@@ -29,12 +33,12 @@ class AlphaEqSpec extends BaseCompilerSpec {
   }
 
   "conditionals" in {
-    val lhs = typeCheck(u.reify {
+    val lhs = idPipeline(u.reify {
       val a$01 = 42 * x
       if (x < 42) x * t._1 else x / a$01
     })
 
-    val rhs = typeCheck(u.reify {
+    val rhs = idPipeline(u.reify {
       val b$01 = 42 * x
       if (x < 42) x * t._1 else x / b$01
     })
@@ -43,7 +47,7 @@ class AlphaEqSpec extends BaseCompilerSpec {
   }
 
   "variable assignment and loops" in {
-    val lhs = typeCheck(u.reify {
+    val lhs = idPipeline(u.reify {
       var u = x
       while (u < 20) {
         println(y)
@@ -55,7 +59,7 @@ class AlphaEqSpec extends BaseCompilerSpec {
       } while (u < 20)
     })
 
-    val rhs = typeCheck(u.reify {
+    val rhs = idPipeline(u.reify {
       var v = x
       while (v < 20) {
         println(y)
@@ -71,7 +75,7 @@ class AlphaEqSpec extends BaseCompilerSpec {
   }
 
   "loops" in {
-    val lhs = typeCheck(u.reify {
+    val lhs = idPipeline(u.reify {
       def b$00(): Unit = {
         val i$1 = 0
         val r$1 = 0
@@ -92,7 +96,7 @@ class AlphaEqSpec extends BaseCompilerSpec {
       b$00()
     })
 
-    val rhs = typeCheck(u.reify {
+    val rhs = idPipeline(u.reify {
       def x$00(): Unit = {
         val j$1 = 0
         val k$1 = 0
@@ -117,14 +121,14 @@ class AlphaEqSpec extends BaseCompilerSpec {
   }
 
   "pattern matching" in {
-    val lhs = typeCheck(u.reify {
+    val lhs = idPipeline(u.reify {
       val u = (t, x)
       u match {
         case ((i, j: String), _) => i * 42
       }
     })
 
-    val rhs = typeCheck(u.reify {
+    val rhs = idPipeline(u.reify {
       val v = (t, x)
       v match {
         case ((l, m: String), _) => l * 42

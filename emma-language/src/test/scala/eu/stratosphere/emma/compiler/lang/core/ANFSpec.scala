@@ -306,7 +306,7 @@ class ANFSpec extends BaseCompilerSpec {
         if (t._1 < 42) "less" else "more"
       })
 
-      val exp = typeCheck(u.reify {
+      val exp = idPipeline(u.reify {
         val t$1 = t
         val t_1$1 = t$1._1
         val less$1 = t_1$1 < 42
@@ -322,7 +322,7 @@ class ANFSpec extends BaseCompilerSpec {
         if (t._1 < 42) x + 10 else x - 10.0
       })
 
-      val exp = typeCheck(u.reify {
+      val exp = idPipeline(u.reify {
         val t$1 = t
         val t_1$1 = t$1._1
         val less$1 = t_1$1 < 42
