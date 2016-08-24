@@ -15,7 +15,6 @@ class CSESpec extends BaseCompilerSpec {
 
   val csePipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
-      ANF.resolveNameClashes,
       ANF.transform,
       tree => time(CSE.cse(tree), "cse")
     ).compose(_.tree)

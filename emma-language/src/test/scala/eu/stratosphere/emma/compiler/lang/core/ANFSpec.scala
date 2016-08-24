@@ -19,7 +19,6 @@ class ANFSpec extends BaseCompilerSpec {
 
   val anfPipeline: Expr[Any] => Tree =
     compiler.pipeline(typeCheck = true)(
-      ANF.resolveNameClashes,
       tree => time(ANF.transform(tree), "anf")
     ).compose(_.tree)
 

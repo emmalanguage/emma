@@ -255,17 +255,27 @@ trait Core extends Common
     // LNF API
     // -------------------------------------------------------------------------
 
-    /** Chains [[ANF.resolveNameClashes]], [[ANF.transform]], and [[DSCF.transform]]. */
+    /** Lifting. The canonical compiler frontend. */
     lazy val lift: u.Tree => u.Tree = {
-      ANF.resolveNameClashes
+      lnf
     } andThen {
-      ANF.transform
+      Comprehension.resugar(API.bagSymbol)
     } andThen {
-      DSCF.transform
+      inlineLetExprs
+    } andThen {
+      Comprehension.normalize(API.bagSymbol)
+    } andThen {
+      uninlineLetExprs
     }
+
+    /** Chains [[ANF.transform]], and [[DSCF.transform]]. */
+    lazy val lnf: u.Tree => u.Tree = anf andThen dscf
 
     /** TODO. */
     lazy val lower = identity[u.Tree] _
+
+    /** Delegates to [[DSCF.transform]]. */
+    lazy val dscf = DSCF.transform
 
     /** Delegates to [[ANF.transform]]. */
     lazy val anf = ANF.transform

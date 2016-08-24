@@ -24,7 +24,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
 
   val liftPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
-      Core.lift,
+      Core.lnf,
       Core.inlineLetExprs
     ) andThen unQualifyStaticModules compose (_.tree)
 
@@ -310,13 +310,13 @@ class PrettyPrintSpec extends BaseCompilerSpec {
           val z = 3
           a - z
         }
-        def thn(x: Int, y: Int): Int = {
-          val r = x * 7
-          r * 42
+        def thn(x1: Int, y1: Int): Int = {
+          val r1 = x1 * 7
+          r1 * 42
         }
-        def els(x: Int, y: Int): Int = {
-          val r = x * 2
-          r * 24
+        def els(x2: Int, y2: Int): Int = {
+          val r2 = x2 * 2
+          r2 * 24
         }
         if (x > 0) thn(x, y) else els(x, y)
       }))
@@ -329,13 +329,13 @@ class PrettyPrintSpec extends BaseCompilerSpec {
             |    val z = 3
             |    a - z
             |  }
-            |  def thn(x: Int, y: Int): Int = {
-            |    val r = x * 7
-            |    r * 42
+            |  def thn(x1: Int, y1: Int): Int = {
+            |    val r1 = x1 * 7
+            |    r1 * 42
             |  }
-            |  def els(x: Int, y: Int): Int = {
-            |    val r = x * 2
-            |    r * 24
+            |  def els(x2: Int, y2: Int): Int = {
+            |    val r2 = x2 * 2
+            |    r2 * 24
             |  }
             |  if (x > 0) thn(x, y) else els(x, y)
             |}

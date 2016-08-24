@@ -20,20 +20,20 @@ class NormalizeSpec extends BaseCompilerSpec {
 
   val liftPipeline: Expr[Any] => Tree =
     compiler.pipeline(typeCheck = true)(
-      Core.lift,
+      Core.lnf,
       Core.inlineLetExprs
     ).compose(_.tree)
 
   val resugarPipeline: Expr[Any] => Tree =
     compiler.pipeline(typeCheck = true)(
-      Core.lift,
+      Core.lnf,
       Comprehension.resugar(API.bagSymbol),
       Core.inlineLetExprs
     ).compose(_.tree)
 
   val normalizePipeline: Expr[Any] => Tree =
     compiler.pipeline(typeCheck = true)(
-      Core.lift,
+      Core.lnf,
       Comprehension.resugar(API.bagSymbol),
       Core.inlineLetExprs,
       tree => time(Comprehension.normalize(API.bagSymbol)(tree), "normalize")

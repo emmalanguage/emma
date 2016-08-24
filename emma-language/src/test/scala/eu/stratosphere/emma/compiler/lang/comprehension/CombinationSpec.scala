@@ -24,19 +24,19 @@ class CombinationSpec extends BaseCompilerSpec {
 
   val liftPipeline: Expr[Any] => Tree =
     compiler.pipeline(typeCheck = true)(
-      Core.lift
+      Core.lnf
     ).compose(_.tree)
 
   val combine: Expr[Any] => Tree =
     compiler.pipeline(typeCheck = true)(
-      Core.lift,
+      Core.lnf,
       tree => time(Comprehension.combine(tree), "combine"),
       Core.flatten
     ).compose(_.tree)
 
   def applyOnce(rule: Tree =?> Tree): Expr[Any] => Tree =
     compiler.pipeline(typeCheck = true)(
-      Core.lift,
+      Core.lnf,
       tree => api.TopDown.transform(rule)(tree).tree,
       Core.flatten
     ).compose(_.tree)

@@ -20,10 +20,6 @@ private[core] trait ANF extends Common {
   /** Administrative Normal Form (ANF) bypassing control-flow and for-comprehensions. */
   private[core] object ANF {
 
-    /** Ensures that all definitions within `tree` have unique names. */
-    val resolveNameClashes: u.Tree => u.Tree = (tree: u.Tree) =>
-      api.Tree.refresh(nameClashes(tree): _*)(tree)
-
     /** Attributes required by the ANF transformation. */
     private lazy val anfAttr = api.BottomUp
       // Inherit all method definitions from the root
@@ -315,13 +311,6 @@ private[core] trait ANF extends Common {
       }
       inStats || inExpr
     }
-
-    /** Returns the set of symbols in `tree` that have clashing names. */
-    private def nameClashes(tree: u.Tree): Seq[u.TermSymbol] = for {
-      (_, defs) <- api.Tree.defs(tree).groupBy(_.name).toSeq
-      if defs.size > 1
-      dfn <- defs.tail
-    } yield dfn
 
     /** Returns the encoded name associated with this subtree. */
     @tailrec private def nameOf(tree: u.Tree): u.Name = tree match {

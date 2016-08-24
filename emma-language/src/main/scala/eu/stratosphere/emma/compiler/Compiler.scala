@@ -24,6 +24,7 @@ trait Compiler extends AlphaEq with Source with Core {
       .andThen(unQualifyStaticModules)
       .andThen(normalizeStatements)
       .andThen(Source.normalize)
+      .andThen(resolveNameClashes)
 
   /** Brings a tree into a form acceptable for `scalac` after being transformed. */
   lazy val postProcess: u.Tree => u.Tree =

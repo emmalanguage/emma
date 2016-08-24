@@ -85,6 +85,17 @@ trait AST extends CommonAST
         api.Tree.resolveStatic(mod)
     }.andThen(_.tree)
 
+  /** Ensures that all definitions within `tree` have unique names. */
+  lazy val resolveNameClashes: u.Tree => u.Tree = (tree: u.Tree) =>
+    api.Tree.refresh(nameClashes(tree): _*)(tree)
+
+  /** Returns the set of symbols in `tree` that have clashing names. */
+  def nameClashes(tree: u.Tree): Seq[u.TermSymbol] = for {
+    (_, defs) <- api.Tree.defs(tree).groupBy(_.name).toSeq
+    if defs.size > 1
+    dfn <- defs.tail
+  } yield dfn
+
   /**
    * Prints `tree` for debugging.
    *
