@@ -18,10 +18,6 @@ class DCESpec extends BaseCompilerSpec {
       tree => time(DCE.dce(tree), "dce")
     ).compose(_.tree)
 
-  val idPipeline: u.Expr[Any] => u.Tree =
-    compiler.identity(typeCheck = true)
-      .compose(_.tree)
-
   "eliminate unused valdefs" - {
 
     "directly" in {

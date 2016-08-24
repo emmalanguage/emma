@@ -18,10 +18,6 @@ class CSESpec extends BaseCompilerSpec {
       tree => time(CSE.cse(tree), "cse")
     ).compose(_.tree)
 
-  val idPipeline: u.Expr[Any] => u.Tree =
-    compiler.identity(typeCheck = true)
-      .compose(_.tree)
-
   "field selections" - {
 
     "as argument" in {

@@ -21,10 +21,6 @@ class ANFSpec extends BaseCompilerSpec {
       tree => time(ANF.transform(tree), "anf")
     ).compose(_.tree)
 
-  val idPipeline: u.Expr[Any] => u.Tree =
-    compiler.identity(typeCheck = true)
-      .compose(_.tree)
-
   "field selections" - {
 
     "as argument" in {

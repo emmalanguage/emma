@@ -25,10 +25,6 @@ class DSCFSpec extends BaseCompilerSpec {
       ANF.inlineLetExprs
     ).compose(_.tree)
 
-  val idPipeline: u.Expr[Any] => u.Tree =
-    compiler.identity(typeCheck = true)
-      .compose(_.tree)
-
   "Talor Series expansion for sin(x) around x = 0" in {
 
     val act = dscfPipeline(u.reify {

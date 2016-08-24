@@ -12,10 +12,6 @@ class AlphaEqSpec extends BaseCompilerSpec {
 
   import compiler._
 
-  val idPipeline: u.Expr[Any] => u.Tree =
-    compiler.identity(typeCheck = true)
-      .compose(_.tree)
-
   "simple valdefs and expressions" in {
     val lhs = idPipeline(u.reify {
       val a$01 = 42 * x

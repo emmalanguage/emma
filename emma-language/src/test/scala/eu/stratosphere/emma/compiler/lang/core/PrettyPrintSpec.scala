@@ -18,9 +18,6 @@ class PrettyPrintSpec extends BaseCompilerSpec {
   import compiler._
   import Core.{Lang => core}
 
-  val idPipeline: u.Expr[Any] => u.Tree =
-    compiler.identity(typeCheck = true) compose (_.tree)
-
   val liftPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
       Core.lnf,

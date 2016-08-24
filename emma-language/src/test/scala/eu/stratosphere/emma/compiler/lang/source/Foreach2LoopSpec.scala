@@ -16,10 +16,6 @@ class Foreach2LoopSpec extends BaseCompilerSpec {
       tree => time(Foreach2Loop.transform(tree), "foreach -> loop")
     }.compose(_.tree)
 
-  val idPipeline: u.Expr[Any] => u.Tree =
-    compiler.identity(typeCheck = true)
-      .compose(_.tree)
-
   "foreach" - {
     "without closure modification" in {
       val act = foreach2loopPipeline(u.reify {
