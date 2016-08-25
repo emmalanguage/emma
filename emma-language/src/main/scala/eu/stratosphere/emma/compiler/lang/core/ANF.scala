@@ -5,6 +5,7 @@ import compiler.Common
 import compiler.lang.source.Source
 import util.Monoids
 
+import cats.implicits._
 import shapeless._
 
 import scala.annotation.tailrec
@@ -195,18 +196,17 @@ private[core] trait ANF extends Common {
      * == Postconditions ==
      * - `Ident` return expressions in blocks have been introduced whenever possible.
      */
-    lazy val uninlineLetExprs: u.Tree => u.Tree = api.BottomUp
+    lazy val uninlineLetExprs: u.Tree => u.Tree = api.TopDown
       // Inherit all method definitions from the root.
-      .withDefDefs.inheritWith[Map[u.MethodSymbol, u.Tree]] {
-        case Attr.syn(_, methods :: _) => methods
-      } (Monoids.left(Map.empty))
-      .withOwner.transformWith {
-        case Attr.inh(let @ core.Let(_, _, expr), _ :: local :: _)
+      .accumulate { case core.Let(_, defs, _) =>
+        (for (core.DefDef(method, _, _, _, _) <- defs) yield method).toSet
+      }.withOwner.transformWith {
+        case Attr.acc(let @ core.Let(_, _, expr), local :: _)
           if (expr match { // Bypass
             case core.Lit(_) => true
             case core.Ref(_) => true
-            case core.DefCall(_, method, _, _*) =>
-              local contains method
+            case core.Branch(_, _, _) => true
+            case core.DefCall(_, method, _, _*) => local(method)
           }) => let
 
         case Attr.inh(core.Let(vals, defs, expr), owner :: _) =>
