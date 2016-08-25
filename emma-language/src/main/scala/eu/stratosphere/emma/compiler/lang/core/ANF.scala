@@ -24,9 +24,9 @@ private[core] trait ANF extends Common {
     /** Attributes required by the ANF transformation. */
     private lazy val anfAttr = api.BottomUp
       // Inherit all method definitions from the root
-      .withDefDefs.inheritWith[Map[u.MethodSymbol, u.Tree]] {
-        case Attr.syn(_, methods :: _) => methods
-      } (Monoids.left(Map.empty))
+      .inherit { case core.Let(_, defs, _) =>
+        (for (core.DefDef(method, _, _, _, _) <- defs) yield method).toSet
+      }
       // Keep track if the current tree is a subtree of a type-tree
       .withParent.inherit { case tree => is.tpe(tree) } (Monoids.disj)
       .withOwner
@@ -94,7 +94,10 @@ private[core] trait ANF extends Common {
           src.Block(stats :+ dfn: _*)(ref)
 
         // Simplify target & arguments
-        case Attr.inh(src.DefCall(target, method, targs, argss@_*) withType tpe, owner :: _) =>
+        case Attr.inh(
+          src.DefCall(target, method, targs, argss@_*) withType tpe,
+          owner :: _ :: _ :: local :: _
+        ) =>
           val (tgtStats, tgtExpr) = target
             .map(decompose(_, simplify = false))
             .map { case (stats, expr) => (stats, Some(expr)) }
@@ -106,7 +109,8 @@ private[core] trait ANF extends Common {
           val rhs = core.DefCall(tgtExpr)(method, targs: _*)(argExprss: _*)
           val dfn = core.ValDef(lhs, rhs)
           val ref = core.ValRef(lhs)
-          src.Block(tgtStats ++ argStats :+ dfn: _*)(ref)
+          if (local contains method) src.Block(tgtStats ++ argStats: _*)(rhs)
+          else src.Block(tgtStats ++ argStats :+ dfn: _*)(ref)
 
         // Simplify arguments
         case Attr.inh(src.Inst(clazz, targs, argss@_*) withType tpe, owner :: _) =>
@@ -138,14 +142,18 @@ private[core] trait ANF extends Common {
           src.Block(dfn)(ref)
 
         // All branches on the RHS
-        case Attr.inh(src.Branch(cond, thn, els) withType tpe, owner :: _) =>
+        case Attr.inh(
+          src.Branch(cond, thn, els) withType tpe,
+          owner :: _ :: _ :: local :: _
+        ) =>
           val (stats, expr) = decompose(cond, simplify = false)
           val branch = core.Branch(expr, thn, els)
           val nme = api.TermName.fresh("if")
           val lhs = api.ValSym(owner, nme, tpe)
           val dfn = core.ValDef(lhs, branch)
           val ref = core.ValRef(lhs)
-          src.Block(stats :+ dfn: _*)(ref)
+          if (isDSCF(branch)(local)) src.Block(stats: _*)(branch)
+          else src.Block(stats :+ dfn: _*)(ref)
       }.andThen(_.tree)
 
     /**
@@ -346,6 +354,32 @@ private[core] trait ANF extends Common {
         case _ =>
           (Seq.empty, tree)
       }
+
+    /** Checks whether the given expression represents direct-style control-flow. */
+    private def isDSCF(expr: u.Tree)(local: Set[u.MethodSymbol]): Boolean = expr match {
+      //@formatter:off
+      // 1a) branch with one local method call and one atomic
+      case src.Branch(_,
+        src.DefCall(_, thn, _, _),
+        src.Atomic(_)
+      ) => local contains thn
+      // 1b) reversed version of 1a
+      case src.Branch(_,
+        src.Atomic(_),
+        src.DefCall(_, els, _, _)
+      ) => local contains els
+      // 2) branch with two local method calls
+      case src.Branch(_,
+        src.DefCall(_, thn, _, _),
+        src.DefCall(_, els, _, _)
+      ) => (local contains thn) && (local contains els)
+      // 3) simple local method call
+      case src.DefCall(_, sym, _, _) =>
+        local contains sym
+      // 4) something else
+      case _ => false
+      //@formatter:on
+    }
 
     /** Decomposes a nested sequence [[src.Block]]s into statements and expressions. */
     private def decompose(treess: Seq[Seq[u.Tree]], simplify: Boolean)
