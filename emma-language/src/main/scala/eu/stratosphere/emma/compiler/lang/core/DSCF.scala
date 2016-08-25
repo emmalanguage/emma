@@ -156,19 +156,16 @@ private[core] trait DSCF extends Common {
               val usesRes = sufUses(lhs) > 0
               val sufPars = varPars(sufVars) ++ (if (usesRes) Some(lhs) else None)
               val sufMeth = api.DefSym(owner, fresh("suffix"))()(sufPars)(tpe)
-              val sufTemp = api.ValSym(owner, fresh("tmp"), tpe)
 
               def branchDefCall(name: u.TermName, body: u.Tree) = body match {
                 case src.Block(branchStats, branchExpr) =>
                   val meth = api.DefSym(owner, name)()(Seq.empty)(tpe)
                   val temp = api.ValSym(meth, fresh("tmp"), tpe)
                   val call = core.DefCall()(meth)(Seq.empty)
+                  val args = sufArgs ++ (if (usesRes) Some(branchExpr) else None)
                   val defn = core.DefDef(meth)()(Seq.empty)(
-                    src.Block(branchStats :+
-                      core.ValDef(temp,
-                        core.DefCall()(sufMeth)(sufArgs ++
-                          (if (usesRes) Some(branchExpr) else None))): _*)(
-                      core.ValRef(temp)))
+                    src.Block(branchStats: _*)(
+                      core.DefCall()(sufMeth)(args)))
                   (Some(defn), call)
 
                 case _ =>
@@ -183,12 +180,11 @@ private[core] trait DSCF extends Common {
 
               src.Block(
                 prefix ++ Seq(
-                  Some(core.ValDef(sufTemp,
-                    core.Branch(cond, thnCall, elsCall))),
-                  thnDefn, elsDefn,
+                  thnDefn,
+                  elsDefn,
                   Some(core.DefDef(sufMeth)()(sufPars)(sufBody))
                 ).flatten: _*)(
-                core.ValRef(sufTemp))
+                core.Branch(cond, thnCall, elsCall))
 
             // While loop
             case (prefix, Seq(loop @ src.While(cond, src.Block(bodyStats, _)), suffix@_*)) =>
@@ -199,8 +195,6 @@ private[core] trait DSCF extends Common {
               val loopArgs = varArgs(loopVars)
               val loopPars = varPars(loopVars)
               val loopMeth = api.DefSym(owner, api.TermName.While())()(loopPars)(tpe)
-              val loopCall = core.DefCall()(loopMeth)(loopArgs)
-              val loopTemp = api.ValSym(loopMeth, fresh("tmp"), tpe)
 
               // Suffix
               val sufBody = src.Block(suffix: _*)(expr)
@@ -208,30 +202,25 @@ private[core] trait DSCF extends Common {
               val sufArgs = if (sufVars.size == loopVars.size) loopArgs else varArgs(sufVars)
               val sufPars = if (sufVars.size == loopVars.size) loopPars else varPars(sufVars)
               val sufMeth = api.DefSym(loopMeth, fresh("suffix"))()(sufPars)(tpe)
-              val sufTemp = api.ValSym(owner, fresh("tmp"), tpe)
 
               // Loop body
               val bodyVars = loopVars & uses(src.Block(bodyStats: _*)()).keySet
               val bodyArgs = if (bodyVars.size == loopVars.size) loopArgs else varArgs(bodyVars)
               val bodyPars = if (bodyVars.size == loopVars.size) loopPars else varPars(bodyVars)
               val bodyMeth = api.DefSym(loopMeth, fresh("body"))()(bodyPars)(tpe)
-              val bodyTemp = api.ValSym(bodyMeth, fresh("tmp"), tpe)
 
               src.Block(prefix ++ Seq(
-                core.ValDef(sufTemp, loopCall),
                 core.DefDef(loopMeth)()(loopPars)(
                   src.Block(condStats ++ Seq(
-                    core.ValDef(loopTemp,
-                      core.Branch(condExpr,
-                        core.DefCall()(bodyMeth)(bodyArgs),
-                        core.DefCall()(sufMeth)(sufArgs))),
                     core.DefDef(bodyMeth)()(bodyPars)(
-                      src.Block(bodyStats :+
-                        core.ValDef(bodyTemp, loopCall): _*)(
-                        core.ValRef(bodyTemp))),
+                      src.Block(
+                        bodyStats: _*)(
+                        core.DefCall()(loopMeth)(loopArgs))),
                     core.DefDef(sufMeth)()(sufPars)(sufBody)): _*)(
-                    core.ValRef(loopTemp)))): _*)(
-                core.ValRef(sufTemp))
+                    core.Branch(condExpr,
+                      core.DefCall()(bodyMeth)(bodyArgs),
+                      core.DefCall()(sufMeth)(sufArgs))))): _*)(
+                core.DefCall()(loopMeth)(loopArgs))
 
             // Do-while loop
             case (prefix, Seq(loop @ src.DoWhile(cond, src.Block(bodyStats, _)), suffix@_*)) =>
@@ -242,24 +231,19 @@ private[core] trait DSCF extends Common {
               val loopArgs = varArgs(loopVars)
               val loopPars = varPars(loopVars)
               val loopMeth = api.DefSym(owner, api.TermName.DoWhile())()(loopPars)(tpe)
-              val loopCall = core.DefCall()(loopMeth)(loopArgs)
-              val loopTemp = api.ValSym(loopMeth, fresh("tmp"), tpe)
 
               // Suffix
               val sufMeth = api.DefSym(loopMeth, fresh("suffix"))()(Seq.empty)(tpe)
-              val sufTemp = api.ValSym(owner, fresh("tmp"), tpe)
 
               src.Block(prefix ++ Seq(
-                core.ValDef(sufTemp, loopCall),
                 core.DefDef(loopMeth)()(loopPars)(
                   src.Block(bodyStats ++ condStats ++ Seq(
-                    core.ValDef(loopTemp,
-                      core.Branch(condExpr, loopCall,
-                        core.DefCall()(sufMeth)(Seq.empty))),
                     core.DefDef(sufMeth)()(Seq.empty)(
                       src.Block(suffix: _*)(expr))): _*)(
-                    core.ValRef(loopTemp)))): _*)(
-                core.ValRef(sufTemp))
+                    core.Branch(condExpr,
+                      core.DefCall()(loopMeth)(loopArgs),
+                      core.DefCall()(sufMeth)(Seq.empty))))): _*)(
+                core.DefCall()(loopMeth)(loopArgs))
           }
       }
 

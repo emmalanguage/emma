@@ -15,14 +15,12 @@ class DSCFSpec extends BaseCompilerSpec {
   val dscfPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
       ANF.transform,
-      tree => time(DSCF.transform(tree), "dscf"),
-      ANF.inlineLetExprs
+      tree => time(DSCF.transform(tree), "dscf")
     ).compose(_.tree)
 
   val anfPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
-      ANF.transform,
-      ANF.inlineLetExprs
+      ANF.transform
     ).compose(_.tree)
 
   "Talor Series expansion for sin(x) around x = 0" in {
