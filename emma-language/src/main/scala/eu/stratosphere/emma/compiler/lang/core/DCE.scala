@@ -7,72 +7,32 @@ import compiler.Common
 private[core] trait DCE extends Common {
   self: Core =>
 
-  import universe._
-  import Tree._
+  import UniverseImplicits._
+  import Core.{Lang => core}
 
   private[core] object DCE {
 
     /**
-     * Eliminates unused valdefs (dead code) from a [[Tree]].
+     * Eliminates unused value definitions (dead code) from a tree.
      *
      * == Preconditions ==
-     * - The input `tree` is in ANF (see [[ANF.transform]]).
+     * - The input tree is in ANF (see [[ANF.transform]]).
      *
      * == Postconditions ==
-     * - All unused valdefs are pruned.
-     *
-     * @param tree The [[Tree]] to be pruned.
-     * @return A [[Tree]] with the same semantics but without unused valdefs.
+     * - All unused value definitions are pruned.
      */
-    def dce(tree: Tree): Tree = {
+    lazy val transform: u.Tree => u.Tree =
+      api.BottomUp.withValUses.transformWith {
+        case Attr(let @ core.Let(vals, defs, expr), _, _, syn) =>
+          def refs(tree: u.Tree) = syn(tree).head.keySet
+          val liveRefs = vals.foldRight(refs(expr)) {
+            case (core.ValDef(lhs, rhs, _), live) =>
+              if (live(lhs)) live | refs(rhs) else live
+          }
 
-      // create a mutable local copy of uses to keep track of unused terms
-      val meta = new Core.Meta(tree)
-      val uses = collection.mutable.Map() ++ meta.uses
-
-      // initialize iteration variables
-      var done = false
-      var rslt = tree
-
-      val decrementUses: Tree => Unit = traverse {
-        case id@Ident(_) if uses.contains(id.symbol) =>
-          uses(id.symbol) -= 1
-          done = false
-      }
-
-      val transform = new postWalk(true) {
-
-        import ComprehensionSyntax.comprehension
-
-        override def template = {
-          // Skip comprehension blocks
-          case Block(stats, expr) if !comprehensionChild() =>
-            block(
-              stats filter {
-                case vd@val_(sym, rhs, _) if uses.getOrElse(sym, 0) < 1 =>
-                  decrementUses(rhs)
-                  false
-                case _ =>
-                  true
-              },
-              expr)
-        }
-
-        /** Check if the current tree is a child of a `comprehension` application. */
-        private def comprehensionChild(): Boolean = ancestors.headOption.exists {
-          case Method.call(_, `comprehension`, _, _) => true
-          case _ => false
-        }
-      }
-
-      while (!done) {
-        done = true
-        val t = transform(rslt)
-        rslt = t
-      }
-
-      rslt
-    }
+          val liveVals = vals.filter(liveRefs compose api.TermSym.of)
+          if (liveVals.size == vals.size) let
+          else core.Let(liveVals: _*)(defs: _*)(expr)
+      }.andThen(_.tree)
   }
-
 }

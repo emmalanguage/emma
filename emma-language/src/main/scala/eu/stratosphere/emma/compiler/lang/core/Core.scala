@@ -293,15 +293,14 @@ trait Core extends Common
     // DCE API
     // -------------------------------------------------------------------------
 
-    /** Delegates to [[DCE.dce()]]. */
-    def dce(tree: u.Tree): u.Tree =
-      DCE.dce(tree)
+    /** Delegates to [[DCE.transform]]. */
+    lazy val dce = DCE.transform
 
     // -------------------------------------------------------------------------
     // CSE API
     // -------------------------------------------------------------------------
 
-    /** Delegates to [[DCE.dce()]]. */
+    /** Delegates to [[CSE.cse()]]. */
     def cse(tree: u.Tree): u.Tree =
       CSE.cse(tree)
 
