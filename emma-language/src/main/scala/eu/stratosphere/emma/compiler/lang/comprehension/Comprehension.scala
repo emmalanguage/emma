@@ -119,7 +119,7 @@ trait Comprehension extends Common
           api.Type of expr
       }
 
-      /** Con- and destructs a generator from/to a [[Tree]]. */
+      /** Con- and destructs a generator from/to a tree. */
       object Generator {
         val symbol = ComprehensionSyntax.generator
 
@@ -139,7 +139,7 @@ trait Comprehension extends Common
           api.Type.arg(1, api.Type of expr)
       }
 
-      /** Con- and destructs a guard from/to a [[Tree]]. */
+      /** Con- and destructs a guard from/to a tree. */
       object Guard {
         val symbol = ComprehensionSyntax.guard
 
@@ -154,7 +154,7 @@ trait Comprehension extends Common
         }
       }
 
-      /** Con- and destructs a head from/to a [[Tree]]. */
+      /** Con- and destructs a head from/to a tree. */
       object Head {
         val symbol = ComprehensionSyntax.head
 
@@ -173,7 +173,7 @@ trait Comprehension extends Common
           api.Type of expr
       }
 
-      /** Con- and destructs a flatten from/to a [[Tree]]. */
+      /** Con- and destructs a flatten from/to a tree. */
       object Flatten {
         val symbol = ComprehensionSyntax.flatten
 

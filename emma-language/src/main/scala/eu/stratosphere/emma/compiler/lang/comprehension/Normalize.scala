@@ -21,9 +21,9 @@ private[comprehension] trait Normalize extends Common {
     /**
      * Normalizes nested mock-comprehension syntax.
      *
-     * @param monad The [[Symbol]] of the monad syntax to be normalized.
-     * @param tree  The [[Tree]] to be resugared.
-     * @return The input [[Tree]] with resugared comprehensions.
+     * @param monad The symbol of the monad syntax to be normalized.
+     * @param tree The tree to be resugared.
+     * @return The input tree with resugared comprehensions.
      */
     def normalize(monad: u.Symbol)(tree: u.Tree): u.Tree = {
       // construct comprehension syntax helper for the given monad

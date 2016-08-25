@@ -107,7 +107,7 @@ trait Common extends ReflectUtil with AST {
       allowed.reduceLeft(_ orElse _)
 
     case class Error(at: Tree, violation: String) {
-      override def toString = s"$violation:\n${Tree show at}"
+      override def toString = s"$violation:\n${api.Tree.show(at)}"
     }
 
     case class all(trees: Seq[Tree]) {
