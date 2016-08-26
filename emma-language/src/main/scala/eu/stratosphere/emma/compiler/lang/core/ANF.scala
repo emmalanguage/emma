@@ -39,7 +39,7 @@ private[core] trait ANF extends Common {
           tree
 
         // Bypass atomics (except in lambdas, methods and comprehensions)
-        case Attr.inh(src.Atomic(atom), _ :: _ :: parent :: _) => parent match {
+        case Attr.inh(src.Atomic(atom), _ :: _ :: Some(parent) :: _) => parent match {
           case src.Lambda(_, _, _) => src.Block()(atom)
           case core.DefDef(_, _, _, _, _) => src.Block()(atom)
           case Comprehension(_) => src.Block()(atom)
@@ -57,8 +57,8 @@ private[core] trait ANF extends Common {
         // Bypass local method calls in branches
         case Attr.inh(
           call @ src.DefCall(_, method, _, _*),
-          _ :: _ :: src.Branch(_, _, _) :: local :: _)
-          if local contains method => call
+          _ :: _ :: Some(src.Branch(_, _, _)) :: local :: _
+        ) if local contains method => call
 
         // Simplify RHS
         case Attr.none(src.VarMut(lhs, rhs)) =>

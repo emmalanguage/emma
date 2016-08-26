@@ -51,7 +51,7 @@ trait AST extends CommonAST
   /** Normalizes all statements in term position by wrapping them in a block. */
   lazy val normalizeStatements: u.Tree => u.Tree =
     api.BottomUp.withParent.transformWith {
-      case Attr.inh(mol @ (api.VarMut(_, _) | api.Loop(_, _)), (_: u.Block) :: _) =>
+      case Attr.inh(mol @ (api.VarMut(_, _) | api.Loop(_, _)), Some(_: u.Block) :: _) =>
         mol
       case Attr.none(mol @ (api.VarMut(_, _) | api.Loop(_, _))) =>
         api.Block(mol)()
