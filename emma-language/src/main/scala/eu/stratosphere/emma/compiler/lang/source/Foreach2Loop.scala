@@ -3,7 +3,6 @@ package compiler.lang.source
 
 import compiler.Common
 
-import cats.std.all._
 import shapeless._
 
 import scala.collection.generic.{CanBuildFrom, FilterMonadic}
@@ -39,24 +38,18 @@ private[source] trait Foreach2Loop extends Common {
     /** The Foreach2Loop transformation. */
     lazy val transform: u.Tree => u.Tree = {
       val asInst = api.Type.any.member(api.TermName("asInstanceOf")).asTerm
-      api.BottomUp.withOwner
-        // Collect variable definitions
-        .synthesize(Attr.collect[Set, u.TermSymbol] {
-        case src.VarDef(lhs, _, _) => lhs
-      })
-        // Collect variable assignments
-        .synthesize(Attr.collect[Set, u.TermSymbol] {
-        case src.VarMut(lhs, _) => lhs
-      }).transformWith {
-        case Attr(
-        src.DefCall(xs @ Some(_ withType xsTpe), method, _,
-        Seq(src.Lambda(_, Seq(src.ParDef(arg, _, _)), body))),
-        _, owner :: _, muts :: defs :: _
-        ) if !muts.subsetOf(defs)
-          && (method == FM.foreach
-          || method == api.Sym.foreach
-          || method.overrides.contains(api.Sym.foreach)
-          ) =>
+      api.BottomUp.withOwner.withVarDefs.withAssignments
+        .transformWith {
+          case Attr.all(
+            src.DefCall(xs @ Some(_ withType xsTpe), method, _,
+            Seq(src.Lambda(_, Seq(src.ParDef(arg, _, _)), body))),
+            _, owner :: _, muts :: defs :: _
+          ) if {
+            def isForeach = method == FM.foreach || method == api.Sym.foreach
+            def overridesForeach = method.overrides.contains(api.Sym.foreach)
+            def modifiesClosure = !muts.keySet.subsetOf(defs.keySet)
+            (isForeach || overridesForeach) && modifiesClosure
+          } =>
 
           val Elem = api.Type.of(arg)
           val elem = api.VarSym(owner, fresh(arg), Elem)
@@ -76,6 +69,7 @@ private[source] trait Foreach2Loop extends Common {
           val hasNext = Iter.member(api.TermName("hasNext")).asTerm
           val next = Iter.member(api.TermName("next")).asTerm
           val mut = src.VarMut(elem, src.DefCall(target)(next)(Seq.empty))
+
           src.Block(
             src.ValDef(iter,
               src.DefCall(trav)(toIter)()),
