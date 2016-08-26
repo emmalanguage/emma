@@ -87,8 +87,8 @@ private[core] trait DSCF extends Common {
     /** Attribute that tracks the two latest values of a variable. */
     private type Trace = Map[(u.Symbol, u.TermName), List[u.TermSymbol]]
 
-    /** Transformation strategy with attributes. */
-    private lazy val dscfStrategy = api.TopDown
+    /** The Direct-Style Control-Flow (DSCF) transformation. */
+    lazy val transform: u.Tree => u.Tree = api.TopDown
       .withBindUses.withVarDefs.withOwnerChain
       // Collect all variable assignments in a set sorted by name.
       .synthesize(Attr.collect[SortedSet, u.TermSymbol] {
@@ -108,10 +108,7 @@ private[core] trait DSCF extends Common {
           (for (core.ParDef(lhs, _, _) <- paramss.flatten)
             yield (method, lhs.name) -> List(lhs)).toMap
       } (Monoids.merge(Monoids.sliding(2)))
-
-    /** The actual DSCF transformation. */
-    private lazy val dscfTransform: Transform[dscfStrategy.Acc, dscfStrategy.Inh, dscfStrategy.Syn] =
-      dscfStrategy.transformWith {
+      .transformWith {
         // Linear transformations
         case Attr(src.VarDef(lhs, rhs, _), trace :: _, owners :: _, _) =>
           core.ValDef(latest(lhs, owners, trace).head, rhs)
@@ -122,8 +119,12 @@ private[core] trait DSCF extends Common {
           core.BindingRef(latest(lhs, owners, trace).head)
 
         // Control-flow elimination
-        case Attr.inh(block @ src.Block(stats, expr withType tpe), owners :: _) =>
+        case Attr(block @ src.Block(stats, expr withType tpe), _, owners :: _, syn) =>
+          // Extract required attributes
           val owner = owners.lastOption.getOrElse(get.enclosingOwner)
+          def uses(tree: u.Tree) = syn(tree)(Nat._2)
+          def mods(tree: u.Tree) = syn(tree) match { case ms :: ds :: _ => ms diff ds.keySet }
+
           stats.span { // Split blocks
             case src.ValDef(_, src.Branch(_, _, _), _) => false
             case src.Loop(_, _) => false
@@ -160,7 +161,6 @@ private[core] trait DSCF extends Common {
               def branchDefCall(name: u.TermName, body: u.Tree) = body match {
                 case src.Block(branchStats, branchExpr) =>
                   val meth = api.DefSym(owner, name)()(Seq.empty)(tpe)
-                  val temp = api.ValSym(meth, fresh("tmp"), tpe)
                   val call = core.DefCall()(meth)(Seq.empty)
                   val args = sufArgs ++ (if (usesRes) Some(branchExpr) else None)
                   val defn = core.DefDef(meth)()(Seq.empty)(
@@ -195,6 +195,7 @@ private[core] trait DSCF extends Common {
               val loopArgs = varArgs(loopVars)
               val loopPars = varPars(loopVars)
               val loopMeth = api.DefSym(owner, api.TermName.While())()(loopPars)(tpe)
+              val loopCall = core.DefCall()(loopMeth)(loopArgs)
 
               // Suffix
               val sufBody = src.Block(suffix: _*)(expr)
@@ -209,18 +210,16 @@ private[core] trait DSCF extends Common {
               val bodyPars = if (bodyVars.size == loopVars.size) loopPars else varPars(bodyVars)
               val bodyMeth = api.DefSym(loopMeth, fresh("body"))()(bodyPars)(tpe)
 
-              src.Block(prefix ++ Seq(
+              src.Block(prefix :+
                 core.DefDef(loopMeth)()(loopPars)(
                   src.Block(condStats ++ Seq(
                     core.DefDef(bodyMeth)()(bodyPars)(
-                      src.Block(
-                        bodyStats: _*)(
-                        core.DefCall()(loopMeth)(loopArgs))),
+                      src.Block(bodyStats: _*)(loopCall)),
                     core.DefDef(sufMeth)()(sufPars)(sufBody)): _*)(
                     core.Branch(condExpr,
                       core.DefCall()(bodyMeth)(bodyArgs),
-                      core.DefCall()(sufMeth)(sufArgs))))): _*)(
-                core.DefCall()(loopMeth)(loopArgs))
+                      core.DefCall()(sufMeth)(sufArgs)))): _*)(
+                loopCall)
 
             // Do-while loop
             case (prefix, Seq(loop @ src.DoWhile(cond, src.Block(bodyStats, _)), suffix@_*)) =>
@@ -231,26 +230,23 @@ private[core] trait DSCF extends Common {
               val loopArgs = varArgs(loopVars)
               val loopPars = varPars(loopVars)
               val loopMeth = api.DefSym(owner, api.TermName.DoWhile())()(loopPars)(tpe)
+              val loopCall = core.DefCall()(loopMeth)(loopArgs)
 
               // Suffix
               val sufMeth = api.DefSym(loopMeth, fresh("suffix"))()(Seq.empty)(tpe)
 
-              src.Block(prefix ++ Seq(
+              src.Block(prefix :+
                 core.DefDef(loopMeth)()(loopPars)(
                   src.Block(bodyStats ++ condStats ++ Seq(
                     core.DefDef(sufMeth)()(Seq.empty)(
                       src.Block(suffix: _*)(expr))): _*)(
                     core.Branch(condExpr,
-                      core.DefCall()(loopMeth)(loopArgs),
-                      core.DefCall()(sufMeth)(Seq.empty))))): _*)(
-                core.DefCall()(loopMeth)(loopArgs))
+                      loopCall,
+                      core.DefCall()(sufMeth)(Seq.empty)))): _*)(
+                loopCall)
           }
-      }
-
-    /** The Direct-Style Control-Flow (DSCF) transformation. */
-    lazy val transform: u.Tree => u.Tree =
-      dscfTransform andThen { case Attr.acc(tree, _ :: params :: _) =>
-        api.Tree.refresh(params: _*)(tree) // refresh all DefDef parameters
+      }.andThen { case Attr.acc(tree, _ :: params :: _) =>
+        api.Tree.refresh(params: _*)(tree) // Refresh all DefDef parameters.
       }
 
     // ---------------
@@ -262,16 +258,6 @@ private[core] trait DSCF extends Common {
       case src.Block(stats, expr) => (stats, expr)
       case _ => (Seq.empty, tree)
     }
-
-    /** Variable modifications in `tree` (synthesized attribute). */
-    private def mods(tree: u.Tree) = {
-      val muts :: defs :: _ = dscfTransform.syn(tree)
-      muts diff defs.keySet
-    }
-
-    /** Binding uses in `tree` (synthesized attribute). */
-    private def uses(tree: u.Tree) =
-      dscfTransform.syn(tree).tail.tail.head
 
     /** Creates a fresh symbol for the latest value of a variable. */
     private def trace(variable: u.TermSymbol, owners: Seq[u.Symbol]) = {
