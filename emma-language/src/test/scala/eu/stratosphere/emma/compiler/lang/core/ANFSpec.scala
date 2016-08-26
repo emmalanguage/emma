@@ -135,15 +135,13 @@ class ANFSpec extends BaseCompilerSpec {
 
   "type ascriptions" in {
     val act = anfPipeline(u.reify {
-      val a = x: Int
-      val b = a + 5
-      b
+      (x: AnyVal).toString
     })
 
     val exp = idPipeline(u.reify {
       val a$1 = x
-      val a$2 = a$1: Int
-      val b$1 = a$2 + 5
+      val a$2 = a$1: AnyVal
+      val b$1 = a$2.toString
       b$1
     })
 

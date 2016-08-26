@@ -22,14 +22,12 @@ class TransitiveClosureSpec extends BaseCompilerSpec {
 
   val anfPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
-      Core.anf,
-      Core.removeTrivialTypeAscrs
+      Core.anf
     ).compose(_.tree)
 
   val liftPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
-      Core.lift,
-      Core.removeTrivialTypeAscrs
+      Core.lift
     ).compose(_.tree)
 
   // ---------------------------------------------------------------------------

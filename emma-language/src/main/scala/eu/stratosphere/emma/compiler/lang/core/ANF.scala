@@ -5,7 +5,7 @@ import compiler.Common
 import compiler.lang.source.Source
 import util.Monoids
 
-import cats.implicits._
+import cats.std.all._
 import shapeless._
 
 import scala.annotation.tailrec
@@ -21,19 +21,15 @@ private[core] trait ANF extends Common {
   /** Administrative Normal Form (ANF) bypassing control-flow and for-comprehensions. */
   private[core] object ANF {
 
-    /** Attributes required by the ANF transformation. */
-    private lazy val anfAttr = api.BottomUp
-      // Inherit all method definitions from the root
+    /** The ANF transformation. */
+    private lazy val anf: u.Tree => u.Tree = api.BottomUp
+      // Inherit all method definitions in scope.
       .inherit { case core.Let(_, defs, _) =>
         (for (core.DefDef(method, _, _, _, _) <- defs) yield method).toSet
       }
-      // Keep track if the current tree is a subtree of a type-tree
+      // Keep track if the current tree is a subtree of a type-tree.
       .withParent.inherit { case tree => is.tpe(tree) } (Monoids.disj)
-      .withOwner
-
-    /** The ANF transformation. */
-    private lazy val anfTransform: u.Tree => u.Tree =
-      anfAttr.transformWith {
+      .withOwner.transformWith {
         // Bypass type-trees
         case Attr.inh(tree, _ :: true :: _) =>
           tree
@@ -58,34 +54,38 @@ private[core] trait ANF extends Common {
         case Attr.inh(
           call @ src.DefCall(_, method, _, _*),
           _ :: _ :: Some(src.Branch(_, _, _)) :: local :: _
-        ) if local contains method => call
+        ) if local(method) => call
 
         // Simplify RHS
         case Attr.none(src.VarMut(lhs, rhs)) =>
-          val (stats, expr) = decompose(rhs, simplify = true)
+          val (stats, expr) = decompose(rhs, unline = true)
           val mut = src.VarMut(lhs, expr)
           if (stats.isEmpty) mut
           else src.Block(stats :+ mut: _*)()
 
         // Simplify RHS
         case Attr.none(src.BindingDef(lhs, rhs, flags)) =>
-          val (stats, expr) = decompose(rhs, simplify = true)
+          val (stats, expr) = decompose(rhs, unline = true)
           val dfn = core.BindingDef(lhs, expr, flags)
           src.Block(stats :+ dfn: _*)()
 
         // Simplify expression
         case Attr.inh(src.TypeAscr(target, tpe), owner :: _) =>
-          val (stats, expr) = decompose(target, simplify = false)
-          val nme = api.TermName.fresh(nameOf(expr))
-          val lhs = api.ValSym(owner, nme, tpe)
-          val rhs = core.TypeAscr(expr, tpe)
-          val dfn = core.ValDef(lhs, rhs)
-          val ref = core.ValRef(lhs)
-          src.Block(stats :+ dfn: _*)(ref)
+          val (stats, expr) = decompose(target, unline = false)
+          if (tpe =:= api.Type.of(expr)) {
+            src.Block(stats: _*)(expr)
+          } else {
+            val nme = api.TermName.fresh(nameOf(expr))
+            val lhs = api.ValSym(owner, nme, tpe)
+            val rhs = core.TypeAscr(expr, tpe)
+            val dfn = core.ValDef(lhs, rhs)
+            val ref = core.ValRef(lhs)
+            src.Block(stats :+ dfn: _*)(ref)
+          }
 
         // Simplify target
         case Attr.inh(src.ModuleAcc(target, module) withType tpe, owner :: _) =>
-          val (stats, expr) = decompose(target, simplify = false)
+          val (stats, expr) = decompose(target, unline = false)
           val nme = api.TermName.fresh(module)
           val lhs = api.ValSym(owner, nme, tpe)
           val rhs = core.ModuleAcc(expr, module)
@@ -99,22 +99,26 @@ private[core] trait ANF extends Common {
           owner :: _ :: _ :: local :: _
         ) =>
           val (tgtStats, tgtExpr) = target
-            .map(decompose(_, simplify = false))
+            .map(decompose(_, unline = false))
             .map { case (stats, expr) => (stats, Some(expr)) }
             .getOrElse(Seq.empty, None)
 
-          val (argStats, argExprss) = decompose(argss, simplify = false)
-          val nme = api.TermName.fresh(method)
-          val lhs = api.ValSym(owner, nme, tpe)
-          val rhs = core.DefCall(tgtExpr)(method, targs: _*)(argExprss: _*)
-          val dfn = core.ValDef(lhs, rhs)
-          val ref = core.ValRef(lhs)
-          if (local contains method) src.Block(tgtStats ++ argStats: _*)(rhs)
-          else src.Block(tgtStats ++ argStats :+ dfn: _*)(ref)
+          val (argStats, argExprss) = decompose(argss, unline = false)
+          val allStats = tgtStats ++ argStats
+          val call = core.DefCall(tgtExpr)(method, targs: _*)(argExprss: _*)
+          if (local contains method) {
+            src.Block(allStats: _*)(call)
+          } else {
+            val nme = api.TermName.fresh(method)
+            val lhs = api.ValSym(owner, nme, tpe)
+            val dfn = core.ValDef(lhs, call)
+            val ref = core.ValRef(lhs)
+            src.Block(allStats :+ dfn: _*)(ref)
+          }
 
         // Simplify arguments
         case Attr.inh(src.Inst(clazz, targs, argss@_*) withType tpe, owner :: _) =>
-          val (stats, exprss) = decompose(argss, simplify = false)
+          val (stats, exprss) = decompose(argss, unline = false)
           val nme = api.TermName.fresh(api.Sym.of(clazz))
           val lhs = api.ValSym(owner, nme, tpe)
           val rhs = core.Inst(clazz, targs: _*)(exprss: _*)
@@ -124,7 +128,7 @@ private[core] trait ANF extends Common {
 
         // Flatten blocks
         case Attr.inh(src.Block(outer, expr), owner :: _) =>
-          val (inner, result) = decompose(expr, simplify = false)
+          val (inner, result) = decompose(expr, unline = false)
           val flat = outer.flatMap {
             case src.Block(stats, src.Atomic(_)) => stats
             case src.Block(stats, stat) => stats :+ stat
@@ -146,14 +150,17 @@ private[core] trait ANF extends Common {
           src.Branch(cond, thn, els) withType tpe,
           owner :: _ :: _ :: local :: _
         ) =>
-          val (stats, expr) = decompose(cond, simplify = false)
+          val (stats, expr) = decompose(cond, unline = false)
           val branch = core.Branch(expr, thn, els)
-          val nme = api.TermName.fresh("if")
-          val lhs = api.ValSym(owner, nme, tpe)
-          val dfn = core.ValDef(lhs, branch)
-          val ref = core.ValRef(lhs)
-          if (isDSCF(branch)(local)) src.Block(stats: _*)(branch)
-          else src.Block(stats :+ dfn: _*)(ref)
+          if (isDSCF(branch)(local)) {
+            src.Block(stats: _*)(branch)
+          } else {
+            val nme = api.TermName.fresh("if")
+            val lhs = api.ValSym(owner, nme, tpe)
+            val dfn = core.ValDef(lhs, branch)
+            val ref = core.ValRef(lhs)
+            src.Block(stats :+ dfn: _*)(ref)
+          }
       }.andThen(_.tree)
 
     /**
@@ -173,7 +180,7 @@ private[core] trait ANF extends Common {
     lazy val transform: u.Tree => u.Tree = (tree: u.Tree) => {
       lazy val clashes = nameClashes(tree)
       assert(clashes.isEmpty, s"Tree has name clashes:\n${clashes.mkString(", ")}")
-      anfTransform(tree)
+      anf(tree)
     }
 
     /**
@@ -205,17 +212,12 @@ private[core] trait ANF extends Common {
      * - `Ident` return expressions in blocks have been introduced whenever possible.
      */
     lazy val uninlineLetExprs: u.Tree => u.Tree = api.TopDown
-      // Inherit all method definitions from the root.
+      // Accumulate all method definitions seen so far.
       .accumulate { case core.Let(_, defs, _) =>
         (for (core.DefDef(method, _, _, _, _) <- defs) yield method).toSet
       }.withOwner.transformWith {
         case Attr.acc(let @ core.Let(_, _, expr), local :: _)
-          if (expr match { // Bypass
-            case core.Lit(_) => true
-            case core.Ref(_) => true
-            case core.Branch(_, _, _) => true
-            case core.DefCall(_, method, _, _*) => local(method)
-          }) => let
+          if isDSCF(expr)(local) => let
 
         case Attr.inh(core.Let(vals, defs, expr), owner :: _) =>
           val nme = api.TermName.fresh("x")
@@ -224,47 +226,6 @@ private[core] trait ANF extends Common {
           val dfn = core.ValDef(lhs, expr)
           core.Let(vals :+ dfn: _*)(defs: _*)(ref)
       }.andThen(_.tree)
-
-    /**
-     * Eliminates trivial type ascriptions.
-     *
-     * == Preconditions ==
-     * - The input `tree` is in ANF (see [[transform]]).
-     *
-     * == Postconditions ==
-     * - Trivial type ascriptions have been inlined.
-     */
-    lazy val removeTrivialTypeAscrs: u.Tree => u.Tree = tree => {
-      val aliases = Map.newBuilder[u.TermSymbol, u.TermSymbol]
-
-      val result = api.BottomUp.transform {
-        case tree@core.TypeAscr(expr, tpe) if expr.tpe =:= tpe =>
-          expr
-        case tree@core.ValDef(lhs, core.Ref(rhs), _) =>
-          aliases += lhs -> rhs
-          tree
-      }.andThen(_.tree)(tree)
-
-      // compute closure of `aliases` map
-      var rslt = Map.empty[u.TermSymbol, u.TermSymbol]
-      var dlta = aliases.result()
-      while (dlta.nonEmpty) {
-        rslt = rslt ++ dlta
-        dlta = for ((s1, s2) <- rslt; s3 <- rslt.get(s2)) yield s1 -> s3
-      }
-
-      api.BottomUp.transform {
-        case tree@core.Ref(sym) =>
-          // substitute aliasses
-          core.Ref(rslt.getOrElse(sym, sym))
-        case tree@core.Let(vals, defs, expr) =>
-          // filter valdefs
-          core.Let(vals filterNot {
-            case core.ValDef(sym, _, _) => rslt.contains(sym)
-            case _ => false
-          }: _*)(defs: _*)(expr)
-      }.andThen(_.tree)(result)
-    }
 
     /**
      * Un-nests nested blocks.
@@ -277,17 +238,23 @@ private[core] trait ANF extends Common {
      */
     lazy val flatten: u.Tree => u.Tree =
       api.BottomUp.transform {
-        case parent@core.Let(vals, defs, expr) if hasNestedLets(parent) =>
-
-          // Flatten nested let expressions in valdef position without control flow
+        case parent @ core.Let(vals, defs, expr) if hasNestedLets(parent) =>
+          // Flatten nested let expressions in value position without control flow.
           val flatVals = vals.flatMap {
-            case core.ValDef(x, LetValsAndExpr(nestedVals, nestedExpr), flags) =>
-              nestedVals :+ core.ValDef(x, nestedExpr, flags)
-            case valDef =>
-              Seq(valDef)
+            case core.ValDef(lhs, core.Let(nestedVals, Seq(), nestedExpr), flags) =>
+              (nestedVals, nestedExpr) match {
+                // Match: { ..vals; val x = expr; x }
+                case (prefix :+ core.ValDef(x, rhs, _), core.ValRef(y))
+                  if x == y => prefix :+ core.ValDef(lhs, rhs, flags)
+                // Match: { ..vals; expr }
+                case (prefix, rhs) =>
+                  prefix :+ core.ValDef(lhs, rhs, flags)
+              }
+            case value =>
+              Some(value)
           }
 
-          // Flatten nested let expressions in expr position without control flow
+          // Flatten nested let expressions in expr position without control flow.
           val (exprVals, flatExpr) = expr match {
             case core.Let(nestedVals, Seq(), nestedExpr) =>
               (nestedVals, nestedExpr)
@@ -295,21 +262,7 @@ private[core] trait ANF extends Common {
               (Seq.empty, expr)
           }
 
-          // Handle degenerate case where the suffix is of the form
-          // { ...; val x2 = x3; val x1 = x2; val x1}
-          val (trimmedVals, trimmedExpr) = {
-
-            @tailrec
-            def trim(vals: Seq[u.ValDef], expr: u.Tree): (Seq[u.ValDef], u.Tree) = (vals, expr) match {
-              case (pre :+ core.ValDef(x1, rhs@core.Ref(x2), _), core.Ref(ref)) if ref == x1 =>
-                trim(pre, rhs)
-              case (_, _) =>
-                (vals, expr)
-            }
-
-            trim(flatVals ++ exprVals, flatExpr)
-          }
-
+          val (trimmedVals, trimmedExpr) = trimVals(flatVals ++ exprVals, flatExpr)
           core.Let(trimmedVals: _*)(defs: _*)(trimmedExpr)
       }.andThen(_.tree)
 
@@ -317,14 +270,24 @@ private[core] trait ANF extends Common {
     // Helper methods
     // ---------------
 
+    // Handle degenerate cases where the suffix is of the form:
+    // { ..vals; val x2 = x3; val x1 = x2; x1 }
+    private def trimVals(vals: Seq[u.ValDef], expr: u.Tree): (Seq[u.ValDef], u.Tree) =
+      (Seq.empty, vals.foldRight(expr, 0) {
+        case (core.ValDef(x, rhs @ core.Atomic(_), _), (core.ValRef(y), n))
+          if x == y => (rhs, n + 1)
+        case (_, (rhs, n)) =>
+          return (vals.dropRight(n), rhs)
+      }._1)
+
     /** Does the input `let` block contain nested `let` expressions? */
     private def hasNestedLets(let: u.Block): Boolean = {
-      lazy val inStats = let.stats.exists {
+      def inStats = let.stats.exists {
         case core.ValDef(_, core.Let(_, Seq(), _), _) => true
         case _ => false
       }
-      lazy val inExpr = let.expr match {
-        case core.Let(_, _, _) => true
+      def inExpr = let.expr match {
+        case core.Let(_, Seq(), _) => true
         case _ => false
       }
       inStats || inExpr
@@ -345,57 +308,59 @@ private[core] trait ANF extends Common {
     }
 
     /** Decomposes a [[src.Block]] into statements and expressions. */
-    private def decompose(tree: u.Tree, simplify: Boolean)
+    private def decompose(tree: u.Tree, unline: Boolean)
       : (Seq[u.Tree], u.Tree) = tree match {
         case src.Block(stats :+ src.ValDef(x, rhs, _), src.ValRef(y))
-          if simplify && x == y => (stats, rhs)
+          if unline && x == y => (stats, rhs)
         case src.Block(stats, expr) =>
           (stats, expr)
         case _ =>
           (Seq.empty, tree)
       }
 
+    /** Decomposes a nested sequence of [[src.Block]]s into statements and expressions. */
+    private def decompose(treess: Seq[Seq[u.Tree]], unline: Boolean)
+      : (Seq[u.Tree], Seq[Seq[u.Tree]]) = {
+
+      val stats = for {
+        trees <- treess
+        tree <- trees
+        stat <- decompose(tree, unline)._1
+      } yield stat
+
+      val exprss = for (trees <- treess)
+        yield for (tree <- trees)
+          yield decompose(tree, unline)._2
+
+      (stats, exprss)
+    }
+
     /** Checks whether the given expression represents direct-style control-flow. */
-    private def isDSCF(expr: u.Tree)(local: Set[u.MethodSymbol]): Boolean = expr match {
+    private def isDSCF(expr: u.Tree)(isLocal: u.MethodSymbol => Boolean): Boolean = expr match {
       //@formatter:off
       // 1a) branch with one local method call and one atomic
-      case src.Branch(_,
-        src.DefCall(_, thn, _, _),
-        src.Atomic(_)
-      ) => local contains thn
+      case core.Branch(core.Atomic(_),
+        core.DefCall(_, thn, _, _),
+        core.Atomic(_)
+      ) => isLocal(thn)
       // 1b) reversed version of 1a
-      case src.Branch(_,
-        src.Atomic(_),
-        src.DefCall(_, els, _, _)
-      ) => local contains els
+      case core.Branch(core.Atomic(_),
+        core.Atomic(_),
+        core.DefCall(_, els, _, _)
+      ) => isLocal(els)
       // 2) branch with two local method calls
-      case src.Branch(_,
-        src.DefCall(_, thn, _, _),
-        src.DefCall(_, els, _, _)
-      ) => (local contains thn) && (local contains els)
+      case core.Branch(core.Atomic(_),
+        core.DefCall(_, thn, _, _),
+        core.DefCall(_, els, _, _)
+      ) => isLocal(thn) && isLocal(els)
       // 3) simple local method call
-      case src.DefCall(_, sym, _, _) =>
-        local contains sym
-      // 4) something else
+      case core.DefCall(_, method, _, _) => isLocal(method)
+      // 4) simple atomic
+      case core.Atomic(_) => true
+      // 5) anything else
       case _ => false
       //@formatter:on
     }
-
-    /** Decomposes a nested sequence [[src.Block]]s into statements and expressions. */
-    private def decompose(treess: Seq[Seq[u.Tree]], simplify: Boolean)
-      : (Seq[u.Tree], Seq[Seq[u.Tree]]) = {
-        val stats = for {
-          trees <- treess
-          tree <- trees
-          stat <- decompose(tree, simplify)._1
-        } yield stat
-
-        val exprss = for (trees <- treess)
-          yield for (tree <- trees)
-            yield decompose(tree, simplify)._2
-
-        (stats, exprss)
-      }
 
     /** Extractor for arbitrary comprehensions. */
     private object Comprehension {
@@ -403,18 +368,6 @@ private[core] trait ANF extends Common {
         case src.DefCall(Some(_), method, _, _*)
           if ComprehensionSyntax.ops(method) => Some(tree)
         case _ => None
-      }
-    }
-
-    /** Extractor for vals and expr from `let` blocks without control flow. Unifies `expr` extraction. */
-    private object LetValsAndExpr {
-      def unapply(tree: u.Block): Option[(Seq[u.ValDef], u.Tree)] = tree match {
-        // Match: `{ $vals; val x = $expr; x }`
-        case core.Let(vals :+ core.ValDef(x1, expr, _), Seq(), core.Ref(x2)) if x1 == x2 =>
-          Some(vals, expr)
-        // Match: `{ $vals; $expr; }`
-        case core.Let(vals, Seq(), expr) =>
-          Some(vals, expr)
       }
     }
   }

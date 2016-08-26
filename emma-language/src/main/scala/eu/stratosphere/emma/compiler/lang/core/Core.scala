@@ -289,9 +289,6 @@ trait Core extends Common
     /** Delegates to [[ANF.uninlineLetExprs]]. */
     lazy val uninlineLetExprs = ANF.uninlineLetExprs
 
-    /** Delegates to [[ANF.removeTrivialTypeAscrs]]. */
-    lazy val removeTrivialTypeAscrs = ANF.removeTrivialTypeAscrs
-
     // -------------------------------------------------------------------------
     // DCE API
     // -------------------------------------------------------------------------
