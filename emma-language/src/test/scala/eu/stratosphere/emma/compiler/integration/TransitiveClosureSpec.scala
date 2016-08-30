@@ -104,10 +104,6 @@ class TransitiveClosureSpec extends BaseCompilerSpec {
   // ---------------------------------------------------------------------------
 
   "lifting" in {
-
-    println(Core.prettyPrint(sourceExpr))
-    println(Core.prettyPrint(coreExpr))
-
     sourceExpr shouldBe alphaEqTo(coreExpr)
   }
 }
