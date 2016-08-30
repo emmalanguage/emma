@@ -45,7 +45,17 @@ private[source] trait PatternMatching extends Common {
           mat @ src.PatMat(target withType tpe, src.PatCase(pat, src.Empty(_), body), _*),
           owner :: _) =>
 
-          target match {
+          // remove potential type ascriptions from the target
+          val (unascr, tpe) = target match {
+            // of the form `(expr: T@unchecked)`, if the type of `expr` is `T`
+            case src.TypeAscr(expr withType tpe1, u.AnnotatedType(Seq(unchecked), tpe2))
+              if tpe1 =:= tpe2 => (expr, tpe1)
+            // otherwise
+            case _ withType tpe3 =>
+              (target, tpe3)
+          }
+
+          unascr match {
             case src.Ref(lhs) =>
               val vals = irrefutable(src.Ref(lhs), pat)
               assert(vals.isDefined, s"Unsupported refutable pattern matching:\n${api.Tree.show(mat)}")

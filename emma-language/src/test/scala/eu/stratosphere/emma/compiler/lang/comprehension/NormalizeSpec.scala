@@ -267,13 +267,12 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
 
     val exp = u.reify {
-      val clicks$11: DataBag[Click] = clicks;
+      val clicks$11: DataBag[Click] = clicks
       comprehension[(Long, Instant), DataBag]({
-        val check$ifrefutable$1: Click = generator[Click, DataBag](clicks$11);
+        val check$ifrefutable$1: Click = generator[Click, DataBag](clicks$11)
         head[(Long, Instant)]({
-          val x$2: Click@unchecked = check$ifrefutable$1: Click@unchecked;
-          val adID$6: Long = x$2.adID;
-          val time$6: Instant = x$2.time;
+          val adID$6: Long = check$ifrefutable$1.adID
+          val time$6: Instant = check$ifrefutable$1.time
           Tuple2.apply[Long, Instant](adID$6, time$6)
         })
       })
@@ -294,28 +293,23 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
 
     val exp = u.reify {
-      val clicks$1 = clicks;
-      val ads$1 = ads;
+      val clicks$1 = clicks
+      val ads$1 = ads
       comprehension[(Long, Instant), DataBag]({
         val click$1 = generator[Click, DataBag]({
           clicks$1
-        });
+        })
         val ad$1 = generator[Ad, DataBag]({
           ads$1
-        });
+        })
         guard({
-          val click$2 = click$1: Click@unchecked
-          val adID$1 = click$2.adID
-          val time$1 = click$2.time
-          val x$5: Ad = ad$1: Ad@unchecked;
-          val ad$2 = ad$1: Ad
-          val id$1 = ad$2.id
+          val adID$1 = click$1.adID
+          val id$1 = ad$1.id
           id$1 == adID$1
-        });
+        })
         head[(Long, Instant)]({
-          val click$3 = click$1: Click@unchecked
-          val adID$2 = click$3.adID;
-          val time$2 = click$3.time;
+          val adID$2 = click$1.adID
+          val time$2 = click$1.time
           Tuple2.apply[Long, Instant](adID$2, time$2)
         })
       })
@@ -336,27 +330,23 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
 
     val exp = u.reify {
-      val clicks$1 = clicks;
-      val ads$1 = ads;
+      val clicks$1 = clicks
+      val ads$1 = ads
       val xs = comprehension[Long, DataBag]({
         val click$1 = generator[Click, DataBag]({
           clicks$1
-        });
+        })
         val ad$1 = generator[Ad, DataBag]({
           ads$1
-        });
+        })
         guard({
-          val click$2 = click$1: Click@unchecked
-          val adID$1 = click$2.adID
-          val time$1 = click$2.time
-          val x$5: Ad = ad$1: Ad@unchecked;
-          val ad$2 = ad$1: Ad
-          val id$1 = ad$2.id
+          val adID$1 = click$1.adID
+          val time$1 = click$1.time
+          val id$1 = ad$1.id
           id$1 == adID$1
-        });
+        })
         head[Long]({
-          val click$3 = click$1: Click@unchecked
-          val time$2 = click$3.time;
+          val time$2 = click$1.time
           time$2.toEpochMilli
         })
       })
@@ -377,14 +367,13 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
 
     val exp = u.reify {
-      val ads$1 = ads;
+      val ads$1 = ads
       val xs = comprehension[String, DataBag]({
         val ad$1 = generator[Ad, DataBag]({
           ads$1
-        });
+        })
         val token = generator[String, DataBag]({
-          val x$5: Ad = ad$1: Ad@unchecked;
-          val x$6 = x$5.name
+          val x$6 = ad$1.name
           val x$7 = x$6.split("\\s+")
           val x$8 = wrapRefArray[String](x$7)
           val x$9 = DataBag(x$8)
@@ -425,9 +414,8 @@ class NormalizeSpec extends BaseCompilerSpec {
           ads$1
         })
         head[(Long, String)]({
-          val x$16 = check$ifrefutable$7: Ad
-          val id$29 = x$16.id
-          val name$19 = x$16.name
+          val id$29 = check$ifrefutable$7.id
+          val name$19 = check$ifrefutable$7.name
           (id$29, name$19)
         })
       })
@@ -440,17 +428,13 @@ class NormalizeSpec extends BaseCompilerSpec {
           xs
         })
         guard({
-          val x$21$1$3 = check$ifrefutable$8: (Long, String)
-          val id1$1$3 = x$21$1$3._1
-          val x$19 = check$ifrefutable$9: (Long, String)
-          val id2$2 = x$19._1
+          val id1$1$3 = check$ifrefutable$8._1
+          val id2$2 = check$ifrefutable$9._1
           id1$1$3 == id2$2
         })
         head[(String, String)]({
-          val x$21$1$4 = check$ifrefutable$8: (Long, String)
-          val name1$1$4 = x$21$1$4._2
-          val x$20 = check$ifrefutable$9: (Long, String)
-          val name2$1 = x$20._2
+          val name1$1$4 = check$ifrefutable$8._2
+          val name2$1 = check$ifrefutable$9._2
           (name1$1$4, name2$1)
         })
       })

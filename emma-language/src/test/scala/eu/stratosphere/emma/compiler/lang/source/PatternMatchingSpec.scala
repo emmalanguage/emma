@@ -21,6 +21,13 @@ class PatternMatchingSpec extends BaseCompilerSpec {
       tree => time(PatternMatching.destruct(tree), "destruct irrefutable pattern matches")
     ).compose(_.tree)
 
+  val noopPipeline: u.Expr[Any] => u.Tree =
+    compiler.pipeline(typeCheck = true, withPre = false)(
+      fixLambdaTypes,
+      unQualifyStaticModules,
+      normalizeStatements
+    ).compose(_.tree)
+
   "pattern match" - {
     "with ref lhs" in {
 
@@ -28,6 +35,41 @@ class PatternMatchingSpec extends BaseCompilerSpec {
 
       val act = destructPatternMatchesPipeline(u.reify {
         val nameFst = dogs match {
+          case pair@(Dog(name), _) => name
+        }
+
+        val nameSnd = dogs match {
+          case (_, snd@Dog(name)) => name
+        }
+
+        nameFst == nameSnd
+      })
+
+      val exp = idPipeline(u.reify {
+        val nameFst = {
+          val pair = dogs
+          val name = pair._1.name
+          name
+        }
+
+        val nameSnd = {
+          val snd = dogs._2
+          val name = snd.name
+          name
+        }
+
+        nameFst == nameSnd
+      })
+
+      act shouldBe alphaEqTo (exp)
+    }
+
+    "with type-ascribed lhs" in {
+
+      val dogs = (Dog("Max"), Dog("Gidget"))
+
+      val act = destructPatternMatchesPipeline(u.reify {
+        val nameFst = (dogs: (Dog, Dog)@unchecked) match {
           case pair@(Dog(name), _) => name
         }
 
