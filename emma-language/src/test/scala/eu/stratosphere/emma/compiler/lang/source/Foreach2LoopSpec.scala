@@ -12,9 +12,12 @@ class Foreach2LoopSpec extends BaseCompilerSpec {
   import compiler._
 
   val foreach2loopPipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true) {
+    compiler.pipeline(typeCheck = true, withPre = false)(
+      fixLambdaTypes,
+      unQualifyStaticModules,
+      normalizeStatements,
       tree => time(Foreach2Loop.transform(tree), "foreach -> loop")
-    }.compose(_.tree)
+    ).compose(_.tree)
 
   "foreach" - {
     "without closure modification" in {

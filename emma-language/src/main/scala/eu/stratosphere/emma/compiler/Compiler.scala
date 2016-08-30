@@ -18,28 +18,38 @@ trait Compiler extends AlphaEq with Source with Core {
   /** The underlying universe object. */
   override val universe: Universe
 
-  /** Brings a tree into form convenient for transformation. */
-  lazy val preProcess: u.Tree => u.Tree =
-    fixLambdaTypes
-      .andThen(unQualifyStaticModules)
-      .andThen(normalizeStatements)
-      .andThen(Source.normalize)
-      .andThen(resolveNameClashes)
+  /** Standard pipeline prefix. Brings a tree into form convenient for transformation. */
+  lazy val preProcess: Seq[u.Tree => u.Tree] = Seq(
+    fixLambdaTypes,
+    unQualifyStaticModules,
+    normalizeStatements,
+    Source.normalize,
+    resolveNameClashes
+  )
 
-  /** Brings a tree into a form acceptable for `scalac` after being transformed. */
-  lazy val postProcess: u.Tree => u.Tree =
-    qualifyStaticModules
-      .andThen(api.Owner.at(get.enclosingOwner))
+  /** Standard pipelien suffix. Brings a tree into a form acceptable for `scalac` after being transformed. */
+  lazy val postProcess: Seq[u.Tree => u.Tree] = Seq(
+    qualifyStaticModules,
+    api.Owner.at(get.enclosingOwner)
+  )
 
   /** The identity transformation with pre- and post-processing. */
   def identity(typeCheck: Boolean = false): u.Tree => u.Tree =
     pipeline(typeCheck)()
 
   /** Combines a sequence of `transformations` into a pipeline with pre- and post-processing. */
-  def pipeline(typeCheck: Boolean = false)
+  def pipeline(typeCheck: Boolean = false, withPre: Boolean = true, withPost: Boolean = true)
     (transformations: (u.Tree => u.Tree)*): u.Tree => u.Tree = {
 
-    val init = if (typeCheck) preProcess.compose[u.Tree](Type.check(_)) else preProcess
-    transformations.foldLeft(init) { _ andThen _ } andThen postProcess
+    val bld = Seq.newBuilder[u.Tree => u.Tree]
+    //@formatter:off
+    if (typeCheck) bld += { Type.check(_) }
+    if (withPre)   bld ++= preProcess
+    bld ++= transformations
+    if (withPost)  bld ++= postProcess
+    //@formatter:on
+    val trs = bld.result()
+
+    trs.tail.fold(trs.head) { _ andThen _ }
   }
 }
