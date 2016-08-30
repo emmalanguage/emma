@@ -86,8 +86,27 @@ trait AST extends CommonAST
     }.andThen(_.tree)
 
   /** Ensures that all definitions within `tree` have unique names. */
-  lazy val resolveNameClashes: u.Tree => u.Tree = (tree: u.Tree) =>
-    api.Tree.refresh(nameClashes(tree): _*)(tree)
+  lazy val resolveNameClashes: u.Tree => u.Tree = (tree: u.Tree) => {
+    val defs = api.Tree.defs(tree).map(_.name) // unique names in the given `tree`
+    val clashes = nameClashes(tree) // name clashes in the given `tree`
+
+    // helper method, gets the first fresh name that does not collide
+    // with another def in the given `tree`
+    def fresh(nme: u.TermName): u.TermName = {
+      val fsh = api.TermName.fresh(nme)
+      if (defs contains fsh) fresh(nme)
+      else fsh
+    }
+
+    // custom build aliases using the helper `fresh` method
+    lazy val aliases = for {
+      sym <- clashes
+    } yield sym -> api.Sym.copy(sym)(name = fresh(sym.name)).asTerm
+
+    // rename if necessarry
+    if (clashes.isEmpty) tree
+    else api.Tree.rename(aliases: _*)(tree)
+  }
 
   /** Returns the set of symbols in `tree` that have clashing names. */
   def nameClashes(tree: u.Tree): Seq[u.TermSymbol] = for {
