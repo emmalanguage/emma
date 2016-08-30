@@ -45,11 +45,18 @@ private[source] trait PatternMatching extends Common {
           mat @ src.PatMat(target withType tpe, src.PatCase(pat, src.Empty(_), body), _*),
           owner :: _) =>
 
-          val nme = api.TermName.fresh("x")
-          val lhs = api.ValSym(owner, nme, tpe)
-          val vals = irrefutable(src.Ref(lhs), pat)
-          assert(vals.isDefined, s"Unsupported refutable pattern matching:\n${api.Tree.show(mat)}")
-          src.Block(src.ValDef(lhs, target) +: vals.get: _*)(body)
+          target match {
+            case src.Ref(lhs) =>
+              val vals = irrefutable(src.Ref(lhs), pat)
+              assert(vals.isDefined, s"Unsupported refutable pattern matching:\n${api.Tree.show(mat)}")
+              src.Block(vals.get: _*)(body)
+            case _ =>
+              val nme = api.TermName.fresh("x")
+              val lhs = api.ValSym(owner, nme, tpe)
+              val vals = irrefutable(src.Ref(lhs), pat)
+              assert(vals.isDefined, s"Unsupported refutable pattern matching:\n${api.Tree.show(mat)}")
+              src.Block(src.ValDef(lhs, target) +: vals.get: _*)(body)
+          }
       }.andThen(_.tree)
 
     /**
