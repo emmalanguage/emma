@@ -43,13 +43,11 @@ trait Compiler extends AlphaEq with Source with Core {
 
     val bld = Seq.newBuilder[u.Tree => u.Tree]
     //@formatter:off
-    if (typeCheck) bld += { Type.check(_) }
+    if (typeCheck) bld += { api.Type.check(_) }
     if (withPre)   bld ++= preProcess
     bld ++= transformations
     if (withPost)  bld ++= postProcess
     //@formatter:on
-    val trs = bld.result()
-
-    trs.tail.fold(trs.head) { _ andThen _ }
+    Function.chain(bld.result())
   }
 }
