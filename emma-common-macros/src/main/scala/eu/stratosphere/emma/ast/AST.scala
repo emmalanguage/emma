@@ -3,6 +3,8 @@ package emma.ast
 
 import shapeless._
 
+import scala.annotation.tailrec
+
 /** Common super-trait for macro- and runtime-compilation. */
 trait AST extends CommonAST
   with Bindings
@@ -87,33 +89,23 @@ trait AST extends CommonAST
 
   /** Ensures that all definitions within `tree` have unique names. */
   lazy val resolveNameClashes: u.Tree => u.Tree = (tree: u.Tree) => {
-    val defs = api.Tree.defs(tree).map(_.name) // unique names in the given `tree`
-    val clashes = nameClashes(tree) // name clashes in the given `tree`
+    val defs = api.Tree.defs(tree)   // definitions in the given `tree`
+    val notUnique = defs.map(_.name) // names already used in the given `tree`
+    val clashes = nameClashes(defs)  // name clashes in the given `tree`
 
-    // helper method, gets the first fresh name that does not collide
-    // with another def in the given `tree`
-    def fresh(nme: u.TermName): u.TermName = {
+    // Helper method: gets the first fresh name that does not collide
+    // with another def in the given tree.
+    @tailrec def fresh(nme: u.TermName): u.TermName = {
       val fsh = api.TermName.fresh(nme)
-      if (defs contains fsh) fresh(nme)
-      else fsh
+      if (notUnique(fsh)) fresh(nme) else fsh
     }
 
-    // custom build aliases using the helper `fresh` method
-    lazy val aliases = for {
-      sym <- clashes
-    } yield sym -> api.Sym.copy(sym)(name = fresh(sym.name)).asTerm
+    // Custom build aliases using the helper `fresh` method.
+    val aliases = for (sym <- clashes) yield
+      sym -> api.Sym.copy(sym)(name = fresh(sym.name)).asTerm
 
-    // rename if necessarry
-    if (clashes.isEmpty) tree
-    else api.Tree.rename(aliases: _*)(tree)
+    api.Tree.rename(aliases: _*)(tree)
   }
-
-  /** Returns the set of symbols in `tree` that have clashing names. */
-  def nameClashes(tree: u.Tree): Seq[u.TermSymbol] = for {
-    (_, defs) <- api.Tree.defs(tree).groupBy(_.name).toSeq
-    if defs.size > 1
-    dfn <- defs.tail
-  } yield dfn
 
   /**
    * Prints `tree` for debugging.
@@ -146,4 +138,15 @@ trait AST extends CommonAST
     // Grab the result
     sb.result()
   }
+
+  /** Returns a sequence of symbols in `tree` that have clashing names. */
+  def nameClashes(tree: u.Tree): Seq[u.TermSymbol] =
+    nameClashes(api.Tree.defs(tree))
+
+  /** Returns a sequence of symbols in `defs` that have clashing names. */
+  private def nameClashes(defs: Set[u.TermSymbol]): Seq[u.TermSymbol] = for {
+    (_, defs) <- defs.groupBy(_.name).toSeq
+    if defs.size > 1
+    dfn <- defs.tail
+  } yield dfn
 }
