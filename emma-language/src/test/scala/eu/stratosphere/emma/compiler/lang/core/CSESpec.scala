@@ -2,6 +2,9 @@ package eu.stratosphere.emma
 package compiler.lang.core
 
 import compiler.BaseCompilerSpec
+import compiler.ir.ComprehensionSyntax._
+import eu.stratosphere.emma.api.DataBag
+import testschema.Literature._
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -14,8 +17,13 @@ class CSESpec extends BaseCompilerSpec {
 
   val csePipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
-      ANF.transform,
-      tree => time(CSE.cse(tree), "cse")
+      Core.lnf,
+      tree => time(Core.cse(tree), "cse")
+    ).compose(_.tree)
+
+  val lnfPipeline: u.Expr[Any] => u.Tree =
+    compiler.pipeline(typeCheck = true)(
+      Core.lnf
     ).compose(_.tree)
 
   "field selections" - {
@@ -111,7 +119,7 @@ class CSESpec extends BaseCompilerSpec {
     act shouldBe alphaEqTo(exp)
   }
 
-  "constant propagation" in {
+  "copy propagation" in {
     val act = csePipeline(u.reify {
       val a = 42
       val b = a
@@ -119,8 +127,79 @@ class CSESpec extends BaseCompilerSpec {
       c
     })
 
+    val exp = u.Block(Nil, u.reify(42).tree)
+    act shouldBe alphaEqTo(exp)
+  }
+
+  "lambdas" in {
+    val act = csePipeline(u.reify {
+      val f = (i: Int) => i + 1
+      val g = (i: Int) => i + 1
+      val xs = Seq(1, 2, 3)
+      xs.map(f).map(g)
+    })
+
     val exp = idPipeline(u.reify {
-      42
+      val f = (i: Int) => {
+        val i$1 = i + 1
+        i$1
+      }
+      val xs$1 = Seq(1, 2, 3)
+      val cbf = Seq.canBuildFrom[Int]
+      val xs$2 = xs$1.map(f)(cbf)
+      val xs$3 = xs$2.map(f)(cbf)
+      xs$3
+    })
+
+    act shouldBe alphaEqTo(exp)
+  }
+
+  "for-comprehensions" in {
+    val act = csePipeline(u.reify {
+      val xs = comprehension[(Character, Character), DataBag] {
+        val x = generator[Character, DataBag](DataBag(hhCrts))
+        val y = generator[Character, DataBag](DataBag(hhCrts))
+        head (x, y)
+      }
+      val sze = xs.size
+      val cnt = xs.count{ case (x, y) => x.name == y.name }
+      sze / cnt.toDouble
+    })
+
+    val exp = lnfPipeline(u.reify {
+      val xs = comprehension[(Character, Character), DataBag] {
+        val x = generator[Character, DataBag](DataBag(hhCrts))
+        val y = generator[Character, DataBag](DataBag(hhCrts))
+        head (x, y)
+      }
+      
+      val fn$1 = (x$2: (Character, Character)) => {
+        1L
+      }
+
+      // used twice: once in the `sze`, and once in the `cde` folds
+      val fn$2 = (x$3: Long, x$1: Long) => {
+        val `+$8` = x$3 + x$1
+        `+$8`
+      }
+
+      val sze = xs.fold(0L)(fn$1, fn$2)
+      
+      val fn$3 = (x$5: (Character, Character)) => {
+        val fn$4 = (x0$1: (Character, Character)) => {
+          val x = x0$1._1
+          val y = x0$1._2
+          val name$1 = x.name
+          val name$2 = y.name
+          val `==$1` = name$1 == name$2
+          `==$1`
+        }
+        (fn$4(x$5) compare false).toLong
+      }
+
+      val cde = xs.fold(0L)(fn$3, fn$2)
+
+      sze / cde.toDouble
     })
 
     act shouldBe alphaEqTo(exp)
