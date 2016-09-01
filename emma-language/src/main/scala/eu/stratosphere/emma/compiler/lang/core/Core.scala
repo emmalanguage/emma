@@ -1,9 +1,10 @@
 package eu.stratosphere.emma
 package compiler.lang.core
 
+import compiler.Common
+import compiler.lang.AlphaEq
 import compiler.lang.comprehension.Comprehension
 import compiler.lang.source.Source
-import compiler.Common
 
 /** Core language. */
 trait Core extends Common
@@ -14,7 +15,7 @@ trait Core extends Common
   with Pickling
   with CoreValidate
   with Comprehension {
-  this: Source =>
+  this: AlphaEq with Source =>
 
   import UniverseImplicits._
 
@@ -300,9 +301,9 @@ trait Core extends Common
     // CSE API
     // -------------------------------------------------------------------------
 
-    /** Delegates to [[CSE.cse()]]. */
-    def cse(tree: u.Tree): u.Tree =
-      CSE.cse(tree)
+    /** Delegates to [[CSE.transform()]]. */
+    lazy val cse: u.Tree => u.Tree =
+      CSE.transform(Map.empty, Map.empty)
 
     // -------------------------------------------------------------------------
     // Pickling API

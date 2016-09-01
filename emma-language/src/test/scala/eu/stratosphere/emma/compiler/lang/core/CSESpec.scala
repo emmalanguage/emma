@@ -15,7 +15,7 @@ class CSESpec extends BaseCompilerSpec {
   val csePipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
       ANF.transform,
-      tree => time(CSE.cse(tree), "cse")
+      tree => time(Core.cse(tree), "cse")
     ).compose(_.tree)
 
   "field selections" - {
@@ -111,7 +111,7 @@ class CSESpec extends BaseCompilerSpec {
     act shouldBe alphaEqTo(exp)
   }
 
-  "constant propagation" in {
+  "copy propagation" in {
     val act = csePipeline(u.reify {
       val a = 42
       val b = a
@@ -119,8 +119,28 @@ class CSESpec extends BaseCompilerSpec {
       c
     })
 
+    val exp = u.Block(Nil, u.reify(42).tree)
+    act shouldBe alphaEqTo(exp)
+  }
+
+  "lambdas" in {
+    val act = csePipeline(u.reify {
+      val f = (i: Int) => i + 1
+      val g = (i: Int) => i + 1
+      val xs = Seq(1, 2, 3)
+      xs.map(f).map(g)
+    })
+
     val exp = idPipeline(u.reify {
-      42
+      val f = (i: Int) => {
+        val i$1 = i + 1
+        i$1
+      }
+      val xs$1 = Seq(1, 2, 3)
+      val cbf = Seq.canBuildFrom[Int]
+      val xs$2 = xs$1.map(f)(cbf)
+      val xs$3 = xs$2.map(f)(cbf)
+      xs$3
     })
 
     act shouldBe alphaEqTo(exp)
