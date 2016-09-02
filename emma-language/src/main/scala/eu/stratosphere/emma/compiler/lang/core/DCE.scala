@@ -16,7 +16,7 @@ private[core] trait DCE extends Common {
      * Eliminates unused value definitions (dead code) from a tree.
      *
      * == Preconditions ==
-     * - The input tree is in ANF (see [[ANF.transform]]).
+     * - The input tree is in LNF (see [[Core.lnf]]).
      *
      * == Postconditions ==
      * - All unused value definitions are pruned.
