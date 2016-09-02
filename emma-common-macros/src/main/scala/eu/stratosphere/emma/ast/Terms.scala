@@ -1,14 +1,13 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 trait Terms { this: AST =>
 
   trait TermAPI { this: API =>
 
-    import universe._
-    import u.internal.newFreeTerm
-    import u.internal.newTermSymbol
+    import u.internal.{newFreeTerm, newTermSymbol}
     import u.internal.reificationSupport.freshTermName
+    import universe._
 
     /** Term names. */
     object TermName extends Node {

@@ -1,8 +1,6 @@
 package eu.stratosphere
 package emma.ast
 
-import emma.compiler.RuntimeUtil
-
 import com.typesafe.scalalogging.slf4j.Logger
 import org.slf4j.LoggerFactory
 
@@ -16,7 +14,7 @@ import scala.tools.reflect.ToolBox
  * macros APIs, e.g. non- idempotent type checking, lack of hygiene, capture-avoiding
  * substitution, fully-qualified names, fresh name generation, identifying closures, etc.
  */
-trait JavaAST extends RuntimeUtil with AST {
+trait JavaAST extends AST {
 
   require(runtime.universe.isInstanceOf[JavaUniverse],
     s"Unsupported universe ${runtime.universe}.\nThe runtime compiler supports only JVM.")

@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 import scala.annotation.tailrec
 import scala.language.higherKinds
@@ -8,10 +8,10 @@ trait Types { this: AST =>
 
   trait TypeAPI { this: API =>
 
-    import universe._
     import u.Flag._
     import u.internal._
     import reificationSupport.freshTypeName
+    import universe._
 
     /** Type names. */
     object TypeName extends Node {

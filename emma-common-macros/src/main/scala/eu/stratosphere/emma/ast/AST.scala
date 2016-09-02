@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 import shapeless._
 
@@ -37,9 +37,10 @@ trait AST extends CommonAST
     with ValueAPI
     with VariableAPI
 
+  import universe._
+
   /** Virtual non-overlapping semantic AST based on Scala trees. */
   object api extends API
-  import universe._
 
   /**
    * Populates the missing types of lambda symbols in a tree.
@@ -117,7 +118,7 @@ trait AST extends CommonAST
    * @param tree The tree to print as source code.
    * @return The printable source code.
    */
-  override def asSource(title: String)(tree: u.Tree): String = {
+  def asSource(title: String)(tree: u.Tree): String = {
     val sb = StringBuilder.newBuilder
     // Prefix
     sb.append(title)

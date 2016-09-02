@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 /** (method / lambda / class) Parameters. */
 trait Parameters { this: AST =>
@@ -17,8 +17,8 @@ trait Parameters { this: AST =>
    */
   trait ParameterAPI { this: API =>
 
-    import universe._
     import u.Flag._
+    import universe._
 
     /** (method / lambda / class) Parameter symbols. */
     object ParSym extends Node {

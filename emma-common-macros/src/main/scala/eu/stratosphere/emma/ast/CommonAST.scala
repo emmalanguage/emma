@@ -1,7 +1,5 @@
-package eu.stratosphere
-package emma.ast
-
-import emma.compiler.ReflectUtil
+package eu.stratosphere.emma
+package ast
 
 import scala.annotation.tailrec
 import scala.reflect.api.Universe
@@ -16,10 +14,12 @@ import scala.reflect.macros.Attachments
  * This trait has to be instantiated with a [[scala.reflect.api.Universe]] type and works for both
  * runtime and compile time reflection.
  */
-trait CommonAST extends ReflectUtil {
+trait CommonAST {
 
   val universe: Universe
   lazy val u: universe.type = universe
+
+  type =?>[-A, +B] = PartialFunction[A, B]
 
   import universe._
   import internal._
@@ -48,14 +48,14 @@ trait CommonAST extends ReflectUtil {
   // ---------------------------
 
   /** Parses a snippet of source code and returns the AST. */
-  private[emma] override def parse(code: String): Tree
+  private[emma] def parse(code: String): Tree
 
   /** Type-checks a `tree` (use `typeMode=true` for type-trees). */
-  private[emma] override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree
+  private[emma] def typeCheck(tree: Tree, typeMode: Boolean = false): Tree
 
   /** Removes all type and symbol attributes from a `tree`. */
   // FIXME: Replace with `c.untypecheck` or `tb.untypecheck` once SI-5464 is resolved.
-  private[emma] override def unTypeCheck(tree: Tree): Tree =
+  private[emma] def unTypeCheck(tree: Tree): Tree =
     parse(showCode(tree, printRootPkg = true))
 
   /** Infers an implicit value from the enclosing context (if possible). */

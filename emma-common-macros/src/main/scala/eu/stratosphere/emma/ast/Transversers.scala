@@ -1,13 +1,13 @@
 package eu.stratosphere.emma
 package ast
 
-import util._
 import util.Functions._
 import util.Monoids._
+import util._
 
+import cats.Monoid
 import cats.std.all._
 import cats.syntax.group._
-import cats.Monoid
 import shapeless._
 
 import scala.annotation.tailrec

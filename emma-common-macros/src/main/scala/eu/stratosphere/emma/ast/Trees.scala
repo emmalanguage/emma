@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 import cats.std.all._
 import shapeless._

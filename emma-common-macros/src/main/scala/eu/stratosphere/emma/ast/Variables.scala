@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 /** Variables (`var`s). */
 trait Variables { this: AST =>

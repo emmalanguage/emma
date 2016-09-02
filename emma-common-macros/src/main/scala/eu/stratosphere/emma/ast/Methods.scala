@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 /** Methods (`def`s). */
 trait Methods { this: AST =>
@@ -40,10 +40,9 @@ trait Methods { this: AST =>
    */
   trait MethodAPI { this: API =>
 
-    import universe._
     import u.Flag._
-    import u.internal.newMethodSymbol
-    import u.internal.typeDef
+    import u.internal.{newMethodSymbol, typeDef}
+    import universe._
 
     /** Method (`def`) symbols. */
     object DefSym extends Node {

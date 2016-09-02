@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 /** Bindings (values, variables and parameters). */
 trait Bindings { this: AST =>

@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 /** Values (`val`s). */
 trait Values { this: AST =>
@@ -21,7 +21,6 @@ trait Values { this: AST =>
    */
   trait ValueAPI { this: API =>
 
-    import universe._
     import u.Flag._
 
     /** Value (`val`) symbols. */

@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 /** Loops (`while` and `do-while`). */
 trait Loops { this: AST =>
@@ -7,8 +7,8 @@ trait Loops { this: AST =>
   /** Loops (`while` and `do-while`). */
   trait LoopAPI { this: API =>
 
-    import universe._
     import u.Flag._
+    import universe._
     import internal.newMethodSymbol
 
     /** Converts `tree` to a statement (block with `Unit` expression). */

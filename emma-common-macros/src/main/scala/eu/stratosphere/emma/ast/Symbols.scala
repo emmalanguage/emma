@@ -1,7 +1,7 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
-import emma.util.Monoids
+import util.Monoids
 
 import shapeless._
 
@@ -9,7 +9,6 @@ trait Symbols { this: AST =>
 
   trait SymbolAPI { this: API =>
 
-    import universe._
     import u.definitions._
     import u.internal._
 
@@ -110,8 +109,9 @@ trait Symbols { this: AST =>
     /** Named entities that own their children. */
     object Owner extends Node {
 
-      import u.internal.substituteSymbols
       import Monoids._
+
+      import u.internal.substituteSymbols
 
       /** Extracts the owner of `sym`, if any. */
       def of(sym: u.Symbol): u.Symbol = {

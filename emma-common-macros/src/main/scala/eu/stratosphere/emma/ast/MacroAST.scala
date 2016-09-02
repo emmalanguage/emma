@@ -1,10 +1,7 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
-import emma.compiler.MacroUtil
-
-import scala.reflect.macros.Attachments
-import scala.reflect.macros.blackbox
+import scala.reflect.macros.{Attachments, blackbox}
 import scala.tools.nsc.Global
 
 /**
@@ -12,7 +9,7 @@ import scala.tools.nsc.Global
  * macros APIs, e.g. non- idempotent type checking, lack of hygiene, capture-avoiding
  * substitution, fully-qualified names, fresh name generation, identifying closures, etc.
  */
-trait MacroAST extends MacroUtil with AST {
+trait MacroAST extends AST {
 
   val c: blackbox.Context
   override val universe: c.universe.type = c.universe
@@ -22,7 +19,7 @@ trait MacroAST extends MacroUtil with AST {
   import decorators._
 
   /** Shows `tree` in a Swing AST browser. */
-  override def browse(tree: Tree): Unit = universe match {
+  def browse(tree: Tree): Unit = universe match {
     case global: Global =>
       val gt = tree.asInstanceOf[global.Tree]
       import global.treeBrowsers._

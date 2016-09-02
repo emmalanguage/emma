@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 /** Patterns (for pattern matching). */
 trait Patterns { this: AST =>

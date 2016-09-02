@@ -18,12 +18,6 @@ object emma {
   final def comprehend[T](e: T): Unit =
     macro WorkflowMacros.comprehend[T]
 
-  final def desugar(e: Any): String =
-    macro UtilMacros.desugar
-
-  final def desugarRaw(e: Any): String =
-    macro UtilMacros.desugarRaw
-
   final def visualize[T](e: T): T =
     macro UtilMacros.visualize[T]
 }

@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 /** Modules (`object`s). */
 trait Modules { this: AST =>
@@ -7,10 +7,9 @@ trait Modules { this: AST =>
   /** Modules (`object`s). */
   trait ModuleAPI { this: API =>
 
-    import universe._
     import u.Flag._
-    import u.internal.newModuleAndClassSymbol
-    import u.internal.singleType
+    import u.internal.{newModuleAndClassSymbol, singleType}
+    import universe._
 
     /** Module (`object`) symbols. */
     object ModuleSym extends Node {

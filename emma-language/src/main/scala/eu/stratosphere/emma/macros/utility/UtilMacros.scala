@@ -1,23 +1,14 @@
 package eu.stratosphere
 package emma.macros.utility
 
-import emma.compiler.MacroUtil
+import emma.compiler.MacroCompiler
 
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
-class UtilMacros(val c: blackbox.Context) extends MacroUtil {
+class UtilMacros(val c: blackbox.Context) extends MacroCompiler {
 
-  import universe._
-  import Term._
-
-  def desugar(e: Expr[Any]) =
-    lit(Tree show e.tree)
-
-  def desugarRaw(e: Expr[Any]) =
-    lit(showRaw(e.tree))
-
-  def visualize[T](e: Expr[T]) = {
+  def visualize[T](e: c.Expr[T]) = {
     browse(e.tree)
     e
   }

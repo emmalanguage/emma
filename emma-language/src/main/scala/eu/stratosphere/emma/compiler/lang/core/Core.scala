@@ -325,8 +325,8 @@ trait Core extends Common
     class Meta(tree: u.Tree) {
 
       val defs: Map[u.Symbol, u.ValDef] = tree.collect {
-        case value: u.ValDef if !Is.param(value) =>
-          value.symbol -> value
+        case value@Lang.ParDef(symbol, _, _) =>
+          symbol -> value
       }.toMap
 
       val uses: Map[u.Symbol, Int] =

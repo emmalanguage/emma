@@ -7,7 +7,7 @@ import org.scalactic._
 import org.scalactic.Accumulation._
 
 /** Common IR tools. */
-trait Common extends ReflectUtil with AST {
+trait Common extends AST {
 
   import universe._
 
