@@ -4,6 +4,7 @@ package compiler
 import lang.AlphaEq
 import lang.core.Core
 import lang.source.Source
+import lang.backend.Backend
 
 import scala.reflect.api.Universe
 
@@ -13,7 +14,7 @@ import scala.reflect.api.Universe
  * This trait has to be instantiated with an underlying universe and works for both runtime and
  * compile time reflection.
  */
-trait Compiler extends AlphaEq with Source with Core {
+trait Compiler extends AlphaEq with Source with Core with Backend {
 
   /** The underlying universe object. */
   override val universe: Universe

@@ -82,6 +82,8 @@ trait Common extends AST {
 
     val cross                 = module.info.decl(TermName("cross")).asMethod
     val equiJoin              = module.info.decl(TermName("equiJoin")).asMethod
+
+    val methods               = Set(cross, equiJoin)
     //@formatter:on
   }
 

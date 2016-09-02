@@ -139,6 +139,10 @@ trait Trees { this: AST =>
           else TypeSym.fresh(sym.asType)
         }): _*)
 
+      /** Refreshes all `symbols` in a tree that are defined within (including the symbols of lambdas). */
+      def refreshAll(tree: u.Tree): u.Tree =
+        refresh((defs(tree) ++ lambdas(tree)).toSeq: _*)(tree)
+
       /** Replaces a sequence of term symbols with references to their `aliases`. */
       def rename(aliases: (u.Symbol, u.Symbol)*): u.Tree => u.Tree =
         if (aliases.isEmpty) identity else {

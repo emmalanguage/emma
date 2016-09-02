@@ -36,7 +36,7 @@ class CombinationSpec extends BaseCompilerSpec {
   def applyOnce(rule: u.Tree =?> u.Tree): u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
       Core.lnf,
-      tree => api.TopDown.transform(rule)(tree).tree,
+      tree => time(api.TopDown.transform(rule)(tree).tree, "match rule"),
       Core.flatten
     ).compose(_.tree)
 
