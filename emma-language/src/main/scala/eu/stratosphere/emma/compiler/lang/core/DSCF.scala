@@ -108,7 +108,7 @@ private[core] trait DSCF extends Common {
           (for (core.ParDef(lhs, _, _) <- paramss.flatten)
             yield (method, lhs.name) -> List(lhs)).toMap
       } (Monoids.merge(Monoids.sliding(2)))
-      .transformWith {
+      .transformWithSyn {
         // Linear transformations
         case Attr(src.VarDef(lhs, rhs, _), trace :: _, owners :: _, _) =>
           core.ValDef(latest(lhs, owners, trace).head, rhs)
