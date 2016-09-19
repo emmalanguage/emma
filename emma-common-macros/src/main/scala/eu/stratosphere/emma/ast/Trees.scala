@@ -143,11 +143,27 @@ trait Trees { this: AST =>
       def refreshAll(tree: u.Tree): u.Tree =
         refresh((defs(tree) ++ lambdas(tree)).toSeq: _*)(tree)
 
+      /**
+       * Some tree nodes have a name field of their own, in addition to their symbols' name fields.
+       * These two names can go out of sync, and this method is for fixing this situation by setting the name
+       * field to the symbol's name field.
+       */
+      def fixNames(tree: u.Tree): u.Tree =
+        api.TopDown.transform {
+          // We just do an unapply-apply, because the apply will set the name field correctly.
+          case d@api.ValDef(lhs, rhs, flags) if d.asInstanceOf[u.ValDef].name != d.symbol.name =>
+            api.ValDef(lhs, rhs, flags)
+          case d@api.ParDef(lhs, rhs, flags) if d.asInstanceOf[u.ValDef].name != d.symbol.name =>
+            api.ParDef(lhs, rhs, flags)
+          case d@api.DefDef(sym, flags, tparams, paramss, body) if d.asInstanceOf[u.DefDef].name != d.symbol.name =>
+            api.DefDef(sym, flags)(tparams: _*)(paramss.map{_.map {case api.ValDef(psym,_,_) => psym}}: _*)(body)
+        }(tree).tree
+
       /** Replaces a sequence of term symbols with references to their `aliases`. */
       def rename(aliases: (u.Symbol, u.Symbol)*): u.Tree => u.Tree =
         if (aliases.isEmpty) identity else {
           val (from, to) = aliases.toList.unzip
-          tree => substituteSymbols(Tree.copy(tree)(), from, to)
+          tree => fixNames(substituteSymbols(Tree.copy(tree)(), from, to))
         }
 
       /** Replaces occurrences of `find` with `repl` in a tree. */
