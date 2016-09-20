@@ -570,10 +570,9 @@ private[comprehension] trait Combination extends Common {
           val kxBdy = replaceRefs(x, kxArg)(maybeAddCast(kxBdy0))
           val (kxRef, kxVal) = valDefAndRef("kx", core.Lambda(kxArg)(kxBdy))
 
-          val joinCondValDefSyms = joinCondVals.collect { case core.ValDef(sym, _, _) => sym }
           val kyArg = api.TermSym.free(api.TermName.fresh("kyArg"), Core.bagElemTpe(yExpr))
           val kyBdy = api.TopDown.transform { case core.Ref(`y`) => core.Ref(kyArg) }(
-            api.Tree.refresh(joinCondValDefSyms: _*)(maybeAddCast(kyBdy0))).tree
+            api.Tree.refreshAll(maybeAddCast(kyBdy0))).tree
           val (kyRef, kyVal) = valDefAndRef("ky", core.Lambda(kyArg)(kyBdy))
 
           val (irRef, irVal) = valDefAndRef("ir", Combinators.EquiJoin(kxRef, kyRef)(xExpr, yExpr))
