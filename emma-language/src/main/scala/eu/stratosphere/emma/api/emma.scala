@@ -20,4 +20,7 @@ object emma {
 
   final def visualize[T](e: T): T =
     macro UtilMacros.visualize[T]
+
+  final def prettyPrint[T](e: T): String =
+    macro UtilMacros.prettyPrint[T]
 }

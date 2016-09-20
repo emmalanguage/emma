@@ -1,9 +1,9 @@
 package eu.stratosphere.emma
 package compiler.lang.core
 
-import api.DataBag
-import compiler.BaseCompilerSpec
+import api.{DataBag, emma}
 import compiler.ir.ComprehensionSyntax._
+import compiler.{BaseCompilerSpec, RuntimeCompiler}
 import testschema.Marketing._
 
 import org.junit.runner.RunWith
@@ -69,26 +69,42 @@ class PrettyPrintSpec extends BaseCompilerSpec {
 
     "This" in {
 
-      val acts = idPipeline(u.reify {
-        class Unqualified {
+      class Unqualified {
+        val expr = emma.prettyPrint {
           println(this)
         }
-        class Qualified {
-          println(Qualified.this)
-        }
-        /*class Outer { FIXME
-          println(PrettyPrintSpec.this)
-        }*/
-        object Module {
-          println(this)
-        }
-      }) collect {
-        case u.Apply(_, (act@core.This(_)) :: Nil) =>
-          prettyPrint(act)
       }
 
+      class Qualified {
+        val expr = emma.prettyPrint {
+          println(Qualified.this)
+        }
+      }
+
+      class Inner {
+        val expr = emma.prettyPrint {
+          println(PrettyPrintSpec.this)
+        }
+      }
+
+      object Module {
+        val expr = emma.prettyPrint {
+          println(this)
+        }
+      }
+
+      val acts = Seq(
+        new Unqualified().expr,
+        new Qualified().expr,
+        new Inner().expr,
+        Module.expr
+      )
+
       val exps = Seq(
-        "Unqualified.this", "Qualified.this", /*"PrettyPrintSpec.this" FIXME ,*/ "Module.this"
+        "Predef println Unqualified.this",
+        "Predef println Qualified.this",
+        "Predef println PrettyPrintSpec.this",
+        "Predef println Module.this"
       )
 
       (acts zip exps) foreach { case (act, exp) =>
@@ -371,7 +387,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
           }
         }
       }))
-      
+
       val exp =
         s"""
            |{
