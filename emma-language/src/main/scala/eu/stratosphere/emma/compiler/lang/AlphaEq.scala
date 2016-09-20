@@ -50,8 +50,6 @@ trait AlphaEq extends Common {
 
     // An accumulator dictionary for alpha equivalence
     val dict = mutable.Map.empty[Symbol, Symbol]
-    // Explicit flags to test
-    val flags = Flags - Flag.SYNTHETIC
 
     // ------------------------------------------------------------------------
     // Helper functions
@@ -122,7 +120,7 @@ trait AlphaEq extends Common {
 
       // Alpha equivalence of modifiers
       def modifiers(lhMods: Modifiers, rhMods: Modifiers): Eq Or Neq = {
-        if (flags.forall(f => lhMods.hasFlag(f) == rhMods.hasFlag(f))) pass
+        if (FlagsNoSynthetic.forall(f => lhMods.hasFlag(f) == rhMods.hasFlag(f))) pass
         else failHere because s"$lhMods and $rhMods differ"
       }
 

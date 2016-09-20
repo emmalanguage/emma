@@ -495,6 +495,8 @@ trait CommonAST {
     Flag.SYNTHETIC,
     Flag.TRAIT)
 
+  lazy val FlagsNoSynthetic = Flags - Flag.SYNTHETIC
+
   // ---------------
   // Virtual nodes
   // ---------------

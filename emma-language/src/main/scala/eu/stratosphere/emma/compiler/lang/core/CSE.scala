@@ -169,11 +169,11 @@ private[core] trait CSE extends Common {
       // Definitions
 
       override def valDef(lhs: u.TermSymbol, rhs: Hash, flags: u.FlagSet): Hash = Hash(lhs) {
-        tab => combine(seed.valDef)(tab(lhs), hashType(lhs.info), rhs(tab), flags.hashCode)
+        tab => combine(seed.valDef)(tab(lhs), hashType(lhs.info), rhs(tab), hashFlags(flags))
       }
 
       override def parDef(lhs: u.TermSymbol, rhs: Hash, flags: u.FlagSet): Hash = Hash(lhs) {
-        tab => combine(seed.parDef)(tab(lhs), hashType(lhs.info), rhs(tab), flags.hashCode)
+        tab => combine(seed.parDef)(tab(lhs), hashType(lhs.info), rhs(tab), hashFlags(flags))
       }
 
       override def defDef(sym: u.MethodSymbol, flags: u.FlagSet,
@@ -184,7 +184,7 @@ private[core] trait CSE extends Common {
           val hTparams = tparams.size.hashCode
           val alphaTab = tab ++ genTab(paramss.flatten, hSym)
           val hParamss = hashSS(alphaTab, paramss)
-          combine(seed.defDef)(hSym, hTparams, hParamss, body(alphaTab))
+          combine(seed.defDef)(hSym, hTparams, hParamss, body(alphaTab), hashFlags(flags))
         }
 
       // Other
@@ -278,6 +278,12 @@ private[core] trait CSE extends Common {
       private def genTab(hs: S[Hash], seed: Int = seqSeed): Seq[(u.Symbol, Int)] = {
         val rand = new Random(seed)
         hs.map(_.sym) zip Stream.continually(rand.nextInt())
+      }
+
+      /** Calculates the hash of a FlagSet, with disregarding the "synthetic" flag and compiler internal flags. */
+      private def hashFlags(flags: u.FlagSet): Int = {
+        val mods = u.Modifiers(flags)
+        MurmurHash3.setHash(FlagsNoSynthetic filter mods.hasFlag)
       }
     }
   }
