@@ -176,7 +176,11 @@ trait Methods { this: AST =>
       def unapply(defn: u.DefDef)
         : Option[(u.MethodSymbol, u.FlagSet, Seq[u.TypeSymbol], Seq[Seq[u.ValDef]], u.Tree)]
         = defn match {
-          case u.DefDef(mods, _, tparams, paramss, _, Term(body)) withSym DefSym(method) =>
+          case defDef@u.DefDef(mods, _, tparams, paramss, _, Term(body)) withSym DefSym(method) =>
+            assert(paramss forall { _ forall { _.rhs == Empty() } },
+              "DefDef parameters with default parameter values are not supported.")
+            assert(defDef.name.toString != "<init>", "DefDef.unapply encountered a constructor. " +
+              "This shouldn't happen, since we don't allow class definitions in the source language.")
             Some(method, mods.flags, tparams.map(TypeSym.of), paramss, body)
           case _ => None
         }
