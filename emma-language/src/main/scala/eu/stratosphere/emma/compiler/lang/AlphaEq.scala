@@ -223,7 +223,7 @@ trait AlphaEq extends Common {
           ValDef(mods$r, _, tpt$r, rhs$r)
           ) => for {
             eq <- modifiers(mods$l, mods$r)
-            eq <- types(tpt$l.tpe, tpt$r.tpe)
+            eq <- types(lhs.symbol.info, rhs.symbol.info)
             _ = dict += lhs.symbol -> rhs.symbol
             eq <- trees(rhs$l, rhs$r)
           } yield eq

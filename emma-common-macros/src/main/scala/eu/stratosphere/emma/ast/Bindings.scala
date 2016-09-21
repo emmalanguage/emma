@@ -98,7 +98,7 @@ trait Bindings { this: AST =>
           Owner.at(lhs)(rhs)
         } else Empty()
 
-        val tpt = TypeQuote(lhT)
+        val tpt = if (is.param(lhs)) TypeQuote(lhT) else u.TypeTree()
         val bind = u.ValDef(mods, name, tpt, body)
         set(bind, sym = lhs)
         bind
