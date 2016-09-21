@@ -95,10 +95,9 @@ class DSCFSpec extends BaseCompilerSpec {
   }
 
   "Google Code Jam 2015 A1 - Haircut (verified)" in {
-    // For some reason reify below doesn't type-check without this
-    implicit val zipVecWithIdx = Seq.canBuildFrom[(Int, Int)]
 
     val act = dscfPipeline(u.reify {
+      implicit val zipSeqWithIdx = Seq.canBuildFrom[(Int, Int)]
       val customers = 4
       val barbers = Seq(10, 5)
       var barber = 0
@@ -122,6 +121,7 @@ class DSCFSpec extends BaseCompilerSpec {
     })
 
     val exp = anfPipeline(u.reify {
+      implicit val zipSeqWithIdx = Seq.canBuildFrom[(Int, Int)]
       val customers = 4
       val barbers = Seq(10, 5)
       val barber$1 = 0
