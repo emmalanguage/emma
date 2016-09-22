@@ -141,29 +141,16 @@ trait Trees { this: AST =>
 
       /** Refreshes all `symbols` in a tree that are defined within (including the symbols of lambdas). */
       def refreshAll(tree: u.Tree): u.Tree =
-        refresh((defs(tree) ++ lambdas(tree)).toSeq: _*)(tree)
-
-      /**
-       * Some tree nodes have a name field of their own, in addition to their symbols' name fields.
-       * These two names can go out of sync, and this method is for fixing this situation by setting the name
-       * field to the symbol's name field.
-       */
-      def fixNames(tree: u.Tree): u.Tree =
-        api.TopDown.transform {
-          // We just do an unapply-apply, because the apply will set the name field correctly.
-          case d@api.ValDef(lhs, rhs, flags) if d.asInstanceOf[u.ValDef].name != d.symbol.name =>
-            api.ValDef(lhs, rhs, flags)
-          case d@api.ParDef(lhs, rhs, flags) if d.asInstanceOf[u.ValDef].name != d.symbol.name =>
-            api.ParDef(lhs, rhs, flags)
-          case d@api.DefDef(sym, flags, tparams, paramss, body) if d.asInstanceOf[u.DefDef].name != d.symbol.name =>
-            api.DefDef(sym, flags)(tparams: _*)(paramss.map{_.map {case api.ValDef(psym,_,_) => psym}}: _*)(body)
-        }(tree).tree
+        refresh(tree.collect {
+          case TermDef(sym) => sym
+          case Lambda(fun, _, _) => fun
+        }: _*)(tree)
 
       /** Replaces a sequence of term symbols with references to their `aliases`. */
       def rename(aliases: (u.Symbol, u.Symbol)*): u.Tree => u.Tree =
         if (aliases.isEmpty) identity else {
           val (from, to) = aliases.toList.unzip
-          tree => fixNames(substituteSymbols(Tree.copy(tree)(), from, to))
+          tree => fixNames(substituteSymbols(copy(tree)(), from, to))
         }
 
       /** Replaces occurrences of `find` with `repl` in a tree. */
@@ -236,6 +223,42 @@ trait Trees { this: AST =>
         case TypeAscr(expr, _) => unAscribe(expr)
         case _ => tree
       }
+
+      /**
+       * Fixes out-of-sync names in some underlying Scala AST nodes caused by
+       * [[internal.substituteSymbols()]].
+       */
+      private lazy val fixNames: u.Tree => u.Tree = TopDown.transform {
+        case u.Ident(name) withSym target withType tpe
+          if name != target.name =>
+          val id = u.Ident(target.name)
+          set(id, sym = target, tpe = tpe)
+          id
+
+        case u.Select(qual, name) withSym member withType tpe
+          if name != member.name =>
+          val sel = u.Select(qual, member.name)
+          set(sel, sym = member, tpe = tpe)
+          sel
+
+        case u.Bind(name, rhs) withSym lhs withType tpe
+          if name != lhs.name =>
+          val bind = u.Bind(lhs.name, rhs)
+          set(bind, sym = lhs, tpe = tpe)
+          bind
+
+        case u.ValDef(mods, name, tpt, rhs) withSym lhs
+          if name != lhs.name =>
+          val value = u.ValDef(mods, TermName(lhs), tpt, rhs)
+          set(value, sym = lhs)
+          value
+
+        case u.DefDef(mods, name, tparams, paramss, tpt, body) withSym method
+          if name != method.name =>
+          val defn = u.DefDef(mods, TermName(method), tparams, paramss, tpt, body)
+          set(defn, sym = method)
+          defn
+      }.andThen(_.tree)
     }
 
     /** The empty tree (instance independent). */
