@@ -5,7 +5,7 @@ trait Terms { this: AST =>
 
   trait TermAPI { this: API =>
 
-    import u.internal.{newFreeTerm, newTermSymbol}
+    import u.internal.{constantType, newFreeTerm, newTermSymbol}
     import u.internal.reificationSupport.freshTermName
     import universe._
 
@@ -302,8 +302,13 @@ trait Terms { this: AST =>
        * @param value Must be a literal ([[Null]], [[AnyVal]] or [[String]]).
        * @return `value`.
        */
-      def apply(value: Any): u.Literal =
-        Type.check(u.Literal(u.Constant(value))).asInstanceOf[u.Literal]
+      def apply(value: Any): u.Literal = {
+        val const = u.Constant(value)
+        val tpe = if (() == value) Type.unit else constantType(const)
+        val lit = u.Literal(const)
+        set(lit, tpe = tpe)
+        lit
+      }
 
       def unapply(lit: u.Literal): Option[Any] =
         Some(lit.value.value)
