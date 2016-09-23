@@ -75,17 +75,17 @@ trait AST extends CommonAST
     }.andThen(_.tree)
 
   /** Removes the qualifiers from references to static symbols. */
-  lazy val unQualifyStaticModules: u.Tree => u.Tree =
+  lazy val unQualifyStatics: u.Tree => u.Tree =
     api.TopDown.break.transform {
-      case api.Sel(_, api.ModuleSym(mod)) if mod.isStatic =>
-        api.Id(mod)
+      case api.Sel(_, sym) if sym.isStatic && (sym.isClass || sym.isModule) =>
+        api.Id(sym)
     }.andThen(_.tree)
 
   /** Fully qualifies references to static symbols. */
-  lazy val qualifyStaticModules: u.Tree => u.Tree =
+  lazy val qualifyStatics: u.Tree => u.Tree =
     api.TopDown.break.transform {
-      case api.TermRef(api.ModuleSym(mod)) if mod.isStatic =>
-        api.Tree.resolveStatic(mod)
+      case api.Ref(sym) if sym.isStatic && (sym.isClass || sym.isModule) =>
+        api.Tree.resolveStatic(sym)
     }.andThen(_.tree)
 
   /** Ensures that all definitions within `tree` have unique names. */

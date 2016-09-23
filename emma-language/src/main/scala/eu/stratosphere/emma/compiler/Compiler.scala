@@ -22,7 +22,7 @@ trait Compiler extends AlphaEq with Source with Core with Backend {
   /** Standard pipeline prefix. Brings a tree into form convenient for transformation. */
   lazy val preProcess: Seq[u.Tree => u.Tree] = Seq(
     fixLambdaTypes,
-    unQualifyStaticModules,
+    unQualifyStatics,
     normalizeStatements,
     Source.normalize,
     resolveNameClashes
@@ -30,7 +30,7 @@ trait Compiler extends AlphaEq with Source with Core with Backend {
 
   /** Standard pipelien suffix. Brings a tree into a form acceptable for `scalac` after being transformed. */
   lazy val postProcess: Seq[u.Tree => u.Tree] = Seq(
-    qualifyStaticModules,
+    qualifyStatics,
     api.Owner.at(get.enclosingOwner)
   )
 

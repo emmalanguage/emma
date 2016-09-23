@@ -26,7 +26,7 @@ class LanguageSpec extends BaseCompilerSpec {
   /** Example pre-processing pipeline. */
   lazy val pipeline = { api.Type.check(_: u.Tree) }
     .andThen(compiler.fixLambdaTypes)
-    .andThen(compiler.unQualifyStaticModules)
+    .andThen(compiler.unQualifyStatics)
     .andThen(compiler.normalizeStatements)
 
   /** Extracts examples from a reified expression. */

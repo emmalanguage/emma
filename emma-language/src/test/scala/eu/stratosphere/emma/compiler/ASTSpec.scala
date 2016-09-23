@@ -33,8 +33,18 @@ class ASTSpec extends BaseCompilerSpec {
       val bar = u.rootMirror.staticModule("org.example.Foo.Bar")
       val ref = api.ModuleRef(bar)
       val qual = api.Tree.resolveStatic(bar)
-      unQualifyStaticModules(qual) shouldBe alphaEqTo (ref)
-      qualifyStaticModules(ref) shouldBe alphaEqTo (qual)
+      unQualifyStatics(qual) shouldBe alphaEqTo (ref)
+      qualifyStatics(ref) shouldBe alphaEqTo (qual)
+    }
+  }
+
+  "static classes should" - {
+    "be unqualified" in {
+      val bar = u.rootMirror.staticClass("java.lang.Object")
+      val ref = api.Ref(bar)
+      val qual = api.Tree.resolveStatic(bar)
+      unQualifyStatics(qual) shouldBe alphaEqTo (ref)
+      qualifyStatics(ref) shouldBe alphaEqTo (qual)
     }
   }
 
@@ -42,7 +52,7 @@ class ASTSpec extends BaseCompilerSpec {
     "remain qualified" in {
       val bal = api.Type.check(u.reify { Bal }.tree)
       val ref = api.TermRef(api.TermSym.of(bal))
-      val act = unQualifyStaticModules(bal)
+      val act = unQualifyStatics(bal)
       act should not be alphaEqTo (ref)
     }
   }

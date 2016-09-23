@@ -16,7 +16,7 @@ class PatternMatchingSpec extends BaseCompilerSpec {
   val destructPatternMatchesPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true, withPre = false)(
       fixLambdaTypes,
-      unQualifyStaticModules,
+      unQualifyStatics,
       normalizeStatements,
       tree => time(PatternMatching.destruct(tree), "destruct irrefutable pattern matches")
     ).compose(_.tree)
@@ -24,7 +24,7 @@ class PatternMatchingSpec extends BaseCompilerSpec {
   val noopPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true, withPre = false)(
       fixLambdaTypes,
-      unQualifyStaticModules,
+      unQualifyStatics,
       normalizeStatements
     ).compose(_.tree)
 

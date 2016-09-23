@@ -22,7 +22,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
     compiler.pipeline(typeCheck = true)(
       Core.lnf,
       Core.inlineLetExprs
-    ) andThen unQualifyStaticModules compose (_.tree)
+    ) andThen unQualifyStatics compose (_.tree)
 
   val prettyPrint: u.Tree => String =
     tree => time(Core.prettyPrint(tree), "pretty print")

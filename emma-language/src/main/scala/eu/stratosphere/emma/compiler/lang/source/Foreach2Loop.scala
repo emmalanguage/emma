@@ -56,7 +56,7 @@ private[source] trait Foreach2Loop extends Common {
           val (trav, tpe) = if (method == FM.foreach) {
             val Repr = api.Type.arg(2, xsTpe)
             val CBF = api.Type.kind3[CanBuildFrom](Repr, Elem, Repr)
-            val cbf = api.Type.inferImplicit(CBF).map(unQualifyStaticModules)
+            val cbf = api.Type.inferImplicit(CBF).map(unQualifyStatics)
             assert(cbf.isDefined, s"Cannot infer implicit value of type `$CBF`")
             val x = api.ParSym(owner, fresh("x"), Elem)
             val id = src.Lambda(x)(api.ParRef(x))

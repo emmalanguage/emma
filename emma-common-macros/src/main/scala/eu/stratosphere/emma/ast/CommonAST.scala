@@ -217,7 +217,7 @@ trait CommonAST {
 
     /** Is `sym` the `_root_` symbol? */
     def root(sym: Symbol): Boolean =
-      sym == rootMirror.RootPackage || sym == rootMirror.RootClass
+      sym.name == termNames.ROOTPKG || sym.name == rootMirror.RootClass.name // This is tricky for Java classes
 
     /** Is `sym` a term symbol? */
     def term(sym: Symbol): Boolean =
