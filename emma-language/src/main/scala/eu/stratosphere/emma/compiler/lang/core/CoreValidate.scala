@@ -31,8 +31,10 @@ private[core] trait CoreValidate extends Common {
 
       /** Validates that a Scala AST belongs to the supported [[Core]] language. */
       // TODO: Narrow scope of valid top-level trees
-      def apply(tree: Tree): Verdict =
+      def apply(tree: Tree): Verdict = {
+        assert(has.tpe(tree), "Core.validate can only be used on typechecked trees.")
         tree is oneOf(Term, Let) otherwise "Unexpected tree"
+      }
 
       // ---------------------------------------------------------------------------
       // Atomics
