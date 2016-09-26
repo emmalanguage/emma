@@ -13,14 +13,14 @@ class OrderSpec extends BaseCompilerSpec {
   import compiler._
 
   val liftPipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
+    pipeline(typeCheck = true)(
       Core.lnf
     ).compose(_.tree)
 
   val dis: u.Tree => u.Tree = tree => Backend.order(tree)._1
 
   val disamb: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
+    pipeline(typeCheck = true)(
       Core.lnf,
       tree => time(dis(tree), "disambiguate")
     ).compose(_.tree)

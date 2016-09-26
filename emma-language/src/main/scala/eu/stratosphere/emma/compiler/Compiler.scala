@@ -19,7 +19,7 @@ trait Compiler extends AlphaEq with Source with Core with Backend {
   /** The underlying universe object. */
   override val universe: Universe
 
-  /** Standard pipeline prefix. Brings a tree into form convenient for transformation. */
+  /** Standard pipeline prefix. Brings a tree into a form convenient for transformation. */
   lazy val preProcess: Seq[u.Tree => u.Tree] = Seq(
     fixLambdaTypes,
     unQualifyStatics,
@@ -28,7 +28,7 @@ trait Compiler extends AlphaEq with Source with Core with Backend {
     resolveNameClashes
   )
 
-  /** Standard pipelien suffix. Brings a tree into a form acceptable for `scalac` after being transformed. */
+  /** Standard pipeline suffix. Brings a tree into a form acceptable for `scalac` after being transformed. */
   lazy val postProcess: Seq[u.Tree => u.Tree] = Seq(
     qualifyStatics,
     api.Owner.at(get.enclosingOwner)

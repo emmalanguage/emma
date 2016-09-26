@@ -19,7 +19,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
   import Core.{Lang => core}
 
   val liftPipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
+    pipeline(typeCheck = true)(
       Core.lnf,
       Core.inlineLetExprs
     ) andThen unQualifyStatics compose (_.tree)

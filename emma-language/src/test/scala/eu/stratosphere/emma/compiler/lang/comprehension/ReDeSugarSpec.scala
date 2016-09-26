@@ -20,13 +20,13 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   // ---------------------------------------------------------------------------
 
   val anfPipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
+    pipeline(typeCheck = true)(
       Core.lnf
     ).compose(_.tree)
 
   val resugarPipeline: u.Expr[Any] => u.Tree = {
     val resugar = Comprehension.resugar(API.bagSymbol)
-    compiler.pipeline(typeCheck = true)(
+    pipeline(typeCheck = true)(
       Core.lnf,
       tree => time(resugar(tree), "resugar")
     ).compose(_.tree)
@@ -34,7 +34,7 @@ class ReDeSugarSpec extends BaseCompilerSpec {
 
   val desugarPipeline: u.Expr[Any] => u.Tree = {
     val desugar = Comprehension.desugar(API.bagSymbol)
-    compiler.pipeline(typeCheck = true)(
+    pipeline(typeCheck = true)(
       Core.lnf,
       tree => time(desugar(tree), "desugar")
     ).compose(_.tree)

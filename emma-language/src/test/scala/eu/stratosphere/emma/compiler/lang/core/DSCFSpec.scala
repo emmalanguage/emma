@@ -13,13 +13,13 @@ class DSCFSpec extends BaseCompilerSpec {
   import compiler._
 
   val dscfPipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
+    pipeline(typeCheck = true)(
       Core.anf,
       tree => time(DSCF.transform(tree), "dscf")
     ).compose(_.tree)
 
   val anfPipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
+    pipeline(typeCheck = true)(
       Core.anf
     ).compose(_.tree)
 
