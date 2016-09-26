@@ -62,6 +62,9 @@
         <reflections.version>0.9.9</reflections.version>
         <scala.graph-core.version>1.9.0</scala.graph-core.version>
         <scala-arm.version>1.4</scala-arm.version>
+
+        <!-- Test configuration -->
+        <compile-spec-pipelines>false</compile-spec-pipelines>
     </properties>
 
     <!-- Enable Apache Development Snapshot Repository -->
@@ -301,6 +304,31 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+
+    <profiles>
+        <!-- Profile that activates integration tests and compile-spec-pipelines -->
+        <profile>
+            <id>IT</id>
+            <build>
+                <pluginManagement>
+                    <plugins>
+                        <plugin>
+                            <groupId>org.apache.maven.plugins</groupId>
+                            <artifactId>maven-surefire-plugin</artifactId>
+                            <version>${maven-surefire-plugin.version}</version>
+                            <configuration>
+                                <!-- An empty element doesn't overwrite, so I'm using an interface here which no one will ever use -->
+                                <excludedGroups>java.io.Serializable</excludedGroups>
+                            </configuration>
+                        </plugin>
+                    </plugins>
+                </pluginManagement>
+            </build>
+            <properties>
+                <compile-spec-pipelines>true</compile-spec-pipelines>
+            </properties>
+        </profile>
+    </profiles>
 
     <build>
         <plugins>

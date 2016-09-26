@@ -13,7 +13,7 @@ class DCESpec extends BaseCompilerSpec {
   import compiler._
 
   val dcePipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
+    pipeline(typeCheck = true)(
       Core.lnf,
       tree => time(DCE.transform(tree), "dce")
     ).compose(_.tree)

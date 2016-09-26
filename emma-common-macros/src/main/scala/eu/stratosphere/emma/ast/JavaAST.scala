@@ -47,6 +47,9 @@ trait JavaAST extends AST {
   private[emma] override def inferImplicit(tpe: Type): Tree =
     tb.inferImplicitValue(tpe)
 
+  private[emma] def compile(tree: Tree) =
+    tb.compile(tree)
+
   // ------------------------
   // Abstract wrapper methods
   // ------------------------

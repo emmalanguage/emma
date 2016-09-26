@@ -18,20 +18,20 @@ class NormalizeSpec extends BaseCompilerSpec {
   import compiler._
 
   val lnfPipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
+    pipeline(typeCheck = true)(
       Core.lnf,
       Core.inlineLetExprs
     ).compose(_.tree)
 
   val resugarPipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
+    pipeline(typeCheck = true)(
       Core.lnf,
       Comprehension.resugar(API.bagSymbol),
       Core.inlineLetExprs
     ).compose(_.tree)
 
   val normalizePipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
+    pipeline(typeCheck = true)(
       Core.lnf,
       Comprehension.resugar(API.bagSymbol),
       Core.inlineLetExprs,
