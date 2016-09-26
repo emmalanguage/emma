@@ -72,7 +72,7 @@ trait Trees { this: AST =>
 
       /** Returns the closure of `tree` as a set. */
       def closure(tree: u.Tree): Set[u.TermSymbol] =
-        refs(tree) diff defs(tree)
+        refs(tree) diff defs(tree) filterNot (_.isStatic)
 
       /** Returns a set of all binding definitions in `tree`. */
       def bindings(tree: u.Tree): Set[u.TermSymbol] = tree.collect {
