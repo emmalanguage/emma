@@ -16,8 +16,6 @@
 package org.emmalanguage
 package util
 
-import shapeless._
-
 /** Utilities for [[scala.Function]]s. */
 object Functions {
 
@@ -25,7 +23,14 @@ object Functions {
   def complete[A, R](pf: A =?> R)(args: A)(default: => R): R =
     pf.applyOrElse(args, (_: A) => default)
 
-  /** Forgets the head of the returned [[HList]]. */
-  def tail[A, H, T <: HList](f: A => (H :: T)): A => T =
-    f.andThen(_.tail)
+  /** Converts `f` to a partial function that is always defined. */
+  def partial[A, R](f: A => R): A =?> R = PartialFunction(f)
+
+  /** Creates a partial function that always returns `value`. */
+  def partialConst[A, R](value: R): A =?> R = partial(Function.const(value))
+
+  /** Composes the partial function `pf` with a regular function `f`. */
+  def compose[A, B, C](pf: B =?> C)(f: A => B): A =?> C = {
+    case a if pf.isDefinedAt(f(a)) => pf(f(a))
+  }
 }
