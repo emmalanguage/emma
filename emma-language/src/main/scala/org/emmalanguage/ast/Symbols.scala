@@ -175,7 +175,7 @@ trait Symbols { this: AST =>
             case Attr(Owner(broken), fixed :: _, current :: _, _)
               if broken.owner != current =>
                 fix(broken, current, fixed)
-          }.traverseAny.andThen {
+          }.traverseAll.andThen {
             case Attr.acc(tree, fixed :: _) =>
               if (fixed.isEmpty) tree else {
                 val dup = api.Tree.copy(tree)()
