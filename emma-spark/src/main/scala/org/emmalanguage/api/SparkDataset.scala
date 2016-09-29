@@ -69,9 +69,7 @@ object SparkDataset {
   import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
   implicit def encoderForType[T: Meta]: Encoder[T] =
-    DataBag.time(s"synthesize SparkDataset Encoder for ${implicitly[Meta[T]].ttag.tpe.toString()}") {
-      ExpressionEncoder[T]
-    }
+    ExpressionEncoder[T]
 
   implicit def wrap[A: Meta](rep: Dataset[A]): SparkDataset[A] =
     new SparkDataset(rep)

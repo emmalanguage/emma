@@ -137,18 +137,4 @@ object DataBag {
    * @return A DataBag containing the elements of the `values` sequence.
    */
   def apply[A: Meta](values: Seq[A]): DataBag[A] = ScalaTraversable(values)
-
-  /**
-   * 
-   * @param name
-   * @param f
-   * @tparam A
-   * @return
-   */
-  def time[A](name: String)(f: => A) = {
-    val s = System.nanoTime
-    val ret = f
-    println(s"$name time: ${(System.nanoTime - s) / 1e6}ms".trim)
-    ret
-  }
 }

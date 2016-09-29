@@ -95,12 +95,11 @@ object FlinkDataSet {
 
   private lazy val memo = collection.mutable.Map.empty[Any, Any]
 
-  implicit def typeInfoForType[T: Meta]: TypeInformation[T] =
-    DataBag.time(s"synthesize FlinkDataBag TypeInformation for ${implicitly[Meta[T]].ttag.tpe.toString()}") {
-      val ttag = implicitly[TypeTag[T]]
-      val info = memo.getOrElseUpdate(ttag, toolbox.eval(q"$typeInfo[${ttag.tpe}]")).asInstanceOf[TypeInformation[T]]
-      info
-    }
+  implicit def typeInfoForType[T: Meta]: TypeInformation[T] = {
+    val ttag = implicitly[TypeTag[T]]
+    val info = memo.getOrElseUpdate(ttag, toolbox.eval(q"$typeInfo[${ttag.tpe}]")).asInstanceOf[TypeInformation[T]]
+    info
+  }
 
   implicit def wrap[A: Meta](rep: DataSet[A]): FlinkDataSet[A] =
     new FlinkDataSet(rep)
