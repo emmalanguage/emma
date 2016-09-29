@@ -53,7 +53,7 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
   // ---------------------------------------------------------------------------
 
   "structural recursion" in {
-    withBackendContext { implicit sc =>
+    withBackendContext { implicit ctx =>
       val act = {
         val xs = Bag(hhCrts)
         val ys = Bag(hhCrts.map(DataBagSpec.f))
@@ -121,7 +121,7 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
   "monad ops" - {
 
     "map" in {
-      withBackendContext { implicit sc =>
+      withBackendContext { implicit ctx =>
         val act = Bag(hhCrts)
           .map(c => c.name)
 
@@ -133,7 +133,7 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
     }
 
     "flatMap" in {
-      withBackendContext { implicit sc =>
+      withBackendContext { implicit ctx =>
         val act = Bag(Seq((hhBook, hhCrts)))
           .flatMap { case (b, cs) => DataBag(cs) }
 
@@ -157,7 +157,7 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
     }
 
     "for-comprehensions" in {
-      withBackendContext { implicit sc =>
+      withBackendContext { implicit ctx =>
         val act = for {
           b <- Bag(Seq(hhBook))
           c <- ScalaTraversable(hhCrts) // nested DataBag cannot be RDDDataBag, as those are not serializable
@@ -178,7 +178,7 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
   }
 
   "grouping" in {
-    withBackendContext { implicit sc =>
+    withBackendContext { implicit ctx =>
       val act = Bag(hhCrts).groupBy(_.book)
 
       val exp = hhCrts.groupBy(_.book).toSeq.map {
@@ -195,7 +195,7 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
     val ys = Seq("fuu", "bin", "bar", "bur", "lez", "liz", "lag")
 
     "union" in {
-      withBackendContext { implicit sc =>
+      withBackendContext { implicit ctx =>
         val act = Bag(xs) union Bag(ys)
         val exp = xs union ys
 
@@ -204,7 +204,7 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
     }
 
     "distinct" in {
-      withBackendContext { implicit sc =>
+      withBackendContext { implicit ctx =>
         val acts = Seq(Bag(xs).distinct, Bag(ys).distinct)
         val exps = Seq(xs.distinct, ys.distinct)
 
