@@ -50,6 +50,13 @@
             <artifactId>emma-common-macros</artifactId>
         </dependency>
 
+        <!-- Auto-Resource Management -->
+        <dependency>
+            <groupId>com.jsuereth</groupId>
+            <artifactId>scala-arm_${scala.tools.version}</artifactId>
+            <version>${scala-arm.version}</version>
+        </dependency>
+
         <!-- HDFS -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>

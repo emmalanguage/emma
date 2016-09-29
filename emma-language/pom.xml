@@ -80,13 +80,6 @@
             <artifactId>scalactic_${scala.tools.version}</artifactId>
         </dependency>
 
-        <!-- Auto-Resource Management -->
-        <dependency>
-            <groupId>com.jsuereth</groupId>
-            <artifactId>scala-arm_${scala.tools.version}</artifactId>
-            <version>${scala-arm.version}</version>
-        </dependency>
-
         <!-- Test -->
         <dependency>
             <groupId>junit</groupId>

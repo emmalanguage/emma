@@ -128,12 +128,6 @@
             <artifactId>reflections</artifactId>
         </dependency>
 
-        <!-- Auto-Resource Management -->
-        <dependency>
-            <groupId>com.jsuereth</groupId>
-            <artifactId>scala-arm_${scala.tools.version}</artifactId>
-        </dependency>
-
         <!-- Breeze -->
         <dependency>
             <groupId>org.scalanlp</groupId>
