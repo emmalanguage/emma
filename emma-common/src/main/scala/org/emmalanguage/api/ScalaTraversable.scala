@@ -16,6 +16,8 @@
 package org.emmalanguage
 package api
 
+import io.csv.{CSV, CSVConverter, CSVScalaSupport}
+
 import scala.language.{higherKinds, implicitConversions}
 
 /** A `DataBag` implementation backed by a Scala `Traversable`. */
@@ -37,7 +39,6 @@ class ScalaTraversable[A] private[api](private val rep: Traversable[A]) extends 
   override def map[B: Meta](f: (A) => B): ScalaTraversable[B] =
     rep.map(f)
 
-
   override def flatMap[B: Meta](f: (A) => DataBag[B]): ScalaTraversable[B] =
     rep.flatMap(x => f(x).fetch())
 
@@ -49,7 +50,7 @@ class ScalaTraversable[A] private[api](private val rep: Traversable[A]) extends 
   // -----------------------------------------------------
 
   override def groupBy[K: Meta](k: (A) => K): ScalaTraversable[Group[K, DataBag[A]]] =
-    rep.groupBy(k).toSeq.map { case (key, vals) => Group(key, wrap(vals)) }
+    wrap(rep.groupBy(k).toSeq map { case (key, vals) => Group(key, wrap(vals)) })
 
   // -----------------------------------------------------
   // Set operations
@@ -65,6 +66,9 @@ class ScalaTraversable[A] private[api](private val rep: Traversable[A]) extends 
   // -----------------------------------------------------
   // Sinks
   // -----------------------------------------------------
+
+  override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
+    CSVScalaSupport(format).write(path)(rep)
 
   override def fetch(): Traversable[A] =
     rep
@@ -91,12 +95,23 @@ class ScalaTraversable[A] private[api](private val rep: Traversable[A]) extends 
 
 object ScalaTraversable {
 
-  private implicit def wrap[A](rep: Traversable[A]): ScalaTraversable[A] =
-    new ScalaTraversable(rep)
+  // ---------------------------------------------------------------------------
+  // Constructors
+  // ---------------------------------------------------------------------------
 
-  def apply[A: Meta]: ScalaTraversable[A] =
+  def apply[A]: ScalaTraversable[A] =
     new ScalaTraversable(Seq.empty)
 
-  def apply[A: Meta](values: Traversable[A]): ScalaTraversable[A] =
+  def apply[A](values: Traversable[A]): ScalaTraversable[A] =
     new ScalaTraversable(values)
+
+  def readCSV[A: CSVConverter](path: String, format: CSV): ScalaTraversable[A] =
+    new ScalaTraversable(CSVScalaSupport(format).read(path).toStream)
+
+  // ---------------------------------------------------------------------------
+  // Implicit Rep -> DataBag conversion
+  // ---------------------------------------------------------------------------
+
+  private implicit def wrap[A](rep: Traversable[A]): ScalaTraversable[A] =
+    new ScalaTraversable(rep)
 }

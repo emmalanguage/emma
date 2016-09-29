@@ -14,24 +14,27 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package api
+package io.csv
 
-import io.csv.{CSV, CSVConverter}
+/** Serialization format for encoding to / decoding from CSV records. */
+trait CSVConverter[T] {
 
-class ScalaTraversableSpec extends DataBagSpec {
+  /** Parses and returns the value encoded in `record`. */
+  def from(record: Array[String]): T
 
-  override type Bag[A] = ScalaTraversable[A]
-  override type BackendContext = Unit
+  /** Serializes `value` using `sep` as field delimiter. */
+  def to(value: T): Array[String]
+}
 
-  override def withBackendContext[T](f: BackendContext => T): T =
-    f(Unit)
+object CSVConverter {
 
-  override def Bag[A: Meta](implicit unit: BackendContext): Bag[A] =
-    ScalaTraversable[A]
+  def apply[T](_from: Array[String] => T)(_to: T => Array[String]): CSVConverter[T] =
+    new CSVConverter[T] {
 
-  override def Bag[A: Meta](seq: Seq[A])(implicit unit: BackendContext): Bag[A] =
-    ScalaTraversable(seq)
+      override def from(record: Array[String]): T =
+        _from(record)
 
-  override def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit unit: BackendContext): DataBag[A] =
-    ScalaTraversable.readCSV(path, format)
+      override def to(value: T): Array[String] =
+        _to(value)
+    }
 }

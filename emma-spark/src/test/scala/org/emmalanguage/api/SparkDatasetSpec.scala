@@ -16,6 +16,8 @@
 package org.emmalanguage
 package api
 
+import io.csv.{CSV, CSVConverter}
+
 import org.apache.spark.sql.SparkSession
 
 class SparkDatasetSpec extends DataBagSpec {
@@ -31,4 +33,7 @@ class SparkDatasetSpec extends DataBagSpec {
 
   override def Bag[A: Meta](seq: Seq[A])(implicit spark: SparkSession): Bag[A] =
     SparkDataset(seq)
+
+  override def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): DataBag[A] =
+    SparkDataset.readCSV(path, format)
 }

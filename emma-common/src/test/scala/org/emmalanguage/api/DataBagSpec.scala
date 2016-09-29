@@ -16,7 +16,9 @@
 package org.emmalanguage
 package api
 
+import io.csv.{CSV, CSVConverter}
 import test.schema.Literature._
+import test.util.tempPath
 
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
@@ -47,6 +49,9 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
 
   /** An [[DataBag]] refinement type constructor which takes a Scala Seq. */
   def Bag[A: Meta](seq: Seq[A])(implicit ctx: BackendContext): Bag[A]
+
+  /** Read a CSV file. */
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit ctx: BackendContext): DataBag[A]
 
   // ---------------------------------------------------------------------------
   // spec tests
@@ -212,6 +217,26 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
           act shouldEqual Bag(exp)
       }
     }
+  }
+
+  "csv support" in {
+
+    import io.csv.CSV
+
+    withBackendContext { implicit ctx =>
+      val path = s"file://${tempPath("foo.txt")}"
+      val format = CSV()
+
+      def `write and read`[A: Meta : CSVConverter](exp: Seq[A]) = {
+        Bag(exp).writeCSV(path, format) // write
+        Thread.sleep(1000) // give it a second
+        readCSV[A](path, format) shouldEqual DataBag(exp) // read
+      }
+
+      //`write and read`(Seq(1, 2, 3))
+      `write and read`(Seq(hhBook))
+    }
+
   }
 }
 

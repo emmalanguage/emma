@@ -16,19 +16,24 @@
 package org.emmalanguage
 package api
 
-import org.apache.flink.api.scala.ExecutionEnvironment
+import org.emmalanguage.io.csv.{CSV, CSVConverter}
+
+import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
 
 class FlinkDataSetSpec extends DataBagSpec {
 
   override type Bag[A] = FlinkDataSet[A]
-  override type BackendContext = ExecutionEnvironment
+  override type BackendContext = FlinkEnv
 
   override def withBackendContext[T](f: BackendContext => T): T =
-    f(ExecutionEnvironment.getExecutionEnvironment)
+    f(FlinkEnv.getExecutionEnvironment)
 
-  override def Bag[A: Meta](implicit flink: ExecutionEnvironment): Bag[A] =
+  override def Bag[A: Meta](implicit flink: FlinkEnv): Bag[A] =
     FlinkDataSet[A]
 
-  override def Bag[A: Meta](seq: Seq[A])(implicit flink: ExecutionEnvironment): Bag[A] =
+  override def Bag[A: Meta](seq: Seq[A])(implicit flink: FlinkEnv): Bag[A] =
     FlinkDataSet(seq)
+
+  override def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit flink: FlinkEnv): DataBag[A] =
+    FlinkDataSet.readCSV(path, format)
 }

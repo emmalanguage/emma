@@ -16,7 +16,10 @@
 package org.emmalanguage
 package api
 
-import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment}
+import io.csv.{CSV, CSVConverter}
+
+import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment => FlinkEnv}
+import org.apache.flink.core.fs.FileSystem
 
 import scala.language.{higherKinds, implicitConversions}
 
@@ -31,12 +34,9 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
 
   override def fold[B: Meta](z: B)(s: A => B, u: (B, B) => B): B = {
     val collected = rep.map(x => s(x)).reduce(u).collect()
-    if (collected.isEmpty) {
-      z
-    } else {
-      assert(collected.size == 1)
-      collected.head
-    }
+    assert(collected.size <= 1)
+    if (collected.isEmpty) z
+    else collected.head
   }
 
   // -----------------------------------------------------
@@ -56,12 +56,11 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
   // Grouping
   // -----------------------------------------------------
 
-  override def groupBy[K: Meta](k: (A) => K): FlinkDataSet[Group[K, DataBag[A]]] = {
+  override def groupBy[K: Meta](k: (A) => K): FlinkDataSet[Group[K, DataBag[A]]] =
     rep.groupBy(k).reduceGroup((it: Iterator[A]) => {
       val buffer = it.toBuffer // This is because the iterator might not be serializable
       Group(k(buffer.head), DataBag(buffer))
     })
-  }
 
   // -----------------------------------------------------
   // Set operations
@@ -78,6 +77,23 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
   // Sinks
   // -----------------------------------------------------
 
+  override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit = {
+    require(format.charset == CSV.DEFAULT_CHARSET,
+      s"""Unsupported `charset` value: `${format.charset}`""")
+    require(format.escape == CSV.DEFAULT_ESCAPE,
+      s"""Unsupported `escape` character: '${format.escape.map(_.toString).getOrElse("")}'""")
+    require(format.comment == CSV.DEFAULT_COMMENT,
+      s"""Unsupported `comment` character: '${format.comment.map(_.toString).getOrElse("")}'""")
+    require(format.nullValue == CSV.DEFAULT_NULLVALUE,
+      s"""Unsupported `nullValue` string: "${format.nullValue}"""")
+
+    rep.writeAsCsv(
+      filePath = path,
+      fieldDelimiter = format.delimiter.toString,
+      writeMode = FileSystem.WriteMode.OVERWRITE
+    )
+  }
+
   def fetch(): Seq[A] =
     rep.collect()
 }
@@ -86,42 +102,51 @@ object FlinkDataSet {
 
   import org.apache.flink.api.common.typeinfo.TypeInformation
 
-  import scala.reflect.runtime.currentMirror
-  import scala.reflect.runtime.universe._
-  import scala.tools.reflect.ToolBox
+  import util.Toolbox.universe._
+  import util.Toolbox.{mirror, toolbox}
 
-  import java.nio.file.{Files, Paths}
-
-  private lazy val codeGenDirDefault = Paths
-    .get(sys.props("java.io.tmpdir"), "emma", "codegen")
-    .toAbsolutePath.toString
-
-  /** The directory where the toolbox will store runtime-generated code. */
-  private lazy val codeGenDir = {
-    val path = Paths.get(sys.props.getOrElse("emma.codegen.dir", codeGenDirDefault))
-    // Make sure that generated class directory exists
-    Files.createDirectories(path)
-    path.toAbsolutePath.toString
-  }
-
-  private lazy val flinkApi = currentMirror.staticModule("org.apache.flink.api.scala.package")
+  private lazy val flinkApi = mirror.staticModule("org.apache.flink.api.scala.package")
   private lazy val typeInfo = flinkApi.info.decl(TermName("createTypeInformation"))
-  private lazy val toolbox = currentMirror.mkToolBox(options = s"-d $codeGenDir")
 
   private lazy val memo = collection.mutable.Map.empty[Any, Any]
 
   implicit def typeInfoForType[T: Meta]: TypeInformation[T] = {
-    val ttag = implicitly[TypeTag[T]]
-    val info = memo.getOrElseUpdate(ttag, toolbox.eval(q"$typeInfo[${ttag.tpe}]")).asInstanceOf[TypeInformation[T]]
-    info
+    val ttag = implicitly[Meta[T]].ttag
+    memo.getOrElseUpdate(
+      ttag,
+      toolbox.eval(q"$typeInfo[${ttag.tpe}]")).asInstanceOf[TypeInformation[T]]
   }
+
+  // ---------------------------------------------------------------------------
+  // Constructors
+  // ---------------------------------------------------------------------------
+
+  def apply[A: Meta](implicit flink: FlinkEnv): FlinkDataSet[A] =
+    flink.fromElements[A]()
+
+  def apply[A: Meta](seq: Seq[A])(implicit flink: FlinkEnv): FlinkDataSet[A] =
+    flink.fromCollection(seq)
+
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit flink: FlinkEnv): FlinkDataSet[A] = {
+    require(format.charset == CSV.DEFAULT_CHARSET,
+      s"""Unsupported `charset` value: `${format.charset}`""")
+    require(format.escape == CSV.DEFAULT_ESCAPE,
+      s"""Unsupported `escape` character: '${format.escape.map(_.toString).getOrElse("")}'""")
+    require(format.nullValue == CSV.DEFAULT_NULLVALUE,
+      s"""Unsupported `nullValue` string: "${format.nullValue}"""")
+
+    flink.readCsvFile[A](
+      filePath = path,
+      ignoreFirstLine = format.header,
+      fieldDelimiter = s"${format.delimiter}",
+      quoteCharacter = format.quote.getOrElse[Char]('"')
+    )
+  }
+
+  // ---------------------------------------------------------------------------
+  // Implicit Rep -> DataBag conversion
+  // ---------------------------------------------------------------------------
 
   implicit def wrap[A: Meta](rep: DataSet[A]): FlinkDataSet[A] =
     new FlinkDataSet(rep)
-
-  def apply[A: Meta](implicit flink: ExecutionEnvironment): FlinkDataSet[A] =
-    flink.fromElements[A]()
-
-  def apply[A: Meta](seq: Seq[A])(implicit flink: ExecutionEnvironment): FlinkDataSet[A] =
-    flink.fromCollection(seq)
 }

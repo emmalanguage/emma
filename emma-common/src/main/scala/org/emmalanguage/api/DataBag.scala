@@ -16,6 +16,8 @@
 package org.emmalanguage
 package api
 
+import io.csv.{CSV, CSVConverter}
+
 /** An abstraction for homogeneous distributed collections. */
 trait DataBag[A] extends Serializable {
 
@@ -127,6 +129,15 @@ trait DataBag[A] extends Serializable {
   // -----------------------------------------------------
 
   /**
+   * Writes a DataBag into the specified `path` in a CSV format.
+   *
+   * @param path      The location where the data will be written.
+   * @param format    The CSV format configuration
+   * @param converter A converter to use for element serialization.
+   */
+  def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit
+
+  /**
    * Converts a DataBag abstraction back into a scala sequence.
    *
    * @return The contents of the DataBag as a scala sequence.
@@ -135,6 +146,10 @@ trait DataBag[A] extends Serializable {
 }
 
 object DataBag {
+
+  // -----------------------------------------------------
+  // Constructors & Sources
+  // -----------------------------------------------------
 
   /**
    * Empty constructor.
@@ -152,4 +167,13 @@ object DataBag {
    * @return A DataBag containing the elements of the `values` sequence.
    */
   def apply[A: Meta](values: Seq[A]): DataBag[A] = ScalaTraversable(values)
+
+  /**
+   * Reads a DataBag into the specified `path` using in a CSV format.
+   *
+   * @param path   The location where the data will be read from.
+   * @param format The CSV format configuration.
+   * @tparam A the type of elements to read.
+   */
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV): DataBag[A] = ScalaTraversable.readCSV[A](path, format)
 }

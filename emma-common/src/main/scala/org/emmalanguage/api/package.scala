@@ -15,6 +15,7 @@
  */
 package org.emmalanguage
 
+import io.csv.{CSVConverter, CSVConverterMacro}
 import eu.stratosphere.emma.macros.Folds
 
 import scala.reflect.ClassTag
@@ -35,7 +36,7 @@ package object api {
     def ttag: TypeTag[T]
   }
 
-  implicit def typeMeta[T : ClassTag : TypeTag] = new Meta[T] {
+  implicit def meta[T : ClassTag : TypeTag] = new Meta[T] {
     override def ctag = implicitly[ClassTag[T]]
     override def ttag = implicitly[TypeTag[T]]
   }
@@ -100,6 +101,9 @@ package object api {
    */
   implicit final class DataBagFolds[A] private[api](val self: DataBag[A])
     extends AnyVal with Folds[A]
+
+  implicit def materializeCSVConverter[T]: CSVConverter[T] =
+    macro CSVConverterMacro.materialize[T]
 
   def comparing[A](lt: (A, A) => Boolean): Ordering[A] =
     Ordering.fromLessThan(lt)

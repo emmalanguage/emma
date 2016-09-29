@@ -16,6 +16,8 @@
 package org.emmalanguage
 package api
 
+import io.csv.{CSV, CSVConverter}
+
 import org.apache.spark.sql.{Dataset, SparkSession}
 
 import scala.language.{higherKinds, implicitConversions}
@@ -67,6 +69,17 @@ class SparkDataset[A: Meta] private[api](@transient private val rep: Dataset[A])
   // Sinks
   // -----------------------------------------------------
 
+  override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
+    rep.write
+      .option("header", format.header)
+      .option("delimiter", format.delimiter)
+      .option("charset", format.charset.toString)
+      .option("quote", format.quote.getOrElse('"').toString)
+      .option("escape", format.escape.getOrElse('\\').toString)
+      .option("nullValue", format.nullValue)
+      .mode("overwrite")
+      .csv(path)
+
   def fetch(): Seq[A] =
     rep.collect()
 
@@ -74,8 +87,8 @@ class SparkDataset[A: Meta] private[api](@transient private val rep: Dataset[A])
   // Conversions
   // -----------------------------------------------------
 
-  def rdd: SparkRDD[A] =
-    new SparkRDD(rep.rdd)
+  private def rdd: SparkRDD[A] =
+    new SparkRDD(rep.rdd)(implicitly[Meta[A]], rep.sparkSession)
 }
 
 object SparkDataset {
@@ -86,12 +99,33 @@ object SparkDataset {
   implicit def encoderForType[T: Meta]: Encoder[T] =
     ExpressionEncoder[T]
 
-  implicit def wrap[A: Meta](rep: Dataset[A]): SparkDataset[A] =
-    new SparkDataset(rep)
+  // ---------------------------------------------------------------------------
+  // Constructors
+  // ---------------------------------------------------------------------------
 
   def apply[A: Meta](implicit spark: SparkSession): SparkDataset[A] =
     spark.emptyDataset[A]
 
   def apply[A: Meta](seq: Seq[A])(implicit spark: SparkSession): SparkDataset[A] =
     spark.createDataset(seq)
+
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): SparkDataset[A] =
+    spark.read
+      .option("header", format.header)
+      .option("delimiter", format.delimiter)
+      .option("charset", format.charset.toString)
+      .option("quote", format.quote.getOrElse('"').toString)
+      .option("escape", format.escape.getOrElse('\\').toString)
+      .option("comment", format.escape.map(_.toString).getOrElse(null.asInstanceOf[String]))
+      .option("nullValue", format.nullValue)
+      .schema(encoderForType[A].schema)
+      .csv(path)
+      .as[A]
+
+  // ---------------------------------------------------------------------------
+  // Implicit Rep -> DataBag conversion
+  // ---------------------------------------------------------------------------
+
+  implicit def wrap[A: Meta](rep: Dataset[A]): SparkDataset[A] =
+    new SparkDataset(rep)
 }
