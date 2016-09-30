@@ -159,6 +159,12 @@ trait CommonAST {
       if (has.name(sym)) Some(sym, sym.name) else None
   }
 
+  /** Extractor for the type of a symbol, if any. */
+  object withInfo {
+    def unapply(sym: Symbol): Option[(Symbol, Type)] =
+      if (has.tpe(sym)) Some(sym, sym.info.dealias.widen) else None
+  }
+
   /** Extractor for the symbol of a tree, if any. */
   object withSym {
     def unapply(tree: Tree): Option[(Tree, Symbol)] =
