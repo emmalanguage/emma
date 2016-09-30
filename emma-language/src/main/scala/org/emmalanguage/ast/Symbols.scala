@@ -105,10 +105,13 @@ trait Symbols { this: AST =>
           if signature.typeParams.size == targs.size
           paramss = Type(signature, targs: _*).paramLists
           if paramss.size == argss.size
-          if paramss.zip(argss).forall { case (params, args) =>
-            params.size == args.size && params.zip(args).forall { case (param, arg) =>
-              Type.of(arg) weak_<:< Type.signature(param)
-            }
+          if paramss.zip(argss).forall {
+            case (Seq(_ withInfo VarArgType(tpe)), args) =>
+              args.map(Type.of).forall(_ weak_<:< tpe)
+            case (params, args) =>
+              params.size == args.size && params.zip(args).forall {
+                case (param, arg) => Type.of(arg) weak_<:< Type.signature(param)
+              }
           }
         } yield alt
 
