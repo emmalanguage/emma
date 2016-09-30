@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.ast
+package eu.stratosphere.emma
+package ast
 
 import com.typesafe.scalalogging.slf4j.Logger
 import org.slf4j.LoggerFactory

@@ -1,10 +1,10 @@
-package eu.stratosphere
-package emma.compiler
+package eu.stratosphere.emma
+package compiler
 package lang
 package source
 
-import emma.api.DataBag
-import emma.testschema.Marketing._
+import api.DataBag
+import testschema.Marketing._
 
 import org.example.foo.{Bar, Baz}
 import org.junit.runner.RunWith
@@ -79,7 +79,7 @@ class LanguageSpec extends BaseCompilerSpec {
       var w = "42"
       object Module
       w += '!'
-      (u, v, w, Module, scala.collection.Seq, emma.util.Monoids)
+      (u, v, w, Module, scala.collection.Seq, util.Monoids)
       ()
     }).last.children.tail
 

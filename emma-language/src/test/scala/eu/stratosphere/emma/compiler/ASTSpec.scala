@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.compiler
+package eu.stratosphere.emma
+package compiler
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner

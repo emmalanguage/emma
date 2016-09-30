@@ -1,5 +1,5 @@
-package eu.stratosphere
-package emma.compiler
+package eu.stratosphere.emma
+package compiler
 package lang
 
 import org.scalactic._
