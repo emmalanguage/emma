@@ -1,7 +1,7 @@
 package org.emmalanguage
 package compiler.lang.core
 
-import api._
+import eu.stratosphere.emma.api._
 import compiler.BaseCompilerSpec
 import testschema.Marketing._
 

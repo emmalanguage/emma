@@ -1,9 +1,9 @@
 package org.emmalanguage
 package compiler.lang.core
 
-import api.{DataBag, emma}
+import eu.stratosphere.emma.api.{DataBag, emma}
 import compiler.ir.ComprehensionSyntax._
-import compiler.{BaseCompilerSpec, RuntimeCompiler}
+import compiler.BaseCompilerSpec
 import testschema.Marketing._
 
 import org.junit.runner.RunWith

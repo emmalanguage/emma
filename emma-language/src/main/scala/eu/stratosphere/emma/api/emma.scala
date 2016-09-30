@@ -1,7 +1,7 @@
 package eu.stratosphere.emma.api
 
 import eu.stratosphere.emma.macros.program.WorkflowMacros
-import eu.stratosphere.emma.macros.utility.UtilMacros
+import org.emmalanguage.macros.utility.UtilMacros
 
 import scala.language.experimental.macros
 

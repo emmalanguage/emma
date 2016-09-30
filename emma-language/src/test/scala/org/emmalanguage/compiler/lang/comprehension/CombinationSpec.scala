@@ -1,7 +1,7 @@
 package org.emmalanguage
 package compiler.lang.comprehension
 
-import api.DataBag
+import eu.stratosphere.emma.api.DataBag
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import compiler.ir.ComprehensionCombinators._

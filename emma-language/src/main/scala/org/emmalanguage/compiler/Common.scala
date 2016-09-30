@@ -16,6 +16,7 @@ trait Common extends AST {
   // --------------------------------------------------------------------------
 
   val rootPkg = "eu.stratosphere.emma"
+  val newRootPkg = "org.emmalanguage"
 
   /** A set of API method symbols to be comprehended. */
   protected[emmalanguage] object API {
@@ -64,7 +65,7 @@ trait Common extends AST {
 
   protected[emmalanguage] object ComprehensionSyntax {
     //@formatter:off
-    val module                = rootMirror.staticModule(s"$rootPkg.compiler.ir.ComprehensionSyntax").asModule
+    val module                = rootMirror.staticModule(s"$newRootPkg.compiler.ir.ComprehensionSyntax").asModule
 
     val flatten               = module.info.decl(TermName("flatten")).asMethod
     val generator             = module.info.decl(TermName("generator")).asMethod
@@ -78,7 +79,7 @@ trait Common extends AST {
 
   protected[emmalanguage] object ComprehensionCombinators {
     //@formatter:off
-    val module                = rootMirror.staticModule(s"$rootPkg.compiler.ir.ComprehensionCombinators").asModule
+    val module                = rootMirror.staticModule(s"$newRootPkg.compiler.ir.ComprehensionCombinators").asModule
 
     val cross                 = module.info.decl(TermName("cross")).asMethod
     val equiJoin              = module.info.decl(TermName("equiJoin")).asMethod

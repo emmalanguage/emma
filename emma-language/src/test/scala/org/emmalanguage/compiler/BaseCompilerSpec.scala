@@ -1,12 +1,12 @@
-package eu.stratosphere.emma
+package org.emmalanguage
 package compiler
 
-import api.DataBag
-import lang.TreeMatchers
+import java.util.{Properties, UUID}
 
+import eu.stratosphere.emma.api.DataBag
+import lang.TreeMatchers
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
-import java.util.{Properties, UUID}
 
 /**
  * Common methods and mixins for all compier specs

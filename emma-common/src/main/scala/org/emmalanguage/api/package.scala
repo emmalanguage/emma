@@ -24,6 +24,7 @@ package object api {
     override def ctag = implicitly[ClassTag[T]]
     override def ttag = implicitly[TypeTag[T]]
   }
+  //@formatter:on
 
   implicit def ttagForType[T: Meta]: TypeTag[T] =
     implicitly[Meta[T]].ttag

@@ -1,7 +1,7 @@
 package org.emmalanguage
 package api
 
-import eu.stratosphere.emma.testschema.Literature._
+import testschema.Literature._
 
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}

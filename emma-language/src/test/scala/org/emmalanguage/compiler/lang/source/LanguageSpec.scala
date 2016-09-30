@@ -3,7 +3,7 @@ package compiler
 package lang
 package source
 
-import api.DataBag
+import eu.stratosphere.emma.api.DataBag
 import testschema.Marketing._
 
 import org.example.foo.{Bar, Baz}

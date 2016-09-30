@@ -1,5 +1,4 @@
-package eu.stratosphere
-package emma
+package org.emmalanguage
 
 import shapeless.labelled.FieldType
 

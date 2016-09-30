@@ -1,7 +1,7 @@
 package org.emmalanguage
 package compiler.lang.source
 
-import eu.stratosphere.emma.compiler.BaseCompilerSpec
+import compiler.BaseCompilerSpec
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
