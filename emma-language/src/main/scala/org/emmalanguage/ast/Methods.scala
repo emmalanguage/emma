@@ -105,19 +105,26 @@ trait Methods { this: AST =>
        */
       def apply(target: Option[u.Tree] = None)
         (method: u.TermSymbol, targs: u.Type*)
-        (argss: Seq[u.Tree]*): u.Tree = target match {
+        (argss: Seq[u.Tree]*): u.Tree = {
 
-        case Some(tgt) =>
-          assert(is.defined(tgt), s"$this target is not defined: $tgt")
-          assert(is.term(tgt), s"$this target is not a term:\n${Tree.show(tgt)}")
-          assert(has.tpe(tgt), s"$this target has no type:\n${Tree.showTypes(tgt)}")
-          val resolved = Sym.resolveOverloaded(Type.of(tgt))(method, targs: _*)(argss: _*)
-          assert(is.method(resolved), s"$this resolved variant `$resolved` is not a method")
-          TermApp(Sel(tgt, resolved), targs: _*)(argss: _*)
-        case None =>
-          val resolved = Sym.resolveOverloaded()(method, targs: _*)(argss: _*)
-          assert(is.method(resolved), s"$this resolved variant `$resolved` is not a method")
-          TermApp(Id(resolved), targs: _*)(argss: _*)
+        val fun = target match {
+          case Some(tgt) =>
+            assert(is.defined(tgt), s"$this target is not defined: $tgt")
+            assert(is.term(tgt), s"$this target is not a term:\n${Tree.show(tgt)}")
+            assert(has.tpe(tgt), s"$this target has no type:\n${Tree.showTypes(tgt)}")
+            val resolved = Sym.resolveOverloaded(Type.of(tgt))(method, targs: _*)(argss: _*)
+            assert(is.method(resolved), s"$this resolved variant `$resolved` is not a method")
+            Sel(tgt, resolved)
+
+          case None =>
+            val resolved = Sym.resolveOverloaded()(method, targs: _*)(argss: _*)
+            assert(is.method(resolved), s"$this resolved variant `$resolved` is not a method")
+            Id(resolved)
+        }
+
+        val app = TermApp(fun, targs: _*)(argss: _*)
+        set(app, tpe = app.tpe.finalResultType)
+        app
       }
 
       def unapplySeq(call: u.Tree)
