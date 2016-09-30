@@ -103,6 +103,16 @@ trait Common extends AST {
     //@formatter:on
   }
 
+  protected[emmalanguage] object GraphRepresentation {
+    //@formatter:off
+    val module  = rootMirror.staticModule(s"$newRootPkg.compiler.ir.GraphRepresentation").asModule
+
+    val phi     = module.info.member(api.TermName("phi")).asMethod
+
+    val methods = Set(phi)
+    //@formatter:on
+  }
+
   /** Common validation helpers. */
   object Validation {
 
