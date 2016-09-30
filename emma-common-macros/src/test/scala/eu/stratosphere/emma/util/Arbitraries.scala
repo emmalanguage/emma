@@ -1,4 +1,5 @@
-package eu.stratosphere.emma.util
+package eu.stratosphere.emma
+package util
 
 import shapeless._
 import shapeless.labelled._
