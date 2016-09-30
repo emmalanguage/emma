@@ -194,7 +194,7 @@
                     <includes>
                         <include>**/*.class</include>
                     </includes>
-                    <excludedGroups>eu.stratosphere.emma.testutil.ExampleTest</excludedGroups>
+                    <excludedGroups>${excludedSurefireGroups}</excludedGroups>
                 </configuration>
             </plugin>
 
