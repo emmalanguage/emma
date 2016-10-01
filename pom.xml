@@ -7,9 +7,61 @@
     <groupId>eu.stratosphere</groupId>
     <artifactId>emma</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <packaging>pom</packaging>
 
     <name>emma</name>
-    <packaging>pom</packaging>
+    <description>
+        Emma is a Scala DSL for scalable data analysis.
+        Our goal is to improve developer productivity by hiding parallelism aspects behind a high-level, declarative API.
+    </description>
+    <inceptionYear>2014</inceptionYear>
+    <url>https://emma-language.org</url>
+
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
+
+    <developers>
+        <developer>
+            <name>Alexander Alexandrov</name>
+            <email>alexander.alexandrov@tu-berlin.de</email>
+            <organization>TU Berlin</organization>
+            <organizationUrl>https://www.tu-berlin.de</organizationUrl>
+        </developer>
+        <developer>
+            <name>Gábor Gévay</name>
+            <email>gevay@tu-berlin.de</email>
+            <organization>TU Berlin</organization>
+            <organizationUrl>https://www.tu-berlin.de</organizationUrl>
+        </developer>
+        <developer>
+            <name>Georgi Krastev</name>
+            <email>g.krastev@campus.tu-berlin.de</email>
+            <organization>TU Berlin</organization>
+            <organizationUrl>https://www.tu-berlin.de</organizationUrl>
+        </developer>
+        <developer>
+            <name>Andreas Kunft</name>
+            <email>andreas.kunft@tu-berlin.de</email>
+            <organization>TU Berlin</organization>
+            <organizationUrl>https://www.tu-berlin.de</organizationUrl>
+        </developer>
+        <developer>
+            <name>Felix Schüler</name>
+            <email>felix.schueler@campus.tu-berlin.de</email>
+            <organization>TU Berlin</organization>
+            <organizationUrl>https://www.tu-berlin.de</organizationUrl>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:git@github.com:emmalanguage/emma.git</connection>
+        <developerConnection>scm:git:git@github.com:emmalanguage/emma.git</developerConnection>
+        <url>git@github.com:emmalanguage/emma.git</url>
+    </scm>
 
     <properties>
         <!-- Common -->
@@ -68,22 +120,13 @@
         <compile-spec-pipelines>false</compile-spec-pipelines>
     </properties>
 
-    <!-- Enable Apache Development Snapshot Repository -->
-    <!--
-    <repositories>
-        <repository>
-            <id>apache.snapshots</id>
-            <name>Apache Development Snapshot Repository</name>
-            <url>https://repository.apache.org/content/repositories/snapshots/</url>
-            <releases>
-                <enabled>false</enabled>
-            </releases>
-            <snapshots>
-                <enabled>true</enabled>
-            </snapshots>
-        </repository>
-    </repositories>
-    -->
+    <!-- Sonatype distribution management -->
+    <distributionManagement>
+        <snapshotRepository>
+            <id>ossrh</id>
+            <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
 
     <dependencyManagement>
         <dependencies>
@@ -475,6 +518,69 @@
                     </includes>
                     <!-- Memory for the Travis build -->
                     <argLine>-Xms1024m -Xmx2048m</argLine>
+                </configuration>
+            </plugin>
+
+            <!-- Check for proper LICENSE header -->
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>3.0</version>
+                <executions>
+                    <execution>
+                        <id>check-license</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <header>com/mycila/maven/plugin/license/templates/APACHE-2.txt</header>
+                    <properties>
+                        <owner>TU Berlin</owner>
+                        <email>emma@dima.tu-berlin.de</email>
+                    </properties>
+                    <excludes>
+                        <exclude>**/LICENSE</exclude>
+                        <exclude>**/NOTICE</exclude>
+                        <exclude>**/README.md</exclude>
+                        <exclude>**/**.ipynb</exclude>
+                        <exclude>**/scalastyle_config.xml</exclude>
+                        <exclude>src/test/resources/**</exclude>
+                        <exclude>src/main/resources/**</exclude>
+                        <exclude>public/js/paper-full-v0.9.23.min.js</exclude>
+                        <exclude>public/**/*foundation*</exclude>
+                    </excludes>
+                    <mapping>
+                        <scala>SLASHSTAR_STYLE</scala>
+                    </mapping>
+                </configuration>
+            </plugin>
+
+            <!-- Generate NOTICE file -->
+            <plugin>
+                <groupId>org.jasig.maven</groupId>
+                <artifactId>maven-notice-plugin</artifactId>
+                <version>1.0.6.1</version>
+                <executions>
+                    <execution>
+                        <id>check-notice</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <generateChildNotices>false</generateChildNotices>
+                    <noticeTemplate>https://gist.githubusercontent.com/aalexandrov/25a931c7d106415c8af7/raw/04e7a3d5534194929f1864d0535b8cc1c5f9cddb/NOTICE.template</noticeTemplate>
+                    <includeChildDependencies>true</includeChildDependencies>
+                    <licenseMapping>
+                        <param>https://source.jasig.org/licenses/license-mappings.xml</param>
+                        <param>file://${project.basedir}/tools/license-mappings.xml</param>
+                    </licenseMapping>
+                    <generateChildNotices>false</generateChildNotices>
                 </configuration>
             </plugin>
         </plugins>
