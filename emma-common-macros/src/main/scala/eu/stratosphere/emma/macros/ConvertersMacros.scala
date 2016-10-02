@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.emmalanguage
-package macros
+package eu.stratosphere.emma.macros
 
-import ast.MacroAST
+import org.emmalanguage.ast.MacroAST
 
 import scala.reflect.macros.blackbox
 

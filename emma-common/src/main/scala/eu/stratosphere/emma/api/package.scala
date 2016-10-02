@@ -20,7 +20,7 @@ import java.net.URI
 
 import eu.stratosphere.emma.api.model.Identity
 import eu.stratosphere.emma.macros.Folds
-import org.emmalanguage.macros.ConvertersMacros
+import eu.stratosphere.emma.macros.ConvertersMacros
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 
