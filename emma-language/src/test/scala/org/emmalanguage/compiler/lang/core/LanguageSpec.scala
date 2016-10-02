@@ -18,7 +18,7 @@ package compiler.lang.core
 
 import eu.stratosphere.emma.api._
 import compiler.BaseCompilerSpec
-import testschema.Marketing._
+import test.schema.Marketing._
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner

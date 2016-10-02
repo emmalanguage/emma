@@ -16,7 +16,7 @@
 package org.emmalanguage
 package api
 
-import testschema.Literature._
+import test.schema.Literature._
 
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}

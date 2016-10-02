@@ -19,7 +19,7 @@ package lang
 package source
 
 import eu.stratosphere.emma.api.DataBag
-import testschema.Marketing._
+import test.schema.Marketing._
 
 import org.example.foo.{Bar, Baz}
 import org.junit.runner.RunWith

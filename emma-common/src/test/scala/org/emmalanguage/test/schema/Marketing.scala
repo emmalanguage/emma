@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package testschema
+package test.schema
 
 import java.time.Instant
 

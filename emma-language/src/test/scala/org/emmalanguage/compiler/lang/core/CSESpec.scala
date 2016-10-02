@@ -19,7 +19,7 @@ package compiler.lang.core
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import eu.stratosphere.emma.api.DataBag
-import testschema.Literature._
+import test.schema.Literature._
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner

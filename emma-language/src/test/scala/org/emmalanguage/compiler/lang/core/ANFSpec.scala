@@ -19,8 +19,8 @@ package compiler.lang.core
 import eu.stratosphere.emma.api.DataBag
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
-import testschema.Marketing._
-import testschema.Math._
+import test.schema.Marketing._
+import test.schema.Math._
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner

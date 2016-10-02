@@ -20,7 +20,7 @@ import eu.stratosphere.emma.api.DataBag
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import compiler.ir.ComprehensionCombinators._
-import testschema.Marketing._
+import test.schema.Marketing._
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
