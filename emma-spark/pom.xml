@@ -48,23 +48,9 @@
         <!-- Emma -->
         <dependency>
             <groupId>eu.stratosphere</groupId>
-            <artifactId>emma-backend</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>eu.stratosphere</groupId>
-            <artifactId>emma-common</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>eu.stratosphere</groupId>
             <artifactId>emma-language</artifactId>
-            <scope>test</scope>
         </dependency>
         <!-- Emma (test jars) -->
-        <dependency>
-            <groupId>eu.stratosphere</groupId>
-            <artifactId>emma-common</artifactId>
-            <type>test-jar</type>
-        </dependency>
         <dependency>
             <groupId>eu.stratosphere</groupId>
             <artifactId>emma-language</artifactId>

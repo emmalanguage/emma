@@ -3,7 +3,7 @@
     "name": "IMDb",
     "class": "eu.stratosphere.emma.examples.imdb.IMDb",
     "parameter": {
-      "input": "../emma-common/src/test/resources/cinema",
+      "input": "../emma-language/src/test/resources/cinema",
       "output": "/tmp/emma/examples/cinema/output"
     }
   },
@@ -11,7 +11,7 @@
     "name": "WordCount",
     "class": "eu.stratosphere.emma.examples.text.WordCount",
     "parameter": {
-      "input": "../emma-common/src/test/resources/lyrics/Jabberwocky.txt",
+      "input": "../emma-language/src/test/resources/lyrics/Jabberwocky.txt",
       "output": "/tmp/emma/examples/wordcount/output"
     }
   },
@@ -112,7 +112,7 @@
     "name": "TPCH-Query01",
     "class": "eu.stratosphere.emma.examples.tpch.Query01",
     "parameter": {
-      "input": "../emma-common/src/test/resources/tpch/sf0.001",
+      "input": "../emma-language/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q1.tbl",
       "delta": 30
     }
@@ -121,7 +121,7 @@
     "name": "TPCH-Query03",
     "class": "eu.stratosphere.emma.examples.tpch.Query03",
     "parameter": {
-      "input": "../emma-common/src/test/resources/tpch/sf0.001",
+      "input": "../emma-language/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q3.tbl",
       "segment": "AUTOMOBILE",
       "date": "1996-06-30"
@@ -131,7 +131,7 @@
     "name": "TPCH-Query05",
     "class": "eu.stratosphere.emma.examples.tpch.Query05",
     "parameter": {
-      "input": "../emma-common/src/test/resources/tpch/sf0.001",
+      "input": "../emma-language/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q5.tbl",
       "region": "AMERICA",
       "date": "1994-01-01"
@@ -141,7 +141,7 @@
     "name": "TPCH-Query06",
     "class": "eu.stratosphere.emma.examples.tpch.Query06",
     "parameter": {
-      "input": "../emma-common/src/test/resources/tpch/sf0.001",
+      "input": "../emma-language/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q6.tbl",
       "date": "1994-01-01",
       "discount": 0.06,
@@ -152,7 +152,7 @@
     "name": "TPCH-Query07",
     "class": "eu.stratosphere.emma.examples.tpch.Query07",
     "parameter": {
-      "input": "../emma-common/src/test/resources/tpch/sf0.001",
+      "input": "../emma-language/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q7.tbl",
       "nation1": "ARGENTINA",
       "nation2": "GERMANY"
@@ -162,7 +162,7 @@
     "name": "TPCH-Query08",
     "class": "eu.stratosphere.emma.examples.tpch.Query08",
     "parameter": {
-      "input": "../emma-common/src/test/resources/tpch/sf0.001",
+      "input": "../emma-language/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q8.tbl",
       "nation": "ETHIOPIA",
       "region": "AMERICA",
@@ -173,7 +173,7 @@
     "name": "TPCH-Query09",
     "class": "eu.stratosphere.emma.examples.tpch.Query09",
     "parameter": {
-      "input": "../emma-common/src/test/resources/tpch/sf0.001",
+      "input": "../emma-language/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q9.tbl",
       "color": "green"
     }
@@ -182,7 +182,7 @@
     "name": "TPCH-Query10",
     "class": "eu.stratosphere.emma.examples.tpch.Query10",
     "parameter": {
-      "input": "../emma-common/src/test/resources/tpch/sf0.001",
+      "input": "../emma-language/src/test/resources/tpch/sf0.001",
       "output": "/tmp/emma/examples/tpch/q10.tbl",
       "begin_date": "1993-10-01",
       "end_date": "1994-01-01"
