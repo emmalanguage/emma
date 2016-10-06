@@ -18,12 +18,22 @@ package api
 
 import io.csv.{CSV, CSVConverter, CSVScalaSupport}
 
+import scala.reflect.ClassTag
+import scala.reflect.runtime.universe._
+
 import scala.language.{higherKinds, implicitConversions}
 
 /** A `DataBag` implementation backed by a Scala `Traversable`. */
 class ScalaTraversable[A] private[api](private val rep: Traversable[A]) extends DataBag[A] {
 
   import ScalaTraversable.wrap
+
+  //@formatter:off
+  @transient override val m = new Meta[A] {
+    override def ctag: ClassTag[A] = null
+    override def ttag: TypeTag[A] = null
+  }
+  //@formatter:on
 
   // -----------------------------------------------------
   // Structural recursion

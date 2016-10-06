@@ -21,6 +21,8 @@ import io.csv.{CSV, CSVConverter}
 /** An abstraction for homogeneous distributed collections. */
 trait DataBag[A] extends Serializable {
 
+  implicit def m: Meta[A]
+
   // -----------------------------------------------------
   // Structural recursion
   // -----------------------------------------------------
@@ -143,6 +145,172 @@ trait DataBag[A] extends Serializable {
    * @return The contents of the DataBag as a scala sequence.
    */
   def fetch(): Traversable[A]
+
+  // -----------------------------------------------------
+  // Pre-defined folds
+  // -----------------------------------------------------
+
+  /**
+   * Test the collection for emptiness.
+   *
+   * @return `true` if the collection contains no elements at all
+   */
+  def isEmpty: Boolean =
+    fold(true)(_ => false, _ && _)
+
+  /**
+   * Tet the collection for emptiness.
+   *
+   * @return `true` if the collection has at least one element
+   */
+  def nonEmpty: Boolean =
+    fold(false)(_ => true, _ || _)
+
+  /**
+   * Shortcut for `fold(z)(identity, f)`.
+   *
+   * @param z `zero`: bottom (of the recursion) element
+   * @param u `plus`: reducing (folding) function, should be associative
+   * @tparam B return type (super class of the element type)
+   * @return the result of combining all elements into one
+   */
+  def reduce[B >: A : Meta](z: B)(u: (B, B) => B): B =
+    fold(z)(x => x, u)
+
+  /**
+   * Shortcut for `fold(None)(Some, Option.lift2(f))`, which is the same as reducing the collection
+   * to a single element by applying a binary operator.
+   *
+   * @param p `plus`: reducing (folding) function, should be associative
+   * @return the result of reducing all elements into one
+   */
+  def reduceOption(p: (A, A) => A): Option[A] =
+    fold(Option.empty[A])(Some(_), (xo, yo) => (for {
+      x <- xo
+      y <- yo
+    } yield p(x, y)) orElse xo orElse yo)
+
+  /**
+   * Find the smallest element in the collection with respect to the natural ordering of the
+   * elements' type.
+   *
+   * @param o the implicit natural [[Ordering]] of the elements
+   * @throws Exception if the collection is empty
+   */
+  def min(implicit o: Ordering[A]): A =
+    reduceOption(o.min).get
+
+  /**
+   * Find the largest element in the collection with respect to the natural ordering of the
+   * elements' type.
+   *
+   * @param o the implicit natural [[Ordering]] of the elements
+   * @throws Exception if the collection is empty
+   */
+  def max(implicit o: Ordering[A]): A =
+    reduceOption(o.max).get
+
+  /**
+   * Calculate the sum over all elements in the collection.
+   *
+   * @param n implicit [[Numeric]] operations of the elements
+   * @return zero if the collection is empty
+   */
+  def sum(implicit n: Numeric[A]): A =
+    reduce(n.zero)(n.plus)
+
+  /**
+   * Calculate the product over all elements in the collection.
+   *
+   * @param n implicit [[Numeric]] operations of the elements
+   * @return one if the collection is empty
+   */
+  def product(implicit n: Numeric[A]): A =
+    reduce(n.one)(n.times)
+
+  /** @return the number of elements in the collection */
+  def size: Long =
+    fold(0L)(_ => 1L, _ + _)
+
+  /**
+   * Count the number of elements in the collection that satisfy a predicate.
+   *
+   * @param p the predicate to test against
+   * @return the number of elements that satisfy `p`
+   */
+  def count(p: A => Boolean): Long =
+    fold(0L)(p(_) compare false, _ + _)
+
+  /**
+   * Test if at least one element of the collection satisfies `p`.
+   *
+   * @param p predicate to test against the elements of the collection
+   * @return `false` if the collections is empty
+   */
+  def exists(p: A => Boolean): Boolean =
+    fold(false)(p, _ || _)
+
+  /**
+   * Test if all elements of the collection satisfy `p`.
+   *
+   * @param p predicate to test against the elements of the collection
+   * @return `true` if the collection is empty
+   */
+  def forall(p: A => Boolean): Boolean =
+    fold(true)(p, _ && _)
+
+  /**
+   * Find the some element in the collection that satisfies a given predicate.
+   *
+   * @param p the predicate to test against
+   * @return [[Some]] element if one exists, [[None]] otherwise
+   */
+  def find(p: A => Boolean): Option[A] =
+    fold(Option.empty[A])(Some(_) filter p, _ orElse _)
+
+  /**
+   * Find the bottom `n` elements in the collection with respect to the natural ordering of the
+   * elements' type.
+   *
+   * @param n number of elements to return
+   * @param o the implicit [[Ordering]] of elements
+   * @return an ordered (ascending) [[List]] of the bottom `n` elements
+   */
+  def bottom(n: Int)(implicit o: Ordering[A]): List[A] =
+    if (n <= 0) List.empty[A]
+    else fold(List.empty[A])(_ :: Nil, DataBag.merge(n, _, _))
+
+  /**
+   * Find the top `n` elements in the collection with respect to the natural ordering of the
+   * elements' type.
+   *
+   * @param n number of elements to return
+   * @param o the implicit [[Ordering]] of elements
+   * @return an ordered (descending) [[List]] of the bottom `n` elements
+   */
+  def top(n: Int)(implicit o: Ordering[A]): List[A] =
+    bottom(n)(o.reverse)
+
+  /**
+   * Take a random sample of specified size.
+   *
+   * @param n number of elements to return
+   * @return a [[List]] of `n` random elements
+   */
+  def sample(n: Int): List[A] = {
+    val now = System.currentTimeMillis
+    if (n <= 0) List.empty[A]
+    else fold((List.empty[A], now))(
+      (x: A) => (x :: Nil, x.hashCode), {
+        case ((x, sx), (y, sy)) =>
+          if (x.size + y.size <= n) (x ::: y, sx ^ sy)
+          else {
+            val seed = now ^ ((sx << Integer.SIZE) | sy)
+            val rand = new _root_.scala.util.Random(seed)
+            (rand.shuffle(x ::: y).take(n), rand.nextLong())
+          }
+      })._1
+  }
 }
 
 object DataBag {
@@ -176,4 +344,21 @@ object DataBag {
    * @tparam A the type of elements to read.
    */
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV): DataBag[A] = ScalaTraversable.readCSV[A](path, format)
+
+  // -----------------------------------------------------
+  // Helper methods
+  // -----------------------------------------------------
+
+  import Ordering.Implicits._
+
+  @scala.annotation.tailrec
+  private def merge[A: Ordering](n: Int, l1: List[A], l2: List[A], acc: List[A] = Nil): List[A] =
+    if (acc.length == n) acc.reverse
+    else (l1, l2) match {
+      case (x :: t1, y :: _) if x <= y => merge(n, t1, l2, x :: acc)
+      case (_, y :: t2) => merge(n, l1, t2, y :: acc)
+      case (_, Nil) => acc.reverse ::: l1.take(n - acc.length)
+      case (Nil, _) => acc.reverse ::: l2.take(n - acc.length)
+      case _ => acc.reverse
+    }
 }

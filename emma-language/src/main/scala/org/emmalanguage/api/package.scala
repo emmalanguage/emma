@@ -16,7 +16,6 @@
 package org.emmalanguage
 
 import io.csv.{CSVConverter, CSVConverterMacro}
-import eu.stratosphere.emma.macros.Folds
 
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
@@ -90,17 +89,6 @@ package object api {
   // -----------------------------------------------------
   // Converters
   // -----------------------------------------------------
-
-  /**
-   * Extend the [[DataBag]] type with methods from [[Folds]] via the "pimp my library" pattern.
-   * This is a value class, which means that in most cases, the allocation of an instance can be
-   * avoided when using the defined methods.
-   *
-   * @param self the actual [[DataBag]] instance
-   * @tparam A the type of elements to fold over
-   */
-  implicit final class DataBagFolds[A] private[api](val self: DataBag[A])
-    extends AnyVal with Folds[A]
 
   implicit def materializeCSVConverter[T]: CSVConverter[T] =
     macro CSVConverterMacro.materialize[T]

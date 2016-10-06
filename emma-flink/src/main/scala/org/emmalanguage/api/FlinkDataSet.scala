@@ -28,6 +28,8 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
 
   import FlinkDataSet.{typeInfoForType, wrap}
 
+  @transient override val m = implicitly[Meta[A]]
+
   // -----------------------------------------------------
   // Structural recursion
   // -----------------------------------------------------

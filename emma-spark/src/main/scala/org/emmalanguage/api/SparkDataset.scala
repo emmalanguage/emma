@@ -27,6 +27,8 @@ class SparkDataset[A: Meta] private[api](@transient private val rep: Dataset[A])
 
   import SparkDataset.{encoderForType, wrap}
 
+  @transient override val m = implicitly[Meta[A]]
+
   // -----------------------------------------------------
   // Structural recursion
   // -----------------------------------------------------

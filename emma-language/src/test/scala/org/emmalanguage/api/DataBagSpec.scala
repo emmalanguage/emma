@@ -29,9 +29,7 @@ import java.nio.file.{Files, Paths}
 
 trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBagEquality {
 
-  // FIXME: intOrd should have a static owner
-  // implicit val intOrd = implicitly[Ordering[Int]]
-  import DataBagSpec.{TestRecord, intOrd}
+  import DataBagSpec.TestRecord
 
   // ---------------------------------------------------------------------------
   // abstract trait methods
@@ -69,33 +67,26 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
         val ys = Bag(hhCrts.map(DataBagSpec.f))
         val zs = Bag(Seq.empty[Double])
 
-        // FIXME: these predicates have to be defined externally in order to be a serializable part of the fold closure
-        // FIXME: However, hard-coding the expanded version of the problematic folds (find, count) resolves the issue
-        val p1 = (c: Character) => c.name startsWith "Zaphod"
-        val p2 = (c: Character) => c.name startsWith "Ford"
-        val p3 = (c: Character) => c.name startsWith "Marvin"
-        val p4 = (c: Double) => c < 42.0
-
         Seq(
           //@formatter:off
           "isEmpty"     -> xs.isEmpty,
           "nonEmpty"    -> xs.nonEmpty,
-          "min"         -> ys.fold(IntLimits.max)(x => x, (x, y) => intOrd.min(x, y)), // FIXME: ys.min does not work
-          "max"         -> ys.fold(IntLimits.min)(x => x, (x, y) => intOrd.max(x, y)), // FIXME: ys.max does not work
+          "min"         -> ys.min,
+          "max"         -> ys.max,
           "sum (1)"     -> ys.sum,
           "sum (2)"     -> zs.sum,
           "product (1)" -> ys.product,
           "product (2)" -> zs.product,
           "size (1)"    -> xs.size,
           "size (2)"    -> zs.size,
-          "count (1)"   -> xs.count(p1), // FIXME: fold macro needs externally defiend lambda
-          "count (2)"   -> zs.count(p4), // FIXME: fold macro needs externally defiend lambda
+          "count (1)"   -> xs.count(_.name startsWith "Zaphod"),
+          "count (2)"   -> zs.count(_ < 42.0),
           "existsP"     -> xs.exists(_.name startsWith "Arthur"),
           "existsN"     -> xs.exists(_.name startsWith "Marvin"),
           "forallP"     -> xs.forall(_.name startsWith "Arthur"),
           "forallN"     -> xs.forall(_.name startsWith "Trillian"),
-          "findP"       -> xs.find(p2), // FIXME: fold macro needs externally defiend lambda
-          "findN"       -> xs.find(p3), // FIXME: fold macro needs externally defiend lambda
+          "findP"       -> xs.find(_.name startsWith "Ford"),
+          "findN"       -> xs.find(_.name startsWith "Marvin"),
           "bottom"      -> ys.bottom(1),
           "top"         -> ys.top(2)
           //@formatter:on
@@ -291,7 +282,6 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
 }
 
 object DataBagSpec {
-  implicit val intOrd = implicitly[Ordering[Int]]
 
   val f = (c: Character) => c.book.title.length
 

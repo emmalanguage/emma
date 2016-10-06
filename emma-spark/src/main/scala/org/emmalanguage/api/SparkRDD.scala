@@ -29,6 +29,8 @@ class SparkRDD[A: Meta] private[api](@transient private val rep: RDD[A])(implici
 
   import SparkRDD.{encoderForType, wrap}
 
+  @transient override val m = implicitly[Meta[A]]
+
   // -----------------------------------------------------
   // Structural recursion
   // -----------------------------------------------------
