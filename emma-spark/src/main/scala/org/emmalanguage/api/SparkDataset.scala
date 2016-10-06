@@ -72,7 +72,7 @@ class SparkDataset[A: Meta] private[api](@transient private val rep: Dataset[A])
   override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
     rep.write
       .option("header", format.header)
-      .option("delimiter", format.delimiter)
+      .option("delimiter", format.delimiter.toString)
       .option("charset", format.charset.toString)
       .option("quote", format.quote.getOrElse('"').toString)
       .option("escape", format.escape.getOrElse('\\').toString)
@@ -112,7 +112,7 @@ object SparkDataset {
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): SparkDataset[A] =
     spark.read
       .option("header", format.header)
-      .option("delimiter", format.delimiter)
+      .option("delimiter", format.delimiter.toString)
       .option("charset", format.charset.toString)
       .option("quote", format.quote.getOrElse('"').toString)
       .option("escape", format.escape.getOrElse('\\').toString)

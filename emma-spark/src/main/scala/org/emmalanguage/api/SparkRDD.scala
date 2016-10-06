@@ -75,7 +75,8 @@ class SparkRDD[A: Meta] private[api](@transient private val rep: RDD[A])(implici
     spark
       .createDataset(rep).write
       .option("header", format.header)
-      .option("delimiter", format.delimiter)
+      .option("delimiter", format.delimiter.toString)
+      .option("charset", format.charset.toString)
       .option("quote", format.quote.getOrElse('"').toString)
       .option("escape", format.escape.getOrElse('\\').toString)
       .option("nullValue", format.nullValue)
@@ -108,10 +109,11 @@ object SparkRDD {
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): SparkDataset[A] =
     spark.read
       .option("header", format.header)
-      .option("delimiter", format.delimiter)
+      .option("delimiter", format.delimiter.toString)
       .option("charset", format.charset.toString)
       .option("quote", format.quote.getOrElse('"').toString)
       .option("escape", format.escape.getOrElse('\\').toString)
+      .option("comment", format.escape.map(_.toString).getOrElse(null.asInstanceOf[String]))
       .option("nullValue", format.nullValue)
       .schema(encoderForType[A].schema)
       .csv(path)

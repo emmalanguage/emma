@@ -25,6 +25,8 @@ class FlinkDataSetSpec extends DataBagSpec {
   override type Bag[A] = FlinkDataSet[A]
   override type BackendContext = FlinkEnv
 
+  override val suffix = "flink"
+
   override def withBackendContext[T](f: BackendContext => T): T =
     f(FlinkEnv.getExecutionEnvironment)
 

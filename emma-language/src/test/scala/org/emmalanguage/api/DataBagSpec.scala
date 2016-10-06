@@ -25,11 +25,13 @@ import org.scalatest.{FreeSpec, Matchers}
 
 import scala.language.{higherKinds, implicitConversions}
 
+import java.nio.file.{Files, Paths}
+
 trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBagEquality {
 
   // FIXME: intOrd should have a static owner
   // implicit val intOrd = implicitly[Ordering[Int]]
-  import DataBagSpec.intOrd
+  import DataBagSpec.{TestRecord, intOrd}
 
   // ---------------------------------------------------------------------------
   // abstract trait methods
@@ -40,6 +42,9 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
 
   /** The type of the backend context associated with the refinement type (e.g. SparkContext). */
   type BackendContext
+
+  /** A system-specific suffix to append to test files. */
+  def suffix: String
 
   /** A function providing a backend context instance which lives for the duration of `f`. */
   def withBackendContext[T](f: BackendContext => T): T
@@ -224,17 +229,50 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
     import io.csv.CSV
 
     withBackendContext { implicit ctx =>
-      val path = s"file://${tempPath("foo.txt")}"
       val format = CSV()
 
-      def `write and read`[A: Meta : CSVConverter](exp: Seq[A]) = {
+      val rand = new scala.util.Random(4531442314L)
+
+      def randString() = {
+        val charsClean = rand
+          .alphanumeric
+          .take(rand.nextInt(50) + 50)
+          .toList
+          .map(c => if (c == '0') ' ' else c)
+
+        val charsDirty = for {
+          q <- format.quote
+          if suffix != "flink" // FIXME: Flink expects manually quoted strings
+        } yield charsClean.map(c => if (c == 'q') q else c)
+
+        (charsDirty getOrElse charsClean).mkString.trim
+      }
+
+      //@formatter:off
+      val foos      = for (i <- 1 to 1000) yield TestRecord(
+        first       = rand.nextInt(Int.MaxValue),
+        second      = rand.nextDouble(),
+        third_field = rand.nextBoolean(),
+        fourth      = (rand.nextInt() % (2 * Short.MaxValue) + Short.MinValue).toShort,
+        // Fifth    = rand.nextPrintableChar(),
+        sixth       = randString(),
+        //`7-th`    = if (rand.nextBoolean()) Some(rand.nextLong()) else None,
+        nine        = rand.nextFloat()
+      )
+      //@formatter:on
+
+      // ensure that output path exists
+      Files.createDirectories(Paths.get(tempPath("test/io")))
+
+      def `write and read`[A: Meta : CSVConverter](exp: Seq[A], name: String) = {
+        val path = s"file://${tempPath("test/io")}/$name.$suffix.csv"
         Bag(exp).writeCSV(path, format) // write
-        Thread.sleep(1000) // give it a second
         readCSV[A](path, format) shouldEqual DataBag(exp) // read
       }
 
       //`write and read`(Seq(1, 2, 3))
-      `write and read`(Seq(hhBook))
+      `write and read`(Seq(hhBook), "books")
+      `write and read`(foos, "foos")
     }
 
   }
@@ -244,4 +282,16 @@ object DataBagSpec {
   implicit val intOrd = implicitly[Ordering[Int]]
 
   val f = (c: Character) => c.book.title.length
+
+  case class TestRecord
+  (
+    first: Int,
+    second: Double,
+    third_field: Boolean,
+    fourth: Short,
+    // Fifth: Char, FIXME: Flink does not support `Char` type
+    sixth: String,
+    //`7-th`: Option[Long], FIXME: Option not supported by CSVConverter, Spark does not support fancy names like `7-th`
+    nine: Float
+  )
 }

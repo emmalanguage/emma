@@ -92,6 +92,8 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
       fieldDelimiter = format.delimiter.toString,
       writeMode = FileSystem.WriteMode.OVERWRITE
     )
+
+    rep.getExecutionEnvironment.execute()
   }
 
   def fetch(): Seq[A] =

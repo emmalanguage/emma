@@ -25,6 +25,8 @@ class SparkRDDSpec extends DataBagSpec {
   override type Bag[A] = SparkRDD[A]
   override type BackendContext = SparkSession
 
+  override val suffix = "spark-rdd"
+
   override def withBackendContext[T](f: BackendContext => T): T =
     LocalSparkSession.withSparkSession(f)
 
