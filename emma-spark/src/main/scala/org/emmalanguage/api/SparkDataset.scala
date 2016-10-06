@@ -32,7 +32,12 @@ class SparkDataset[A: Meta] private[api](@transient private val rep: Dataset[A])
   // -----------------------------------------------------
 
   override def fold[B: Meta](z: B)(s: A => B, u: (B, B) => B): B =
-    rep.map(x => s(x)).reduce(u) // TODO: handle the empty Dataset case (maybe catch the exception?)
+    try {
+      rep.map(x => s(x)).reduce(u)
+    } catch {
+      case e: UnsupportedOperationException if e.getMessage == "empty collection" => z
+      case e: Throwable => throw e
+    }
 
   // -----------------------------------------------------
   // Monad Ops
