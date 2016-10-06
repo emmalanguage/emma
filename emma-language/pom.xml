@@ -48,20 +48,33 @@
             <artifactId>graph-core_${scala.tools.version}</artifactId>
         </dependency>
 
-        <!-- Emma -->
+        <!-- Type-level -->
         <dependency>
-            <groupId>eu.stratosphere</groupId>
-            <artifactId>emma-backend</artifactId>
+            <groupId>org.typelevel</groupId>
+            <artifactId>cats_${scala.tools.version}</artifactId>
         </dependency>
         <dependency>
-            <groupId>eu.stratosphere</groupId>
-            <artifactId>emma-common</artifactId>
+            <groupId>com.chuusai</groupId>
+            <artifactId>shapeless_${scala.tools.version}</artifactId>
         </dependency>
-        <!-- Emma (test jars) -->
+
+        <!-- Scalactic -->
         <dependency>
-            <groupId>eu.stratosphere</groupId>
-            <artifactId>emma-common</artifactId>
-            <type>test-jar</type>
+            <groupId>org.scalactic</groupId>
+            <artifactId>scalactic_${scala.tools.version}</artifactId>
+        </dependency>
+
+        <!-- Auto-Resource Management -->
+        <dependency>
+            <groupId>com.jsuereth</groupId>
+            <artifactId>scala-arm_${scala.tools.version}</artifactId>
+            <version>${scala-arm.version}</version>
+        </dependency>
+
+        <!-- CSV -->
+        <dependency>
+            <groupId>net.sf.opencsv</groupId>
+            <artifactId>opencsv</artifactId>
         </dependency>
 
         <!-- HDFS -->
@@ -74,10 +87,29 @@
             <artifactId>hadoop-hdfs</artifactId>
         </dependency>
 
-        <!-- Scalactic -->
+        <!-- Serialization -->
         <dependency>
-            <groupId>org.scalactic</groupId>
-            <artifactId>scalactic_${scala.tools.version}</artifactId>
+            <groupId>com.twitter</groupId>
+            <artifactId>chill_${scala.tools.version}</artifactId>
+            <version>0.5.2</version>
+        </dependency>
+
+        <!-- Logging -->
+        <dependency>
+            <groupId>log4j</groupId>
+            <artifactId>log4j</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.slf4j</groupId>
+            <artifactId>slf4j-log4j12</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.typesafe.scala-logging</groupId>
+            <artifactId>scala-logging-slf4j_${scala.tools.version}</artifactId>
         </dependency>
 
         <!-- Test -->

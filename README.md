@@ -77,7 +77,7 @@ val max = xs.fold(Int.MinValue)(identity, Math.max(_,_))
 val sum = xs.fold(0, x => 1, _ + _)
 ```
 
-*Emma* offers [pre-defined aliases for common `fold` operators](emma-common/src/main/scala/eu/stratosphere/emma/macros/Folds.scala):
+*Emma* offers [pre-defined aliases for common `fold` operators](emma-language/src/main/scala/eu/stratosphere/emma/macros/Folds.scala):
 
 Fold Alias                     | Purpose
 -------------------------------|-----------------------------
@@ -135,7 +135,7 @@ for {
 
 #### DSL Compiler
 
-The presented API is not abstract: The semantics of each operator are given directly by the corresponding [`DataBag[A]`-method definitions](emma-common/src/main/scala/eu/stratosphere/emma/api/DataBag.scala). This allows you to incrementally develop, test, and debug data analysis algorithms at small scale locally as a pure Scala programs.
+The presented API is not abstract: The semantics of each operator are given directly by the corresponding [`DataBag[A]`-method definitions](emma-language/src/main/scala/eu/stratosphere/emma/api/DataBag.scala). This allows you to incrementally develop, test, and debug data analysis algorithms at small scale locally as a pure Scala programs.
 
 For example, the following code-snippet that counts words runs out-of-the-box. 
 

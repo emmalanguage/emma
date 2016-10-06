@@ -69,11 +69,6 @@
         <!-- Emma (test jars) -->
         <dependency>
             <groupId>eu.stratosphere</groupId>
-            <artifactId>emma-common</artifactId>
-            <type>test-jar</type>
-        </dependency>
-        <dependency>
-            <groupId>eu.stratosphere</groupId>
             <artifactId>emma-language</artifactId>
             <type>test-jar</type>
         </dependency>

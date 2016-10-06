@@ -167,21 +167,6 @@
             <!-- Emma -->
             <dependency>
                 <groupId>eu.stratosphere</groupId>
-                <artifactId>emma-backend</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>eu.stratosphere</groupId>
-                <artifactId>emma-common</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>eu.stratosphere</groupId>
-                <artifactId>emma-common-macros</artifactId>
-                <version>${project.version}</version>
-            </dependency>
-            <dependency>
-                <groupId>eu.stratosphere</groupId>
                 <artifactId>emma-flink</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -211,13 +196,6 @@
                 <version>${project.version}</version>
             </dependency>
             <!-- Emma (test jars) -->
-            <dependency>
-                <groupId>eu.stratosphere</groupId>
-                <artifactId>emma-common</artifactId>
-                <version>${project.version}</version>
-                <type>test-jar</type>
-                <scope>test</scope>
-            </dependency>
             <dependency>
                 <groupId>eu.stratosphere</groupId>
                 <artifactId>emma-language</artifactId>
@@ -665,10 +643,7 @@
     </build>
 
     <modules>
-        <module>emma-common-macros</module>
-        <module>emma-common</module>
         <module>emma-language</module>
-        <module>emma-backend</module>
         <module>emma-flink</module>
         <module>emma-spark</module>
         <module>emma-examples</module>
