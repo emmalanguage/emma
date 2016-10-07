@@ -16,9 +16,9 @@
 package org.emmalanguage
 package test.schema
 
-import java.time.Instant
+import api._
 
-import eu.stratosphere.emma.api.DataBag
+import java.time.Instant
 
 /** A simple domain for marketing, consisting of ads and ad views. */
 object Marketing {

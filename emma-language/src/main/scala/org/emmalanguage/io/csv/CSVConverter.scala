@@ -40,6 +40,6 @@ object CSVConverter {
         _to(value)
     }
 
-  implicit def materializeCSVConverter[T]: CSVConverter[T] =
+  implicit def apply[T]: CSVConverter[T] =
     macro CSVConverterMacro.materialize[T]
 }

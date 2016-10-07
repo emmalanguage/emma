@@ -30,57 +30,85 @@ trait Common extends AST {
   // Emma API
   // --------------------------------------------------------------------------
 
-  val rootPkg = "eu.stratosphere.emma"
-  val newRootPkg = "org.emmalanguage"
+  val rootPkg = "org.emmalanguage"
 
   /** A set of API method symbols to be comprehended. */
   protected[emmalanguage] object API {
     //@formatter:off
     val moduleSymbol          = rootMirror.staticModule(s"$rootPkg.api.package")
+    val csvPkgSymbol          = rootMirror.staticPackage(s"$rootPkg.io.csv")
     val bagSymbol             = rootMirror.staticClass(s"$rootPkg.api.DataBag")
     val groupSymbol           = rootMirror.staticClass(s"$rootPkg.api.Group")
-    val statefulSymbol        = rootMirror.staticClass(s"$rootPkg.api.Stateful.Bag")
-    val inputFmtSymbol        = rootMirror.staticClass(s"$rootPkg.api.InputFormat")
-    val outputFmtSymbol       = rootMirror.staticClass(s"$rootPkg.api.OutputFormat")
 
+    // Sources
     val apply                 = bagSymbol.companion.info.decl(TermName("apply"))
-    val read                  = moduleSymbol.info.decl(TermName("read"))
-    val write                 = moduleSymbol.info.decl(TermName("write"))
-    val stateful              = moduleSymbol.info.decl(TermName("stateful"))
-    val fold                  = bagSymbol.info.decl(TermName("fold"))
+    val readCSV               = bagSymbol.companion.info.decl(TermName("readCSV"))
+    // Sinks
+    val fetch                 = bagSymbol.info.decl(TermName("fetch"))
+    val writeCSV              = bagSymbol.info.decl(TermName("writeCSV"))
+    // Monad ops
     val map                   = bagSymbol.info.decl(TermName("map"))
     val flatMap               = bagSymbol.info.decl(TermName("flatMap"))
     val withFilter            = bagSymbol.info.decl(TermName("withFilter"))
+    // Grouping
     val groupBy               = bagSymbol.info.decl(TermName("groupBy"))
-    val minus                 = bagSymbol.info.decl(TermName("minus"))
-    val plus                  = bagSymbol.info.decl(TermName("plus"))
+    // Set operations
+    val union                 = bagSymbol.info.decl(TermName("union"))
     val distinct              = bagSymbol.info.decl(TermName("distinct"))
-    val fetchToStateless      = statefulSymbol.info.decl(TermName("bag"))
-    val updateWithZero        = statefulSymbol.info.decl(TermName("updateWithZero"))
-    val updateWithOne         = statefulSymbol.info.decl(TermName("updateWithOne"))
-    val updateWithMany        = statefulSymbol.info.decl(TermName("updateWithMany"))
+    // Structural recursion & Folds
+    val fold                  = bagSymbol.info.decl(TermName("fold"))
+    val isEmpty               = bagSymbol.info.decl(TermName("isEmpty"))
+    val nonEmpty              = bagSymbol.info.decl(TermName("nonEmpty"))
+    val reduce                = bagSymbol.info.decl(TermName("reduce"))
+    val reduceOption          = bagSymbol.info.decl(TermName("reduceOption"))
+    val min                   = bagSymbol.info.decl(TermName("min"))
+    val max                   = bagSymbol.info.decl(TermName("max"))
+    val sum                   = bagSymbol.info.decl(TermName("sum"))
+    val product               = bagSymbol.info.decl(TermName("product"))
+    val size                  = bagSymbol.info.decl(TermName("size"))
+    val count                 = bagSymbol.info.decl(TermName("count"))
+    val exists                = bagSymbol.info.decl(TermName("exists"))
+    val forall                = bagSymbol.info.decl(TermName("forall"))
+    val find                  = bagSymbol.info.decl(TermName("find"))
+    val bottom                = bagSymbol.info.decl(TermName("bottom"))
+    val top                   = bagSymbol.info.decl(TermName("top"))
+    val sample                = bagSymbol.info.decl(TermName("sample"))
 
-    val methods = Set(
-      read, write,
-      stateful, fetchToStateless, updateWithZero, updateWithOne, updateWithMany,
+    val sourceOps             = Set(apply, readCSV)
+    val sinkOps               = Set(fetch, writeCSV)
+    val monadOps              = Set(map, flatMap, withFilter)
+    val nestOps               = Set(groupBy)
+    val setOps                = Set(union, distinct)
+    val foldOps               = Set(
       fold,
-      map, flatMap, withFilter,
-      groupBy,
-      minus, plus, distinct
-    ) ++ apply.alternatives
+      isEmpty, nonEmpty,
+      reduce, reduceOption,
+      min, max, sum, product,
+      size, count,
+      exists, forall,
+      find, top, bottom,
+      sample
+    )
 
-    val monadic = Set(map, flatMap, withFilter)
-    val updateWith = Set(updateWithZero, updateWithOne, updateWithMany)
+    val ops                   =  for {
+      m <- sourceOps ++ sinkOps ++ monadOps ++ nestOps ++ setOps ++ foldOps
+      a <- m.alternatives
+    } yield m
+
+    val implicitTypes         = Set(
+      typeOf[org.emmalanguage.api.Meta[Nothing]].typeConstructor,
+      typeOf[org.emmalanguage.io.csv.CSVConverter[Nothing]].typeConstructor
+    )
 
     // Type constructors
-    val DATA_BAG              = typeOf[eu.stratosphere.emma.api.DataBag[Nothing]].typeConstructor
-    val GROUP                 = typeOf[eu.stratosphere.emma.api.Group[Nothing, Nothing]].typeConstructor
+    val DataBag               = typeOf[org.emmalanguage.api.DataBag[Nothing]].typeConstructor
+    val Group                 = typeOf[org.emmalanguage.api.Group[Nothing, Nothing]].typeConstructor
     //@formatter:on
   }
 
   protected[emmalanguage] object ComprehensionSyntax {
     //@formatter:off
-    val module                = rootMirror.staticModule(s"$newRootPkg.compiler.ir.ComprehensionSyntax").asModule
+    val module                = rootMirror.staticModule(s"$rootPkg.compiler.ir.ComprehensionSyntax").asModule
 
     val flatten               = module.info.decl(TermName("flatten")).asMethod
     val generator             = module.info.decl(TermName("generator")).asMethod
@@ -94,7 +122,7 @@ trait Common extends AST {
 
   protected[emmalanguage] object ComprehensionCombinators {
     //@formatter:off
-    val module                = rootMirror.staticModule(s"$newRootPkg.compiler.ir.ComprehensionCombinators").asModule
+    val module                = rootMirror.staticModule(s"$rootPkg.compiler.ir.ComprehensionCombinators").asModule
 
     val cross                 = module.info.decl(TermName("cross")).asMethod
     val equiJoin              = module.info.decl(TermName("equiJoin")).asMethod

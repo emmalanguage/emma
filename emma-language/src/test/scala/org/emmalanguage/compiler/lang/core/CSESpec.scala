@@ -16,9 +16,9 @@
 package org.emmalanguage
 package compiler.lang.core
 
+import api._
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
-import eu.stratosphere.emma.api.DataBag
 import test.schema.Literature._
 
 import org.junit.runner.RunWith
@@ -75,13 +75,13 @@ class CSESpec extends BaseCompilerSpec {
 
     "package selections" in {
       val act = csePipeline(u.reify {
-        val bag = eu.stratosphere.emma.api.DataBag(Seq(1, 2, 3))
+        val bag = DataBag(Seq(1, 2, 3))
         scala.Predef.println(bag.fetch())
       })
 
       val exp = idPipeline(u.reify {
         val x$1 = Seq(1, 2, 3)
-        val bag = eu.stratosphere.emma.api.DataBag(x$1)
+        val bag = DataBag(x$1)
         val x$2 = bag.fetch()
         val x$3 = scala.Predef.println(x$2)
         x$3
@@ -187,34 +187,18 @@ class CSESpec extends BaseCompilerSpec {
         val y = generator[Character, DataBag](DataBag(hhCrts))
         head (x, y)
       }
-      
-      val fn$1 = (x$2: (Character, Character)) => {
-        1L
+
+      val sze = xs.size;
+      val fn$4 = (x0$1: (Character, Character)) => {
+        val x = x0$1._1
+        val y = x0$1._2
+        val name$1 = x.name
+        val name$2 = y.name
+        val `==$1` = name$1 == name$2
+        `==$1`
       }
-
-      // used twice: once in the `sze`, and once in the `cde` folds
-      val fn$2 = (x$3: Long, x$1: Long) => {
-        val `+$8` = x$3 + x$1
-        `+$8`
-      }
-
-      val sze = xs.fold(0L)(fn$1, fn$2)
-      
-      val fn$3 = (x$5: (Character, Character)) => {
-        val fn$4 = (x0$1: (Character, Character)) => {
-          val x = x0$1._1
-          val y = x0$1._2
-          val name$1 = x.name
-          val name$2 = y.name
-          val `==$1` = name$1 == name$2
-          `==$1`
-        }
-        (fn$4(x$5) compare false).toLong
-      }
-
-      val cde = xs.fold(0L)(fn$3, fn$2)
-
-      sze / cde.toDouble
+      val cnt = xs.count(fn$4);
+      sze / cnt.toDouble
     })
 
     act shouldBe alphaEqTo(exp)

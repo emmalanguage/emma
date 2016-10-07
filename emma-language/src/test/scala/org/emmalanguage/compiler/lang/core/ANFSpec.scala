@@ -16,7 +16,7 @@
 package org.emmalanguage
 package compiler.lang.core
 
-import eu.stratosphere.emma.api.DataBag
+import api._
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import test.schema.Marketing._
@@ -71,13 +71,13 @@ class ANFSpec extends BaseCompilerSpec {
 
     "package selections" in {
       val act = anfPipeline(u.reify {
-        val bag = eu.stratosphere.emma.api.DataBag(Seq(1, 2, 3))
+        val bag = DataBag(Seq(1, 2, 3))
         scala.Predef.println(bag.fetch())
       })
 
       val exp = idPipeline(u.reify {
         val x$1 = Seq(1, 2, 3)
-        val bag = eu.stratosphere.emma.api.DataBag(x$1)
+        val bag = DataBag(x$1)
         val x$2 = bag.fetch()
         val x$3 = scala.Predef.println(x$2)
         x$3

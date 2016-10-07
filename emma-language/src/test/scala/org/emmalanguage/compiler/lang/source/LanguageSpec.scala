@@ -18,7 +18,7 @@ package compiler
 package lang
 package source
 
-import eu.stratosphere.emma.api.DataBag
+import api._
 import test.schema.Marketing._
 
 import org.example.foo.{Bar, Baz}
@@ -187,7 +187,7 @@ class LanguageSpec extends BaseCompilerSpec {
       y.substring(1),
       ((x: Int, y: Int) => x + y) (x, x),
       Seq(x, x),
-      DataBag(xs.fetch()),
+      DataBag(xs.fetch().toSeq),
       List.canBuildFrom[Int],
       DataBag(Seq(1, 2, 3)).sum
     )).map(api.Tree.unAscribe)

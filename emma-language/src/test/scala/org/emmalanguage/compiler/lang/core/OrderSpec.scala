@@ -16,7 +16,7 @@
 package org.emmalanguage
 package compiler.lang.core
 
-import eu.stratosphere.emma.api.DataBag
+import api._
 import compiler.BaseCompilerSpec
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner

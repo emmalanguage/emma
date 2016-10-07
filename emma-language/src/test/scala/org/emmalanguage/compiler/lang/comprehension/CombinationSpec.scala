@@ -16,7 +16,7 @@
 package org.emmalanguage
 package compiler.lang.comprehension
 
-import eu.stratosphere.emma.api.DataBag
+import api._
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import compiler.ir.ComprehensionCombinators._
@@ -252,7 +252,7 @@ class CombinationSpec extends BaseCompilerSpec {
             u
           }
           val y = generator[Int, DataBag] {
-            DataBag(Seq(1,2,3)) plus DataBag(Seq(4,5,6))
+            DataBag(Seq(1,2,3)) union DataBag(Seq(4,5,6))
           }
           val z = generator[Long, DataBag] {
             DataBag(Seq(x.id + x.id))
@@ -272,7 +272,7 @@ class CombinationSpec extends BaseCompilerSpec {
             DataBag(Seq(users, users))
           }
           val c = generator[(User, Int), DataBag] {
-            cross(u, DataBag(Seq(1,2,3)) plus DataBag(Seq(4,5,6)))
+            cross(u, DataBag(Seq(1,2,3)) union DataBag(Seq(4,5,6)))
           }
           val z = generator[Long, DataBag] {
             DataBag(Seq(c._1.id + c._1.id))
@@ -396,10 +396,10 @@ class CombinationSpec extends BaseCompilerSpec {
             DataBag(Seq(8))
           }
           val x = generator[Int, DataBag] {
-            DataBag(Seq(1,2,3)) plus DataBag(Seq(4,5,6))
+            DataBag(Seq(1,2,3)) union DataBag(Seq(4,5,6))
           }
           val y = generator[User, DataBag] {
-            users plus users
+            users union users
           }
           guard {
             val aa = a * a
@@ -428,8 +428,8 @@ class CombinationSpec extends BaseCompilerSpec {
             apply$2
           }
           val j: (Int, User) = generator[(Int, User), DataBag] {
-            val plus$1: DataBag[Int] = DataBag(Seq(1,2,3)) plus DataBag(Seq(4,5,6))
-            val plus$2: DataBag[User] = users plus users
+            val plus$1: DataBag[Int] = DataBag(Seq(1,2,3)) union DataBag(Seq(4,5,6))
+            val plus$2: DataBag[User] = users union users
             val kx$3 = (kxArg$3: Int) => {
               val aa: Int = a * a
               val c: Int = kxArg$3 + 2
@@ -507,10 +507,10 @@ class CombinationSpec extends BaseCompilerSpec {
       val inp = u.reify {
         comprehension[(User, User, Int), DataBag] {
           val x = generator[User, DataBag] {
-            users minus users$1
+            users$1.distinct
           }
           val y = generator[User, DataBag] {
-            users$1 plus users
+            users$1 union users
           }
           val z = generator[Int, DataBag] {
             DataBag(Seq(1,2,3))
@@ -524,8 +524,8 @@ class CombinationSpec extends BaseCompilerSpec {
       val exp = u.reify {
         cross(
           cross(
-            users minus users$1,
-            users$1 plus users
+            users$1.distinct,
+            users$1 union users
           ),
           DataBag(Seq(1, 2, 3))
         ) map {
@@ -656,7 +656,7 @@ class CombinationSpec extends BaseCompilerSpec {
           val y = generator[Long, DataBag] {
             val ir1 = comprehension[Long, DataBag] {
               val w = generator[User, DataBag] {
-                x plus x
+                x union x
               }
               head {
                 w.id
@@ -684,7 +684,7 @@ class CombinationSpec extends BaseCompilerSpec {
         val apply$120 = Seq(users$1, users$1)
         val apply$121 = DataBag(apply$120)
         val f$26 = (fArg$26: DataBag[User]) => {
-          val plus$9 = fArg$26 plus fArg$26
+          val plus$9 = fArg$26 union fArg$26
           val f$30 = (fArg$30: User) => {
             val id$68 = fArg$30.id
             id$68

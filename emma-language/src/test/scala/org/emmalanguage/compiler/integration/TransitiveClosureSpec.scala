@@ -16,8 +16,10 @@
 package org.emmalanguage
 package compiler.integration
 
+import api._
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
+import io.csv.{CSV, CSVConverter}
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -27,7 +29,6 @@ import org.scalatest.junit.JUnitRunner
 class TransitiveClosureSpec extends BaseCompilerSpec {
 
   import TransitiveClosureSpec._
-  import eu.stratosphere.emma.api._
 
   import compiler._
 
@@ -52,8 +53,8 @@ class TransitiveClosureSpec extends BaseCompilerSpec {
   // input parameters
   val input = "file://path/to/input"
   val output = "file://path/to/output"
-  // implicit parameters
-  implicit val csvConverters = implicitly[CSVConverters[Edge[Long]]]
+  // implicit parameters FIXME: remove
+  implicit val csvConverter = implicitly[CSVConverter[Edge[Long]]]
 
   // ---------------------------------------------------------------------------
   // Program representations
@@ -61,7 +62,7 @@ class TransitiveClosureSpec extends BaseCompilerSpec {
 
   val sourceExpr = liftPipeline(u.reify {
     // read in a directed graph
-    var paths = read(input, new CSVInputFormat[Edge[Long]]).distinct()
+    var paths = DataBag.readCSV[Edge[Long]](input, CSV()).distinct
     var count = paths.size
     var added = 0L
 
@@ -72,18 +73,18 @@ class TransitiveClosureSpec extends BaseCompilerSpec {
         if e1.dst == e2.src
       } yield Edge(e1.src, e2.dst)
 
-      paths = (paths plus delta).distinct()
+      paths = (paths union delta).distinct
 
       added = paths.size - count
       count = paths.size
     } while (added > 0)
 
-    write(output, new CSVOutputFormat[Edge[Long]])(paths)
+    paths.writeCSV(output, CSV())
   })
 
   val coreExpr = anfPipeline(u.reify {
     // read in a directed graph
-    val paths$1 = read(input, new CSVInputFormat[Edge[Long]]).distinct()
+    val paths$1 = DataBag.readCSV[Edge[Long]](input, CSV()).distinct
     val count$1 = paths$1.size
     val added$1 = 0L
 
@@ -98,13 +99,13 @@ class TransitiveClosureSpec extends BaseCompilerSpec {
         }
       }
 
-      val paths$2 = (paths$3 plus closure).distinct()
+      val paths$2 = (paths$3 union closure).distinct
       val added$2 = paths$2.size - count$3
       val count$2 = paths$2.size
       val isReady = added$2 > 0
 
       def suffix$1(): Unit = {
-        write(output, new CSVOutputFormat()(csvConverters))(paths$2)
+        paths$2.writeCSV(output, CSV())
       }
 
       if (isReady) doWhile$1(added$2, count$2, paths$2)

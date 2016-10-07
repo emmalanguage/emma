@@ -41,7 +41,7 @@ private[backend] trait Order extends Common {
      * If a lambda is given as an argument to one of these methods,
      * then that lambda will be called from higher-order context.
      */
-    val combinators = API.methods ++ ComprehensionCombinators.methods
+    val combinators = API.ops ++ ComprehensionCombinators.methods
 
     /**
      * Disambiguates order in a tree and gives information on which parts of the code might be executed

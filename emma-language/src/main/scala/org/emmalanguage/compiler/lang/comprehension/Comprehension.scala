@@ -63,7 +63,7 @@ trait Comprehension extends Common
           api.Term.member(monad, api.TermName("map")).asMethod
 
         override def apply(xs: u.Tree)(f: u.Tree): u.Tree = {
-          assert(xs.tpe.typeConstructor == API.DATA_BAG)
+          assert(xs.tpe.typeConstructor == API.DataBag)
           core.DefCall(Some(xs))(symbol, elemTpe(f))(Seq(f))
         }
 
@@ -83,7 +83,7 @@ trait Comprehension extends Common
           api.Term.member(monad, api.TermName("flatMap")).asMethod
 
         override def apply(xs: u.Tree)(f: u.Tree): u.Tree = {
-          assert(api.Type.arg(2, f.tpe).typeConstructor == API.DATA_BAG)
+          assert(api.Type.arg(2, f.tpe).typeConstructor == API.DataBag)
           core.DefCall(Some(xs))(symbol, elemTpe(f))(Seq(f))
         }
 

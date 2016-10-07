@@ -14,20 +14,14 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.ir
+package api
 
-import api._
+import macros.utility.UtilMacros
 
-import scala.language.higherKinds
+import scala.language.experimental.macros
 
-/** Dummy IR nodes that model comprehension combinators in the Emma IR. */
-object ComprehensionCombinators {
+object emma {
 
-  def cross[A : Meta, B : Meta]
-    (xs: DataBag[A], ys: DataBag[B]): DataBag[(A,B)] = ???
-
-  def equiJoin[A : Meta, B : Meta, K : Meta]
-    (keyx: A => K, keyy: B => K)
-    (xs: DataBag[A], ys: DataBag[B]): DataBag[(A,B)] = ???
+  final def prettyPrint[T](e: T): String = macro UtilMacros.prettyPrint[T]
 
 }

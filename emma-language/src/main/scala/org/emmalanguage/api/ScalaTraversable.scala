@@ -29,7 +29,7 @@ class ScalaTraversable[A] private[api](private val rep: Traversable[A]) extends 
   import ScalaTraversable.wrap
 
   //@formatter:off
-  @transient override val m = new Meta[A] {
+  @transient override val m: Meta[A] = new Meta[A] {
     override def ctag: ClassTag[A] = null
     override def ttag: TypeTag[A] = null
   }

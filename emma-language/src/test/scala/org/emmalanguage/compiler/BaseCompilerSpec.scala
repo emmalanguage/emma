@@ -16,12 +16,15 @@
 package org.emmalanguage
 package compiler
 
-import java.util.{Properties, UUID}
+// FIXME: import api._ does not work
+import api.DataBag
 
-import eu.stratosphere.emma.api.DataBag
 import lang.TreeMatchers
+
 import org.scalatest.prop.PropertyChecks
 import org.scalatest.{FreeSpec, Matchers}
+
+import java.util.{Properties, UUID}
 
 /**
  * Common methods and mixins for all compier specs

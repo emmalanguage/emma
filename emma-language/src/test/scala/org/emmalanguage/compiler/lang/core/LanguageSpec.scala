@@ -16,8 +16,8 @@
 package org.emmalanguage
 package compiler.lang.core
 
-import eu.stratosphere.emma.api._
 import compiler.BaseCompilerSpec
+import io.csv.{CSV, CSVConverter, CSVScalaSupport}
 import test.schema.Marketing._
 
 import org.junit.runner.RunWith
@@ -30,8 +30,7 @@ import scala.collection.mutable
 class LanguageSpec extends BaseCompilerSpec {
 
   import compiler._
-  import Core.{Lang => core}
-  import Core.valid
+  import Core.{valid, Lang => core}
   import Validation._
 
   // ---------------------------------------------------------------------------
@@ -398,7 +397,8 @@ class LanguageSpec extends BaseCompilerSpec {
     // - `Inst` objects in `Core.Lang`
     // - `Apply(tpt: New, args)` nodes in Scala ASTs
 
-    implicit val converter = materializeCSVConverters[(Int, String, Int)]
+    implicit val converter = implicitly[CSVConverter[(Int, String, Int)]]
+    val csv = CSV()
 
     val services = AdClass.SERVICES
     val examples = extractFrom(u.reify(
@@ -407,7 +407,7 @@ class LanguageSpec extends BaseCompilerSpec {
       new Array[Int](10), // explicit type-args
       new mutable.ListBuffer[String], // type-args only
       new Object, // no-args
-      new CSVOutputFormat[(Int, String, Int)]
+      new CSVScalaSupport[(Int, String, Int)](csv)
     ))
 
     val negatives = extractFrom(u.reify(

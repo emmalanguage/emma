@@ -16,7 +16,7 @@
 package org.emmalanguage
 package compiler.lang.core
 
-import eu.stratosphere.emma.api.{DataBag, emma}
+import api._
 import compiler.ir.ComprehensionSyntax._
 import compiler.BaseCompilerSpec
 import test.schema.Marketing._
