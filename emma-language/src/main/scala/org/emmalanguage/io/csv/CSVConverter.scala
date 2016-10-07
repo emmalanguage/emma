@@ -16,6 +16,8 @@
 package org.emmalanguage
 package io.csv
 
+import scala.language.experimental.macros
+
 /** Serialization format for encoding to / decoding from CSV records. */
 trait CSVConverter[T] {
 
@@ -37,4 +39,7 @@ object CSVConverter {
       override def to(value: T): Array[String] =
         _to(value)
     }
+
+  implicit def materializeCSVConverter[T]: CSVConverter[T] =
+    macro CSVConverterMacro.materialize[T]
 }

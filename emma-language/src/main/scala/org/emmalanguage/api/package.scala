@@ -15,15 +15,11 @@
  */
 package org.emmalanguage
 
-import io.csv.{CSVConverter, CSVConverterMacro}
-
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
 
 /** Package object for the Emma API. Contains default methods and definitions. */
 package object api {
-
-  import scala.language.experimental.macros
 
   // -----------------------------------------------------
   // types supported by Emma
@@ -35,63 +31,28 @@ package object api {
     def ttag: TypeTag[T]
   }
 
-  implicit def meta[T : ClassTag : TypeTag] = new Meta[T] {
-    override def ctag = implicitly[ClassTag[T]]
-    override def ttag = implicitly[TypeTag[T]]
+  object Meta {
+    implicit def apply[T : ClassTag : TypeTag]: Meta[T] = new Meta[T] {
+      override def ctag = implicitly[ClassTag[T]]
+      override def ttag = implicitly[TypeTag[T]]
+    }
+
+    implicit def bag[T : ClassTag : TypeTag]: Meta[DataBag[T]] = new Meta[DataBag[T]] {
+      override def ctag = implicitly[ClassTag[DataBag[T]]]
+      override def ttag = implicitly[TypeTag[DataBag[T]]]
+    }
   }
   //@formatter:on
 
-  implicit def ttagForType[T: Meta]: TypeTag[T] =
+  implicit def ttagFor[T: Meta]: TypeTag[T] =
     implicitly[Meta[T]].ttag
 
-  implicit def ctagForType[T: Meta]: ClassTag[T] =
+  implicit def ctagFor[T: Meta]: ClassTag[T] =
     implicitly[Meta[T]].ctag
-
-  // -----------------------------------------------------
-  // limits
-  // -----------------------------------------------------
-
-  trait Limits[T] {
-    val min: T
-    val max: T
-  }
-
-  implicit val ByteLimits = new Limits[Byte] {
-    val min = Byte.MinValue
-    val max = Byte.MaxValue
-  }
-
-  implicit val IntLimits = new Limits[Int] {
-    val min = Int.MinValue
-    val max = Int.MaxValue
-  }
-
-  implicit val LongLimits = new Limits[Long] {
-    val min = Long.MinValue
-    val max = Long.MaxValue
-  }
-
-  implicit val CharLimits = new Limits[Char] {
-    val min = Char.MinValue
-    val max = Char.MaxValue
-  }
-
-  implicit val FloatLimits = new Limits[Float] {
-    val min = Float.MinValue
-    val max = Float.MaxValue
-  }
-
-  implicit val DoubleLimits = new Limits[Double] {
-    val min = Double.MinValue
-    val max = Double.MaxValue
-  }
 
   // -----------------------------------------------------
   // Converters
   // -----------------------------------------------------
-
-  implicit def materializeCSVConverter[T]: CSVConverter[T] =
-    macro CSVConverterMacro.materialize[T]
 
   def comparing[A](lt: (A, A) => Boolean): Ordering[A] =
     Ordering.fromLessThan(lt)
