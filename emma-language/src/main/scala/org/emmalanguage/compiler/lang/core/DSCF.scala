@@ -104,17 +104,14 @@ private[core] trait DSCF extends Common {
 
     /** The Direct-Style Control-Flow (DSCF) transformation. */
     lazy val transform: u.Tree => u.Tree = api.TopDown
-      .withBindUses.withVarDefs.withOwnerChain
+      .skipTypeTrees.withBindUses.withVarDefs.withOwnerChain
       // Collect all variable assignments in a set sorted by name.
       .synthesize(Attr.collect[SortedSet, u.TermSymbol] {
         case src.VarMut(lhs, _) => lhs
-      })
-      // Accumulate all parameters (to refresh them at the end).
-      .accumulate { case core.DefDef(_, _, _, paramss, _) =>
-        (for (core.ParDef(lhs, _, _) <- paramss.flatten) yield lhs).toVector
-      }
-      // Accumulate the two latest values of a variable in a map per owner.
-      .accumulateWith[Trace] {
+      }).accumulate { // Accumulate all parameters (to refresh them at the end).
+        case core.DefDef(_, _, _, paramss, _) =>
+          (for (core.ParDef(lhs, _, _) <- paramss.flatten) yield lhs).toVector
+      }.accumulateWith[Trace] { // Accumulate the two latest values of a variable per owner.
         case Attr.inh(src.VarDef(lhs, _, _), owners :: _) =>
           trace(lhs, owners)
         case Attr.inh(src.VarMut(lhs, _), owners :: _) =>
@@ -122,8 +119,7 @@ private[core] trait DSCF extends Common {
         case Attr.none(core.DefDef(method, _, _, paramss, _)) =>
           (for (core.ParDef(lhs, _, _) <- paramss.flatten)
             yield (method, lhs.name) -> List(lhs)).toMap
-      } (Monoids.merge(Monoids.sliding(2)))
-      .transformWithSyn {
+      } (Monoids.merge(Monoids.sliding(2))).transformWithSyn {
         // Linear transformations
         case Attr(src.VarDef(lhs, rhs, _), trace :: _, owners :: _, _) =>
           core.ValDef(latest(lhs, owners, trace).head, rhs)

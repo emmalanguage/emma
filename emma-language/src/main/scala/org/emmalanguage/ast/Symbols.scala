@@ -24,8 +24,10 @@ trait Symbols { this: AST =>
 
   trait SymbolAPI { this: API =>
 
+    import universe._
     import u.definitions._
     import u.internal._
+    import u.Flag.IMPLICIT
 
     object Sym extends Node {
 
@@ -104,11 +106,16 @@ trait Symbols { this: AST =>
           signature = Type.signature(alt, in = target)
           if signature.typeParams.size == targs.size
           paramss = Type(signature, targs: _*).paramLists
-          if paramss.size == argss.size
-          if paramss.zip(argss).forall { case (params, args) =>
-            params.size == args.size && params.zip(args).forall { case (param, arg) =>
-              Type.of(arg) weak_<:< Type.signature(param)
-            }
+          (np, na) = (paramss.size, argss.size)
+          // NOTE: This allows to skip implicit parameters.
+          if np == na || (np == na + 1 && paramss.last.forall(is(IMPLICIT)))
+          if paramss.zip(argss).forall {
+            case (Seq(_ withInfo VarArgType(tpe)), args) =>
+              args.map(Type.of).forall(_ weak_<:< tpe)
+            case (params, args) => params.size == args.size &&
+              params.zip(args).forall { case (param, arg) =>
+                Type.of(arg) weak_<:< Type.signature(param)
+              }
           }
         } yield alt
 
@@ -175,7 +182,7 @@ trait Symbols { this: AST =>
             case Attr(Owner(broken), fixed :: _, current :: _, _)
               if broken.owner != current =>
                 fix(broken, current, fixed)
-          }.traverseAny.andThen {
+          }.traverseAll.andThen {
             case Attr.acc(tree, fixed :: _) =>
               if (fixed.isEmpty) tree else {
                 val dup = api.Tree.copy(tree)()

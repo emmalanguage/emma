@@ -84,7 +84,7 @@ private[backend] trait Order extends Common {
       }.toSet
 
       val Attr.all(_, topLevRefs :: combRefs :: _, _, funGraph :: _) =
-        api.TopDown
+        api.TopDown.skipTypeTrees
         // Fun Refs
         .synthesize(Attr.collect[Vector, u.TermSymbol]{
           case api.ValRef(sym) if funs contains sym =>
@@ -113,8 +113,7 @@ private[backend] trait Order extends Common {
           case Attr.inh(api.ValRef(sym), insideCombinator :: insideLambda :: _)
             if !insideLambda && !insideCombinator && (funs contains sym) =>
             Vector(sym)
-        }
-          .traverseAny(tree)
+        }.traverseAll(tree)
 
       // BFS on funGraph, starting from `start`
       def funReachability(start: Vector[u.TermSymbol]): Set[u.TermSymbol] = {

@@ -379,5 +379,31 @@ trait Types { this: AST =>
         case _ => None
       }
     }
+
+    /** By-name types (`=> T`), legal only in parameter declarations. */
+    // TODO: Define a constructor?
+    object ByNameType {
+
+      val sym: u.ClassSymbol = u.definitions.ByNameParamClass
+
+      def unapply(tpe: u.TypeRef): Option[u.Type] = tpe match {
+        case u.TypeRef(_, `sym`, Seq(arg)) => Some(arg)
+        case _ => None
+      }
+    }
+
+    /** Vararg types (`T*`), legal only in parameter declarations. */
+    // TODO: Define a constructor?
+    object VarArgType {
+
+      val scalaSym: u.ClassSymbol = u.definitions.RepeatedParamClass
+      val javaSym: u.ClassSymbol = u.definitions.JavaRepeatedParamClass
+
+      def unapply(tpe: u.TypeRef): Option[u.Type] = tpe match {
+        case u.TypeRef(_, `scalaSym`, Seq(arg)) => Some(arg)
+        case u.TypeRef(_, `javaSym`, Seq(arg)) => Some(arg)
+        case _ => None
+      }
+    }
   }
 }
