@@ -49,8 +49,8 @@ trait Transversers { this: AST =>
    * @tparam S The types of synthesized attributes.
    */
   private[ast] case class AttrGrammar[A <: HList, I <: HList, S <: HList](
-      accumulation: Attr[A,  I,  S] => A,
-      inheritance:  Attr[HNil, I,  S] => I,
+      accumulation: Attr[A, I, S] => A,
+      inheritance:  Attr[HNil, I, S] => I,
       synthesis:    Attr[HNil, HNil, S] => S
   )(implicit
     val MAcc: Monoid[A],
@@ -74,7 +74,7 @@ trait Transversers { this: AST =>
     def inherit[X](inh: Attr[HNil, X :: I, S] =?> X)(implicit M: Monoid[X]) =
       copy[A, X :: I, S](
         accumulation = attr => accumulation(attr.copy(inh = attr.inh.tail)),
-        inheritance = { case attr @ Attr.inh(_, i :: is) =>
+        inheritance  = { case attr @ Attr.inh(_, i :: is) =>
           val is1 = inheritance(attr.copy(inh = is))
           val is2 = i :: MInh.combine(is, is1)
           complete(inh)(attr.copy(inh = is2))(M.empty) :: is1
@@ -84,7 +84,7 @@ trait Transversers { this: AST =>
     def synthesize[X](syn: Attr[HNil, HNil, X :: S] =?> X)(implicit M: Monoid[X]) = {
       copy[A, I, X :: S](
         accumulation = attr => accumulation(attr.copy(syn = attr.syn.tail)),
-        inheritance = attr => inheritance(attr.copy(syn = attr.syn.tail)),
+        inheritance  = attr => inheritance(attr.copy(syn = attr.syn.tail)),
         synthesis = { case attr @ Attr.syn(_, s :: ss) =>
           val ss1 = synthesis(attr.copy(syn = ss))
           val ss2 = s :: MSyn.combine(ss, ss1)
@@ -102,7 +102,7 @@ trait Transversers { this: AST =>
     type Syn = S
 
     protected val grammar: AttrGrammar[A, I, S]
-    val callback: Attr[A, I, S] =?> Any  = PartialFunction.empty
+    val callback: Attr[A, I, S] =?> Unit = PartialFunction.empty
     val template: Attr[A, I, S] =?> Tree = PartialFunction.empty
 
     // Expose monoid instances.
@@ -144,15 +144,11 @@ trait Transversers { this: AST =>
     protected final lazy val inheritance: Tree => I =
       grammar.inheritance.compose(tree => Attr(tree, inh, syn(tree)))
 
-    protected final lazy val traversal: Tree =?> Unit = {
-      case tree if callback.isDefinedAt(ann(tree)) =>
-        callback(ann(tree))
-    }
+    protected final lazy val traversal: Tree =?> Unit =
+      compose(callback)(ann)
 
-    protected final lazy val transformation: Tree =?> Tree = {
-      case tree if template.isDefinedAt(ann(tree)) =>
-        template(ann(tree))
-    }
+    protected final lazy val transformation: Tree =?> Tree =
+      compose(template)(ann)
 
     /** Inherit attributes for `tree`. */
     protected final def at[X](tree: Tree)(f: => X): X =
@@ -200,9 +196,7 @@ trait Transversers { this: AST =>
 
     /** Prepends an accumulated attribute based on trees only. */
     def accumulate[X: Monoid](acc: Tree =?> X) =
-      copy(grammar = grammar.accumulate[X] {
-        case Attr.none(t) if acc.isDefinedAt(t) => acc(t)
-      })
+      accumulateWith[X](forgetful(acc))
 
     /** Prepends an inherited attribute based on inherited and synthesized attributes. */
     def inheritWith[X: Monoid](inh: Attr[HNil, X :: I, S] =?> X) =
@@ -210,9 +204,7 @@ trait Transversers { this: AST =>
 
     /** Prepends an inherited attribute based on trees only. */
     def inherit[X: Monoid](inh: Tree =?> X) =
-      copy(grammar = grammar.inherit[X] {
-        case Attr.none(t) if inh.isDefinedAt(t) => inh(t)
-      })
+      inheritWith[X](forgetful(inh))
 
     /** Prepends a synthesized attribute based on all synthesized attributes. */
     def synthesizeWith[X: Monoid](syn: Attr[HNil, HNil, X :: S] =?> X) =
@@ -220,13 +212,11 @@ trait Transversers { this: AST =>
 
     /** Prepends a synthesized attribute based on trees only. */
     def synthesize[X: Monoid](syn: Tree =?> X) =
-      copy(grammar = grammar.synthesize[X] {
-        case Attr.none(t) if syn.isDefinedAt(t) => syn(t)
-      })
+      synthesizeWith[X](forgetful(syn))
 
     /** Traverses a tree with access to all attributes (and a memoized synthesis function). */
-    def traverseWithSyn(callback: Attr[A, I, Tree => S] =?> Any): Traversal[A, I, S] = {
-      lazy val traversal: Traversal[A, I, S] = factory.traversal(grammar) {
+    def traverseWithSyn(callback: Attr[A, I, Tree => S] =?> Unit): Traversal[A, I, S] = {
+      lazy val traversal: Traversal[A, I, S] = traverseWith {
         case Attr(t, as, is, _) if callback.isDefinedAt(Attr(t, as, is, traversal.syn)) =>
           callback(Attr(t, as, is, traversal.syn))
       }
@@ -235,14 +225,12 @@ trait Transversers { this: AST =>
     }
 
     /** Traverses a tree with access to all attributes. */
-    def traverseWith(callback: Attr[A, I, S] =?> Any): Traversal[A, I, S] =
+    def traverseWith(callback: Attr[A, I, S] =?> Unit): Traversal[A, I, S] =
       factory.traversal(grammar)(callback)
 
     /** Traverses a tree without access to attributes. */
-    def traverse(callback: Tree =?> Any): Traversal[A, I, S] =
-      factory.traversal(grammar) { case Attr(t, _, _, _)
-        if callback.isDefinedAt(t) => callback(t)
-      }
+    def traverse(callback: Tree =?> Unit): Traversal[A, I, S] =
+      traverseWith(forgetful(callback))
 
     /** Shortcut for visiting every node in a tree. */
     def traverseAny: Traversal[A, I, S] =
@@ -250,7 +238,7 @@ trait Transversers { this: AST =>
 
     /** Transforms a tree with access to all attributes (and a memoized synthesis function). */
     def transformWithSyn(template: Attr[A, I, Tree => S] =?> Tree): Transform[A, I, S] = {
-      lazy val transform: Transform[A, I, S] = factory.transform(grammar) {
+      lazy val transform: Transform[A, I, S] = transformWith {
         case Attr(t, as, is, _) if template.isDefinedAt(Attr(t, as, is, transform.syn)) =>
           template(Attr(t, as, is, transform.syn))
       }
@@ -264,24 +252,16 @@ trait Transversers { this: AST =>
 
     /** Transforms a tree without access to attributes. */
     def transform(template: Tree =?> Tree): Transform[A, I, S] =
-      factory.transform(grammar) { case Attr(t, _, _, _)
-        if template.isDefinedAt(t) => template(t)
-      }
+      transformWith(forgetful(template))
 
     /** Inherits the root of the tree ([[None]] if the current node is the root). */
-    def withRoot = inherit {
-      case root => Option(root)
-    } (Monoids.left(None))
+    def withRoot = inherit(partial(Option.apply))(Monoids.left(None))
 
     /** Inherits the parent of the current node ([[None]] if the current node is the root). */
-    def withParent = inherit {
-      case parent => Option(parent)
-    } (Monoids.right(None))
+    def withParent = inherit(partial(Option.apply))(Monoids.right(None))
 
     /** Inherits all ancestors of the current node in a vector. */
-    def withAncestors = inherit(Attr.collect[Vector, Tree] {
-      case ancestor => ancestor
-    })
+    def withAncestors = inherit(Attr.collect[Vector, Tree](partial(identity)))
 
     /** Inherits the owner of the current node. */
     def withOwner = inherit {
@@ -357,6 +337,11 @@ trait Transversers { this: AST =>
     def withDefCalls = synthesize(Attr.group {
       case api.DefCall(_, method, _, _*) => method -> 1
     })(Monoids.merge)
+
+    /** Converts a partial function over trees to a partial function over attributed trees. */
+    private def forgetful[X, Acc, Inh, Syn](pf: Tree =?> X): Attr[Acc, Inh, Syn] =?> X = {
+      case Attr.none(t) if pf.isDefinedAt(t) => pf(t)
+    }
   }
 
   /** An abstract transformation (default is top-down break). */
@@ -388,7 +373,7 @@ trait Transversers { this: AST =>
   /** An abstract traversal (default is top-down break). */
   abstract class Traversal[A <: HList, I <: HList, S <: HList](
       protected val grammar: AttrGrammar[A, I, S],
-      override val callback: Attr[A, I, S] =?> Any
+      override val callback: Attr[A, I, S] =?> Unit
   ) extends Traverser with ManagedAttr[A, I, S] with (Tree => Attr[A, I, S]) {
 
     override def apply(tree: Tree): Attr[A, I, S] = {
@@ -417,7 +402,7 @@ trait Transversers { this: AST =>
 
     def traversal[A <: HList, I <: HList, S <: HList]
       (grammar: AttrGrammar[A, I, S])
-      (callback: Attr[A, I, S] =?> Any)
+      (callback: Attr[A, I, S] =?> Unit)
       : Traversal[A, I, S]
 
     def transform[A <: HList, I <: HList, S <: HList]
@@ -435,7 +420,7 @@ trait Transversers { this: AST =>
       /** Top-down continue traversal. */
       override def traversal[A <: HList, I <: HList, S <: HList]
         (grammar: AttrGrammar[A, I, S])
-        (callback: Attr[A, I, S] =?> Any)
+        (callback: Attr[A, I, S] =?> Unit)
         : Traversal[A, I, S]
         = Traversal.topDown(grammar)(callback)
 
@@ -452,7 +437,7 @@ trait Transversers { this: AST =>
         /** Top-down break traversal. */
         override def traversal[A <: HList, I <: HList, S <: HList]
           (grammar: AttrGrammar[A, I, S])
-          (callback: Attr[A, I, S] =?> Any)
+          (callback: Attr[A, I, S] =?> Unit)
           : Traversal[A, I, S]
           = Traversal.topDown.break(grammar)(callback)
 
@@ -470,7 +455,7 @@ trait Transversers { this: AST =>
         /** Top-down exhaustive traversal. */
         override def traversal[A <: HList, I <: HList, S <: HList]
           (grammar: AttrGrammar[A, I, S])
-          (callback: Attr[A, I, S] =?> Any)
+          (callback: Attr[A, I, S] =?> Unit)
           : Traversal[A, I, S]
           = Traversal.topDown.exhaust(grammar)(callback)
 
@@ -489,7 +474,7 @@ trait Transversers { this: AST =>
       /** Bottom-up continue traversal. */
       override def traversal[A <: HList, I <: HList, S <: HList]
         (grammar: AttrGrammar[A, I, S])
-        (callback: Attr[A, I, S] =?> Any)
+        (callback: Attr[A, I, S] =?> Unit)
         : Traversal[A, I, S]
         = Traversal.bottomUp(grammar)(callback)
 
@@ -506,7 +491,7 @@ trait Transversers { this: AST =>
         /** Bottom-up break traversal. */
         override def traversal[A <: HList, I <: HList, S <: HList]
           (grammar: AttrGrammar[A, I, S])
-          (callback: Attr[A, I, S] =?> Any)
+          (callback: Attr[A, I, S] =?> Unit)
           : Traversal[A, I, S]
           = Traversal.bottomUp.break(grammar)(callback)
 
@@ -524,7 +509,7 @@ trait Transversers { this: AST =>
         /** Bottom-up exhaustive traversal. */
         override def traversal[A <: HList, I <: HList, S <: HList]
           (grammar: AttrGrammar[A, I, S])
-          (callback: Attr[A, I, S] =?> Any)
+          (callback: Attr[A, I, S] =?> Unit)
           : Traversal[A, I, S]
           = Traversal.bottomUp.exhaust(grammar)(callback)
 
@@ -622,7 +607,7 @@ trait Transversers { this: AST =>
 
       /** Top-down continue traversal. */
       def apply[A <: HList, I <: HList, S <: HList]
-        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Any)
+        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Unit)
         : Traversal[A, I, S] = new Traversal[A, I, S](grammar, callback) {
           override final def traverse(tree: Tree): Unit = {
             accTraverse(tree)
@@ -632,7 +617,7 @@ trait Transversers { this: AST =>
 
       /** Top-down exhaustive traversal. */
       def exhaust[A <: HList, I <: HList, S <: HList]
-        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Any)
+        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Unit)
         : Traversal[A, I, S] = new Traversal[A, I, S](grammar, callback) {
           override final def traverse(tree: Tree): Unit = {
             fixTraverse(tree)
@@ -642,7 +627,7 @@ trait Transversers { this: AST =>
 
       /** Top-down break traversal. */
       def break[A <: HList, I <: HList, S <: HList]
-        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Any)
+        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Unit)
         : Traversal[A, I, S] = new Traversal[A, I, S](grammar, callback) {
           override final def traverse(tree: Tree): Unit = {
             accumulate(tree)
@@ -656,7 +641,7 @@ trait Transversers { this: AST =>
 
       /** Bottom-up continue traversal. */
       def apply[A <: HList, I <: HList, S <: HList]
-        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Any)
+        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Unit)
         : Traversal[A, I, S] = new Traversal[A, I, S](grammar, callback) {
           override final def traverse(tree: Tree): Unit = {
             super.traverse(tree)
@@ -666,7 +651,7 @@ trait Transversers { this: AST =>
 
       /** Bottom-up exhaustive traversal. */
       def exhaust[A <: HList, I <: HList, S <: HList]
-        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Any)
+        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Unit)
         : Traversal[A, I, S] = new Traversal[A, I, S](grammar, callback) {
           override final def traverse(tree: Tree): Unit = {
             super.traverse(tree)
@@ -676,7 +661,7 @@ trait Transversers { this: AST =>
 
       /** Bottom-up break traversal. */
       def break[A <: HList, I <: HList, S <: HList]
-        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Any)
+        (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Unit)
         : Traversal[A, I, S] = new Traversal[A, I, S](grammar, callback) {
           val matches: mutable.Set[Tree] = mutable.Set.empty
           override final def traverse(tree: Tree): Unit = {
