@@ -370,19 +370,8 @@ trait Transversers { this: AST =>
       ann(transform(tree))
     }
 
-    override def transform(tree: Tree): Tree = at(tree)(tree match {
-      // NOTE: TypeTree.original is not transformed by default
-      case tpt: TypeTree if tpt.original != null =>
-        val original = transform(tpt.original)
-        if (original == tpt.original) tpt else {
-          val copy = treeCopy.TypeTree(tpt)
-          set.original(copy, original)
-          copy
-        }
-
-      case _ =>
-        super.transform(tree)
-    })
+    override def transform(tree: Tree): Tree =
+      at(tree)(super.transform(tree))
 
     protected final def accTransform(tree: Tree): Tree = {
       accumulate(tree)
@@ -408,11 +397,8 @@ trait Transversers { this: AST =>
       ann(tree)
     }
 
-    override def traverse(tree: Tree): Unit = at(tree)(tree match {
-      // NOTE: TypeTree.original is not traversed by default
-      case tpt: TypeTree if tpt.original != null => traverse(tpt.original)
-      case _ => super.traverse(tree)
-    })
+    override def traverse(tree: Tree): Unit =
+      at(tree)(super.traverse(tree))
 
     protected final def accTraverse(tree: Tree): Unit = {
       accumulate(tree)

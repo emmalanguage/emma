@@ -37,6 +37,7 @@ trait Compiler extends AlphaEq with Source with Core with Backend {
   /** Standard pipeline prefix. Brings a tree into a form convenient for transformation. */
   lazy val preProcess: Seq[u.Tree => u.Tree] = Seq(
     fixLambdaTypes,
+    stubTypeTrees,
     unQualifyStatics,
     normalizeStatements,
     Source.normalize,

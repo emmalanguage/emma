@@ -18,7 +18,6 @@ package compiler.lang.core
 
 import compiler.Common
 import compiler.lang.source.Source
-import util.Monoids
 
 import cats.std.all._
 import shapeless._
@@ -38,19 +37,11 @@ private[core] trait ANF extends Common {
 
     /** The ANF transformation. */
     private lazy val anf: u.Tree => u.Tree = api.BottomUp
-      // Inherit all method definitions in scope.
-      .inherit { case core.Let(_, defs, _) =>
-        (for (core.DefDef(method, _, _, _, _) <- defs) yield method).toSet
-      }
-      // Keep track if the current tree is a subtree of a type-tree.
-      .withParent.inherit { case tree => is.tpe(tree) } (Monoids.disj)
-      .withOwner.transformWith {
-        // Bypass type-trees
-        case Attr.inh(tree, _ :: true :: _) =>
-          tree
-
+      .inherit { // Inherit all method definitions in scope (local methods)
+        case core.Let(_, defs, _) => defs.map(_.symbol.asMethod).toSet
+      }.withParent.withOwner.transformWith {
         // Bypass atomics (except in lambdas, methods and comprehensions)
-        case Attr.inh(src.Atomic(atom), _ :: _ :: Some(parent) :: _) => parent match {
+        case Attr.inh(src.Atomic(atom), _ :: Some(parent) :: _) => parent match {
           case src.Lambda(_, _, _) => src.Block()(atom)
           case core.DefDef(_, _, _, _, _) => src.Block()(atom)
           case Comprehension(_) => src.Block()(atom)
@@ -68,7 +59,7 @@ private[core] trait ANF extends Common {
         // Bypass local method calls in branches
         case Attr.inh(
           call @ src.DefCall(_, method, _, _*),
-          _ :: _ :: Some(src.Branch(_, _, _)) :: local :: _
+          _ :: Some(src.Branch(_, _, _)) :: local :: _
         ) if local(method) => call
 
         // Simplify RHS
@@ -111,7 +102,7 @@ private[core] trait ANF extends Common {
         // Simplify target & arguments
         case Attr.inh(
           src.DefCall(target, method, targs, argss@_*) withType tpe,
-          owner :: _ :: _ :: local :: _
+          owner :: _ :: local :: _
         ) =>
           val (tgtStats, tgtExpr) = target
             .map(decompose(_, unline = false))
@@ -163,7 +154,7 @@ private[core] trait ANF extends Common {
         // All branches on the RHS
         case Attr.inh(
           src.Branch(cond, thn, els) withType tpe,
-          owner :: _ :: _ :: local :: _
+          owner :: _ :: local :: _
         ) =>
           val (stats, expr) = decompose(cond, unline = false)
           val branch = core.Branch(expr, thn, els)

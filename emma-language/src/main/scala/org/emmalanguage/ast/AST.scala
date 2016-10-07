@@ -66,6 +66,19 @@ trait AST extends CommonAST
       case api.Lambda(f, _, _) withType fT => set.tpe(f, fT)
     }.andThen(_.tree)
 
+  /**
+   * Replaces [[u.TypeTree]]s that have their `original` field set with stubs that only have their
+   * `tpe` field set to the corresponding type. Type-trees of `val/var`s are left empty for the
+   * compiler to infer.
+   */
+  lazy val stubTypeTrees: u.Tree => u.Tree =
+    api.TopDown.break.withParent.transformWith {
+      // Leave `val/var` types to be inferred by the compiler.
+      case Attr.inh(u.TypeTree(), Some(api.BindingDef(lhs, rhs, _)) :: _)
+        if !lhs.isParameter && rhs.nonEmpty => u.TypeTree()
+      case Attr.none(u.TypeTree() withType tpe) => api.TypeQuote(tpe)
+    }.andThen(_.tree)
+
   /** Normalizes all statements in term position by wrapping them in a block. */
   lazy val normalizeStatements: u.Tree => u.Tree =
     api.BottomUp.withParent.transformWith {
