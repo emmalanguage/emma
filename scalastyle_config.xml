@@ -6,7 +6,7 @@
    <parameter name="maxFileLength"><![CDATA[1000]]></parameter>
   </parameters>
  </check>
- <check level="error" class="org.scalastyle.file.HeaderMatchesChecker" enabled="true">
+ <check level="warning" class="org.scalastyle.file.HeaderMatchesChecker" enabled="true">
   <parameters>
    <parameter name="header"><![CDATA[/*
  * Copyright © 2014 TU Berlin (emma@dima.tu-berlin.de)
