@@ -95,6 +95,7 @@ trait CommonAST {
     // Symbols
     def enclosingOwner: Symbol
     def ans(sym: Symbol): Seq[Annotation] = sym.annotations
+    def ann[A: TypeTag](sym: Symbol): Option[Annotation] = ans(sym).find(_.tree.tpe =:= typeOf[A])
     def flags(sym: Symbol): FlagSet = sym.flags
     def meta(sym: Symbol): Attachments
     def name(sym: Symbol): Name = sym.name
