@@ -172,22 +172,16 @@ private[core] trait ANF extends Common {
     /**
      * Converts a tree into administrative normal form (ANF).
      *
-     * == Preconditions ==
-     *
-     * - There are no name clashes (can be ensured with `resolveNameClashes`).
-     *
      * == Postconditions ==
      *
-     * - Introduces dedicated symbols for chains of length greater than one.
+     * - There are no name clashes (ensured with `resolveNameClashes`).
+     * - Introduces dedicated symbols for sub-terms in application trees.
      * - Ensures that all function arguments are trivial identifiers.
      *
      * @return An ANF version of the input tree.
      */
-    lazy val transform: u.Tree => u.Tree = (tree: u.Tree) => {
-      lazy val clashes = nameClashes(tree)
-      assert(clashes.isEmpty, s"Tree has name clashes:\n${clashes.mkString(", ")}")
-      anf(tree)
-    }
+    lazy val transform: u.Tree => u.Tree =
+      resolveNameClashes andThen anf
 
     /**
      * Inlines `Ident` return expressions in blocks whenever the referred symbol is used only once.

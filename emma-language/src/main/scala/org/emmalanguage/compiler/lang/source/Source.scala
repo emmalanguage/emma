@@ -182,6 +182,37 @@ trait Source extends Common
       PatternMatching.destruct
     } andThen {
       Foreach2Loop.transform
+    } andThen {
+      removeImplicits(API.implicitTypes)
+    }
+
+    /** Removes implicit lists consisting of the following symbols. */
+    def removeImplicits(types: Set[u.Type]): u.Tree => u.Tree = {
+
+      object Matching {
+
+        def matchingImplicits(args: List[u.Tree], params: List[u.Symbol]): Boolean = {
+          // args binds to implicit parameter lsit
+          lazy val isImplicit = params.forall(is(u.Flag.IMPLICIT))
+          // args exclusively from the given `types` list
+          lazy val isMatching = args.forall(arg => types.exists(_ =:= arg.tpe.typeConstructor))
+          args.size == params.size && args.nonEmpty && isImplicit && isMatching
+        }
+
+        def unapply(tree: u.Tree): Option[u.Tree] = tree match {
+          case api.DefCall(target, method, targs, argss@_*) =>
+            argss.map(_.toList).toList zip method.paramLists match {
+              case _ :+ Tuple2(args, params) if matchingImplicits(args, params) => Some(tree)
+              case _ => None
+            }
+          case _ => None
+        }
+      }
+
+      api.TopDown.transform {
+        case Matching(api.DefCall(target, method, targs, argss@_*)) =>
+          api.DefCall(target)(method, targs: _*)(argss.init: _*)
+      }.andThen(_.tree)
     }
   }
 }
