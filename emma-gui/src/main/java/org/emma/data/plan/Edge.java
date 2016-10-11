@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright © 2014 TU Berlin (emma@dima.tu-berlin.de)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");

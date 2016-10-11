@@ -549,6 +549,7 @@
                     </excludes>
                     <mapping>
                         <scala>SLASHSTAR_STYLE</scala>
+                        <java>SLASHSTAR_STYLE</java>
                     </mapping>
                 </configuration>
             </plugin>
