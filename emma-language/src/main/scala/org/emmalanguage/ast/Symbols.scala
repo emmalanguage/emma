@@ -50,11 +50,15 @@ trait Symbols { this: AST =>
 
       /** Creates a copy of `sym`, optionally changing some of its attributes. */
       def copy(sym: u.Symbol)(
-        name: u.Name = sym.name,
-        owner: u.Symbol = sym.owner,
-        tpe: u.Type = sym.info,
-        pos: u.Position = sym.pos,
-        flags: u.FlagSet = get.flags(sym)): u.Symbol = {
+          name:  u.Name     = sym.name,
+          owner: u.Symbol   = sym.owner,
+          tpe:   u.Type     = sym.info,
+          pos:   u.Position = sym.pos,
+          flags: u.FlagSet  = get.flags(sym)): u.Symbol = {
+
+        // Optimize when there are no changes.
+        if (name == sym.name && owner == sym.owner && tpe == sym.info &&
+          pos == sym.pos && flags == get.flags(sym)) return sym
 
         assert(is.defined(sym), s"Undefined symbol `$sym` cannot be copied")
         assert(!is.pkg(sym), s"Package symbol `$sym` cannot be copied")
@@ -133,8 +137,6 @@ trait Symbols { this: AST =>
 
       import Monoids._
 
-      import u.internal.substituteSymbols
-
       /** Extracts the owner of `sym`, if any. */
       def of(sym: u.Symbol): u.Symbol = {
         assert(is.defined(sym), s"Undefined symbol `$sym` has no $this")
@@ -184,11 +186,8 @@ trait Symbols { this: AST =>
                 fix(broken, current, fixed)
           }.traverseAny.andThen {
             case Attr.acc(tree, fixed :: _) =>
-              if (fixed.isEmpty) tree else {
-                val dup = api.Tree.copy(tree)()
-                val (from, to) = fixed.toList.unzip
-                substituteSymbols(dup, from, to)
-              }
+              if (fixed.isEmpty) tree
+              else Tree.renameUnsafe(fixed.toSeq: _*)(tree)
           }
       }
 

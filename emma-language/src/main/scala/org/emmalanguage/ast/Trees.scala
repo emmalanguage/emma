@@ -20,13 +20,13 @@ import cats.std.all._
 import shapeless._
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 
 trait Trees { this: AST =>
 
   trait TreeAPI { this: API =>
 
     import universe._
-    import u.internal.substituteSymbols
 
     object Tree extends Node {
 
@@ -35,17 +35,108 @@ trait Trees { this: AST =>
       lazy val Java = Sel(Root, u.definitions.JavaLangPackage)
       lazy val Scala = Sel(Root, u.definitions.ScalaPackage)
 
-      /** Creates a copy of `tree` while preserving its node type and setting new attributes. */
-      def copy[T <: u.Tree](tree: T)(
-        pos: u.Position = tree.pos,
-        sym: u.Symbol = tree.symbol,
-        tpe: u.Type = tree.tpe): T = {
+      /** Creates a shallow copy of `tree`, preserving its type and setting new attributes. */
+      def copy[T <: Tree](tree: T)(
+          pos: u.Position = tree.pos,
+          sym: u.Symbol   = tree.symbol,
+          tpe: u.Type     = tree.tpe): T = {
 
-        val copy = tree.duplicate.asInstanceOf[T]
-        if (is.defined(sym)) set.sym(copy, sym)
-        if (is.defined(tpe)) set.tpe(copy, Type.fix(tpe))
-        if (is.defined(pos)) set.pos(copy, pos)
-        copy
+        // Optimize when there are no changes.
+        if (pos == tree.pos && sym == tree.symbol && tpe == tree.tpe) return tree
+
+        val copy = tree match {
+          case _ if tree.isEmpty =>
+            u.EmptyTree
+          case u.Alternative(choices) =>
+            u.Alternative(choices)
+          case u.Annotated(target, arg) =>
+            u.Annotated(target, arg)
+          case u.AppliedTypeTree(target, args) =>
+            u.AppliedTypeTree(target, args)
+          case u.Apply(target, args) =>
+            u.Apply(target, args)
+          case u.Assign(lhs, rhs) =>
+            u.Assign(lhs, rhs)
+          case u.AssignOrNamedArg(lhs, rhs) =>
+            u.AssignOrNamedArg(lhs, rhs)
+          case u.Bind(_, pat) =>
+            u.Bind(sym.name, pat)
+          case u.Block(stats, expr) =>
+            u.Block(stats, expr)
+          case u.CaseDef(pat, guard, body) =>
+            u.CaseDef(pat, guard, body)
+          case u.ClassDef(mods, _, tparams, impl) =>
+            u.ClassDef(mods, sym.name.toTypeName, tparams, impl)
+          case u.CompoundTypeTree(templ) =>
+            u.CompoundTypeTree(templ)
+          case u.DefDef(mods, _, tparams, paramss, tpt, body) =>
+            u.DefDef(mods, sym.name.toTermName, tparams, paramss, tpt, body)
+          case u.ExistentialTypeTree(tpt, where) =>
+            u.ExistentialTypeTree(tpt, where)
+          case u.Function(params, body) =>
+            u.Function(params, body)
+          case u.Ident(_) =>
+            u.Ident(sym.name)
+          case u.If(cond, thn, els) =>
+            u.If(cond, thn, els)
+          case u.Import(qual, selectors) =>
+            u.Import(qual, selectors)
+          case u.LabelDef(_, params, body) =>
+            u.LabelDef(sym.name.toTermName, params, body)
+          case u.Literal(const) =>
+            u.Literal(const)
+          case u.Match(target, cases) =>
+            u.Match(target, cases)
+          case u.ModuleDef(mods, _, impl) =>
+            u.ModuleDef(mods, sym.name.toTermName, impl)
+          case u.New(tpt) =>
+            u.New(tpt)
+          case u.PackageDef(id, stats) =>
+            u.PackageDef(id, stats)
+          case u.ReferenceToBoxed(id) =>
+            u.ReferenceToBoxed(id)
+          case u.RefTree(qual, _) =>
+            u.RefTree(qual, sym.name)
+          case u.Return(expr) =>
+            u.Return(expr)
+          case u.Select(target, _) =>
+            u.Select(target, sym.name)
+          case u.SelectFromTypeTree(target, _) =>
+            u.SelectFromTypeTree(target, sym.name.toTypeName)
+          case u.SingletonTypeTree(ref) =>
+            u.SingletonTypeTree(ref)
+          case u.Star(elem) =>
+            u.Star(elem)
+          case u.Super(qual, _) =>
+            u.Super(qual, sym.name.toTypeName)
+          case u.Template(parents, self, body) =>
+            u.Template(parents, self, body)
+          case u.This(_) =>
+            u.This(sym.name.toTypeName)
+          case u.Throw(ex) =>
+            u.Throw(ex)
+          case u.Try(block, catches, finalizer) =>
+            u.Try(block, catches, finalizer)
+          case u.TypeApply(target, targs) =>
+            u.TypeApply(target, targs)
+          case u.TypeBoundsTree(lo, hi) =>
+            u.TypeBoundsTree(lo, hi)
+          case u.Typed(expr, tpt) =>
+            u.Typed(expr, tpt)
+          case u.TypeDef(mods, _, tparams, rhs) =>
+            u.TypeDef(mods, sym.name.toTypeName, tparams, rhs)
+          case _: u.TypeTree =>
+            u.TypeTree()
+          case u.UnApply(extr, args) =>
+            u.UnApply(extr, args)
+          case u.ValDef(mods, _, tpt, rhs) =>
+            u.ValDef(mods, sym.name.toTermName, tpt, rhs)
+          case other =>
+            other
+        }
+
+        set(copy, pos, sym, tpe)
+        copy.asInstanceOf[T]
       }
 
       /** Prints `tree` for debugging (most details). */
@@ -161,11 +252,61 @@ trait Trees { this: AST =>
           case Lambda(fun, _, _) => fun
         }: _*)(tree)
 
-      /** Replaces a sequence of term symbols with references to their `aliases`. */
+      /**
+       * Replaces a sequence of term symbols with references to their `aliases`.
+       * Dependent symbols are changed as well, such as children symbols with renamed owners,
+       * and method symbols with renamed (type) parameters.
+       */
       def rename(aliases: (u.Symbol, u.Symbol)*): u.Tree => u.Tree =
+        if (aliases.isEmpty) identity else tree => {
+          val depAliases = mutable.Map(aliases: _*).withDefault(identity)
+          for (Def(sym) <- tree) {
+            val alias = depAliases(sym)
+            val owner = depAliases(alias.owner)
+            if (alias.isMethod) {
+              val method = alias.asMethod
+              val tps = method.typeParams.map(depAliases(_).asType)
+              val pss = method.paramLists.map(_.map(depAliases(_).asTerm))
+              if (owner != sym.owner || tps != method.typeParams || pss != method.paramLists) {
+                val (name, flags, pos) = (method.name, get.flags(method), method.pos)
+                val Result = method.info.finalResultType
+                val alias = DefSym(owner, name, flags, pos)(tps: _*)(pss: _*)(Result)
+                val from = sym :: method.typeParams ::: method.paramLists.flatten
+                val to = alias :: alias.typeParams ::: alias.paramLists.flatten
+                depAliases ++= from zip to
+              }
+            } else if (owner != sym.owner) {
+              depAliases += sym -> Sym.copy(alias)(owner = owner)
+            }
+          }
+
+          renameUnsafe(depAliases.toSeq: _*)(tree)
+        }
+
+      /** Replaces a sequence of term symbols with references to their `aliases`. */
+      private[ast] def renameUnsafe(aliases: (u.Symbol, u.Symbol)*): u.Tree => u.Tree =
         if (aliases.isEmpty) identity else {
+          val dict = aliases.toMap.withDefault(identity)
           val (from, to) = aliases.toList.unzip
-          tree => fixNames(substituteSymbols(copy(tree)(), from, to))
+
+          def hasAlias(tpe: u.Type) = is.defined(tpe) &&
+            (from.exists(tpe.contains) ||
+              tpe.typeParams.exists(dict.contains) ||
+              tpe.paramLists.flatten.exists(dict.contains))
+
+          def aliasOf(tpe: u.Type) = if (!is.defined(tpe)) tpe else {
+            val alias = tpe.substituteSymbols(from, to)
+            if (!is.method(alias)) alias else {
+              val tparams = alias.typeParams.map(dict(_).asType)
+              val paramss = alias.paramLists.map(_.map(dict(_).asTerm))
+              Type.method(tparams: _*)(paramss: _*)(alias.finalResultType)
+            }
+          }
+
+          TopDown.transform { case tree
+            if dict.contains(tree.symbol) || hasAlias(tree.tpe)
+            => copy(tree)(sym = dict(tree.symbol), tpe = aliasOf(tree.tpe))
+          }.andThen(_.tree)
         }
 
       /** Replaces occurrences of `find` with `repl` in a tree. */
@@ -238,42 +379,6 @@ trait Trees { this: AST =>
         case TypeAscr(expr, _) => unAscribe(expr)
         case _ => tree
       }
-
-      /**
-       * Fixes out-of-sync names in some underlying Scala AST nodes caused by
-       * [[internal.substituteSymbols()]].
-       */
-      private lazy val fixNames: u.Tree => u.Tree = TopDown.transform {
-        case u.Ident(name) withSym target withType tpe
-          if name != target.name =>
-          val id = u.Ident(target.name)
-          set(id, sym = target, tpe = tpe)
-          id
-
-        case u.Select(qual, name) withSym member withType tpe
-          if name != member.name =>
-          val sel = u.Select(qual, member.name)
-          set(sel, sym = member, tpe = tpe)
-          sel
-
-        case u.Bind(name, rhs) withSym lhs withType tpe
-          if name != lhs.name =>
-          val bind = u.Bind(lhs.name, rhs)
-          set(bind, sym = lhs, tpe = tpe)
-          bind
-
-        case u.ValDef(mods, name, tpt, rhs) withSym lhs
-          if name != lhs.name =>
-          val value = u.ValDef(mods, TermName(lhs), tpt, rhs)
-          set(value, sym = lhs)
-          value
-
-        case u.DefDef(mods, name, tparams, paramss, tpt, body) withSym method
-          if name != method.name =>
-          val defn = u.DefDef(mods, TermName(method), tparams, paramss, tpt, body)
-          set(defn, sym = method)
-          defn
-      }.andThen(_.tree)
     }
 
     /** The empty tree (instance independent). */

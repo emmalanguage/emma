@@ -189,7 +189,7 @@ trait Methods { this: AST =>
         val tpeTree = TypeQuote(resT)
         val original = tparams ++ paramss.flatten
         val aliases = sym.typeParams ++ sym.paramLists.flatten
-        val rhs = Owner.at(sym)(Tree.rename(original zip aliases: _*)(body))
+        val rhs = Owner.at(sym)(Tree.renameUnsafe(original zip aliases: _*)(body))
         val method = u.DefDef(mods, sym.name, tpeDefs, parDefs, tpeTree, rhs)
         set(method, sym = sym)
         method
