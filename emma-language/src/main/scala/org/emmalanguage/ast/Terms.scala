@@ -434,7 +434,7 @@ trait Terms { this: AST =>
         val tpe = Type.fun(parTs: _*)(body.tpe)
         val fun = TermSym.free(TermName.lambda, tpe)
         val aliases = for ((p, t) <- params zip parTs) yield ParSym(fun, p.name, t)
-        val rhs = Owner.at(fun)(Tree.rename(params zip aliases: _*)(body))
+        val rhs = Owner.at(fun)(Tree.renameUnsafe(params zip aliases: _*)(body))
         val lambda = u.Function(aliases.map(ParDef(_)).toList, rhs)
         set(lambda, sym = fun, tpe = tpe)
         lambda
