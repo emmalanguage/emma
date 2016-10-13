@@ -53,6 +53,9 @@ trait JavaAST extends AST {
   // Parsing and type-checking
   // ---------------------------
 
+  private[emmalanguage] def eval[T](code: Tree): T =
+    tb.eval(code).asInstanceOf[T]
+
   private[emmalanguage] override def parse(code: String): Tree =
     tb.parse(code)
 

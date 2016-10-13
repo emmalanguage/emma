@@ -56,6 +56,9 @@ trait MacroAST extends AST {
   // Parsing and type-checking
   // ---------------------------
 
+  private[emmalanguage] def eval[T](code: Tree): T =
+    c.eval[T](c.Expr[T](code))
+
   private[emmalanguage] override def parse(code: String): Tree =
     c.parse(code)
 

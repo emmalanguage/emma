@@ -62,6 +62,9 @@ trait CommonAST {
   // Parsing and type-checking
   // ---------------------------
 
+  /** Evaluates a snippet of code and returns a value of type `T`. */
+  private[emmalanguage] def eval[T](code: Tree): T
+
   /** Parses a snippet of source code and returns the AST. */
   private[emmalanguage] def parse(code: String): Tree
 
