@@ -130,8 +130,8 @@ trait CommonAST {
       tpe: Type = NoType): Unit = {
 
       if (pos != null) set.pos(tree, pos)
-      if (sym != null) set.sym(tree, sym)
       if (tpe != null) set.tpe(tree, tpe)
+      if (sym != null) set.sym(tree, sym)
     }
 
     // Symbols
@@ -145,7 +145,7 @@ trait CommonAST {
     // Trees
     def original(tpt: TypeTree, original: Tree): Unit
     def pos(tree: Tree, pos: Position): Unit
-    def sym(tree: Tree, sym: Symbol): Unit = setSymbol(tree, sym)
+    def sym(tree: Tree, sym: Symbol): Unit = if (tree.symbol != sym) setSymbol(tree, sym)
     def tpe(tree: Tree, tpe: Type): Unit = setType(tree, tpe)
   }
 
