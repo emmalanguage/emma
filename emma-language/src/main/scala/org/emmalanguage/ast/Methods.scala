@@ -175,21 +175,27 @@ trait Methods { this: AST =>
         assert(paramss.size == sym.paramLists.size, s"Wrong number of $this parameter lists")
         assert(paramss.flatten.size == sym.paramLists.flatten.size,
           s"Shape of $this parameter lists doesn't match")
+        val tparamsMap = (tparams.map(_.toType) zip sym.typeParams.map(_.asType.toType))
+          .toMap
+          .withDefault(identity[u.Type])
         assert(paramss.flatten zip sym.paramLists.flatten forall {
-          case (p, q) => Type.of(p) =:= Type.of(q)
+          case (p, q) => Type.of(p).map(tparamsMap) =:= Type.of(q)
         }, s"Not all $this parameters have the correct type")
-        val tpe = Type.of(sym)
-        lazy val (bodyT, resT) = (Type.of(body), tpe.finalResultType)
-        assert(bodyT weak_<:< resT,
-          s"$this body type `$bodyT` is not a subtype of return type `$resT`")
 
         val mods = u.Modifiers(get.flags(sym) | flags)
         val tpeDefs = sym.typeParams.map(typeDef)
         val parDefs = sym.paramLists.map(_.map(p => ParDef(p.asTerm)))
-        val tpeTree = TypeQuote(resT)
         val original = tparams ++ paramss.flatten
         val aliases = sym.typeParams ++ sym.paramLists.flatten
         val rhs = Owner.at(sym)(Tree.renameUnsafe(original zip aliases: _*)(body))
+
+        val tpe = Type.of(sym)
+        val (rhsT, resT) = (Type.of(rhs), tpe.finalResultType)
+        val bool = rhsT weak_<:< resT
+        assert(bool,
+          s"$this body type `$rhsT` is not a subtype of return type `$resT`")
+
+        val tpeTree = TypeQuote(resT)
         val method = u.DefDef(mods, sym.name, tpeDefs, parDefs, tpeTree, rhs)
         set(method, sym = sym)
         method
