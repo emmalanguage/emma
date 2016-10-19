@@ -1,0 +1,67 @@
+{
+  "OPERATOR_NAME": "GENERIC_GROUPBY",
+  "GROUPING_COLUMNS": [
+    {
+      "ATTRIBUTE_REFERENCE": {
+        "TABLE_NAME": "LINEORDER",
+        "COLUMN_NAME": "LO_SHIPMODE",
+        "VERSION": 1,
+        "RESULT_NAME": "SHIPMODE",
+        "ATTRIBUTE_TYPE": "INT"
+      }
+    }
+  ],
+  "AGGREGATION_SPECIFICATION": [
+    {
+      "AGGREGATION_FUNCTION": "SUM",
+      "ATTRIBUTE_REFERENCE": {
+        "TABLE_NAME": "LINEORDER",
+        "COLUMN_NAME": "LO_REVENUE",
+        "VERSION": 1,
+        "RESULT_NAME": "SUM_REVENUE",
+        "ATTRIBUTE_TYPE": "INT"
+      },
+      "RESULT_NAME": "SUM_REVENUE"
+    },
+    {
+      "AGGREGATION_FUNCTION": "UDF",
+      "REDUCE_UDF": {
+        "REDUCE_UDF_TYPE": "ALGEBRAIC",
+        "REDUCE_UDF_PAYLOAD_ATTRIBUTES": [
+          {
+            "ATTRIBUTE_TYPE": "double",
+            "ATTRIBUTE_NAME": "min_value",
+            "ATTRIBUTE_INIT_VALUE": "400000.0"
+          },
+          {
+            "ATTRIBUTE_TYPE": "OID",
+            "ATTRIBUTE_NAME": "ID",
+            "ATTRIBUTE_INIT_VALUE": "0"
+          }
+        ],
+        "REDUCE_UDF_OUTPUT_ATTRIBUTES": [
+          {
+            "ATTRIBUTE_TYPE": "OID",
+            "ATTRIBUTE_NAME": "CID",
+            "INTERNAL_VARIABLE_NAME": "TMP_CID"
+          }
+        ],
+        "REDUCE_UDF_CODE": [
+          "if(#<hash_entry>.min_value#>#LINEORDER.LO_REVENUE#){",
+          "   #<hash_entry>.min_value#=#LINEORDER.LO_REVENUE#;",
+          "   #<hash_entry>.ID#=#LINEORDER.LO_LINENUMBER#;",
+          "}"
+        ],
+        "REDUCE_UDF_FINAL_CODE": [
+          "#<out>.CID# = #<hash_entry>.min_value#*#<hash_entry>.ID#;"
+        ]
+      }
+    }
+  ],
+  "LEFT_CHILD": {
+    "OPERATOR_NAME": "TABLE_SCAN",
+    "TABLE_NAME": "LINEORDER",
+    "VERSION": 1
+  },
+  "RIGHT_CHILD": null
+}

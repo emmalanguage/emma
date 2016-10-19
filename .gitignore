@@ -27,3 +27,9 @@ _site
 !.idea/fileTemplates/
 !.idea/fileTemplates/internal/
 !.idea/inspectionProfiles/
+!.idea/fileTemplates/internal/
+
+#cogadb specific
+output
+cogascript_timings.log
+minimal_api_c.debug.h.pch
