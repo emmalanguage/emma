@@ -128,14 +128,78 @@ trait Symbols { this: AST =>
         matching.head
       } else sym
 
+      /**
+       * Performs a symbol substitution, given a set of `aliases` and a new owner.
+       * @param at The new owner of the tree.
+       * @param aliases Pairs of symbols to substitute from -> to.
+       * @param in The tree to perform substitution in.
+       * @return A structurally equivalent tree, owned by `at`, with all `aliases` substituted.
+       */
+      def subst(at: u.Symbol, aliases: (u.Symbol, u.Symbol)*)(in: u.Tree): u.Tree = {
+        if (!is.defined(at) && aliases.isEmpty) return in
+        // NOTE: This mutable state could be avoided if Transducers had attribute initializers.
+        var (from, to) = aliases.toList.unzip
+        var symAlias = aliases.toMap.withDefault(identity)
+        // Handle method types as well.
+        def tpeAlias(tpe: u.Type): u.Type =
+          if (is.defined(tpe)) {
+            if (tpe.typeParams.exists(symAlias.contains) ||
+                tpe.paramLists.iterator.flatten.exists(symAlias.contains)) {
+              val tps = tpe.typeParams.map(symAlias(_).asType)
+              val pss = tpe.paramLists.map(_.map(symAlias(_).asTerm))
+              val Res = tpe.finalResultType.substituteSymbols(from, to)
+              Type.method(tps: _*)(pss: _*)(Res)
+            } else tpe.substituteSymbols(from, to)
+          } else tpe
+
+        TopDown.inherit {
+          case Owner(sym) => sym
+        } (Monoids.right(at)).traverseWith {
+          case Attr.inh(Owner(sym), currOwner :: _) =>
+            val alias = symAlias(sym)
+            val owner = symAlias(currOwner)
+            val tpe = alias.info.substituteSymbols(from, to)
+            val changed = owner != alias.owner || tpe != alias.info
+            if (is.method(alias)) {
+              val met = alias.asMethod
+              if (changed || met.typeParams.exists(symAlias.contains) ||
+                  met.paramLists.iterator.flatten.exists(symAlias.contains)) {
+                val tps = met.typeParams.map(symAlias(_).asType)
+                val pss = met.paramLists.map(_.map(symAlias(_).asTerm))
+                val nme = alias.name.toTermName
+                val flg = get.flags(alias)
+                val pos = alias.pos
+                val Res = tpe.finalResultType
+                val dup = DefSym(owner, nme, flg, pos)(tps: _*)(pss: _*)(Res)
+                val src = sym :: met.typeParams ::: met.paramLists.flatten
+                val dst = dup :: dup.typeParams ::: dup.paramLists.flatten
+                symAlias ++= src.iterator zip dst.iterator
+                from :::= src
+                to :::= dst
+              }
+            } else if (changed) {
+              val dup = copy(alias)(owner = owner, tpe = tpe)
+              symAlias += sym -> dup
+              from ::= sym
+              to ::= dup
+            }
+        } (in)
+
+        // Can't be fused with the traversal above,
+        // because method calls might appear before their definition.
+        if (symAlias.isEmpty) in
+        else TopDown.transform { case tree
+          if has.tpe(tree) || (has.sym(tree) && symAlias.contains(tree.symbol))
+          => Tree.copy(tree)(sym = symAlias(tree.symbol), tpe = tpeAlias(tree.tpe))
+        } (in).tree
+      }
+
       def unapply(sym: u.Symbol): Option[u.Symbol] =
         Option(sym).filter(is.defined)
     }
 
     /** Named entities that own their children. */
     object Owner extends Node {
-
-      import Monoids._
 
       /** Extracts the owner of `sym`, if any. */
       def of(sym: u.Symbol): u.Symbol = {
@@ -145,8 +209,10 @@ trait Symbols { this: AST =>
       }
 
       /** Extracts the owner of `tree`, if any. */
-      def of(tree: u.Tree): u.Symbol =
-        Owner.of(Sym.of(tree))
+      def of(tree: u.Tree): u.Symbol = tree
+        .find(is.owner)
+        .map(_.symbol.owner)
+        .getOrElse(u.NoSymbol)
 
       /** Extracts the owner of `tpe`, if any. */
       def of(tpe: u.Type): u.Symbol =
@@ -168,27 +234,7 @@ trait Symbols { this: AST =>
       /** Fixes the owner chain of a tree with `owner` at the root. */
       def at(owner: u.Symbol): u.Tree => u.Tree = {
         assert(is.defined(owner), s"Undefined owner `$owner`")
-
-        def fix(broken: u.Symbol, owner: u.Symbol, dict: Map[u.Symbol, u.Symbol]) = {
-          val (from, to) = dict.toList.unzip
-          val tpe = Type.of(broken).substituteSymbols(from, to)
-          val fixed = Sym.copy(broken)(owner = owner, tpe = tpe)
-          Map(broken -> fixed)
-        }
-
-        TopDown.inherit { case Owner(sym) => sym } (Monoids.right(owner))
-          .accumulateWith[Map[u.Symbol, u.Symbol]] {
-            case Attr(Owner(broken), fixed :: _, current :: _, _)
-              if fixed.contains(current) && broken.owner != fixed(current) =>
-                fix(broken, fixed(current), fixed)
-            case Attr(Owner(broken), fixed :: _, current :: _, _)
-              if broken.owner != current =>
-                fix(broken, current, fixed)
-          }.traverseAny.andThen {
-            case Attr.acc(tree, fixed :: _) =>
-              if (fixed.isEmpty) tree
-              else Tree.renameUnsafe(fixed.toSeq: _*)(tree)
-          }
+        Sym.subst(owner)
       }
 
       def unapply(tree: u.Tree): Option[u.Symbol] = for {
