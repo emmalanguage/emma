@@ -61,9 +61,14 @@ trait AST extends CommonAST
    * Populates the missing types of lambda symbols in a tree.
    * WARN: Mutates the symbol table in place.
    */
-  lazy val fixLambdaTypes: u.Tree => u.Tree =
-    api.BottomUp.traverse {
+  lazy val fixSymbolTypes: u.Tree => u.Tree =
+    api.TopDown.traverse {
       case api.Lambda(f, _, _) withType fT => set.tpe(f, fT)
+      case u.DefDef(_, _, tparams, paramss, _ withType tpe, _) withSym method =>
+        val tps = tparams.map(_.symbol.asType)
+        val pss = paramss.map(_.map(_.symbol.asTerm))
+        val Res = tpe.finalResultType
+        set.tpe(method, api.Type.method(tps: _*)(pss: _*)(Res))
     }.andThen(_.tree)
 
   /**

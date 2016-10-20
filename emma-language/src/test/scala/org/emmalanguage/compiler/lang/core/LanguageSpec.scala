@@ -39,7 +39,7 @@ class LanguageSpec extends BaseCompilerSpec {
 
   /** Example pre-processing pipeline. */
   lazy val pipeline = { api.Type.check(_: u.Tree) }
-    .andThen(compiler.fixLambdaTypes)
+    .andThen(compiler.fixSymbolTypes)
     .andThen(compiler.unQualifyStatics)
     .andThen(compiler.normalizeStatements)
 

@@ -29,7 +29,7 @@ class Foreach2LoopSpec extends BaseCompilerSpec {
 
   val foreach2loopPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true, withPre = false)(
-      fixLambdaTypes,
+      fixSymbolTypes,
       unQualifyStatics,
       normalizeStatements,
       tree => time(Foreach2Loop.transform(tree), "foreach -> loop")
