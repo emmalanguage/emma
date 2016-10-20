@@ -258,56 +258,8 @@ trait Trees { this: AST =>
        * and method symbols with renamed (type) parameters.
        */
       def rename(aliases: (u.Symbol, u.Symbol)*): u.Tree => u.Tree =
-        if (aliases.isEmpty) identity else tree => {
-          val depAliases = mutable.Map(aliases: _*).withDefault(identity)
-          for (Def(sym) <- tree) {
-            val alias = depAliases(sym)
-            val owner = depAliases(alias.owner)
-            if (alias.isMethod) {
-              val method = alias.asMethod
-              val tps = method.typeParams.map(depAliases(_).asType)
-              val pss = method.paramLists.map(_.map(depAliases(_).asTerm))
-              if (owner != sym.owner || tps != method.typeParams || pss != method.paramLists) {
-                val (name, flags, pos) = (method.name, get.flags(method), method.pos)
-                val Result = method.info.finalResultType
-                val alias = DefSym(owner, name, flags, pos)(tps: _*)(pss: _*)(Result)
-                val from = sym :: method.typeParams ::: method.paramLists.flatten
-                val to = alias :: alias.typeParams ::: alias.paramLists.flatten
-                depAliases ++= from zip to
-              }
-            } else if (owner != sym.owner) {
-              depAliases += sym -> Sym.copy(alias)(owner = owner)
-            }
-          }
-
-          renameUnsafe(depAliases.toSeq: _*)(tree)
-        }
-
-      /** Replaces a sequence of term symbols with references to their `aliases`. */
-      private[ast] def renameUnsafe(aliases: (u.Symbol, u.Symbol)*): u.Tree => u.Tree =
-        if (aliases.isEmpty) identity else {
-          val dict = aliases.toMap.withDefault(identity)
-          val (from, to) = aliases.toList.unzip
-
-          def hasAlias(tpe: u.Type) = is.defined(tpe) &&
-            (from.exists(tpe.contains) ||
-              tpe.typeParams.exists(dict.contains) ||
-              tpe.paramLists.flatten.exists(dict.contains))
-
-          def aliasOf(tpe: u.Type) = if (!is.defined(tpe)) tpe else {
-            val alias = tpe.substituteSymbols(from, to)
-            if (!is.method(alias)) alias else {
-              val tparams = alias.typeParams.map(dict(_).asType)
-              val paramss = alias.paramLists.map(_.map(dict(_).asTerm))
-              Type.method(tparams: _*)(paramss: _*)(alias.finalResultType)
-            }
-          }
-
-          TopDown.transform { case tree
-            if dict.contains(tree.symbol) || hasAlias(tree.tpe)
-            => copy(tree)(sym = dict(tree.symbol), tpe = aliasOf(tree.tpe))
-          }.andThen(_.tree)
-        }
+        if (aliases.isEmpty) identity
+        else tree => Sym.subst(Owner.of(tree), aliases: _*)(tree)
 
       /** Replaces occurrences of `find` with `repl` in a tree. */
       def replace(find: u.Tree, repl: u.Tree): u.Tree => u.Tree =

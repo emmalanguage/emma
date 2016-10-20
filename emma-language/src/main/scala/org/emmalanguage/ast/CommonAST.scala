@@ -404,7 +404,7 @@ trait CommonAST {
 
     /** Does `tree` have an owner? */
     def owner(tree: Tree): Boolean =
-      has.owner(tree.symbol)
+      tree.exists(is.owner)
 
     /** Does `tpe` have an owner? */
     def owner(tpe: Type): Boolean = has.owner {
