@@ -181,7 +181,7 @@ private[comprehension] trait Normalize extends Common {
                   core.Let(
                     vals3,
                     Nil,
-                    expr3@Comprehension(
+                    expr3@DataBagExprToCompr(
                       qs2,
                       Head(hd2)
                     ))))))) =>
@@ -212,6 +212,20 @@ private[comprehension] trait Normalize extends Common {
       case _ =>
         None
     })
+
+    /** This matches any DataBag expression. If it is not a comprehension, then it wraps it into one. */
+    object DataBagExprToCompr {
+      val symbol = ComprehensionSyntax.comprehension
+
+      def unapply(tree: u.Tree): Option[(Seq[u.Tree], u.Tree)] = tree match {
+        case Comprehension(qs,hd) => Some(qs, hd)
+        case t if api.Type.of(t).typeConstructor == Monad => {
+          val x = api.TermSym.free(api.TermName.fresh("x"), api.Type.arg(1, api.Type.of(t)))
+          Some(Seq(Generator(x, core.Let()()(t))), Head(core.Let()()(api.TermRef(x))))
+        }
+        case _ => None
+      }
+    }
 
     /** Splits `vals` in two subsequences: vals dependent on generators bound in `qs`, and complement. */
     private def split(vals: Seq[u.ValDef], qs: Seq[u.Tree]): (Seq[u.ValDef], Seq[u.ValDef]) = {
