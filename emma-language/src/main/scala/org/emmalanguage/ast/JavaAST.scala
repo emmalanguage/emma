@@ -54,19 +54,30 @@ trait JavaAST extends AST {
   // ---------------------------
 
   private[emmalanguage] def eval[T](code: Tree): T =
-    tb.eval(code).asInstanceOf[T]
+    compile(unTypeCheck(code))().asInstanceOf[T]
 
   private[emmalanguage] override def parse(code: String): Tree =
     tb.parse(code)
 
   private[emmalanguage] override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
-    if (typeMode) tb.typecheck(tree, tb.TYPEmode) else tb.typecheck(tree)
+    try if (typeMode) tb.typecheck(tree, tb.TYPEmode) else tb.typecheck(tree)
+    catch {
+      case ex: scala.tools.reflect.ToolBoxError => throw scala.tools.reflect.ToolBoxError(
+        s"Typecheck failed for tree:\n================\n${api.Tree.show(tree)}\n================\n", ex)
+    }
 
   private[emmalanguage] override def inferImplicit(tpe: Type): Tree =
     tb.inferImplicitValue(tpe)
 
-  private[emmalanguage] def compile(tree: Tree) =
-    tb.compile(tree)
+  private[emmalanguage] def compile(tree: Tree): () => Any =
+    try {
+      val res = tb.compile(tree)
+      typeCheck(u.reify {}.tree) // This is a workaround for https://issues.scala-lang.org/browse/SI-9932
+      res
+    } catch {
+      case ex: scala.tools.reflect.ToolBoxError => throw scala.tools.reflect.ToolBoxError(
+        s"Compilation failed for tree:\n================\n${api.Tree.show(tree)}\n================\n", ex)
+    }
 
   // ------------------------
   // Abstract wrapper methods
