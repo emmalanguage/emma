@@ -17,9 +17,10 @@ package org.emmalanguage
 package compiler.integration
 
 import api._
+import api.model._
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
-import io.csv.{CSV, CSVConverter}
+import io.csv.CSV
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -53,8 +54,6 @@ class TransitiveClosureSpec extends BaseCompilerSpec {
   // input parameters
   val input = "file://path/to/input"
   val output = "file://path/to/output"
-  // implicit parameters FIXME: remove
-  implicit val csvConverter = implicitly[CSVConverter[Edge[Long]]]
 
   // ---------------------------------------------------------------------------
   // Program representations
@@ -125,11 +124,7 @@ class TransitiveClosureSpec extends BaseCompilerSpec {
 }
 
 object TransitiveClosureSpec {
-
-  import api.model._
-
   case class Edge[VT](@id src: VT, @id dst: VT) extends Identity[Edge[VT]] {
     def identity = Edge(src, dst)
   }
-
 }
