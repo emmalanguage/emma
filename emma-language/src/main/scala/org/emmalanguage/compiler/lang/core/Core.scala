@@ -24,12 +24,13 @@ import compiler.lang.source.Source
 /** Core language. */
 trait Core extends Common
   with ANF
+  with Comprehension
+  with CoreValidate
   with CSE
   with DCE
   with DSCF
   with Pickling
-  with CoreValidate
-  with Comprehension {
+  with Trampoline {
   this: AlphaEq with Source =>
 
   import UniverseImplicits._
@@ -272,23 +273,15 @@ trait Core extends Common
     // -------------------------------------------------------------------------
 
     /** Lifting. The canonical compiler frontend. */
-    lazy val lift: u.Tree => u.Tree = {
-      lnf
-    } andThen {
-      Comprehension.resugar(API.bagSymbol)
-    } andThen {
-      inlineLetExprs
-    } andThen {
-      Comprehension.normalize(API.bagSymbol)
-    } andThen {
-      uninlineLetExprs
-    }
+    lazy val lift: u.Tree => u.Tree = Function.chain(Seq(
+      lnf,
+      Comprehension.resugar(API.bagSymbol),
+      inlineLetExprs,
+      Comprehension.normalize(API.bagSymbol),
+      uninlineLetExprs))
 
     /** Chains [[ANF.transform]], and [[DSCF.transform]]. */
     lazy val lnf: u.Tree => u.Tree = anf andThen dscf
-
-    /** TODO. */
-    lazy val lower = identity[u.Tree] _
 
     /** Delegates to [[DSCF.transform]]. */
     lazy val dscf = DSCF.transform
@@ -326,6 +319,16 @@ trait Core extends Common
 
     /** Delegates to [[Pickle.prettyPrint]]. */
     val prettyPrint = unQualifyStatics andThen Pickle.prettyPrint
+
+    // -------------------------------------------------------------------------
+    // Lowering API
+    // -------------------------------------------------------------------------
+
+    /** Lowering. The canonical compiler backend. */
+    lazy val lower = trampoline
+
+    /** Delegates to [[Trampoline.transform]] */
+    lazy val trampoline = Trampoline.transform
 
     // -------------------------------------------------------------------------
     // Meta Information API
