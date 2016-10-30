@@ -49,6 +49,8 @@ trait JavaAST extends AST {
   override def warning(msg: String, pos: Position = NoPosition): Unit =
     logger.warn(s"Warning at $pos: $msg")
 
+  override private[ast] def freshNameSuffix: Char = 'r'
+
   // ---------------------------
   // Parsing and type-checking
   // ---------------------------

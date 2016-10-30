@@ -83,7 +83,7 @@ trait Loops { this: AST =>
         lazy val Cond = Type.of(cond)
         assert(Cond =:= Type.bool, s"$this condition is not boolean:\n${Tree.showTypes(cond)}")
 
-        val nme = TermName.While()
+        val nme = TermName.fresh("while")
         val lbl = LabelSym(u.NoSymbol, nme)
         val rhs = WhileBody(lbl, cond, asStat(body))
         val dfn = u.LabelDef(nme, Nil, rhs)
@@ -113,7 +113,7 @@ trait Loops { this: AST =>
         lazy val Cond = Type.of(cond)
         assert(Cond =:= Type.bool, s"$this condition is not boolean:\n${Tree.showTypes(cond)}")
 
-        val nme = TermName.DoWhile()
+        val nme = TermName.fresh("doWhile")
         val lbl = LabelSym(u.NoSymbol, nme)
         val rhs = DoWhileBody(lbl, cond, asStat(body))
         val dfn = u.LabelDef(nme, Nil, rhs)

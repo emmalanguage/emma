@@ -209,7 +209,7 @@ private[core] trait DSCF extends Common {
               val loopVars = mods(loop)
               val loopArgs = varArgs(loopVars)
               val loopPars = varPars(loopVars)
-              val loopMeth = api.DefSym(owner, api.TermName.While())()(loopPars)(tpe)
+              val loopMeth = api.DefSym(owner, api.TermName.fresh("while"))()(loopPars)(tpe)
               val loopCall = core.DefCall()(loopMeth)(loopArgs)
 
               // Suffix
@@ -244,7 +244,7 @@ private[core] trait DSCF extends Common {
               val loopVars = mods(loop)
               val loopArgs = varArgs(loopVars)
               val loopPars = varPars(loopVars)
-              val loopMeth = api.DefSym(owner, api.TermName.DoWhile())()(loopPars)(tpe)
+              val loopMeth = api.DefSym(owner, api.TermName.fresh("doWhile"))()(loopPars)(tpe)
               val loopCall = core.DefCall()(loopMeth)(loopArgs)
 
               // Suffix

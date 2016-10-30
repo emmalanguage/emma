@@ -55,8 +55,8 @@ trait Types { this: AST =>
 
       /** Creates a fresh type name with the given `prefix`. */
       def fresh(prefix: String): u.TypeName = apply {
-        if (prefix.nonEmpty && prefix.last == '$') freshTypeName(prefix)
-        else freshTypeName(s"$prefix$$")
+        assert(prefix.nonEmpty, "Cannot create a fresh name with empty prefix")
+        freshTypeName(s"$prefix$$$freshNameSuffix")
       }
 
       /** Creates a fresh type name with the given `prefix`. */
