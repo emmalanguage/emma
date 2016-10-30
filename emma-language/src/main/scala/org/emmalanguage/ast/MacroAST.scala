@@ -52,6 +52,8 @@ trait MacroAST extends AST {
   override def warning(msg: String, pos: Position = NoPosition): Unit =
     c.warning(pos, msg)
 
+  override private[ast] def freshNameSuffix: Char = 'm'
+
   // ---------------------------
   // Parsing and type-checking
   // ---------------------------

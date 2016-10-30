@@ -62,8 +62,8 @@ trait Terms { this: AST =>
 
       /** Creates a fresh term name with the given `prefix`. */
       def fresh(prefix: String): u.TermName = apply {
-        if (prefix.nonEmpty && prefix.last == '$') freshTermName(prefix)
-        else freshTermName(s"$prefix$$")
+        assert(prefix.nonEmpty, "Cannot create a fresh name with empty prefix")
+        freshTermName(s"$prefix$$$freshNameSuffix")
       }
 
       /** Creates a fresh term name with the given `prefix`. */
@@ -81,45 +81,6 @@ trait Terms { this: AST =>
 
       def unapply(name: u.TermName): Option[String] =
         for (name <- Option(name) if is.defined(name)) yield name.toString
-
-      /** Names generated during eta expansion. */
-      object Eta extends Node {
-
-        /** Creates a fresh `eta` name. */
-        def apply(): u.TermName =
-          fresh("eta$")
-
-        def unapply(name: u.TermName): Option[String] = name match {
-          case TermName(str) if str.matches("""eta(\$\d+)+""") => Some(str)
-          case _ => None
-        }
-      }
-
-      /** Names for `while` loop labels. */
-      object While extends Node {
-
-        /** Creates a fresh `while` name. */
-        def apply(): u.TermName =
-          fresh("while$")
-
-        def unapply(name: u.TermName): Option[String] = name match {
-          case TermName(str) if str.matches("""while(\$\d+)+""") => Some(str)
-          case _ => None
-        }
-      }
-
-      /** Names for `do-while` loop labels. */
-      object DoWhile extends Node {
-
-        /** Creates a fresh `do-while` name. */
-        def apply(): u.TermName =
-          fresh("doWhile$")
-
-        def unapply(name: u.TermName): Option[String] = name match {
-          case TermName(str) if str.matches("""doWhile(\$\d+)+""") => Some(str)
-          case _ => None
-        }
-      }
     }
 
     /** Term symbols. */

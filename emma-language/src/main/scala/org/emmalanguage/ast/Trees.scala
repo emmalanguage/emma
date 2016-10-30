@@ -289,35 +289,6 @@ trait Trees { this: AST =>
           }
         }
 
-      /** Reverses eta-expansions in `tree`. */
-      def etaCompact(tree: u.Tree): u.Tree = Tree.inline(tree.collect {
-        case eta @ ParDef(_ withName TermName.Eta(_), _, _) => eta
-      }: _*)(tree)
-
-      /** Creates a new lambda from a `method` reference with an optional `target`. */
-      def etaExpand(target: Option[u.Tree] = None)(method: u.MethodSymbol): u.Function = {
-        assert(is.defined(method), s"Cannot eta-expand undefined method `$method`")
-        assert(is.overloaded(method), s"Cannot eta-expand overloaded method `$method`")
-        assert(has.tpe(method), s"Method `$method` has no type")
-
-        lazy val tpe = target match {
-          case Some(_ withType t) => Type.of(method, in = t)
-          case _ => Type.of(method)
-        }
-
-        assert(!is.poly(tpe), s"Cannot eta-expand polymorphic method `$method` of type `$tpe`")
-
-        val paramss = for (params <- method.paramLists) yield
-          for (p <- params) yield TermSym.free(TermName.Eta(), p.info, get.flags(p))
-
-        val args = for (params <- paramss) yield
-          for (p <- params) yield TermRef(p)
-
-        Lambda(paramss.flatten: _*) {
-          DefCall(target)(method)(args: _*)
-        }
-      }
-
       /** Creates a curried version of the supplied `lambda`. */
       def curry(lambda: u.Function): u.Function = lambda match {
         case Lambda(sym, params, body) => params.foldRight(body) {

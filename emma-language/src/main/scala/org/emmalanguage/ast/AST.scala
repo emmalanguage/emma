@@ -183,4 +183,6 @@ trait AST extends CommonAST
     if defs.size > 1
     dfn <- defs.tail
   } yield dfn
+
+  private[ast] def freshNameSuffix: Char
 }
