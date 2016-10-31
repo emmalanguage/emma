@@ -18,6 +18,8 @@ package compiler.lang.core
 
 import compiler.Common
 
+import scala.collection.breakOut
+
 /** Dead code elimination (DCE) for the Core language. */
 private[core] trait DCE extends Common {
   self: Core =>
@@ -40,11 +42,18 @@ private[core] trait DCE extends Common {
       api.BottomUp.withValUses.transformWithSyn {
         case Attr(let @ core.Let(vals, defs, expr), _, _, syn) =>
           def refs(tree: u.Tree) = syn(tree).head.keySet
-          val liveRefs = vals.foldRight(refs(expr)) {
+
+          // Gather refs in DefDefs.
+          val refsInDefs: Set[u.TermSymbol] = defs.flatMap(refs)(breakOut)
+
+          // Decide for each ValDef whether it is needed.
+          // Start with the refs in the expr and refs in the DefDefs, then go through the ValDefs backwards.
+          val liveRefs = vals.foldRight(refs(expr) | refsInDefs) {
             case (core.ValDef(lhs, rhs, _), live) =>
               if (live(lhs)) live | refs(rhs) else live
           }
 
+          // Retain only those ValDefs which are referenced.
           val liveVals = vals.filter(liveRefs compose api.TermSym.of)
           if (liveVals.size == vals.size) let
           else core.Let(liveVals: _*)(defs: _*)(expr)
