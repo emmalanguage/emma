@@ -109,7 +109,8 @@ trait Bindings { this: AST =>
           assert(is.term(rhs), s"$this RHS is not a term:\n${Tree.show(rhs)}")
           assert(has.tpe(rhs), s"$this RHS has no type:\n${Tree.showTypes(rhs)}")
           lazy val rhT = Type.of(rhs)
-          assert(rhT weak_<:< lhT, s"$this LH type `$lhT` is not a supertype of RH type `$rhT`")
+          assert(rhT weak_<:< lhT,
+            s"$this LH type `$lhT` is not a supertype of RH type `$rhT`.\n(lhs: `$lhs`, rhs:\n`$rhs`\n)")
           Owner.at(lhs)(rhs)
         } else Empty()
 

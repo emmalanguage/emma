@@ -45,7 +45,6 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
       val wrapped = wrapInClass(tree)
       val showed = u.showCode(wrapped)
       compiler.compile(parse(showed))
-      compiler.typeCheck(u.reify {}.tree) // This is a workaround for https://issues.scala-lang.org/browse/SI-9932
     }
     tree
   }
@@ -88,6 +87,7 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
     ret
   }
 
+  /** Wraps the given tree in a class and a method whose params are the closure of the tree. */
   private def wrapInClass(tree: u.Tree): u.Tree = {
     import universe._
     val params = api.Tree.closure(tree).map{ sym =>
