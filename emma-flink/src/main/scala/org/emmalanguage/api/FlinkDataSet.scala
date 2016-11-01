@@ -17,6 +17,7 @@ package org.emmalanguage
 package api
 
 import io.csv.{CSV, CSVConverter}
+import compiler.RuntimeCompiler
 
 import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment => FlinkEnv}
 import org.apache.flink.core.fs.FileSystem
@@ -106,11 +107,8 @@ object FlinkDataSet {
 
   import org.apache.flink.api.common.typeinfo.TypeInformation
 
-  import util.Toolbox.universe._
-  import util.Toolbox.{mirror, toolbox}
-
-  private lazy val flinkApi = mirror.staticModule("org.apache.flink.api.scala.package")
-  private lazy val typeInfo = flinkApi.info.decl(TermName("createTypeInformation"))
+  val compiler = new RuntimeCompiler()
+  import compiler.u._
 
   private lazy val memo = collection.mutable.Map.empty[Any, Any]
 
@@ -118,7 +116,11 @@ object FlinkDataSet {
     val ttag = implicitly[Meta[T]].ttag
     memo.getOrElseUpdate(
       ttag,
-      toolbox.eval(q"$typeInfo[${ttag.tpe}]")).asInstanceOf[TypeInformation[T]]
+      compiler.eval[TypeInformation[T]](
+        // The dynamic cast in the following line is necessary, because the compiler can't see statically that
+        // these path-dependent types are actually the same.
+        q"org.apache.flink.api.scala.createTypeInformation[${ttag.tpe.asInstanceOf[Type]}]")
+      ).asInstanceOf[TypeInformation[T]]
   }
 
   // ---------------------------------------------------------------------------
