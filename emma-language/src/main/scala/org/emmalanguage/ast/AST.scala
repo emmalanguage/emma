@@ -84,6 +84,12 @@ trait AST extends CommonAST
       case Attr.none(u.TypeTree() withType tpe) => api.TypeQuote(tpe)
     }.andThen(_.tree)
 
+  /** Restores [[u.TypeTree]]s with their `original` field set. */
+  lazy val restoreTypeTrees: u.Tree => u.Tree =
+    api.TopDown.break.transform {
+      case u.TypeTree() withType tpe => api.Type.tree(tpe)
+    }.andThen(_.tree)
+
   /** Normalizes all statements in term position by wrapping them in a block. */
   lazy val normalizeStatements: u.Tree => u.Tree =
     api.BottomUp.withParent.transformWith {

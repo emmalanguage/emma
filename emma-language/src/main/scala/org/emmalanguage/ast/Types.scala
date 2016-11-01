@@ -347,6 +347,63 @@ trait Types { this: AST =>
         opt
       }
 
+      /** Returns the original type-tree corresponding to `tpe`. */
+      def tree(tpe: u.Type): u.Tree = {
+        def original(tpe: u.Type): u.Tree = {
+          val tpt = tpe match {
+            // Degenerate type: `_root_.<root>`.
+            case u.ThisType(sym) if is.root(sym) =>
+              api.Id(u.rootMirror.RootPackage)
+            // This type: `this[T]`.
+            case u.ThisType(sym) =>
+              api.This(sym)
+            // Super type: `this.super[T]`
+            case u.SuperType(ths, sup) =>
+              val sym = sup.typeSymbol.asType
+              val mix = u.Super(original(ths), sym.name)
+              set(mix, sym = sym)
+              mix
+            // Package or class ref: `package` or `Class`.
+            case u.SingleType(u.NoPrefix, target) if target.isPackage || target.isClass =>
+              api.Id(target)
+            // Singleton type: `stableID.tpe`.
+            case u.SingleType(u.NoPrefix, stableID) =>
+              u.SingletonTypeTree(api.Id(stableID))
+            // Qualified type: `pkg.T`.
+            case u.SingleType(pkg, target) =>
+              api.Sel(original(pkg), target)
+            // Abstract type ref: `T`.
+            case u.TypeRef(u.NoPrefix, target, Nil) =>
+              api.Id(target)
+            // Path dependent type: `path.T`.
+            case u.TypeRef(path, target, Nil) =>
+              api.Sel(original(path), target)
+            // Applied type: `T[A, B, ...]`.
+            case u.TypeRef(u.NoPrefix, target, args) =>
+              u.AppliedTypeTree(api.Id(target), args.map(Type.tree))
+            // Applied path dependent type: `path.T[A, B, ...]`
+            case u.TypeRef(path, target, args) =>
+              u.AppliedTypeTree(api.Sel(original(path), target), args.map(Type.tree))
+            // Type bounds: `T >: lo <: hi`.
+            case u.TypeBounds(lo, hi) =>
+              u.TypeBoundsTree(Type.tree(lo), Type.tree(hi))
+            // Existential type: `F[A, B, ...] forSome { type A; type B; ... }`
+            case u.ExistentialType(quantified, underlying) =>
+              u.ExistentialTypeTree(Type.tree(underlying), quantified.map(internal.typeDef))
+            // E.g. type refinement: `T { def size: Int }`
+            case _ =>
+              abort(s"Cannot convert type `$tpe` to a type-tree")
+          }
+
+          set.tpe(tpt, tpe)
+          tpt
+        }
+
+        val tpt = u.TypeTree(tpe)
+        set.original(tpt, original(tpe))
+        tpt
+      }
+
       /** Extractor for result types (legal for terms). */
       private[ast] object Result extends Node {
         def unapply(tpe: u.Type): Option[u.Type] =
