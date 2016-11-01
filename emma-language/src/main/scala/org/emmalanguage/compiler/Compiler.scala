@@ -46,8 +46,9 @@ trait Compiler extends AlphaEq with Source with Core with Backend {
 
   /** Standard pipeline suffix. Brings a tree into a form acceptable for `scalac` after being transformed. */
   lazy val postProcess: Seq[u.Tree => u.Tree] = Seq(
+    api.Owner.at(get.enclosingOwner),
     qualifyStatics,
-    api.Owner.at(get.enclosingOwner)
+    restoreTypeTrees
   )
 
   /** The identity transformation with pre- and post-processing. */
