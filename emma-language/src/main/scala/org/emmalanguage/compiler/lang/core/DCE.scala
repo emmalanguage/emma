@@ -49,6 +49,12 @@ private[core] trait DCE extends Common {
           // Decide for each ValDef whether it is needed.
           // Start with the refs in the expr and refs in the DefDefs, then go through the ValDefs backwards.
           val liveRefs = vals.foldRight(refs(expr) | refsInDefs) {
+
+            // When we have a DefCall that is returning a unit, then treat this val as used
+            case (core.ValDef(lhs, rhs@api.DefCall(_, method, _, _), _), live)
+              if method.returnType == api.Type[Unit] =>
+              live | refs(rhs) + lhs
+
             case (core.ValDef(lhs, rhs, _), live) =>
               if (live(lhs)) live | refs(rhs) else live
           }
