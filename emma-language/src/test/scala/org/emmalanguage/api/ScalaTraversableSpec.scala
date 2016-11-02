@@ -28,8 +28,8 @@ class ScalaTraversableSpec extends DataBagSpec {
 
   override val suffix = "scala"
 
-  override def Bag[A: Meta](implicit unit: BackendContext): Bag[A] =
-    ScalaTraversable[A]
+  override def Bag[A: Meta]()(implicit unit: BackendContext): Bag[A] =
+    ScalaTraversable.empty[A]
 
   override def Bag[A: Meta](seq: Seq[A])(implicit unit: BackendContext): Bag[A] =
     ScalaTraversable(seq)

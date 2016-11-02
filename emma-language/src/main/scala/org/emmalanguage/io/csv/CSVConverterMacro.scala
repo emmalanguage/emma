@@ -56,7 +56,11 @@ class CSVConverterMacro(val c: blackbox.Context) extends MacroAST {
 
   def fromCSV(T: Type, value: Tree): Tree =
     if (T <:< api.Type[Product]) {
-      val method = T.decl(api.TermName.init).alternatives.head.asMethod
+      val alternatives = T.decl(api.TermName.init).alternatives
+      if (alternatives.isEmpty) {
+        throw new Exception("fromCSV failed. Did you forget to add explicit generic argument to readCSV?")
+      }
+      val method = alternatives.head.asMethod
       val params = method.typeSignatureIn(T).paramLists.head
       val args = for (p <- params) yield fromCSV(api.Type.of(p), value)
       q"new $T(..$args)"

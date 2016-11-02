@@ -87,7 +87,7 @@ class SparkDataset[A: Meta] private[api](@transient private val rep: Dataset[A])
       .mode("overwrite")
       .csv(path)
 
-  def fetch(): Seq[A] =
+  protected override def collect(): Traversable[A] =
     rep.collect()
 
   // -----------------------------------------------------
@@ -112,11 +112,11 @@ object SparkDataset {
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def apply[A: Meta](implicit spark: SparkSession): SparkDataset[A] =
+  def empty[A: Meta](implicit spark: SparkSession): SparkDataset[A] =
     spark.emptyDataset[A]
 
-  def apply[A: Meta](seq: Seq[A])(implicit spark: SparkSession): SparkDataset[A] =
-    spark.createDataset(seq)
+  def apply[A: Meta](values: Traversable[A])(implicit spark: SparkSession): SparkDataset[A] =
+    spark.createDataset(values.toSeq)
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): SparkDataset[A] =
     spark.read

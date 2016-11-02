@@ -48,7 +48,7 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
   def withBackendContext[T](f: BackendContext => T): T
 
   /** An empty [[DataBag]] refinement type constructor. */
-  def Bag[A: Meta](implicit ctx: BackendContext): Bag[A]
+  def Bag[A: Meta]()(implicit ctx: BackendContext): Bag[A]
 
   /** An [[DataBag]] refinement type constructor which takes a Scala Seq. */
   def Bag[A: Meta](seq: Seq[A])(implicit ctx: BackendContext): Bag[A]
@@ -278,6 +278,15 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
       `write and read`(foos, "foos")
     }
 
+  }
+
+  "empty" in {
+    withBackendContext { implicit ctx =>
+      // TODO: Why doesn't this work without an explicit type argument?
+      // Note: It also doesn't work with [Nothing], and the reason for this is probably this:
+      //   https://github.com/emmalanguage/emma/issues/245
+      DataBag.empty[Int].isEmpty shouldBe true
+    }
   }
 }
 

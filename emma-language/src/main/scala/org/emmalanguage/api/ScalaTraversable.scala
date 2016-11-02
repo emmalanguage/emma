@@ -80,27 +80,8 @@ class ScalaTraversable[A] private[api](private val rep: Traversable[A]) extends 
   override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
     CSVScalaSupport(format).write(path)(rep)
 
-  override def fetch(): Traversable[A] =
+  protected override def collect(): Traversable[A] =
     rep
-
-  // -----------------------------------------------------
-  // equals, hashCode and toString
-  // -----------------------------------------------------
-
-  override def equals(o: Any) = o match {
-    case that: ScalaTraversable[A] =>
-      lazy val sizeEq = this.rep.size == that.rep.size
-      lazy val diffEm = (this.rep.toSeq diff this.rep.toSeq).isEmpty
-      sizeEq && diffEm
-    case _ =>
-      false
-  }
-
-  override def hashCode(): Int =
-    scala.util.hashing.MurmurHash3.unorderedHash(rep)
-
-  override def toString: String =
-    rep.toString
 }
 
 object ScalaTraversable {
@@ -109,7 +90,7 @@ object ScalaTraversable {
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def apply[A]: ScalaTraversable[A] =
+  def empty[A]: ScalaTraversable[A] =
     new ScalaTraversable(Seq.empty)
 
   def apply[A](values: Traversable[A]): ScalaTraversable[A] =
