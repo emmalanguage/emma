@@ -68,6 +68,24 @@ class DCESpec extends BaseCompilerSpec {
       act shouldBe alphaEqTo(exp)
     }
   }
+
+  "don't eliminate unit valdefs" - {
+    "println" in {
+      val act = dcePipeline(u.reify {
+        println("alma")
+        val x = 5
+        x
+      })
+
+      val exp = idPipeline(u.reify {
+        val res = println("alma")
+        val x = 5
+        x
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+  }
 }
 
 
