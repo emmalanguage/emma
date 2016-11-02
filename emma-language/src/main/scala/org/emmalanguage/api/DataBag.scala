@@ -121,7 +121,7 @@ trait DataBag[A] extends Serializable {
    * Removes duplicate entries from the bag, e.g.
    *
    * {{{
-   * DataBag(Seq(1,1,2,3)).distinct() = DataBag(Seq(1,2,3))
+   * DataBag(Seq(1,1,2,3)).distinct = DataBag(Seq(1,2,3))
    * }}}
    *
    * @return A version of this DataBag without duplicate entries.
@@ -146,7 +146,12 @@ trait DataBag[A] extends Serializable {
    *
    * @return The contents of the DataBag as a scala sequence.
    */
-  def fetch(): Traversable[A]
+  def fetch(): Traversable[A] = {
+    if (collected == null) {
+      collected = collect()
+    }
+    collected
+  }
 
   // -----------------------------------------------------
   // Pre-defined folds
@@ -313,6 +318,34 @@ trait DataBag[A] extends Serializable {
           }
       })._1
   }
+
+  // -----------------------------------------------------
+  // equals, hashCode and toString
+  // -----------------------------------------------------
+
+  override def equals(o: Any) = o match {
+    case that: DataBag[A] => {
+      val thisVals = fetch()
+      val thatVals = that.fetch()
+      (thisVals.size == thatVals.size) &&
+        (thisVals.toSet diff thatVals.toSet).isEmpty
+    }
+    case _ => false
+  }
+
+  override def hashCode(): Int =
+    scala.util.hashing.MurmurHash3.unorderedHash(fetch())
+
+  override def toString: String =
+    fetch().toString
+
+  // -----------------------------------------------------
+  // Protected and private members
+  // -----------------------------------------------------
+
+  protected def collect(): Traversable[A]
+
+  private var collected: Traversable[A] = _
 }
 
 object DataBag {
@@ -327,7 +360,7 @@ object DataBag {
    * @tparam A The element type for the DataBag.
    * @return An empty DataBag for elements of type A.
    */
-  def apply[A: Meta]: DataBag[A] = ScalaTraversable[A]
+  def empty[A: Meta]: DataBag[A] = ScalaTraversable.empty[A]
 
   /**
    * Sequence constructor.
@@ -336,7 +369,7 @@ object DataBag {
    * @tparam A The element type for the DataBag.
    * @return A DataBag containing the elements of the `values` sequence.
    */
-  def apply[A: Meta](values: Seq[A]): DataBag[A] = ScalaTraversable(values)
+  def apply[A: Meta](values: Traversable[A]): DataBag[A] = ScalaTraversable(values)
 
   /**
    * Reads a DataBag into the specified `path` using in a CSV format.

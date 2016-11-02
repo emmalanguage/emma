@@ -30,8 +30,8 @@ class SparkRDDSpec extends DataBagSpec {
   override def withBackendContext[T](f: BackendContext => T): T =
     LocalSparkSession.withSparkSession(f)
 
-  override def Bag[A: Meta](implicit spark: BackendContext): Bag[A] =
-    SparkRDD[A]
+  override def Bag[A: Meta]()(implicit spark: BackendContext): Bag[A] =
+    SparkRDD.empty[A]
 
   override def Bag[A: Meta](seq: Seq[A])(implicit spark: BackendContext): Bag[A] =
     SparkRDD(seq)

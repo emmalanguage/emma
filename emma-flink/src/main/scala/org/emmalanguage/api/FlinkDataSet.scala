@@ -101,7 +101,7 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
     rep.getExecutionEnvironment.execute()
   }
 
-  def fetch(): Seq[A] =
+  protected override def collect(): Traversable[A] =
     rep.collect()
 }
 
@@ -131,11 +131,11 @@ object FlinkDataSet {
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def apply[A: Meta](implicit flink: FlinkEnv): FlinkDataSet[A] =
+  def empty[A: Meta](implicit flink: FlinkEnv): FlinkDataSet[A] =
     flink.fromElements[A]()
 
-  def apply[A: Meta](seq: Seq[A])(implicit flink: FlinkEnv): FlinkDataSet[A] =
-    flink.fromCollection(seq)
+  def apply[A: Meta](values: Traversable[A])(implicit flink: FlinkEnv): FlinkDataSet[A] =
+    flink.fromCollection(values.toIterable)
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit flink: FlinkEnv): FlinkDataSet[A] = {
     require(format.charset == CSV.DEFAULT_CHARSET,

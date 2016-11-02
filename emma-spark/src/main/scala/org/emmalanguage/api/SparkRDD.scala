@@ -88,7 +88,7 @@ class SparkRDD[A: Meta] private[api](@transient private val rep: RDD[A])(implici
       .csv(path)
   }
 
-  def fetch(): Seq[A] =
+  protected override def collect(): Traversable[A] =
     rep.collect()
 }
 
@@ -106,11 +106,11 @@ object SparkRDD {
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def apply[A: Meta]()(implicit spark: SparkSession): SparkRDD[A] =
+  def empty[A: Meta](implicit spark: SparkSession): SparkRDD[A] =
     spark.sparkContext.emptyRDD[A]
 
-  def apply[A: Meta](seq: Seq[A])(implicit spark: SparkSession): SparkRDD[A] =
-    spark.sparkContext.parallelize(seq)
+  def apply[A: Meta](values: Traversable[A])(implicit spark: SparkSession): SparkRDD[A] =
+    spark.sparkContext.parallelize(values.toSeq)
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): SparkDataset[A] =
     spark.read

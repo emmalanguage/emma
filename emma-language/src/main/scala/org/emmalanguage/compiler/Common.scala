@@ -35,12 +35,14 @@ trait Common extends AST {
   /** A set of API method symbols to be comprehended. */
   protected[emmalanguage] object API {
     //@formatter:off
-    val moduleSymbol          = rootMirror.staticModule(s"$rootPkg.api.package")
+    val apiModuleSymbol       = rootMirror.staticModule(s"$rootPkg.api.package")
     val csvPkgSymbol          = rootMirror.staticPackage(s"$rootPkg.io.csv")
     val bagSymbol             = rootMirror.staticClass(s"$rootPkg.api.DataBag")
     val groupSymbol           = rootMirror.staticClass(s"$rootPkg.api.Group")
+    val bagModuleSymbol       = rootMirror.staticModule(s"$rootPkg.api.DataBag")
 
     // Sources
+    val empty                 = bagSymbol.companion.info.decl(TermName("empty"))
     val apply                 = bagSymbol.companion.info.decl(TermName("apply"))
     val readCSV               = bagSymbol.companion.info.decl(TermName("readCSV"))
     // Sinks
@@ -74,7 +76,7 @@ trait Common extends AST {
     val top                   = bagSymbol.info.decl(TermName("top"))
     val sample                = bagSymbol.info.decl(TermName("sample"))
 
-    val sourceOps             = Set(apply, readCSV)
+    val sourceOps             = Set(empty, apply, readCSV)
     val sinkOps               = Set(fetch, writeCSV)
     val monadOps              = Set(map, flatMap, withFilter)
     val nestOps               = Set(groupBy)
@@ -104,6 +106,12 @@ trait Common extends AST {
     val DataBag               = typeOf[org.emmalanguage.api.DataBag[Nothing]].typeConstructor
     val Group                 = typeOf[org.emmalanguage.api.Group[Nothing, Nothing]].typeConstructor
     //@formatter:on
+
+    sourceOps.foreach {
+      op => assert(op.alternatives.size == 1,
+        s"`$op` should have exactly one overload, because DataBag sources shouldn't be overloaded. " +
+          s"(see the source changing logic in translateToDataflows)")
+    }
   }
 
   protected[emmalanguage] object ComprehensionSyntax {
