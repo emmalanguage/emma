@@ -80,8 +80,9 @@ class ScalaTraversable[A] private[api](private val rep: Traversable[A]) extends 
   override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
     CSVScalaSupport(format).write(path)(rep)
 
-  protected override def collect(): Traversable[A] =
+  override val fetch: Traversable[A] =
     rep
+
 }
 
 object ScalaTraversable {
@@ -98,6 +99,10 @@ object ScalaTraversable {
 
   def readCSV[A: CSVConverter](path: String, format: CSV): ScalaTraversable[A] =
     new ScalaTraversable(CSVScalaSupport(format).read(path).toStream)
+
+  // This is used in the code generation in TranslateToDataflows when inserting fetches
+  def byFetch[A](bag: DataBag[A]): ScalaTraversable[A] =
+    new ScalaTraversable(bag.fetch())
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion

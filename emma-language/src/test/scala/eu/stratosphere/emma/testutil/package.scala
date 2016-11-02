@@ -97,29 +97,4 @@ package object testutil {
    */
   def withRuntime[T](rt: runtime.Engine = runtime.testing())(f: runtime.Engine => T): T =
     try f(rt) finally rt.close()
-
-  /** Syntax sugar for testing [[Algorithm]]s. */
-  implicit class AlgorithmVerification[A](val alg: Algorithm[A]) extends AnyVal {
-
-    /**
-      * Run this [[Algorithm]] on the provided `engine` and on the native runtime and ensure that
-      * the results match.
-      *
-      * @param engine The runtime to test.
-      */
-    def verifyWith(engine: runtime.Engine): Unit =
-      withRuntime(engine) { _ =>
-        withRuntime(runtime.Native()) { native =>
-          // compute the algorithm using the original code and the runtime under test
-          val actual = alg.run(engine)
-          val expected = alg.run(native)
-          // assert that the result contains the expected values
-          assert(actual == expected, s"""
-            |actual != expected
-            |actual: $actual
-            |expected: $expected
-            |""".stripMargin)
-        }
-      }
-  }
 }

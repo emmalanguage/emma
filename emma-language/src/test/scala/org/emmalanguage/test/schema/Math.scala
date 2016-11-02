@@ -21,4 +21,8 @@ object Math {
 
   case class Point(x: Int, y: Int)
 
+  // predicates
+  def p1(x: Int) = x < 2
+  def p2(x: Int) = x > 5
+  def p3(x: Int) = x == 0
 }

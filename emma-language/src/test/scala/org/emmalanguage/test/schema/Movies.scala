@@ -13,14 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.stratosphere
-package emma.codegen.spark
+package org.emmalanguage
+package test.schema
 
-import emma.codegen.BaseCodegenTest
-import emma.runtime.Spark
-
-class CodegenTest extends BaseCodegenTest("spark") {
-
-  override def runtimeUnderTest: Spark =
-    Spark.testing()
+object Movies {
+  case class ImdbMovie(title: String, rating: Double, rank: Int, link: String, year: Int)
+  case class ImdbYear(year: Int)
+  case class FilmFestWinner(year: Int, title: String, director: String, country: String)
 }

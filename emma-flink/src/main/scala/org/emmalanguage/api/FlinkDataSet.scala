@@ -23,6 +23,7 @@ import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment => FlinkEnv}
 import org.apache.flink.core.fs.FileSystem
 
 import scala.language.{higherKinds, implicitConversions}
+import scala.util.hashing.MurmurHash3
 
 /** A `DataBag` implementation backed by a Flink `DataSet`. */
 class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A]) extends DataBag[A] {
@@ -101,8 +102,41 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
     rep.getExecutionEnvironment.execute()
   }
 
-  protected override def collect(): Traversable[A] =
+  override lazy val fetch: Traversable[A] =
     rep.collect()
+
+  // -----------------------------------------------------
+  // equals and hashCode
+  // -----------------------------------------------------
+
+  override def equals(o: Any) =
+    super.equals(o)
+
+  override def hashCode(): Int = {
+    val (a, b, c, n) = rep
+      .mapPartition(it => {
+        var a, b, n = 0
+        var c = 1
+        it foreach { x =>
+          val h = x.##
+          a += h
+          b ^= h
+          if (h != 0) c *= h
+          n += 1
+        }
+        Some((a, b, c, n)).iterator
+      })
+      .collect()
+      .fold((0, 0, 1, 0))((x, r) => (x, r) match {
+        case ((a1, b1, c1, n1), (a2, b2, c2, n2)) => (a1 + a2, b1 ^ b2, c1 * c2, n1 + n2)
+      })
+
+    var h = MurmurHash3.traversableSeed
+    h = MurmurHash3.mix(h, a)
+    h = MurmurHash3.mix(h, b)
+    h = MurmurHash3.mixLast(h, c)
+    MurmurHash3.finalizeHash(h, n)
+  }
 }
 
 object FlinkDataSet {
@@ -110,6 +144,7 @@ object FlinkDataSet {
   import org.apache.flink.api.common.typeinfo.TypeInformation
 
   val compiler = new RuntimeCompiler()
+
   import compiler.u._
 
   private lazy val memo = collection.mutable.Map.empty[Any, Any]
@@ -122,7 +157,7 @@ object FlinkDataSet {
         // The dynamic cast in the following line is necessary, because the compiler can't see statically that
         // these path-dependent types are actually the same.
         q"org.apache.flink.api.scala.createTypeInformation[${ttag.tpe.asInstanceOf[Type]}]")
-      ).asInstanceOf[TypeInformation[T]]
+    ).asInstanceOf[TypeInformation[T]]
   }
 
   import Meta.Implicits._

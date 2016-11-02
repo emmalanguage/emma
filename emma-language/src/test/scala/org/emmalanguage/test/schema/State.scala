@@ -13,14 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package eu.stratosphere
-package emma.codegen.flink
+package org.emmalanguage
+package test.schema
 
-import emma.codegen.BaseCodegenTest
-import emma.runtime.Flink
+import eu.stratosphere.emma.api.model.Identity
 
-class CodegenTest extends BaseCodegenTest("flink") {
-
-  override def runtimeUnderTest: Flink =
-    Flink.testing()
+object State {
+  // schema
+  case class State(identity: Long, var value: Int) extends Identity[Long]
+  case class Update(identity: Long, inc: Int) extends Identity[Long]
 }
