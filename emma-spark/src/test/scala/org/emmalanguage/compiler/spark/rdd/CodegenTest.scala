@@ -14,23 +14,29 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.lang.backend
+package compiler.spark.rdd
 
-import compiler.Common
-import compiler.lang.core.Core
+import compiler.BaseCodegenTest
 
-/** Backend-related (but backend-agnostic) transformations. */
-trait Backend extends Common
-  with Order
-  with TranslateToDataflows {
-  this: Core =>
+class CodegenTest extends BaseCodegenTest("SparkRDD") {
 
-  import UniverseImplicits._
+  import compiler._
 
-  object Backend {
+  lazy val sparkRDDModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.SparkRDD")
 
-    /** Delegates to [[TranslateToDataflows.translateToDataflows]]. */
-    def translateToDataflows(to: u.ModuleSymbol) = TranslateToDataflows.translateToDataflows(to)
+  override lazy val backendPipeline: (compiler.u.Tree) => compiler.u.Tree = {
+    Comprehension.desugar(API.bagSymbol)
+  } andThen {
+    Backend.translateToDataflows(sparkRDDModuleSymbol)
+  } andThen {
+    addContext
+  }
 
+  private lazy val addContext: u.Tree => u.Tree = tree => {
+    import u._
+    q"""
+        implicit val ctx = _root_.org.emmalanguage.LocalSparkSession.getOrCreate()
+        $tree
+    """
   }
 }

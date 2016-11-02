@@ -370,7 +370,7 @@ trait Core extends Common
      * Gets the type argument of the DataBag type that is the type of the given expression.
      */
     def bagElemTpe(xs: u.Tree): u.Type = {
-      assert(xs.tpe.typeConstructor == API.DataBag,
+      assert(api.Type.of(xs).typeConstructor == API.DataBag,
         s"`bagElemTpe` was called with a tree that has a non-bag type. " +
           s"The tree:\n-----\n$xs\n-----\nIts type: `${xs.tpe}`")
       api.Type.arg(1, api.Type.of(xs))

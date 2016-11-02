@@ -142,16 +142,12 @@ trait DataBag[A] extends Serializable {
   def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit
 
   /**
-   * Converts a DataBag abstraction back into a scala sequence.
+   * Converts the DataBag back into a scala Traversable.
+   * Warning: Do not call this on DataBags that are too large to fit on one machine!
    *
-   * @return The contents of the DataBag as a scala sequence.
+   * @return The contents of the DataBag as a scala Traversable.
    */
-  def fetch(): Traversable[A] = {
-    if (collected == null) {
-      collected = collect()
-    }
-    collected
-  }
+  def fetch(): Traversable[A]
 
   // -----------------------------------------------------
   // Pre-defined folds
@@ -320,32 +316,25 @@ trait DataBag[A] extends Serializable {
   }
 
   // -----------------------------------------------------
-  // equals, hashCode and toString
+  // equals and hashCode
   // -----------------------------------------------------
 
-  override def equals(o: Any) = o match {
-    case that: DataBag[A] => {
-      val thisVals = fetch()
-      val thatVals = that.fetch()
-      (thisVals.size == thatVals.size) &&
-        (thisVals.toSet diff thatVals.toSet).isEmpty
-    }
-    case _ => false
+  override def equals(o: Any): Boolean = o match {
+    case that: DataBag[A] =>
+      lazy val hashEq = this.## == that.##
+      lazy val thisVals = this.fetch().toSeq
+      lazy val thatVals = that.fetch().toSeq
+      // Note that in the following line, checking diff in only one direction is enough because we also compare the
+      // sizes. Also note that SeqLike.diff uses bag semantics.
+      lazy val valsEq = thisVals.size == thatVals.size && (thisVals diff thatVals).isEmpty
+      hashEq && valsEq
+    case _ =>
+      false
   }
 
   override def hashCode(): Int =
     scala.util.hashing.MurmurHash3.unorderedHash(fetch())
 
-  override def toString: String =
-    fetch().toString
-
-  // -----------------------------------------------------
-  // Protected and private members
-  // -----------------------------------------------------
-
-  protected def collect(): Traversable[A]
-
-  private var collected: Traversable[A] = _
 }
 
 object DataBag {

@@ -68,15 +68,12 @@ trait Compiler extends AlphaEq with Source with Core with Backend {
     //@formatter:on
     val steps = bld.result()
 
-    if (!printAllTrees) {
-      Function.chain(steps)
-    } else {
-      Function.chain(List(print) ++ steps.flatMap(List(_, print)))
-    }
+    if (!printAllTrees) Function.chain(steps)
+    else Function.chain(List(print) ++ steps.flatMap(List(_, print)))
   }
 
   // Turn this on to print the tree between every step in the pipeline (also before the first and after the last step).
-  lazy val printAllTrees = false
+  val printAllTrees = false
 
   lazy val print: u.Tree => u.Tree = {
     (tree: u.Tree) => {

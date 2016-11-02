@@ -14,10 +14,11 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.lang.core
+package compiler.lang.backend
 
-import api._
+import api.DataBag
 import compiler.BaseCompilerSpec
+
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -32,7 +33,7 @@ class OrderSpec extends BaseCompilerSpec {
       Core.lnf
     ).compose(_.tree)
 
-  val dis: u.Tree => u.Tree = tree => Backend.order(tree)._1
+  val dis: u.Tree => u.Tree = tree => Order.disambiguate(tree)._1
 
   val disamb: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(

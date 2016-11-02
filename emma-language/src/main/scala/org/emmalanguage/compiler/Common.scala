@@ -40,6 +40,7 @@ trait Common extends AST {
     val bagSymbol             = rootMirror.staticClass(s"$rootPkg.api.DataBag")
     val groupSymbol           = rootMirror.staticClass(s"$rootPkg.api.Group")
     val bagModuleSymbol       = rootMirror.staticModule(s"$rootPkg.api.DataBag")
+    val scalaTraversablModSym = rootMirror.staticModule(s"$rootPkg.api.ScalaTraversable")
 
     // Sources
     val empty                 = bagSymbol.companion.info.decl(TermName("empty"))
@@ -109,9 +110,12 @@ trait Common extends AST {
 
     sourceOps.foreach {
       op => assert(op.alternatives.size == 1,
-        s"`$op` should have exactly one overload, because DataBag sources shouldn't be overloaded. " +
-          s"(see the source changing logic in translateToDataflows)")
+        s"""`$op` should have exactly one overload, because DataBag sources shouldn't be overloaded.
+           | (see the source changing logic in translateToDataflows)""".stripMargin)
     }
+
+    // Backend-only operations
+    val byFetch               = scalaTraversablModSym.info.decl(api.TermName("byFetch")).asInstanceOf[u.TermSymbol]
   }
 
   protected[emmalanguage] object ComprehensionSyntax {
