@@ -131,11 +131,6 @@ private[backend] trait Order extends Common {
         reached
       }
 
-      // The Set of symbols of ValDefs of functions
-      val lambdas = tree.collect {
-        case core.ValDef(sym, api.Lambda(_,_,_), _) => sym
-      }.toSet
-
       val driverFuns = funReachability(topLevRefs)
       // highFuns0 will also contain the ambiguous ones, which we will soon eliminate
       val highFuns0 = funReachability(combRefs)

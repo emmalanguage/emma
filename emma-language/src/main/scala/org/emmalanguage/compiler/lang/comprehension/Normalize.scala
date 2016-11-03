@@ -37,8 +37,8 @@ private[comprehension] trait Normalize extends Common {
      * Normalizes nested mock-comprehension syntax.
      *
      * @param monad The symbol of the monad syntax to be normalized.
-     * @param tree The tree to be resugared.
-     * @return The input tree with resugared comprehensions.
+     * @param tree The tree to be normalized.
+     * @return The normalized input tree.
      */
     def normalize(monad: u.Symbol)(tree: u.Tree): u.Tree = {
       // construct comprehension syntax helper for the given monad
@@ -100,7 +100,7 @@ private[comprehension] trait Normalize extends Common {
      * } // enclosing block
      * }}}
      *
-     * (2) A `flatten` expression occurring in the `rhs` opsition of some binding in the enclosing `let` block.
+     * (2) A `flatten` expression occurring in the `rhs` position of some binding in the enclosing `let` block.
      *
      * {{{
      * {
