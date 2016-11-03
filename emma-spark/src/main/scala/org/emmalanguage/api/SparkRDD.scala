@@ -150,7 +150,7 @@ object SparkRDD {
   def apply[A: Meta](values: Seq[A])(implicit spark: SparkSession): SparkRDD[A] =
     spark.sparkContext.parallelize(values)
 
-  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): SparkDataset[A] =
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): SparkRDD[A] =
     spark.read
       .option("header", format.header)
       .option("delimiter", format.delimiter.toString)
@@ -162,6 +162,7 @@ object SparkRDD {
       .schema(encoderForType[A].schema)
       .csv(path)
       .as[A]
+      .rdd
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
@@ -169,4 +170,23 @@ object SparkRDD {
 
   implicit def wrap[A: Meta](rep: RDD[A])(implicit spark: SparkSession): SparkRDD[A] =
     new SparkRDD(rep)
+
+  // ---------------------------------------------------------------------------
+  // ComprehensionCombinators
+  // (these should correspond to `compiler.ir.ComprehensionCombinators`)
+  // ---------------------------------------------------------------------------
+
+  def cross[A : Meta, B : Meta]
+    (xs: DataBag[A], ys: DataBag[B])
+    (implicit spark: SparkSession): DataBag[(A,B)] = (xs, ys) match {
+    case (xsRdd: SparkRDD[A], ysRdd: SparkRDD[B]) => xsRdd.rep.cartesian(ysRdd.rep)
+  }
+
+  def equiJoin[A : Meta, B : Meta, K : Meta]
+    (keyx: A => K, keyy: B => K)
+    (xs: DataBag[A], ys: DataBag[B])
+    (implicit spark: SparkSession): DataBag[(A,B)] = (xs, ys) match {
+    case (xsRdd: SparkRDD[A], ysRdd: SparkRDD[B]) =>
+      xsRdd.rep.map(x => (keyx(x), x)).join(ysRdd.rep.map(y => (keyy(y), y))).map(_._2)
+  }
 }

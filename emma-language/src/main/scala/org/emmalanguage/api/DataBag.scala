@@ -322,8 +322,8 @@ trait DataBag[A] extends Serializable {
   override def equals(o: Any): Boolean = o match {
     case that: DataBag[A] =>
       lazy val hashEq = this.## == that.##
-      lazy val thisVals = this.fetch().toSeq
-      lazy val thatVals = that.fetch().toSeq
+      lazy val thisVals = this.fetch()
+      lazy val thatVals = that.fetch()
       // Note that in the following line, checking diff in only one direction is enough because we also compare the
       // sizes. Also note that SeqLike.diff uses bag semantics.
       lazy val valsEq = thisVals.size == thatVals.size && (thisVals diff thatVals).isEmpty

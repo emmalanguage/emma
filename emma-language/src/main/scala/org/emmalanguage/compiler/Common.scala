@@ -43,9 +43,9 @@ trait Common extends AST {
     val scalaSeqModuleSymbol  = rootMirror.staticModule(s"$rootPkg.api.ScalaSeq")
 
     // Sources
-    val empty                 = bagSymbol.companion.info.decl(TermName("empty"))
-    val apply                 = bagSymbol.companion.info.decl(TermName("apply"))
-    val readCSV               = bagSymbol.companion.info.decl(TermName("readCSV"))
+    val empty                 = bagSymbol.companion.info.member(TermName("empty")).asMethod
+    val apply                 = bagSymbol.companion.info.member(TermName("apply")).asMethod
+    val readCSV               = bagSymbol.companion.info.member(TermName("readCSV")).asMethod
     // Sinks
     val fetch                 = bagSymbol.info.decl(TermName("fetch"))
     val writeCSV              = bagSymbol.info.decl(TermName("writeCSV"))
@@ -77,7 +77,7 @@ trait Common extends AST {
     val top                   = bagSymbol.info.decl(TermName("top"))
     val sample                = bagSymbol.info.decl(TermName("sample"))
 
-    val sourceOps             = Set(empty, apply, readCSV)
+    val sourceOps             = Set(empty, apply, readCSV); assertOneOverload(sourceOps)
     val sinkOps               = Set(fetch, writeCSV)
     val monadOps              = Set(map, flatMap, withFilter)
     val nestOps               = Set(groupBy)
@@ -106,16 +106,10 @@ trait Common extends AST {
     // Type constructors
     val DataBag               = typeOf[org.emmalanguage.api.DataBag[Nothing]].typeConstructor
     val Group                 = typeOf[org.emmalanguage.api.Group[Nothing, Nothing]].typeConstructor
-    //@formatter:on
-
-    sourceOps.foreach {
-      op => assert(op.alternatives.size == 1,
-        s"""`$op` should have exactly one overload, because DataBag sources shouldn't be overloaded.
-           | (see the source changing logic in translateToDataflows)""".stripMargin)
-    }
 
     // Backend-only operations
-    val byFetch               = scalaSeqModuleSymbol.info.decl(api.TermName("byFetch")).asInstanceOf[u.TermSymbol]
+    val byFetch               = scalaSeqModuleSymbol.info.member(api.TermName("byFetch")).asMethod
+    //@formatter:on
   }
 
   protected[emmalanguage] object ComprehensionSyntax {
@@ -139,7 +133,7 @@ trait Common extends AST {
     val cross                 = module.info.decl(TermName("cross")).asMethod
     val equiJoin              = module.info.decl(TermName("equiJoin")).asMethod
 
-    val methods               = Set(cross, equiJoin)
+    val ops                   = Set(cross, equiJoin); assertOneOverload(ops)
     //@formatter:on
   }
 
@@ -152,6 +146,12 @@ trait Common extends AST {
     val methods = Set(phi)
     //@formatter:on
   }
+
+  private def assertOneOverload(ops: Traversable[u.MethodSymbol]) =
+    ops.foreach {
+      op => assert(op.alternatives.size == 1,
+        s"`$op` should have exactly one overload. (see `changeStaticCalls` in translateToDataflows)")
+    }
 
   /** Common validation helpers. */
   object Validation {

@@ -197,4 +197,23 @@ object FlinkDataSet {
 
   implicit def wrap[A: Meta](rep: DataSet[A]): FlinkDataSet[A] =
     new FlinkDataSet(rep)
+
+  // ---------------------------------------------------------------------------
+  // ComprehensionCombinators
+  // (these should correspond to `compiler.ir.ComprehensionCombinators`)
+  // ---------------------------------------------------------------------------
+
+  def cross[A : Meta, B : Meta]
+    (xs: DataBag[A], ys: DataBag[B])
+    (implicit flink: FlinkEnv): DataBag[(A,B)] = (xs, ys) match {
+    case (xs: FlinkDataSet[A], ys: FlinkDataSet[B]) => xs.rep.cross(ys.rep)
+  }
+
+  def equiJoin[A : Meta, B : Meta, K : Meta]
+    (keyx: A => K, keyy: B => K)
+    (xs: DataBag[A], ys: DataBag[B])
+    (implicit flink: FlinkEnv): DataBag[(A,B)] = (xs, ys) match {
+    case (xs: FlinkDataSet[A], ys: FlinkDataSet[B]) =>
+      xs.rep.join(ys.rep).where(keyx).equalTo(keyy)
+  }
 }
