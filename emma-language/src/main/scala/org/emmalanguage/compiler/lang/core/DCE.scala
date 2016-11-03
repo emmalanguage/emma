@@ -51,7 +51,7 @@ private[core] trait DCE extends Common {
           val liveRefs = vals.foldRight(refs(expr) | refsInDefs) {
 
             // When we have a DefCall that is returning a unit, then treat this val as used
-            case (core.ValDef(lhs, rhs@api.DefCall(_, method, _, _), _), live)
+            case (core.ValDef(lhs, rhs@api.DefCall(_, method, _, _*), _), live)
               if method.returnType =:= api.Type[Unit] =>
               live | refs(rhs) + lhs
 
