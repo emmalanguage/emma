@@ -27,6 +27,8 @@ import scala.language.{higherKinds, implicitConversions}
 class SparkRDD[A: Meta] private[api](@transient private val rep: RDD[A])(implicit spark: SparkSession)
   extends DataBag[A] {
 
+  import Meta.Implicits._
+
   import SparkRDD.{encoderForType, wrap}
 
   @transient override val m = implicitly[Meta[A]]
@@ -94,6 +96,8 @@ object SparkRDD {
 
   import org.apache.spark.sql.Encoder
   import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
+
+  import Meta.Implicits._
 
   implicit def encoderForType[T: Meta]: Encoder[T] =
     ExpressionEncoder[T]

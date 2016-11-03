@@ -21,6 +21,8 @@ import io.csv.{CSV, CSVConverter}
 /** An abstraction for homogeneous distributed collections. */
 trait DataBag[A] extends Serializable {
 
+  import Meta.Implicits._
+
   implicit def m: Meta[A]
 
   // -----------------------------------------------------
