@@ -27,6 +27,8 @@ import scala.language.{higherKinds, implicitConversions}
 /** A `DataBag` implementation backed by a Flink `DataSet`. */
 class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A]) extends DataBag[A] {
 
+  import Meta.Implicits._
+
   import FlinkDataSet.{typeInfoForType, wrap}
 
   @transient override val m = implicitly[Meta[A]]
@@ -122,6 +124,8 @@ object FlinkDataSet {
         q"org.apache.flink.api.scala.createTypeInformation[${ttag.tpe.asInstanceOf[Type]}]")
       ).asInstanceOf[TypeInformation[T]]
   }
+
+  import Meta.Implicits._
 
   // ---------------------------------------------------------------------------
   // Constructors

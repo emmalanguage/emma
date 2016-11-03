@@ -41,14 +41,16 @@ package object api {
       override def ctag = implicitly[ClassTag[DataBag[T]]]
       override def ttag = implicitly[TypeTag[DataBag[T]]]
     }
+
+    object Implicits {
+      implicit def ttagFor[T: Meta]: scala.reflect.runtime.universe.TypeTag[T] =
+        implicitly[Meta[T]].ttag
+
+      implicit def ctagFor[T: Meta]: ClassTag[T] =
+        implicitly[Meta[T]].ctag
+    }
   }
   //@formatter:on
-
-  implicit def ttagFor[T: Meta]: TypeTag[T] =
-    implicitly[Meta[T]].ttag
-
-  implicit def ctagFor[T: Meta]: ClassTag[T] =
-    implicitly[Meta[T]].ctag
 
   // -----------------------------------------------------
   // Converters

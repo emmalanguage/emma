@@ -182,8 +182,6 @@ trait Source extends Common
       PatternMatching.destruct
     } andThen {
       Foreach2Loop.transform
-    } andThen {
-      removeImplicits(API.implicitTypes)
     }
 
     /** Removes implicit lists consisting of the following symbols. */
