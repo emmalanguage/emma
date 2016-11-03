@@ -28,8 +28,8 @@ import scala.util.hashing.MurmurHash3
 class SparkRDD[A: Meta] private[api](@transient private[api] val rep: RDD[A])(implicit spark: SparkSession)
   extends DataBag[A] {
 
-  import Meta.Implicits._
   import spark.sqlContext.implicits._
+  import Meta.Projections._
 
   import SparkRDD.{encoderForType, wrap}
 
@@ -135,7 +135,7 @@ object SparkRDD {
   import org.apache.spark.sql.Encoder
   import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
-  import Meta.Implicits._
+  import Meta.Projections._
 
   implicit def encoderForType[T: Meta]: Encoder[T] =
     ExpressionEncoder[T]

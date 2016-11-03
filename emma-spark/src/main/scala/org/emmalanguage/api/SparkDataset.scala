@@ -142,7 +142,7 @@ object SparkDataset {
   import org.apache.spark.sql.Encoder
   import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
-  import Meta.Implicits._
+  import Meta.Projections._
 
   implicit def encoderForType[T: Meta]: Encoder[T] =
     ExpressionEncoder[T]

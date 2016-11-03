@@ -21,7 +21,7 @@ import io.csv.{CSV, CSVConverter}
 /** An abstraction for homogeneous distributed collections. */
 trait DataBag[A] extends Serializable {
 
-  import Meta.Implicits._
+  import Meta.Projections._
 
   implicit def m: Meta[A]
 
@@ -113,7 +113,7 @@ trait DataBag[A] extends Serializable {
    * }}}
    *
    * @param that The second addend parameter.
-   * @return The set-theoretic union (with duplicates) between this DataBag and the given subtrahend.
+   * @return The set-theoretic union (with duplicates) between this DataBag and the given one.
    */
   def union(that: DataBag[A]): DataBag[A]
 
@@ -248,7 +248,7 @@ trait DataBag[A] extends Serializable {
    * Test if at least one element of the collection satisfies `p`.
    *
    * @param p predicate to test against the elements of the collection
-   * @return `false` if the collections is empty
+   * @return `true` if the collection contains an element that satisfies the predicate
    */
   def exists(p: A => Boolean): Boolean =
     fold(false)(p, _ || _)
@@ -257,13 +257,13 @@ trait DataBag[A] extends Serializable {
    * Test if all elements of the collection satisfy `p`.
    *
    * @param p predicate to test against the elements of the collection
-   * @return `true` if the collection is empty
+   * @return `true` if all the elements of the collection satisfy the predicate
    */
   def forall(p: A => Boolean): Boolean =
     fold(true)(p, _ && _)
 
   /**
-   * Find the some element in the collection that satisfies a given predicate.
+   * Finds some element in the collection that satisfies a given predicate.
    *
    * @param p the predicate to test against
    * @return [[Some]] element if one exists, [[None]] otherwise

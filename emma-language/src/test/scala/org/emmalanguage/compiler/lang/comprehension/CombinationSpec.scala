@@ -494,7 +494,7 @@ class CombinationSpec extends BaseCompilerSpec {
       }
 
       applyOnce(MatchResidual)(inp) shouldBe alphaEqTo(liftPipeline(exp))
-      combine(inp) shouldBe alphaEqTo(liftPipeline(exp)) // TODO: @ggevay why test this here?
+      combine(inp) shouldBe alphaEqTo(liftPipeline(exp))
     }
   }
 
@@ -605,6 +605,7 @@ class CombinationSpec extends BaseCompilerSpec {
   }
 
   "combine nested" - {
+    
     "in head" in {
 
       val inp = u.reify {
@@ -640,9 +641,6 @@ class CombinationSpec extends BaseCompilerSpec {
 
       combine(inp) shouldBe alphaEqTo(liftPipeline(exp))
     }
-  }
-
-  "combine nested" - {
 
     "complicated" in {
 

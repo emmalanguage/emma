@@ -97,7 +97,7 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
     }
     q"""
       class ${api.TypeName(UUID.randomUUID().toString)} {
-        def run(..$params) = {
+        def ${u.TermName(RuntimeCompiler.default.runMethod)}(..$params) = {
           $tree
         }
       }

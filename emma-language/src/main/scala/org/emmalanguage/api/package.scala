@@ -42,7 +42,7 @@ package object api {
       override def ttag = implicitly[TypeTag[DataBag[T]]]
     }
 
-    object Implicits {
+    object Projections {
       implicit def ttagFor[T: Meta]: scala.reflect.runtime.universe.TypeTag[T] =
         implicitly[Meta[T]].ttag
 

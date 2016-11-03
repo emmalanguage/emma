@@ -36,7 +36,6 @@ private[comprehension] trait Combination extends Common {
     private val tuple2   = api.Type[(Nothing, Nothing)]
     private val tuple2_1 = tuple2.member(api.TermName("_1")).asTerm
     private val tuple2_2 = tuple2.member(api.TermName("_2")).asTerm
-    private val and      = api.Type[Boolean].member(api.TermName("&&")).asTerm
     //@formatter:on
 
     // TODO: Split conjunctive filter predicates.
@@ -81,8 +80,6 @@ private[comprehension] trait Combination extends Common {
       object Cross     extends RewriteState
       object Residuals extends RewriteState
       object End       extends RewriteState
-
-      val desugar = Comprehension.desugar(API.bagSymbol)
 
       def applyOnce(rule: u.Tree =?> u.Tree): Boolean = {
         if (rule.isDefinedAt(root)) {

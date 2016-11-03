@@ -28,7 +28,7 @@ import scala.util.hashing.MurmurHash3
 /** A `DataBag` implementation backed by a Flink `DataSet`. */
 class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A]) extends DataBag[A] {
 
-  import Meta.Implicits._
+  import Meta.Projections._
 
   import FlinkDataSet.{typeInfoForType, wrap}
 
@@ -163,7 +163,7 @@ object FlinkDataSet {
     ).asInstanceOf[TypeInformation[T]]
   }
 
-  import Meta.Implicits._
+  import Meta.Projections._
 
   // ---------------------------------------------------------------------------
   // Constructors
