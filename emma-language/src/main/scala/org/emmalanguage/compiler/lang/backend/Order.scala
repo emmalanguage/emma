@@ -101,7 +101,7 @@ private[backend] trait Order extends Common {
         }(Monoids.disj)
         // Am I inside a combinator call?
         .inherit {
-          case api.DefCall(_, method, _, _) if combinators contains method => true
+          case api.DefCall(_, method, _, _*) if combinators contains method => true
         }(Monoids.disj)
         // Funs given as arguments to combinators (combRefs)
         .accumulateWith[Vector[u.TermSymbol]] {
@@ -151,7 +151,7 @@ private[backend] trait Order extends Common {
       // because of the refresh. But this is not a problem, since isHighContext will be inherited to it anyway.
       val isHighContext: u.Tree =?> Boolean = {
         case core.ValDef(sym, _, _) if highFuns contains sym => true
-        case api.DefCall(_, method, _, _) if combinators contains method => true
+        case api.DefCall(_, method, _, _*) if combinators contains method => true
       }
 
       val disambiguatedTree = api.TopDown
