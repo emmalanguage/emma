@@ -34,13 +34,13 @@ import java.io.File
 import java.nio.file.Paths
 
 @RunWith(classOf[JUnitRunner])
-abstract class BaseCodegenTest(rtName: String)
-  extends BaseCompilerSpec with Matchers with BeforeAndAfter {
+abstract class BaseCodegenSpec
+  extends BaseCompilerSpec with BeforeAndAfter {
 
-  import BaseCodegenTest._
+  import BaseCodegenSpec._
 
   import compiler._
-  
+
   val inputDir = tempPath("test/input")
   val outputDir = tempPath("test/output")
 
@@ -49,7 +49,7 @@ abstract class BaseCodegenTest(rtName: String)
   val codegenPipeline: u.Expr[Any] => u.Tree = compiler.pipeline(true)(
     checkValid,
     Core.lift,
-    Comprehension.desugar(API.bagSymbol),
+    Comprehension.combine,
     backendPipeline
   ).compose(_.tree)
 
@@ -586,7 +586,7 @@ abstract class BaseCodegenTest(rtName: String)
   }
 }
 
-object BaseCodegenTest {
+object BaseCodegenSpec {
   lazy val jabberwocky = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
 
   lazy val imdb = DataBag.readCSV[ImdbMovie]("file://" + materializeResource("/cinema/imdb.csv"), CSV()).fetch()
