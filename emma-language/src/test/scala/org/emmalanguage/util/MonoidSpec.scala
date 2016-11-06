@@ -95,5 +95,10 @@ class MonoidSpec extends FreeSpec with Checkers with Equivalences with Arbitrari
       check(GroupLaws[SortedSet[Int]].monoid.all)
       check(GroupLaws[SortedSet[String]].monoid.all)
     }
+
+    "for reversed monoids (right to left)" in {
+      check(GroupLaws[String].monoid(reverse).all)
+      check(GroupLaws[List[Double]].monoid(reverse).all)
+    }
   }
 }

@@ -102,4 +102,10 @@ object Monoids {
     override def empty: SortedSet[A] = SortedSet.empty
     override def combine(x: SortedSet[A], y: SortedSet[A]): SortedSet[A] = x | y
   }
+
+  /** Reverses an existing monoid (i.e. applying it right to left). */
+  def reverse[A](implicit m: Monoid[A]): Monoid[A] = new Monoid[A] {
+    override def empty: A = m.empty
+    override def combine(x: A, y: A): A = m.combine(y, x)
+  }
 }
