@@ -39,7 +39,7 @@ private[core] trait DCE extends Common {
      * - All unused value definitions are pruned.
      */
     lazy val transform: u.Tree => u.Tree =
-      api.BottomUp.withValUses.transformWithSyn {
+      api.BottomUp.withValUses.transformSyn {
         case Attr(let @ core.Let(vals, defs, expr), _, _, syn) =>
           def refs(tree: u.Tree) = syn(tree).head.keySet
 

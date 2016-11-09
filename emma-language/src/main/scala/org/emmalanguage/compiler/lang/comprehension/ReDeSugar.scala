@@ -50,56 +50,46 @@ private[comprehension] trait ReDeSugar extends Common {
     def resugar(monad: u.Symbol): u.Tree => u.Tree = {
       // Construct comprehension syntax helper for the given monad
       val cs = new Comprehension.Syntax(monad)
-
       // Handle the case when a lambda is defined externally
       def lookup(f: u.TermSymbol, owner: u.Symbol,
-        lambdas: Map[u.TermSymbol, (u.TermSymbol, u.Tree)]) = {
-
-        lambdas.get(f).map { case (arg, body) =>
-          val sym = api.Sym.With(arg)(flg = u.NoFlags).asTerm
-          sym -> api.Tree.rename(Seq(arg -> sym))(body)
-        }.getOrElse {
-          val nme = api.TermName.fresh("x")
-          val tpe = f.info.dealias.widen.typeArgs.last
-          val arg = api.ValSym(owner, nme, tpe)
-          val tgt = Some(core.ValRef(f))
-          val app = f.info.member(api.TermName.app).asMethod
-          arg -> core.DefCall(tgt, app, Seq(), Seq(Seq(core.ValRef(arg))))
-        }
+        lambdas: Map[u.TermSymbol, (u.TermSymbol, u.Tree)]
+      ) = lambdas.get(f).map { case (arg, body) =>
+        val sym = api.Sym.With(arg)(flg = u.NoFlags).asTerm
+        sym -> api.Tree.rename(Seq(arg -> sym))(body)
+      }.getOrElse {
+        val nme = api.TermName.fresh("x")
+        val tpe = f.info.dealias.widen.typeArgs.last
+        val arg = api.ValSym(owner, nme, tpe)
+        val tgt = Some(core.ValRef(f))
+        val app = f.info.member(api.TermName.app).asMethod
+        arg -> core.DefCall(tgt, app, argss = Seq(Seq(core.ValRef(arg))))
       }
 
-      api.TopDown.withOwner
+      api.TopDown.withOwner.accumulate(Attr.group {
         // Accumulate a LHS -> (arg, body) Map from lambdas
-        .accumulate(Attr.group {
-          case core.ValDef(lhs, core.Lambda(_, Seq(core.ParDef(arg, _)), body)) =>
-            lhs -> (arg, body)
-        })
-        // Re-sugar comprehensions
-        .transformWith {
-          case Attr(cs.Map(xs, core.Ref(f)), lambdas :: _, owner :: _, _) =>
-            val (sym, body) = lookup(f, owner, lambdas)
-            cs.Comprehension(
-              Seq(
-                cs.Generator(sym, asLet(xs))),
-              cs.Head(asLet(body)))
+        case core.ValDef(lhs, core.Lambda(_, Seq(core.ParDef(arg, _)), body)) =>
+          lhs -> (arg, body)
+      })(overwrite).transformWith { // Re-sugar comprehensions
+        case Attr(cs.Map(xs, core.Ref(f)), lambdas :: _, owner :: _, _) =>
+          val (sym, body) = lookup(f, owner, lambdas)
+          cs.Comprehension(Seq(
+            cs.Generator(sym, asLet(xs))),
+            cs.Head(asLet(body)))
 
-          case Attr(cs.FlatMap(xs, core.Ref(f)), lambdas :: _, owner :: _, _) =>
-            val (sym, body) = lookup(f, owner, lambdas)
-            cs.Flatten(
-              core.Let(expr =
-                cs.Comprehension(
-                  Seq(
-                    cs.Generator(sym, asLet(xs))),
-                  cs.Head(asLet(body)))))
+        case Attr(cs.FlatMap(xs, core.Ref(f)), lambdas :: _, owner :: _, _) =>
+          val (sym, body) = lookup(f, owner, lambdas)
+          cs.Flatten(core.Let(expr =
+            cs.Comprehension(Seq(
+              cs.Generator(sym, asLet(xs))),
+              cs.Head(asLet(body)))))
 
-          case Attr(cs.WithFilter(xs, core.Ref(p)), lambdas :: _, owner :: _, _) =>
-            val (sym, body) = lookup(p, owner, lambdas)
-            cs.Comprehension(
-              Seq(
-                cs.Generator(sym, asLet(xs)),
-                cs.Guard(asLet(body))),
-              cs.Head(core.Let(expr = core.Ref(sym))))
-        }.andThen(_.tree).andThen(Core.dce)
+        case Attr(cs.WithFilter(xs, core.Ref(p)), lambdas :: _, owner :: _, _) =>
+          val (sym, body) = lookup(p, owner, lambdas)
+          cs.Comprehension(Seq(
+            cs.Generator(sym, asLet(xs)),
+            cs.Guard(asLet(body))),
+            cs.Head(core.Let(expr = core.Ref(sym))))
+      }.andThen(_.tree).andThen(Core.dce)
     }
 
     /**

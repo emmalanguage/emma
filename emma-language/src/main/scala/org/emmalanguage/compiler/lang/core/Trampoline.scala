@@ -17,7 +17,7 @@ package org.emmalanguage
 package compiler.lang.core
 
 import compiler.Common
-import util.Monoids
+import util.Monoids._
 
 import shapeless._
 
@@ -30,7 +30,6 @@ private[core] trait Trampoline extends Common {
   /** Trampolining tail calls to avoid stack overflow. */
   private[core] object Trampoline {
 
-    import Monoids._
     import UniverseImplicits._
     import Core.{Lang => core}
     import u.internal.flags
@@ -63,7 +62,7 @@ private[core] trait Trampoline extends Common {
             val ans = method.annotations
             method -> api.DefSym(own, nme, tparams, pss, res, flg, pos, ans)
           }).toMap
-      }.transformWith {
+      } (overwrite).transformWith {
         // Return position in a method definition, wrap in trampoline.
         case Attr.inh(tree, local :: (_ :+ (_: u.DefDef) :+ core.Let(_, _, expr)) :: _)
           if tree == expr => wrap(expr, local)

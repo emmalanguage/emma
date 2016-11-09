@@ -19,7 +19,6 @@ package util
 import cats.implicits._
 import cats.kernel.laws.GroupLaws
 import shapeless._
-import shapeless.syntax.singleton._
 
 import org.junit.runner.RunWith
 import org.scalacheck.{Arbitrary, Gen}
@@ -75,12 +74,6 @@ class MonoidSpec extends FreeSpec with Checkers with Equivalences with Arbitrari
     "for generic products" in {
       check(GroupLaws[HNil].monoid.all)
       check(GroupLaws[Int :: String :: HNil].monoid.all)
-    }
-
-    "for labelled fields" in {
-      val key = "key".witness
-      check(GroupLaws[key.T ->> Int].monoid.all)
-      check(GroupLaws[key.T ->> String].monoid.all)
     }
 
     "for sliding collections" in {
