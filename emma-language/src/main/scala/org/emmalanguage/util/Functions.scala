@@ -19,6 +19,9 @@ package util
 /** Utilities for [[scala.Function]]s. */
 object Functions {
 
+  /** Syntax sugar for partial functions. */
+  type =?>[-A, +R] = PartialFunction[A, R]
+
   /** Applies a partial function to the `args` or else return `default`. */
   def complete[A, R](pf: A =?> R)(args: A)(default: => R): R =
     pf.applyOrElse(args, (_: A) => default)
