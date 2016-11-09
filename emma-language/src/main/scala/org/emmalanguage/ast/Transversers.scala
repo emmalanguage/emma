@@ -215,7 +215,7 @@ trait Transversers { this: AST =>
       synthesizeWith[X](forgetful(syn))
 
     /** Traverses a tree with access to all attributes (and a memoized synthesis function). */
-    def traverseWithSyn(callback: Attr[A, I, Tree => S] =?> Unit): Traversal[A, I, S] = {
+    def traverseSyn(callback: Attr[A, I, Tree => S] =?> Unit): Traversal[A, I, S] = {
       lazy val traversal: Traversal[A, I, S] = traverseWith {
         case Attr(t, as, is, _) if callback.isDefinedAt(Attr(t, as, is, traversal.syn)) =>
           callback(Attr(t, as, is, traversal.syn))
@@ -237,7 +237,7 @@ trait Transversers { this: AST =>
       factory.traversal(grammar) { case _ => () }
 
     /** Transforms a tree with access to all attributes (and a memoized synthesis function). */
-    def transformWithSyn(template: Attr[A, I, Tree => S] =?> Tree): Transform[A, I, S] = {
+    def transformSyn(template: Attr[A, I, Tree => S] =?> Tree): Transform[A, I, S] = {
       lazy val transform: Transform[A, I, S] = transformWith {
         case Attr(t, as, is, _) if template.isDefinedAt(Attr(t, as, is, transform.syn)) =>
           template(Attr(t, as, is, transform.syn))
@@ -269,7 +269,7 @@ trait Transversers { this: AST =>
 
     /** Inherits the owner of the current node. */
     def withOwner(default: Symbol): Strategy[A, Symbol :: I, S] =
-      inherit { case api.Owner(sym) => sym } (Monoids.right(default))
+      inherit { case api.Owner(sym) => sym } (right(default))
 
     /** Inherits the owner chain of the current node. */
     def withOwnerChain = inherit(Attr.collect[Vector, Symbol] {
@@ -278,68 +278,68 @@ trait Transversers { this: AST =>
 
     /** Synthesizes all term definitions contained in the current node and its children. */
     def withDefs = synthesize(Attr.group {
-      case defn @ api.TermDef(sym) => sym -> defn
-    })
+      case dfn @ api.TermDef(sym) => sym -> dfn
+    })(overwrite)
 
     /** Synthesizes all binding definitions contained in the current node and its children. */
     def withBindDefs = synthesize(Attr.group {
       case bind @ api.BindingDef(lhs, _) => lhs -> bind
-    })
+    })(overwrite)
 
     /** Synthesizes all value definitions contained in the current node and its children. */
     def withValDefs = synthesize(Attr.group {
       case value @ api.ValDef(lhs, _) => lhs -> value
-    })
+    })(overwrite)
 
     /** Synthesizes all variable definitions contained in the current node and its children. */
     def withVarDefs = synthesize(Attr.group {
       case variable @ api.VarDef(lhs, _) => lhs -> variable
-    })
+    })(overwrite)
 
     /** Synthesizes all parameter definitions contained in the current node and its children. */
     def withParDefs = synthesize(Attr.group {
       case param @ api.ParDef(lhs, _) => lhs -> param
-    })
+    })(overwrite)
 
     /** Synthesizes all method definitions contained in the current node and its children. */
     def withDefDefs = synthesize(Attr.group {
-      case defn @ api.DefDef(method, _, _, _) => method -> defn
-    })
+      case dfn @ api.DefDef(method, _, _, _) => method -> dfn
+    })(overwrite)
 
     /** Counts all term references contained in the current node and its children. */
     def withUses = synthesize(Attr.group {
       case api.TermRef(target) => target -> 1
-    })(Monoids.merge)
+    })(merge)
 
     /** Counts all binding references contained in the current node and its children. */
     def withBindUses = synthesize(Attr.group {
       case api.BindingRef(target) => target -> 1
-    })(Monoids.merge)
+    })(merge)
 
     /** Counts all value references contained in the current node and its children. */
     def withValUses = synthesize(Attr.group {
       case api.ValRef(target) => target -> 1
-    })(Monoids.merge)
+    })(merge)
 
     /** Counts all variable references contained in the current node and its children. */
     def withVarUses = synthesize(Attr.group {
       case api.VarRef(target) => target -> 1
-    })(Monoids.merge)
+    })(merge)
 
     /** Counts all parameter references contained in the current node and its children. */
     def withParUses = synthesize(Attr.group {
       case api.ParRef(target) => target -> 1
-    })(Monoids.merge)
+    })(merge)
 
     /** Counts all variable assignments contained in the current node and its children. */
     def withAssignments = synthesize(Attr.group {
       case api.VarMut(lhs, _) => lhs -> 1
-    })(Monoids.merge)
+    })(merge)
 
     /** Counts all method calls contained in the current node and its children. */
     def withDefCalls = synthesize(Attr.group {
       case api.DefCall(_, method, _, _) => method -> 1
-    })(Monoids.merge)
+    })(merge)
 
     /** Converts a partial function over trees to a partial function over attributed trees. */
     private def forgetful[X, Acc, Inh, Syn](pf: Tree =?> X): Attr[Acc, Inh, Syn] =?> X = {
