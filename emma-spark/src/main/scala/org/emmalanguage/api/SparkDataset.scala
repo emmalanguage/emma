@@ -24,11 +24,13 @@ import scala.language.{higherKinds, implicitConversions}
 import scala.util.hashing.MurmurHash3
 
 /** A `DataBag` implementation backed by a Spark `Dataset`. */
-class SparkDataset[A: Meta] private[api](@transient private val rep: Dataset[A]) extends DataBag[A] {
+class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Dataset[A]) extends DataBag[A] {
 
   import SparkDataset.{encoderForType, wrap}
+  import rep.sparkSession.sqlContext.implicits._
 
   @transient override val m = implicitly[Meta[A]]
+  private implicit def spark = this.rep.sparkSession
 
   // -----------------------------------------------------
   // Structural recursion
@@ -66,8 +68,11 @@ class SparkDataset[A: Meta] private[api](@transient private val rep: Dataset[A])
   // Set operations
   // -----------------------------------------------------
 
-  override def union(that: DataBag[A]): SparkDataset[A] = that match {
-    case dataset: SparkDataset[A] => this.rep union dataset.rep
+  override def union(that: DataBag[A]): DataBag[A] = that match {
+    case dbag: ScalaTraversable[A] => this.rep union SparkDataset(dbag.rep).rep
+    case dbag: SparkRDD[A] => this.rep union dbag.rep.toDS()
+    case dbag: SparkDataset[A] => this.rep union dbag.rep
+    case _ => that union this
   }
 
   override def distinct: SparkDataset[A] =
@@ -88,8 +93,8 @@ class SparkDataset[A: Meta] private[api](@transient private val rep: Dataset[A])
       .mode("overwrite")
       .csv(path)
 
-  override lazy val fetch: Traversable[A] =
-    rep.collect().toTraversable
+  override lazy val fetch: Seq[A] =
+    rep.collect()
 
   // -----------------------------------------------------
   // equals and hashCode

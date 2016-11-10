@@ -25,10 +25,11 @@ import scala.language.{higherKinds, implicitConversions}
 import scala.util.hashing.MurmurHash3
 
 /** A `DataBag` implementation backed by a Spark `RDD`. */
-class SparkRDD[A: Meta] private[api](@transient private val rep: RDD[A])(implicit spark: SparkSession)
+class SparkRDD[A: Meta] private[api](@transient private[api] val rep: RDD[A])(implicit spark: SparkSession)
   extends DataBag[A] {
 
   import Meta.Implicits._
+  import spark.sqlContext.implicits._
 
   import SparkRDD.{encoderForType, wrap}
 
@@ -65,8 +66,11 @@ class SparkRDD[A: Meta] private[api](@transient private val rep: RDD[A])(implici
   // Set operations
   // -----------------------------------------------------
 
-  override def union(that: DataBag[A]): SparkRDD[A] = that match {
-    case rdd: SparkRDD[A] => this.rep union rdd.rep
+  override def union(that: DataBag[A]): DataBag[A] = that match {
+    case dbag: ScalaTraversable[A] => this.rep union SparkRDD(dbag.rep).rep
+    case dbag: SparkRDD[A] => this.rep union dbag.rep
+    case dbag: SparkDataset[A] => SparkDataset.wrap(this.rep.toDS() union dbag.rep)
+    case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
 
   override def distinct: SparkRDD[A] =

@@ -24,7 +24,7 @@ import scala.reflect.runtime.universe._
 import scala.language.{higherKinds, implicitConversions}
 
 /** A `DataBag` implementation backed by a Scala `Traversable`. */
-class ScalaTraversable[A] private[api](private val rep: Traversable[A]) extends DataBag[A] {
+class ScalaTraversable[A] private[api](private[api] val rep: Traversable[A]) extends DataBag[A] {
 
   import ScalaTraversable.wrap
 
@@ -66,8 +66,9 @@ class ScalaTraversable[A] private[api](private val rep: Traversable[A]) extends 
   // Set operations
   // -----------------------------------------------------
 
-  override def union(that: DataBag[A]): ScalaTraversable[A] = that match {
-    case rdd: ScalaTraversable[A] => this.rep ++ rdd.rep
+  override def union(that: DataBag[A]): DataBag[A] = that match {
+    case dbag: ScalaTraversable[A] => this.rep ++ dbag.rep
+    case _ => that union this
   }
 
   override def distinct: ScalaTraversable[A] =
