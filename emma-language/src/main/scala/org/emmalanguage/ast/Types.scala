@@ -351,9 +351,9 @@ trait Types { this: AST =>
       def tree(tpe: u.Type): u.Tree = {
         def original(tpe: u.Type): u.Tree = {
           val tpt = tpe match {
-            // Degenerate type: `_root_.<root>`.
-            case u.ThisType(sym) if is.root(sym) =>
-              api.Id(u.rootMirror.RootPackage)
+            // Degenerate type: `this[staticID]`.
+            case u.ThisType(sym) if sym.isStatic =>
+              api.Tree.resolveStatic(sym)
             // This type: `this[T]`.
             case u.ThisType(sym) =>
               api.This(sym)
@@ -390,6 +390,11 @@ trait Types { this: AST =>
             // Existential type: `F[A, B, ...] forSome { type A; type B; ... }`
             case u.ExistentialType(quantified, underlying) =>
               u.ExistentialTypeTree(Type.tree(underlying), quantified.map(internal.typeDef))
+            // Annotated type: `A @ann1 @ann2 ...`
+            case AnnotatedType(annotations, underlying) =>
+              annotations.foldLeft(original(underlying))((res, ann) =>
+                u.Annotated(ann.tree, res)
+              )
             // E.g. type refinement: `T { def size: Int }`
             case _ =>
               abort(s"Cannot convert type `$tpe` to a type-tree")
