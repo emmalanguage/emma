@@ -173,7 +173,7 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
       withBackendContext { implicit ctx =>
         val act = for {
           b <- Bag(Seq(hhBook))
-          c <- ScalaTraversable(hhCrts) // nested DataBag cannot be RDDDataBag, as those are not serializable
+          c <- ScalaSeq(hhCrts) // nested DataBag cannot be RDDDataBag, as those are not serializable
           if b.title == c.book.title
           if b.title == "The Hitchhiker's Guide to the Galaxy"
         } yield (b.title, c.name)

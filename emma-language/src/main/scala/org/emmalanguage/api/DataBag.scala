@@ -142,12 +142,12 @@ trait DataBag[A] extends Serializable {
   def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit
 
   /**
-   * Converts the DataBag back into a scala Traversable.
+   * Converts the DataBag back into a scala Seq.
    * Warning: Do not call this on DataBags that are too large to fit on one machine!
    *
-   * @return The contents of the DataBag as a scala Traversable.
+   * @return The contents of the DataBag as a scala Seq.
    */
-  def fetch(): Traversable[A]
+  def fetch(): Seq[A]
 
   // -----------------------------------------------------
   // Pre-defined folds
@@ -349,7 +349,7 @@ object DataBag {
    * @tparam A The element type for the DataBag.
    * @return An empty DataBag for elements of type A.
    */
-  def empty[A: Meta]: DataBag[A] = ScalaTraversable.empty[A]
+  def empty[A: Meta]: DataBag[A] = ScalaSeq.empty[A]
 
   /**
    * Sequence constructor.
@@ -358,7 +358,7 @@ object DataBag {
    * @tparam A The element type for the DataBag.
    * @return A DataBag containing the elements of the `values` sequence.
    */
-  def apply[A: Meta](values: Traversable[A]): DataBag[A] = ScalaTraversable(values)
+  def apply[A: Meta](values: Seq[A]): DataBag[A] = ScalaSeq(values)
 
   /**
    * Reads a DataBag into the specified `path` using in a CSV format.
@@ -367,7 +367,7 @@ object DataBag {
    * @param format The CSV format configuration.
    * @tparam A the type of elements to read.
    */
-  def readCSV[A: Meta : CSVConverter](path: String, format: CSV): DataBag[A] = ScalaTraversable.readCSV[A](path, format)
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV): DataBag[A] = ScalaSeq.readCSV[A](path, format)
 
   // -----------------------------------------------------
   // Helper methods

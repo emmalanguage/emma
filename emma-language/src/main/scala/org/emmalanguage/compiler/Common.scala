@@ -40,7 +40,7 @@ trait Common extends AST {
     val bagSymbol             = rootMirror.staticClass(s"$rootPkg.api.DataBag")
     val groupSymbol           = rootMirror.staticClass(s"$rootPkg.api.Group")
     val bagModuleSymbol       = rootMirror.staticModule(s"$rootPkg.api.DataBag")
-    val scalaTraversablModSym = rootMirror.staticModule(s"$rootPkg.api.ScalaTraversable")
+    val scalaSeqModuleSymbol  = rootMirror.staticModule(s"$rootPkg.api.ScalaSeq")
 
     // Sources
     val empty                 = bagSymbol.companion.info.decl(TermName("empty"))
@@ -115,7 +115,7 @@ trait Common extends AST {
     }
 
     // Backend-only operations
-    val byFetch               = scalaTraversablModSym.info.decl(api.TermName("byFetch")).asInstanceOf[u.TermSymbol]
+    val byFetch               = scalaSeqModuleSymbol.info.decl(api.TermName("byFetch")).asInstanceOf[u.TermSymbol]
   }
 
   protected[emmalanguage] object ComprehensionSyntax {
