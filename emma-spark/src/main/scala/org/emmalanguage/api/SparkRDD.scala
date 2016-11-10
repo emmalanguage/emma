@@ -67,7 +67,7 @@ class SparkRDD[A: Meta] private[api](@transient private[api] val rep: RDD[A])(im
   // -----------------------------------------------------
 
   override def union(that: DataBag[A]): DataBag[A] = that match {
-    case dbag: ScalaTraversable[A] => this.rep union SparkRDD(dbag.rep).rep
+    case dbag: ScalaSeq[A] => this.rep union SparkRDD(dbag.rep).rep
     case dbag: SparkRDD[A] => this.rep union dbag.rep
     case dbag: SparkDataset[A] => SparkDataset.wrap(this.rep.toDS() union dbag.rep)
     case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
@@ -93,8 +93,8 @@ class SparkRDD[A: Meta] private[api](@transient private[api] val rep: RDD[A])(im
       .csv(path)
   }
 
-  override lazy val fetch: Traversable[A] =
-    rep.collect().toTraversable
+  override lazy val fetch: Seq[A] =
+    rep.collect()
 
   // -----------------------------------------------------
   // equals and hashCode
@@ -147,8 +147,8 @@ object SparkRDD {
   def empty[A: Meta](implicit spark: SparkSession): SparkRDD[A] =
     spark.sparkContext.emptyRDD[A]
 
-  def apply[A: Meta](values: Traversable[A])(implicit spark: SparkSession): SparkRDD[A] =
-    spark.sparkContext.parallelize(values.toSeq)
+  def apply[A: Meta](values: Seq[A])(implicit spark: SparkSession): SparkRDD[A] =
+    spark.sparkContext.parallelize(values)
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): SparkDataset[A] =
     spark.read

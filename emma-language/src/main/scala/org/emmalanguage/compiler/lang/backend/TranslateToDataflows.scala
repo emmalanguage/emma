@@ -77,7 +77,7 @@ private[backend] trait TranslateToDataflows extends Common {
         if valsRefdFromHigh(lhs)
         => {
           val origSym = api.TermSym(lhs, api.TermName.fresh("orig"), api.Type.of(lhs)) // will be the original bag
-          val fetchCall = Core.Lang.DefCall(Some(api.ModuleRef(API.scalaTraversablModSym))) (
+          val fetchCall = Core.Lang.DefCall(Some(api.ModuleRef(API.scalaSeqModuleSymbol))) (
             API.byFetch,
             Core.bagElemTpe(Core.Lang.ValRef(lhs))) (
             Seq(Core.Lang.ValRef(origSym)))

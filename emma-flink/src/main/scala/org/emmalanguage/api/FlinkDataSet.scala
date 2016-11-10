@@ -74,7 +74,7 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
   // -----------------------------------------------------
 
   override def union(that: DataBag[A]): FlinkDataSet[A] = that match {
-    case dbag: ScalaTraversable[A] => this.rep union FlinkDataSet(dbag.rep).rep
+    case dbag: ScalaSeq[A] => this.rep union FlinkDataSet(dbag.rep).rep
     case dbag: FlinkDataSet[A] => this.rep union dbag.rep
     case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
@@ -105,7 +105,7 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
     rep.getExecutionEnvironment.execute()
   }
 
-  override lazy val fetch: Traversable[A] =
+  override lazy val fetch: Seq[A] =
     rep.collect()
 
   // -----------------------------------------------------
@@ -172,8 +172,8 @@ object FlinkDataSet {
   def empty[A: Meta](implicit flink: FlinkEnv): FlinkDataSet[A] =
     flink.fromElements[A]()
 
-  def apply[A: Meta](values: Traversable[A])(implicit flink: FlinkEnv): FlinkDataSet[A] =
-    flink.fromCollection(values.toIterable)
+  def apply[A: Meta](values: Seq[A])(implicit flink: FlinkEnv): FlinkDataSet[A] =
+    flink.fromCollection(values)
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit flink: FlinkEnv): FlinkDataSet[A] = {
     require(format.charset == CSV.DEFAULT_CHARSET,

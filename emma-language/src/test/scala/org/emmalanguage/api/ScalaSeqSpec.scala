@@ -18,9 +18,9 @@ package api
 
 import io.csv.{CSV, CSVConverter}
 
-class ScalaTraversableSpec extends DataBagSpec {
+class ScalaSeqSpec extends DataBagSpec {
 
-  override type Bag[A] = ScalaTraversable[A]
+  override type Bag[A] = ScalaSeq[A]
   override type BackendContext = Unit
 
   override def withBackendContext[T](f: BackendContext => T): T =
@@ -29,11 +29,11 @@ class ScalaTraversableSpec extends DataBagSpec {
   override val suffix = "scala"
 
   override def Bag[A: Meta]()(implicit unit: BackendContext): Bag[A] =
-    ScalaTraversable.empty[A]
+    ScalaSeq.empty[A]
 
   override def Bag[A: Meta](seq: Seq[A])(implicit unit: BackendContext): Bag[A] =
-    ScalaTraversable(seq)
+    ScalaSeq(seq)
 
   override def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit unit: BackendContext): DataBag[A] =
-    ScalaTraversable.readCSV(path, format)
+    ScalaSeq.readCSV(path, format)
 }

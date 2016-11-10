@@ -23,10 +23,10 @@ import scala.reflect.runtime.universe._
 
 import scala.language.{higherKinds, implicitConversions}
 
-/** A `DataBag` implementation backed by a Scala `Traversable`. */
-class ScalaTraversable[A] private[api](private[api] val rep: Traversable[A]) extends DataBag[A] {
+/** A `DataBag` implementation backed by a Scala `Seq`. */
+class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] {
 
-  import ScalaTraversable.wrap
+  import ScalaSeq.wrap
 
   //@formatter:off
   @transient override val m: Meta[A] = new Meta[A] {
@@ -46,20 +46,20 @@ class ScalaTraversable[A] private[api](private[api] val rep: Traversable[A]) ext
   // Monad Ops
   // -----------------------------------------------------
 
-  override def map[B: Meta](f: (A) => B): ScalaTraversable[B] =
+  override def map[B: Meta](f: (A) => B): ScalaSeq[B] =
     rep.map(f)
 
-  override def flatMap[B: Meta](f: (A) => DataBag[B]): ScalaTraversable[B] =
+  override def flatMap[B: Meta](f: (A) => DataBag[B]): ScalaSeq[B] =
     rep.flatMap(x => f(x).fetch())
 
-  def withFilter(p: (A) => Boolean): ScalaTraversable[A] =
+  def withFilter(p: (A) => Boolean): ScalaSeq[A] =
     rep.filter(p)
 
   // -----------------------------------------------------
   // Grouping
   // -----------------------------------------------------
 
-  override def groupBy[K: Meta](k: (A) => K): ScalaTraversable[Group[K, DataBag[A]]] =
+  override def groupBy[K: Meta](k: (A) => K): ScalaSeq[Group[K, DataBag[A]]] =
     wrap(rep.groupBy(k).toSeq map { case (key, vals) => Group(key, wrap(vals)) })
 
   // -----------------------------------------------------
@@ -67,12 +67,12 @@ class ScalaTraversable[A] private[api](private[api] val rep: Traversable[A]) ext
   // -----------------------------------------------------
 
   override def union(that: DataBag[A]): DataBag[A] = that match {
-    case dbag: ScalaTraversable[A] => this.rep ++ dbag.rep
+    case dbag: ScalaSeq[A] => this.rep ++ dbag.rep
     case _ => that union this
   }
 
-  override def distinct: ScalaTraversable[A] =
-    rep.toSeq.distinct
+  override def distinct: ScalaSeq[A] =
+    rep.distinct
 
   // -----------------------------------------------------
   // Sinks
@@ -81,34 +81,34 @@ class ScalaTraversable[A] private[api](private[api] val rep: Traversable[A]) ext
   override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
     CSVScalaSupport(format).write(path)(rep)
 
-  override val fetch: Traversable[A] =
+  override val fetch: Seq[A] =
     rep
 
 }
 
-object ScalaTraversable {
+object ScalaSeq {
 
   // ---------------------------------------------------------------------------
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def empty[A]: ScalaTraversable[A] =
-    new ScalaTraversable(Seq.empty)
+  def empty[A]: ScalaSeq[A] =
+    new ScalaSeq(Seq.empty)
 
-  def apply[A](values: Traversable[A]): ScalaTraversable[A] =
-    new ScalaTraversable(values)
+  def apply[A](values: Seq[A]): ScalaSeq[A] =
+    new ScalaSeq(values)
 
-  def readCSV[A: CSVConverter](path: String, format: CSV): ScalaTraversable[A] =
-    new ScalaTraversable(CSVScalaSupport(format).read(path).toStream)
+  def readCSV[A: CSVConverter](path: String, format: CSV): ScalaSeq[A] =
+    new ScalaSeq(CSVScalaSupport(format).read(path).toStream)
 
   // This is used in the code generation in TranslateToDataflows when inserting fetches
-  def byFetch[A](bag: DataBag[A]): ScalaTraversable[A] =
-    new ScalaTraversable(bag.fetch())
+  def byFetch[A](bag: DataBag[A]): ScalaSeq[A] =
+    new ScalaSeq(bag.fetch())
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  private implicit def wrap[A](rep: Traversable[A]): ScalaTraversable[A] =
-    new ScalaTraversable(rep)
+  private implicit def wrap[A](rep: Seq[A]): ScalaSeq[A] =
+    new ScalaSeq(rep)
 }

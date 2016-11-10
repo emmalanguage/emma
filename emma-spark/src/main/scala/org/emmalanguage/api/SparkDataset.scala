@@ -69,7 +69,7 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
   // -----------------------------------------------------
 
   override def union(that: DataBag[A]): DataBag[A] = that match {
-    case dbag: ScalaTraversable[A] => this.rep union SparkDataset(dbag.rep).rep
+    case dbag: ScalaSeq[A] => this.rep union SparkDataset(dbag.rep).rep
     case dbag: SparkRDD[A] => this.rep union dbag.rep.toDS()
     case dbag: SparkDataset[A] => this.rep union dbag.rep
     case _ => that union this
@@ -154,8 +154,8 @@ object SparkDataset {
   def empty[A: Meta](implicit spark: SparkSession): SparkDataset[A] =
     spark.emptyDataset[A]
 
-  def apply[A: Meta](values: Traversable[A])(implicit spark: SparkSession): SparkDataset[A] =
-    spark.createDataset(values.toSeq)
+  def apply[A: Meta](values: Seq[A])(implicit spark: SparkSession): SparkDataset[A] =
+    spark.createDataset(values)
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): SparkDataset[A] =
     spark.read
