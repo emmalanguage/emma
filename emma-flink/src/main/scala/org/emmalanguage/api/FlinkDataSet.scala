@@ -33,6 +33,7 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
   import FlinkDataSet.{typeInfoForType, wrap}
 
   @transient override val m = implicitly[Meta[A]]
+  private implicit def env = this.rep.getExecutionEnvironment
 
   // -----------------------------------------------------
   // Structural recursion
@@ -73,7 +74,9 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
   // -----------------------------------------------------
 
   override def union(that: DataBag[A]): FlinkDataSet[A] = that match {
-    case dataset: FlinkDataSet[A] => this.rep union dataset.rep
+    case dbag: ScalaTraversable[A] => this.rep union FlinkDataSet(dbag.rep).rep
+    case dbag: FlinkDataSet[A] => this.rep union dbag.rep
+    case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
 
   override def distinct: FlinkDataSet[A] =
