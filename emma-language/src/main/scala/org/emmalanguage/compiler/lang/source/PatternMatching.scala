@@ -80,7 +80,7 @@ private[source] trait PatternMatching extends Common {
               val lhs = api.ValSym(owner, nme, tpe)
               val vals = irrefutable(src.Ref(lhs), pat)
               assert(vals.isDefined, s"Unsupported refutable pattern matching:\n${api.Tree.show(mat)}")
-              src.Block(src.ValDef(lhs, target) +: vals.get: _*)(body)
+              src.Block(src.ValDef(lhs, unascr) +: vals.get: _*)(body)
           }
       }.andThen(_.tree)
 
