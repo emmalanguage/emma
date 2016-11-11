@@ -20,9 +20,9 @@ trait Terms { this: AST =>
 
   trait TermAPI { this: API =>
 
-    import u.internal.{constantType, newFreeTerm, newTermSymbol}
-    import u.internal.reificationSupport.freshTermName
     import universe._
+    import internal._
+    import reificationSupport._
 
     /** Term names. */
     object TermName extends Node {
@@ -119,7 +119,7 @@ trait Terms { this: AST =>
         assert(is.defined(name), s"$this name `$name` is not defined")
         assert(is.defined(tpe), s"$this type `$tpe` is not defined")
 
-        val free = newFreeTerm(TermName(name).toString, null, flags, null)
+        val free = internal.newFreeTerm(TermName(name).toString, null, flags, null)
         set.tpe(free, Type.fix(tpe))
         free
       }
@@ -164,15 +164,23 @@ trait Terms { this: AST =>
 
       def apply(target: u.Tree, args: Seq[u.Tree]): u.Apply = {
         assert(is.defined(target), s"$this target is not defined: $target")
-        assert(has.sym(target), s"$this target has no symbol:\n${Tree.showSymbols(target)}")
-        assert(has.tpe(target), s"$this target has no type:\n${Tree.showTypes(target)}")
-        assert(are.defined(args), s"Not all $this args are defined")
-        assert(are.terms(args), s"Not all $this args are terms")
-        assert(have.tpe(args), s"Not all $this args have type")
-
-        val app = u.Apply(target, args.toList)
-        set(app, sym = Sym.of(target), tpe = Type.of(target).resultType)
-        app
+        assert(has.sym(target),    s"$this target has no symbol:\n${Tree.showSymbols(target)}")
+        assert(has.tpe(target),    s"$this target has no type:\n${Tree.showTypes(target)}")
+        assert(are.defined(args),  s"Not all $this args are defined")
+        assert(are.terms(args),    s"Not all $this args are terms")
+        assert(have.tpe(args),     s"Not all $this args have type")
+        val varParam = target.tpe.paramLists.head.lastOption.map(_.info)
+        val argList = ((varParam, args) match {
+          // Handle variable length arguments.
+          case (Some(VarArgType(paramTpe)), initArgs :+ lastArg)
+            if lastArg.tpe <:< Type.kind1[Seq](paramTpe) =>
+            val tpt = setType(u.Ident(TypeName.wildStar), paramTpe)
+            initArgs :+ setType(u.Typed(lastArg, tpt), paramTpe)
+          case _ => args
+        }).toList
+        val app = u.Apply(target, argList)
+        setSymbol(app, target.symbol)
+        setType(app, target.tpe.resultType)
       }
 
       def apply(target: u.Tree, targs: u.Type*)(argss: Seq[u.Tree]*): u.Tree = {
@@ -186,10 +194,19 @@ trait Terms { this: AST =>
       }
 
       def unapplySeq(tree: u.Tree): Option[(u.Tree, Seq[u.Type], Seq[Seq[u.Tree]])] = tree match {
-        case u.Apply(TermApp(target, targs, argss@_*), args) => Some(target, targs, argss :+ args)
-        case u.Apply(target, args) => Some(target, Nil, Seq(args))
-        case TypeApp(target, targs@_*) => Some(target, targs, Nil)
+        case u.Apply(TermApp(target, targs, argss@_*), args) =>
+          Some(target, targs, argss :+ cleanVarArgs(args))
+        case u.Apply(target, args) =>
+          Some(target, Nil, Seq(cleanVarArgs(args)))
+        case TypeApp(target, targs@_*) =>
+          Some(target, targs, Nil)
         case _ => None
+      }
+
+      /** Removes var-arg specific type ascriptions. */
+      private def cleanVarArgs(args: Seq[u.Tree]) = args.map {
+        case u.Typed(arg, u.Ident(TypeName.wildStar)) => arg
+        case arg => arg
       }
     }
 
@@ -335,7 +352,9 @@ trait Terms { this: AST =>
       }
 
       def unapply(ascr: u.Typed): Option[(u.Tree, u.Type)] = ascr match {
-        case u.Typed(Term(expr), _) withType tpe => Some(expr, tpe)
+        // This encodes variable length arguments: method(seq: _*).
+        case u.Typed(_, u.Ident(TypeName.wildStar)) => None
+        case u.Typed(Term(expr), tpt) => Some(expr, tpt.tpe)
         case _ => None
       }
     }

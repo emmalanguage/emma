@@ -32,7 +32,9 @@ trait Types { this: AST =>
     object TypeName extends Node {
 
       // Predefined type names
-      val empty = u.TypeName("")
+      val empty    = u.typeNames.EMPTY
+      val wildcard = u.typeNames.WILDCARD
+      val wildStar = u.typeNames.WILDCARD_STAR
 
       /** Creates a new type name (must be non-empty). */
       def apply(name: String): u.TypeName = {
