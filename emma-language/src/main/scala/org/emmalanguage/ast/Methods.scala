@@ -112,7 +112,7 @@ trait Methods { this: AST =>
             assert(is.defined(tgt), s"$this target is not defined: $tgt")
             assert(is.term(tgt), s"$this target is not a term:\n${Tree.show(tgt)}")
             assert(has.tpe(tgt), s"$this target has no type:\n${Tree.showTypes(tgt)}")
-            val resolved = Sym.resolveOverloaded(Type.of(tgt))(method, targs: _*)(argss: _*)
+            val resolved = Sym.resolveOverloaded(tgt.tpe)(method, targs: _*)(argss: _*)
             assert(is.method(resolved), s"$this resolved variant `$resolved` is not a method")
             Sel(tgt, resolved)
 
@@ -179,7 +179,7 @@ trait Methods { this: AST =>
           val tpMap = (tparams.map(_.toType) zip sym.typeParams.map(_.asType.toType))
             .toMap.withDefault(identity[u.Type])
           (paramss.flatten zip sym.paramLists.flatten)
-            .forall { case (p, q) => Type.of(p).map(tpMap) =:= Type.of(q) }
+            .forall { case (p, q) => p.info.map(tpMap) =:= q.info }
         }, s"Not all $this parameters have the correct type")
 
         val mods = u.Modifiers(get.flags(sym) | flags)
@@ -188,15 +188,13 @@ trait Methods { this: AST =>
         val original = tparams ++ paramss.flatten
         val aliases = sym.typeParams ++ sym.paramLists.flatten
         val rhs = Sym.subst(sym, original zip aliases: _*)(body)
-        val tpe = Type.of(sym)
-        val (rhsTpe, resTpe) = (Type.of(rhs), tpe.finalResultType)
-        assert(Type.of(rhs) weak_<:< resTpe,
-          s"$this body type `$rhsTpe` is not a subtype of return type `$resTpe`")
+        val res = sym.info.finalResultType
+        assert(rhs.tpe <:< sym.info.finalResultType,
+          s"$this body type `${rhs.tpe}` is not a subtype of return type `$res`")
 
-        val tpeTree = TypeQuote(resTpe)
-        val method = u.DefDef(mods, sym.name, tpeDefs, parDefs, tpeTree, rhs)
-        set(method, sym = sym)
-        method
+        val defn = u.DefDef(mods, sym.name, tpeDefs, parDefs, TypeQuote(res), rhs)
+        set(defn, sym = sym)
+        defn
       }
 
       def unapply(defn: u.DefDef)

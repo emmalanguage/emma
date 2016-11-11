@@ -100,8 +100,7 @@ private[source] trait PatternMatching extends Common {
      * Caution: Does not consider `null` refutable in contrast to the standard Scala compiler. This
      * might cause [[java.lang.NullPointerException]]s.
      */
-    private def irrefutable(target: u.Tree, pattern: u.Tree): Option[Seq[u.ValDef]] = {
-      val tgT = api.Type.of(target)
+    private def irrefutable(target: u.Tree, pattern: u.Tree): Option[Seq[u.ValDef]] =
       pattern match {
         // Alternative patterns don't allow binding
         case api.PatAlt(alternatives@_*) =>
@@ -110,7 +109,7 @@ private[source] trait PatternMatching extends Common {
         case api.PatAny(_) =>
           Some(Seq.empty)
 
-        case api.PatAscr(pat, tpe) if tgT weak_<:< tpe =>
+        case api.PatAscr(pat, tpe) if target.tpe <:< tpe =>
           irrefutable(src.TypeAscr(target, tpe), pat)
 
         case api.PatAt(lhs, pat) =>
@@ -118,14 +117,13 @@ private[source] trait PatternMatching extends Common {
           irrefutable(src.ValRef(lhs), pat).map(value +: _)
 
         case api.PatExtr(_, args@_*) withType tpe
-          if is.caseClass(tpe) && tpe.typeSymbol == tgT.typeSymbol =>
-            val inst = tpe.typeSymbol.asClass.primaryConstructor
-            val params = inst.infoIn(tgT).paramLists.head
+          if is.caseClass(tpe) && tpe.typeSymbol == target.tpe.typeSymbol =>
+            val init = tpe.typeSymbol.asClass.primaryConstructor
             val getters = for {
-              param <- inst.infoIn(tgT).paramLists.head
-              api.DefSym(acc) <- tgT.member(param.name).alternatives
-              if acc.isGetter
-            } yield src.DefCall(Some(target))(acc)()
+              param <- init.infoIn(target.tpe).paramLists.head
+              api.DefSym(accessor) <- target.tpe.member(param.name).alternatives
+              if accessor.isGetter
+            } yield src.DefCall(Some(target))(accessor)()
             val patterns = getters zip args map (irrefutable _).tupled
             if (patterns.exists(_.isEmpty)) None
             else Some(patterns.flatMap(_.get))
@@ -133,6 +131,5 @@ private[source] trait PatternMatching extends Common {
         case _ =>
           None
       }
-    }
   }
 }

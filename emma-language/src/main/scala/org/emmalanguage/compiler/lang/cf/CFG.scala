@@ -128,8 +128,7 @@ private[compiler] trait CFG extends Common {
             val values = defs.collect {
               case value @ (api.ValSym(_), _) => value
               case (_, core.ParDef(lhs, _, flags)) if choices.contains(lhs) =>
-                val tpe = api.Type.of(lhs)
-                val rhs = core.DefCall(module)(phi, tpe)(choices(lhs))
+                val rhs = core.DefCall(module)(phi, lhs.info)(choices(lhs))
                 lhs -> core.ParDef(lhs, rhs, flags)
             }
 

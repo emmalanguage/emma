@@ -43,7 +43,7 @@ trait Patterns { this: AST =>
         assert(are.patterns(alternatives), s"Not all $this alternatives are valid patterns")
         assert(have.tpe(alternatives), s"Not all $this alternatives have a type")
 
-        val tpe = Type.weakLub(alternatives map Type.of: _*)
+        val tpe = Type.lub(alternatives.map(_.tpe): _*)
         val alt = u.Alternative(alternatives.toList)
         set(alt, tpe = tpe)
         alt
@@ -113,7 +113,7 @@ trait Patterns { this: AST =>
         assert(is.pattern(rhs), s"$this RHS is not a pattern:\n${Tree.show(rhs)}")
 
         val at = u.Bind(lhs.name, rhs)
-        set(at, sym = lhs, tpe = Type.of(lhs))
+        set(at, sym = lhs, tpe = lhs.info)
         at
       }
 
@@ -139,7 +139,7 @@ trait Patterns { this: AST =>
         if (target.name.toString.head.isUpper) TermRef(target) else {
           assert(has.tpe(target), s"$this target `$target` has no type")
           val id = q"`$target`".asInstanceOf[u.Ident]
-          set(id, sym = target, tpe = Type.of(target))
+          set(id, sym = target, tpe = target.info)
           id
         }
       }
@@ -240,17 +240,15 @@ trait Patterns { this: AST =>
         assert(is.defined(body), s"$this body is not defined: $body")
         assert(is.term(body), s"$this body is not a term:\n${Tree.show(body)}")
         assert(has.tpe(body), s"$this body has no type:\n${Tree.showTypes(body)}")
-        lazy val bodyT = Type.of(body)
-        lazy val guardT = Type.of(guard)
         val grd = if (is.defined(guard)) {
           assert(is.term(guard), s"$this guard is not a term:\n${Tree.show(guard)}")
           assert(has.tpe(guard), s"$this guard has no type:\n${Tree.showTypes(guard)}")
-          assert(guardT =:= Type.bool, s"$this guard is not boolean:\n${Tree.showTypes(guard)}")
+          assert(guard.tpe <:< Type.bool, s"$this guard is not boolean:\n${Tree.showTypes(guard)}")
           guard
         } else Empty()
 
         val cse = u.CaseDef(pat, grd, body)
-        set(cse, tpe = bodyT)
+        set(cse, tpe = body.tpe)
         cse
       }
 
@@ -279,7 +277,7 @@ trait Patterns { this: AST =>
         assert(have.tpe(cases), s"Not all $this cases have types")
 
         val mat = u.Match(sel, cases.toList)
-        val tpe = Type.weakLub(cases.map(Type.of): _*)
+        val tpe = Type.lub(cases.map(_.tpe): _*)
         set(mat, tpe = tpe)
         mat
       }

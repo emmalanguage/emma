@@ -293,6 +293,10 @@ trait CommonAST {
     def pkg(sym: Symbol): Boolean =
       sym.isPackage
 
+    /** Is `sym` a by-name parameter? */
+    def byName(sym: Symbol): Boolean =
+      sym.isTerm && sym.asTerm.isByNameParam
+
     /** Is `tpe` legal for a term (i.e. not of a higher kind or method)? */
     def result(tpe: Type): Boolean =
       !is.poly(tpe) && !is.method(tpe)

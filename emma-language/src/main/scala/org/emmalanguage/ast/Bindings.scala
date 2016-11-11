@@ -104,18 +104,18 @@ trait Bindings { this: AST =>
         assert(is.encoded(lhs), s"$this LHS `$lhs` is not encoded")
         val mods = u.Modifiers(get.flags(lhs) | flags)
         assert(!mods.hasFlag(LAZY), s"$this LHS `$lhs` cannot be lazy")
-        val (name, lhT) = (lhs.name, Type.of(lhs))
         val body = if (is.defined(rhs)) {
           assert(is.term(rhs), s"$this RHS is not a term:\n${Tree.show(rhs)}")
           assert(has.tpe(rhs), s"$this RHS has no type:\n${Tree.showTypes(rhs)}")
-          lazy val rhT = Type.of(rhs)
-          assert(rhT weak_<:< lhT,
-            s"$this LH type `$lhT` is not a supertype of RH type `$rhT`.\n(lhs: `$lhs`, rhs:\n`${u.showCode(rhs)}`\n)")
+          assert(rhs.tpe <:< lhs.info, s"""
+            |$this LH type `${lhs.info}` is not a supertype of RH type `${rhs.tpe}`.
+            |(lhs: `$lhs`, rhs:\n`${u.showCode(rhs)}`\n)
+            |""".stripMargin.trim)
           Owner.at(lhs)(rhs)
         } else Empty()
-
-        val tpt = if (is.param(lhs)) TypeQuote(lhT) else u.TypeTree()
-        val bind = u.ValDef(mods, name, tpt, body)
+        val needsTpt = is.param(lhs) || !(lhs.info =:= rhs.tpe)
+        val tpt = if (needsTpt) TypeQuote(lhs.info) else u.TypeTree()
+        val bind = u.ValDef(mods, lhs.name, tpt, body)
         set(bind, sym = lhs)
         bind
       }

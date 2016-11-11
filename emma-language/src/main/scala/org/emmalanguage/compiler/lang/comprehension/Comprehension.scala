@@ -74,7 +74,7 @@ trait Comprehension extends Common
 
         @inline
         private def elemTpe(f: u.Tree): u.Type =
-          api.Type.arg(2, api.Type.of(f))
+          api.Type.arg(2, f.tpe)
       }
 
       object FlatMap extends MonadOp {
@@ -94,7 +94,7 @@ trait Comprehension extends Common
 
         @inline
         private def elemTpe(f: u.Tree): u.Type =
-          api.Type.arg(1, api.Type.arg(2, api.Type.of(f)))
+          api.Type.arg(1, api.Type.arg(2, f.tpe))
       }
 
       object WithFilter extends MonadOp {
@@ -131,7 +131,7 @@ trait Comprehension extends Common
 
         @inline
         private def elemTpe(expr: u.Tree): u.Type =
-          api.Type of expr
+          expr.tpe
       }
 
       /** Con- and destructs a generator from/to a tree. */
@@ -150,7 +150,7 @@ trait Comprehension extends Common
 
         @inline
         private def elemTpe(expr: u.Tree): u.Type =
-          api.Type.arg(1, api.Type.of(expr))
+          api.Type.arg(1, expr.tpe)
       }
 
       /** Con- and destructs a guard from/to a tree. */
@@ -180,7 +180,7 @@ trait Comprehension extends Common
 
         @inline
         private def elemTpe(expr: u.Tree): u.Type =
-          api.Type.of(expr)
+          expr.tpe
       }
 
       /** Con- and destructs a flatten from/to a tree. */
@@ -197,7 +197,7 @@ trait Comprehension extends Common
 
         @inline
         private def elemTpe(expr: u.Tree): u.Type =
-          api.Type.arg(1, api.Type.arg(1, api.Type.of(expr)))
+          api.Type.arg(1, api.Type.arg(1, expr.tpe))
       }
 
     }

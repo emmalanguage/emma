@@ -218,11 +218,10 @@ private[comprehension] trait Normalize extends Common {
       val symbol = ComprehensionSyntax.comprehension
 
       def unapply(tree: u.Tree): Option[(Seq[u.Tree], u.Tree)] = tree match {
-        case Comprehension(qs,hd) => Some(qs, hd)
-        case t if api.Type.of(t).typeConstructor == Monad => {
-          val x = api.TermSym.free(api.TermName.fresh("x"), api.Type.arg(1, api.Type.of(t)))
+        case Comprehension(qs, hd) => Some(qs, hd)
+        case t if api.Type.constructor(t.tpe) =:= Monad =>
+          val x = api.TermSym.free(api.TermName.fresh("x"), api.Type.arg(1, t.tpe))
           Some(Seq(Generator(x, core.Let()()(t))), Head(core.Let()()(api.TermRef(x))))
-        }
         case _ => None
       }
     }
