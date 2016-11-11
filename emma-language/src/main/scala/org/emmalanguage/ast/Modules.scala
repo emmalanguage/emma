@@ -22,9 +22,10 @@ trait Modules { this: AST =>
   /** Modules (`object`s). */
   trait ModuleAPI { this: API =>
 
-    import u.Flag._
-    import u.internal.{newModuleAndClassSymbol, singleType}
     import universe._
+    import internal._
+    import reificationSupport._
+    import u.Flag._
 
     /** Module (`object`) symbols. */
     object ModuleSym extends Node {
@@ -44,10 +45,8 @@ trait Modules { this: AST =>
         assert(is.defined(name), s"$this name `$name` is not defined")
         assert(are.not(MUTABLE)(flags), s"$this `$name` cannot be mutable")
         assert(are.not(PARAM)(flags), s"$this `$name` cannot be a parameter")
-
-        val module = newModuleAndClassSymbol(owner, TermName(name), pos, flags)._1
-        set.tpe(module, singleType(u.NoPrefix, module))
-        module
+        val obj = newModuleAndClassSymbol(owner, TermName(name), pos, flags)._1
+        setInfo(obj, singleType(u.NoPrefix, obj))
       }
 
       def unapply(sym: u.ModuleSymbol): Option[u.ModuleSymbol] =

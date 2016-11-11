@@ -31,7 +31,7 @@ class ConvertersMacros(val c: blackbox.Context) extends MacroAST {
   private val seq = q"${api.Tree.Scala}.collection.Seq"
   private val emma = q"_root_.eu.stratosphere.emma"
 
-  def materializeCSVConverters[T: c.WeakTypeTag] = api.Type.check {
+  def materializeCSVConverters[T: c.WeakTypeTag] = typeCheck {
     val T = api.Type.weak[T]
     val value = api.TermName.fresh("value")
     val sep = api.TermName.fresh("sep")

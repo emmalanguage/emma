@@ -107,7 +107,7 @@ private[compiler] trait CFG extends Common {
           case core.ValDef(lhs, cs.Comprehension(_, _), _) => Option(lhs)
           case core.ValDef(lhs, core.Lambda(_, _, _), _) => Option(lhs)
         } (Monoids.right(None)).inherit { // Accessible methods
-          case core.Let(_, defs, _) => defs.map(api.TermSym.of).toSet
+          case core.Let(_, defs, _) => defs.map(_.symbol.asTerm).toSet
         }.accumulateWith[Map[u.TermSymbol, Set[u.TermSymbol]]] { // Dataflow edges
           case Attr.syn(core.ValDef(lhs, _, _), defs :: uses :: _) =>
             Map(lhs -> uses.keySet.diff(defs.keySet).filterNot(_.isStatic))

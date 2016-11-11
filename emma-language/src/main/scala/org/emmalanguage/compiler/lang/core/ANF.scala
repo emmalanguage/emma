@@ -123,11 +123,11 @@ private[core] trait ANF extends Common {
           }
 
         // Simplify arguments
-        case Attr.inh(src.Inst(clazz, targs, argss@_*) withType tpe, owner :: _) =>
+        case Attr.inh(src.Inst(cls, targs, argss@_*) withType tpe, owner :: _) =>
           val (stats, exprss) = decompose(argss, unline = false)
-          val nme = api.TermName.fresh(api.Sym.of(clazz))
+          val nme = api.TermName.fresh(cls.typeSymbol)
           val lhs = api.ValSym(owner, nme, tpe)
-          val rhs = core.Inst(clazz, targs: _*)(exprss: _*)
+          val rhs = core.Inst(cls, targs: _*)(exprss: _*)
           val dfn = core.ValDef(lhs, rhs)
           val ref = core.ValRef(lhs)
           src.Block(stats :+ dfn: _*)(ref)

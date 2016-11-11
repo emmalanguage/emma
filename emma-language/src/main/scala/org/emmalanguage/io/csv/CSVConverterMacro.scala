@@ -32,7 +32,7 @@ class CSVConverterMacro(val c: blackbox.Context) extends MacroAST {
   private val seq = q"${api.Tree.Scala}.collection.Seq"
   private val emma = q"_root_.org.emmalanguage"
 
-  def materialize[T: c.WeakTypeTag] = api.Type.check {
+  def materialize[T: c.WeakTypeTag] = typeCheck {
     val T = api.Type.weak[T]
     val value = api.TermName.fresh("value")
 

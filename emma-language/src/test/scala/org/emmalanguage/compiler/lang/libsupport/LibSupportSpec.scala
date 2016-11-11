@@ -31,7 +31,7 @@ class LibSupportSpec extends LibSupportExamples {
 
   val prePipeline: u.Expr[Any] => u.Tree = compiler
     .pipeline(typeCheck = true, withPost = false)(
-      api.Owner.at(get.enclosingOwner)
+      api.Owner.at(enclosingOwner)
     ).compose(_.tree)
 
   val callGraph: u.Tree => CG = tree =>

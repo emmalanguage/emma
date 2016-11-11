@@ -53,6 +53,8 @@ trait AST extends CommonAST
     with VariableAPI
 
   import universe._
+  import internal._
+  import reificationSupport._
 
   /** Virtual non-overlapping semantic AST based on Scala trees. */
   object api extends API
@@ -63,12 +65,12 @@ trait AST extends CommonAST
    */
   lazy val fixSymbolTypes: u.Tree => u.Tree =
     api.TopDown.traverse {
-      case api.Lambda(f, _, _) withType fT => set.tpe(f, fT)
+      case lambda: u.Function => setInfo(lambda.symbol, lambda.tpe)
       case u.DefDef(_, _, tparams, paramss, _ withType tpe, _) withSym method =>
         val tps = tparams.map(_.symbol.asType)
         val pss = paramss.map(_.map(_.symbol.asTerm))
-        val Res = tpe.finalResultType
-        set.tpe(method, api.Type.method(tps: _*)(pss: _*)(Res))
+        val res = tpe.finalResultType
+        setInfo(method, api.Type.method(tps: _*)(pss: _*)(res))
     }.andThen(_.tree)
 
   /**
@@ -189,6 +191,4 @@ trait AST extends CommonAST
     if defs.size > 1
     dfn <- defs.tail
   } yield dfn
-
-  private[ast] def freshNameSuffix: Char
 }

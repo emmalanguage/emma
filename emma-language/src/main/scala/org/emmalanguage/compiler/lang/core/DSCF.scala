@@ -136,7 +136,7 @@ private[core] trait DSCF extends Common {
         // Control-flow elimination
         case Attr(block @ src.Block(stats, expr withType tpe), _, owners :: _, syn) =>
           // Extract required attributes
-          val owner = owners.lastOption.getOrElse(get.enclosingOwner)
+          val owner = owners.lastOption.getOrElse(enclosingOwner)
           def uses(tree: u.Tree) = syn(tree)(Nat._2)
           def mods(tree: u.Tree) = syn(tree) match { case ms :: ds :: _ => ms diff ds.keySet }
 
@@ -276,7 +276,7 @@ private[core] trait DSCF extends Common {
 
     /** Creates a fresh symbol for the latest value of a variable. */
     private def trace(variable: u.TermSymbol, owners: Seq[u.Symbol]) = {
-      val owner = owners.lastOption.getOrElse(get.enclosingOwner)
+      val owner = owners.lastOption.getOrElse(enclosingOwner)
       val name = api.TermName.fresh(variable)
       val value = api.ValSym(owner, name, variable.info)
       Map((owner, variable.name) -> List(value.asTerm))
@@ -284,12 +284,12 @@ private[core] trait DSCF extends Common {
 
     /** Returns a stream of the latest values of a variable. */
     private def latest(variable: u.TermSymbol, owners: Seq[u.Symbol], trace: Trace) =
-      (get.enclosingOwner +: owners).reverseIterator
+      (enclosingOwner +: owners).reverseIterator
         .flatMap(trace(_, variable.name).reverse).toStream
 
     /** Variables -> Parameters mapping. */
     private def varPars(vars: SortedSet[u.TermSymbol]): Seq[u.TermSymbol] =
-      vars.toSeq.map(api.Sym.copy(_)(flags = PARAM).asTerm)
+      vars.toSeq.map(api.Sym.copy(_)(flg = PARAM).asTerm)
 
     /** Variables -> Arguments mapping. */
     private def varArgs(vars: SortedSet[u.TermSymbol]): Seq[u.Ident] =

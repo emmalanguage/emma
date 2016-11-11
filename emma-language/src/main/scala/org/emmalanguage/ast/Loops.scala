@@ -22,9 +22,10 @@ trait Loops { this: AST =>
   /** Loops (`while` and `do-while`). */
   trait LoopAPI { this: API =>
 
-    import u.Flag._
     import universe._
-    import internal.newMethodSymbol
+    import internal._
+    import reificationSupport._
+    import u.Flag._
 
     /** Converts `tree` to a statement (block with `Unit` expression). */
     private def asStat(tree: u.Tree) = tree match {
@@ -49,9 +50,8 @@ trait Loops { this: AST =>
         pos: u.Position = u.NoPosition)
         : u.MethodSymbol = {
 
-        val label = newMethodSymbol(owner, TermName(name), pos, flags | CONTRAVARIANT)
-        set.tpe(label, Type.loop)
-        label
+        val lbl = newMethodSymbol(owner, TermName(name), pos, flags | CONTRAVARIANT)
+        setInfo(lbl, Type.loop)
       }
 
       def unapply(sym: u.MethodSymbol): Option[u.MethodSymbol] =
@@ -81,13 +81,11 @@ trait Loops { this: AST =>
         assert(is.defined(body), s"$this body is not defined: $body")
         assert(has.tpe(cond), s"$this condition has no type:\n${Tree.showTypes(cond)}")
         assert(cond.tpe <:< Type.bool, s"$this condition is not boolean:\n${Tree.showTypes(cond)}")
-
         val nme = TermName.fresh("while")
         val lbl = LabelSym(u.NoSymbol, nme)
         val rhs = WhileBody(lbl, cond, asStat(body))
         val dfn = u.LabelDef(nme, Nil, rhs)
-        set(dfn, sym = lbl, tpe = Type.unit)
-        dfn
+        setType(setSymbol(dfn, lbl), Type.unit)
       }
 
       def unapply(loop: u.LabelDef): Option[(u.Tree, u.Tree)] = loop match {
@@ -110,13 +108,11 @@ trait Loops { this: AST =>
         assert(is.defined(body), s"$this body is not defined: $body")
         assert(has.tpe(cond), s"$this condition has no type:\n${Tree.showTypes(cond)}")
         assert(cond.tpe <:< Type.bool, s"$this condition is not boolean:\n${Tree.showTypes(cond)}")
-
         val nme = TermName.fresh("doWhile")
         val lbl = LabelSym(u.NoSymbol, nme)
         val rhs = DoWhileBody(lbl, cond, asStat(body))
         val dfn = u.LabelDef(nme, Nil, rhs)
-        set(dfn, sym = lbl, tpe = Type.unit)
-        dfn
+        setType(setSymbol(dfn, lbl), Type.unit)
       }
 
       def unapply(loop: u.LabelDef): Option[(u.Tree, u.Tree)] = loop match {

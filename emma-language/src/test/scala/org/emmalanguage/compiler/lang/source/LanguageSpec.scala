@@ -39,7 +39,7 @@ class LanguageSpec extends BaseCompilerSpec {
   // ---------------------------------------------------------------------------
 
   /** Example pre-processing pipeline. */
-  lazy val pipeline = { api.Type.check(_: u.Tree) }
+  lazy val pipeline = { compiler.typeCheck(_: u.Tree) }
     .andThen(compiler.fixSymbolTypes)
     .andThen(compiler.unQualifyStatics)
     .andThen(compiler.normalizeStatements)
@@ -58,7 +58,7 @@ class LanguageSpec extends BaseCompilerSpec {
     }
 
   override def alphaEqTo[T <: u.Tree](tree: T) =
-    super.alphaEqTo(api.Owner.at(get.enclosingOwner)(tree))
+    super.alphaEqTo(api.Owner.at(enclosingOwner)(tree))
 
   // ---------------------------------------------------------------------------
   // Atomics
@@ -400,7 +400,7 @@ class LanguageSpec extends BaseCompilerSpec {
 
     "can be constructed and destructed" in {
       examples foreach { case x @ src.Lambda(_, params, body) =>
-        x shouldBe alphaEqTo (src.Lambda(params.map(api.TermSym.of(_)): _*)(body))
+        x shouldBe alphaEqTo (src.Lambda(params.map(_.symbol.asTerm): _*)(body))
       }
     }
   }

@@ -56,7 +56,7 @@ trait Terms { this: AST =>
       /** Extracts the term name of `sym`, if any. */
       def apply(sym: u.Symbol): u.TermName = {
         assert(is.defined(sym), s"Undefined symbol `$sym`")
-        assert(has.name(sym), s"Symbol `$sym` has no name")
+        assert(has.nme(sym), s"Symbol `$sym` has no name")
         apply(sym.name)
       }
 
@@ -75,7 +75,7 @@ trait Terms { this: AST =>
       /** Creates a fresh term name with the given symbol's name as `prefix`. */
       def fresh(prefix: u.Symbol): u.TermName = {
         assert(is.defined(prefix), s"Undefined prefix `$prefix`")
-        assert(has.name(prefix), s"Prefix `$prefix` has no name")
+        assert(has.nme(prefix), s"Prefix `$prefix` has no name")
         fresh(prefix.name)
       }
 
@@ -105,13 +105,6 @@ trait Terms { this: AST =>
         setInfo(sym, tpe.dealias.widen)
       }
 
-      /** Extracts the term symbol of `tree`, if any. */
-      def of[T <: u.Tree](tree: T): u.TermSymbol = {
-        val sym = Sym.of(tree)
-        assert(is.term(sym), s"Symbol `$sym` is not a term")
-        sym.asTerm
-      }
-
       /** Creates a free term symbol (without an owner). */
       def free(name: u.TermName, tpe: u.Type, flags: u.FlagSet = u.NoFlags): u.FreeTermSymbol = {
         assert(is.defined(name), s"$this name `$name` is not defined")
@@ -122,7 +115,7 @@ trait Terms { this: AST =>
 
       /** Creates a free term symbol with the same attributes as the `original`. */
       def free(original: u.TermSymbol): u.FreeTermSymbol =
-        free(TermName(original), original.info, get.flags(original))
+        free(TermName(original), original.info, flags(original))
 
       /** Creates a fresh term symbol with the same attributes as the `original`. */
       def fresh(original: u.TermSymbol): u.TermSymbol =
@@ -136,20 +129,6 @@ trait Terms { this: AST =>
 
       // Predefined terms
       lazy val unit = Lit(())
-
-      /** Looks for `member` in `target` and returns its symbol (possibly overloaded). */
-      def member(target: u.Type, member: u.TermName): u.TermSymbol = {
-        assert(is.defined(target), s"Undefined target `$target`")
-        assert(is.defined(member), s"Undefined term member `$member`")
-        target.member(member).asTerm
-      }
-
-      /** Looks for `member` in `target` and returns its symbol (possibly overloaded). */
-      def member(target: u.Symbol, member: u.TermName): u.TermSymbol = {
-        assert(is.defined(target), s"Undefined target `$target`")
-        assert(has.tpe(target), s"Target `$target` has no type")
-        Term.member(target.info, member)
-      }
 
       def unapply(tree: u.Tree): Option[u.Tree] =
         Option(tree).filter(is.term)
@@ -213,11 +192,9 @@ trait Terms { this: AST =>
         assert(has.tpe(target), s"$this target has no type:\n${Tree.showTypes(target)}")
         assert(targs.nonEmpty, s"No type args supplied to $this")
         assert(targs.forall(is.defined), s"Not all $this type args are defined")
-
         val tpts = targs.map(TypeQuote(_)).toList
         val tapp = u.TypeApply(target, tpts)
-        set(tapp, tpe = Type(target.tpe, targs: _*))
-        tapp
+        setType(tapp, Type(target.tpe, targs: _*))
       }
 
       def unapplySeq(tapp: u.TypeApply): Option[(u.Tree, Seq[u.Type])] =
@@ -291,11 +268,9 @@ trait Terms { this: AST =>
        * @return `value`.
        */
       def apply(value: Any): u.Literal = {
-        val const = u.Constant(value)
-        val tpe = if (() == value) Type.unit else constantType(const)
-        val lit = u.Literal(const)
-        set(lit, tpe = tpe)
-        lit
+        val cst = u.Constant(value)
+        val tpe = if (() == value) Type.unit else constantType(cst)
+        setType(u.Literal(cst), tpe)
       }
 
       def unapply(lit: u.Literal): Option[Any] =
@@ -312,12 +287,10 @@ trait Terms { this: AST =>
        */
       def apply(sym: u.Symbol): u.This = {
         assert(is.defined(sym), s"$this `$sym` is not defined")
-        assert(has.name(sym), s"$this `$sym` has no name")
-        assert(is.clazz(sym) || is.module(sym), s"$this `$sym` is neither a class nor a module")
-
-        val ths = u.This(if (is.clazz(sym)) sym.asType.name else TypeName.empty)
-        set(ths, sym = sym, tpe = Type.thisOf(sym))
-        ths
+        assert(has.nme(sym), s"$this `$sym` has no name")
+        assert(sym.isClass || sym.isModule, s"$this `$sym` is neither a class nor a module")
+        val ths = u.This(if (sym.isClass) sym.asType.name else TypeName.empty)
+        setType(setSymbol(ths, sym), Type.thisOf(sym))
       }
 
       def unapply(ths: u.This): Option[u.Symbol] =
@@ -365,16 +338,13 @@ trait Terms { this: AST =>
         assert(targs.forall(is.defined), s"Not all $this type args are defined")
         assert(are.defined(argss.flatten), s"Not all $this args are defined")
         assert(have.tpe(argss.flatten), s"Not all $this args have type")
-
-        val clazz = Type.constructor(target)
-        val constructor = clazz.decl(TermName.init)
-        val init = Sym.resolveOverloaded(appliedType(clazz, targs: _*))(constructor)(argss: _*)
-        val tpe = Type(clazz, targs: _*)
-        val tpt = u.New(TypeQuote(tpe))
-        set(tpt, tpe = tpe)
-        val inst = TermApp(Sel(tpt, init))(argss: _*)
-        set(inst, sym = init, tpe = tpe)
-        inst
+        val cls = Type.constructor(target)
+        val ini = cls.decl(TermName.init)
+        val ctr = Sym.resolveOverloaded(appliedType(cls, targs: _*))(ini)(argss: _*)
+        val tpe = Type(cls, targs: _*)
+        val tpt = setType(u.New(TypeQuote(tpe)), tpe)
+        val app = TermApp(Sel(tpt, ctr))(argss: _*)
+        setType(setSymbol(app, ctr), tpe)
       }
 
       def unapplySeq(tree: u.Tree): Option[(u.Type, Seq[u.Type], Seq[Seq[u.Tree]])] = tree match {
@@ -395,20 +365,18 @@ trait Terms { this: AST =>
        */
       def apply(params: u.TermSymbol*)(body: u.Tree): u.Function = {
         assert(params.forall(is.defined), s"Not all $this parameters are defined")
-        assert(have.name(params), s"Not all $this parameters have names")
+        assert(have.nme(params), s"Not all $this parameters have names")
         assert(params.forall(has.tpe), s"Not all $this parameters have types")
         assert(is.defined(body), s"$this body is not defined: $body")
         assert(is.term(body), s"$this body is not a term:\n${Tree.show(body)}")
         assert(has.tpe(body), s"$this body has no type:\n${Tree.showTypes(body)}")
-
-        val parTs = params.map(_.info)
-        val tpe = Type.fun(parTs: _*)(body.tpe)
-        val fun = TermSym.free(TermName.lambda, tpe)
-        val aliases = for ((p, t) <- params zip parTs) yield ParSym(fun, p.name, t)
-        val rhs = Sym.subst(fun, params zip aliases: _*)(body)
-        val lambda = u.Function(aliases.map(ParDef(_)).toList, rhs)
-        set(lambda, sym = fun, tpe = tpe)
-        lambda
+        val pts = params.map(_.info)
+        val tpe = Type.fun(pts: _*)(body.tpe)
+        val sym = TermSym.free(TermName.lambda, tpe)
+        val als = for ((p, t) <- params zip pts) yield ParSym(sym, p.name, t)
+        val rhs = Sym.subst(sym, params zip als: _*)(body)
+        val fun = u.Function(als.map(ParDef(_)).toList, rhs)
+        setType(setSymbol(fun, sym), tpe)
       }
 
       def unapply(lambda: u.Function): Option[(u.TermSymbol, Seq[u.ValDef], u.Tree)] = lambda match {
@@ -431,14 +399,10 @@ trait Terms { this: AST =>
         assert(is.defined(expr), s"$this expr is not defined: $expr")
         assert(is.term(expr), s"$this expr is not a term:\n${Tree.show(expr)}")
         assert(has.tpe(expr), s"$this expr has no type:\n${Tree.showTypes(expr)}")
-
-        val compressed = stats.filter {
+        setType(u.Block(stats.filter {
           case Lit(()) => false
           case _ => true
-        }.toList
-        val block = u.Block(compressed, expr)
-        set(block, tpe = expr.tpe)
-        block
+        }.toList, expr), expr.tpe)
       }
 
       def unapply(block: u.Block): Option[(Seq[u.Tree], u.Tree)] = block match {
@@ -471,10 +435,7 @@ trait Terms { this: AST =>
         assert(has.tpe(thn), s"$this then has no type:\n${Tree.showTypes(thn)}")
         assert(has.tpe(els), s"$this else has no type:\n${Tree.showTypes(els)}")
         assert(cond.tpe <:< Type.bool, s"$this condition is not boolean:\n${Tree.showTypes(cond)}")
-
-        val branch = u.If(cond, thn, els)
-        set(branch, tpe = Type.lub(thn.tpe, els.tpe))
-        branch
+        setType(u.If(cond, thn, els), Type.lub(thn.tpe, els.tpe))
       }
 
       def unapply(branch: u.If): Option[(u.Tree, u.Tree, u.Tree)] = branch match {

@@ -33,21 +33,8 @@ trait Symbols { this: AST =>
     object Sym extends Node {
 
       // Predefined symbols
-      lazy val foreach = Type[TraversableOnce[Nothing]].member(TermName.foreach).asMethod
-
-      /** Extracts the symbol of `tree`, if any. */
-      def of(tree: u.Tree): u.Symbol = {
-        assert(is.defined(tree), s"Undefined tree has no $this: $tree")
-        assert(has.sym(tree), s"Tree has no $this:\n${Tree.showSymbols(tree)}")
-        tree.symbol
-      }
-
-      /** Extracts the symbol of `tpe` (preferring the type symbol), if any. */
-      def of(tpe: u.Type): u.Symbol = {
-        assert(is.defined(tpe), s"Undefined type `$tpe` has no $this")
-        assert(has.sym(tpe), s"Type `$tpe` has no $this")
-        if (has.typeSym(tpe)) tpe.typeSymbol else tpe.termSymbol
-      }
+      lazy val foreach = Type[TraversableOnce[Nothing]]
+        .member(TermName.foreach).asMethod
 
       /** Creates a copy of `sym`, optionally changing some of its attributes. */
       def copy(sym: u.Symbol)(
@@ -55,30 +42,31 @@ trait Symbols { this: AST =>
         owner: u.Symbol   = sym.owner,
         tpe:   u.Type     = sym.info,
         pos:   u.Position = sym.pos,
-        flags: u.FlagSet  = get.flags(sym)): u.Symbol = {
+        flg: u.FlagSet    = flags(sym)): u.Symbol = {
 
         // Optimize when there are no changes.
-        if (name == sym.name && owner == sym.owner && tpe == sym.info &&
-          pos == sym.pos && flags == get.flags(sym)) return sym
+        val noChange = name == sym.name &&
+          owner == sym.owner &&
+          tpe == sym.info &&
+          pos == sym.pos &&
+          flg == flags(sym)
 
-        assert(is.defined(sym), s"Undefined symbol `$sym` cannot be copied")
-        assert(!is.pkg(sym), s"Package symbol `$sym` cannot be copied")
-        assert(is.defined(name), s"Undefined name `$name`")
-        assert(is.defined(tpe), s"Undefined type `$tpe`")
-
-        val encoded = name.encodedName
-        val dup = if (sym.isType) {
-          val typeName = encoded.toTypeName
-          if (sym.isClass) newClassSymbol(owner, typeName, pos, flags)
-          else newTypeSymbol(owner, typeName, pos, flags)
-        } else {
-          val termName = encoded.toTermName
-          if (sym.isModule) newModuleAndClassSymbol(owner, termName, pos, flags)._1
-          else if (sym.isMethod) newMethodSymbol(owner, termName, pos, flags)
-          else newTermSymbol(owner, termName, pos, flags)
+        if (noChange) sym else {
+          assert(is.defined(sym), s"Undefined symbol `$sym` cannot be copied")
+          assert(!sym.isPackage, s"Package symbol `$sym` cannot be copied")
+          assert(is.defined(name), s"Undefined name `$name`")
+          assert(is.defined(tpe), s"Undefined type `$tpe`")
+          setInfo(if (sym.isType) {
+            val typeName = name.encodedName.toTypeName
+            if (sym.isClass) newClassSymbol(owner, typeName, pos, flg)
+            else newTypeSymbol(owner, typeName, pos, flg)
+          } else {
+            val termName = name.encodedName.toTermName
+            if (sym.isModule) newModuleAndClassSymbol(owner, termName, pos, flg)._1
+            else if (sym.isMethod) newMethodSymbol(owner, termName, pos, flg)
+            else newTermSymbol(owner, termName, pos, flg)
+          }, tpe.dealias.widen)
         }
-
-        setInfo(dup, tpe.dealias.widen)
       }
 
       /** A map of all tuple symbols by number of elements. */
@@ -99,6 +87,14 @@ trait Symbols { this: AST =>
       /** A set of all lambda function symbols. */
       lazy val funs: Set[u.Symbol] =
         FunctionClass.seq.toSet
+
+      /** Returns the flags associated with `sym`. */
+      def flags(sym: u.Symbol): u.FlagSet =
+        internal.flags(sym)
+
+      /** Returns any annotation of type `A` associated with `sym`. */
+      def findAnn[A: TypeTag](sym: u.Symbol): Option[u.Annotation] =
+        sym.annotations.find(_.tree.tpe =:= Type[A])
 
       /** Finds a version of an overloaded symbol with matching type signature, if possible. */
       def resolveOverloaded(target: u.Type = u.NoType)
@@ -166,64 +162,63 @@ trait Symbols { this: AST =>
        * @param in The tree to perform substitution in.
        * @return A structurally equivalent tree, owned by `at`, with all `aliases` substituted.
        */
-      def subst(at: u.Symbol, aliases: (u.Symbol, u.Symbol)*)(in: u.Tree): u.Tree = {
-        if (!is.defined(at) && aliases.isEmpty) return in
-        // NOTE: This mutable state could be avoided if Transducers had attribute initializers.
-        var (from, to) = aliases.toList.unzip
-        var symAlias = aliases.toMap.withDefault(identity)
-        // Handle method types as well.
-        def tpeAlias(tpe: u.Type): u.Type =
-          if (is.defined(tpe)) {
-            if (tpe.typeParams.exists(symAlias.contains) ||
-                tpe.paramLists.iterator.flatten.exists(symAlias.contains)) {
-              val tps = tpe.typeParams.map(symAlias(_).asType)
-              val pss = tpe.paramLists.map(_.map(symAlias(_).asTerm))
-              val Res = tpe.finalResultType.substituteSymbols(from, to)
-              Type.method(tps: _*)(pss: _*)(Res)
-            } else tpe.substituteSymbols(from, to)
-          } else tpe
+      def subst(at: u.Symbol, aliases: (u.Symbol, u.Symbol)*)(in: u.Tree): u.Tree =
+        if (!is.defined(at) && aliases.isEmpty) in else {
+          // NOTE: This mutable state could be avoided if Transducers had attribute initializers.
+          var (keys, vals) = aliases.toList.unzip
+          var dict = aliases.toMap.withDefault(identity)
+          // Handle method types as well.
+          def tpeAlias(tpe: u.Type): u.Type =
+            if (is.defined(tpe)) {
+              if (tpe.typeParams.exists(dict.contains) ||
+                tpe.paramLists.iterator.flatten.exists(dict.contains)) {
+                val tps = tpe.typeParams.map(dict(_).asType)
+                val pss = tpe.paramLists.map(_.map(dict(_).asTerm))
+                val Res = tpe.finalResultType.substituteSymbols(keys, vals)
+                Type.method(tps: _*)(pss: _*)(Res)
+              } else tpe.substituteSymbols(keys, vals)
+            } else tpe
 
-        TopDown.inherit {
-          case Owner(sym) => sym
-        } (Monoids.right(at)).traverseWith {
-          case Attr.inh(Owner(sym), currOwner :: _) =>
-            val alias = symAlias(sym)
-            val owner = symAlias(currOwner)
-            val tpe = alias.info.substituteSymbols(from, to)
-            val changed = owner != alias.owner || tpe != alias.info
-            if (is.method(alias)) {
-              val met = alias.asMethod
-              if (changed || met.typeParams.exists(symAlias.contains) ||
-                  met.paramLists.iterator.flatten.exists(symAlias.contains)) {
-                val tps = met.typeParams.map(symAlias(_).asType)
-                val pss = met.paramLists.map(_.map(symAlias(_).asTerm))
-                val nme = alias.name.toTermName
-                val flg = get.flags(alias)
-                val pos = alias.pos
-                val Res = tpe.finalResultType
-                val dup = DefSym(owner, nme, flg, pos)(tps: _*)(pss: _*)(Res)
-                val src = sym :: met.typeParams ::: met.paramLists.flatten
-                val dst = dup :: dup.typeParams ::: dup.paramLists.flatten
-                symAlias ++= src.iterator zip dst.iterator
-                from :::= src
-                to :::= dst
+          TopDown.inherit {
+            case Owner(sym) => sym
+          } (Monoids.right(at)).traverseWith {
+            case Attr.inh(Owner(sym), cur :: _) =>
+              val als = dict(sym)
+              val own = dict(cur)
+              val tpe = als.info.substituteSymbols(keys, vals)
+              val changed = own != als.owner || tpe != als.info
+              if (is.method(als)) {
+                val met = als.asMethod
+                if (changed || met.typeParams.exists(dict.contains) ||
+                  met.paramLists.iterator.flatten.exists(dict.contains)) {
+                  val tps = met.typeParams.map(dict(_).asType)
+                  val pss = met.paramLists.map(_.map(dict(_).asTerm))
+                  val nme = als.name.toTermName
+                  val flg = flags(als)
+                  val pos = als.pos
+                  val res = tpe.finalResultType
+                  val dup = DefSym(own, nme, flg, pos)(tps: _*)(pss: _*)(res)
+                  val src = sym :: met.typeParams ::: met.paramLists.flatten
+                  val dst = dup :: dup.typeParams ::: dup.paramLists.flatten
+                  dict ++= src.iterator zip dst.iterator
+                  keys :::= src
+                  vals :::= dst
+                }
+              } else if (changed) {
+                val dup = copy(als)(owner = own, tpe = tpe)
+                dict += sym -> dup
+                keys ::= sym
+                vals ::= dup
               }
-            } else if (changed) {
-              val dup = copy(alias)(owner = owner, tpe = tpe)
-              symAlias += sym -> dup
-              from ::= sym
-              to ::= dup
-            }
-        } (in)
+          } (in)
 
-        // Can't be fused with the traversal above,
-        // because method calls might appear before their definition.
-        if (symAlias.isEmpty) in
-        else TopDown.transform { case tree
-          if has.tpe(tree) || (has.sym(tree) && symAlias.contains(tree.symbol))
-          => Tree.copy(tree)(sym = symAlias(tree.symbol), tpe = tpeAlias(tree.tpe))
-        } (in).tree
-      }
+          // Can't be fused with the traversal above,
+          // because method calls might appear before their definition.
+          if (dict.isEmpty) in else TopDown.transform { case tree
+            if has.tpe(tree) || (has.sym(tree) && dict.contains(tree.symbol))
+            => Tree.copy(tree)(sym = dict(tree.symbol), tpe = tpeAlias(tree.tpe))
+          } (in).tree
+        }
 
       def unapply(sym: u.Symbol): Option[u.Symbol] =
         Option(sym).filter(is.defined)
@@ -232,35 +227,15 @@ trait Symbols { this: AST =>
     /** Named entities that own their children. */
     object Owner extends Node {
 
-      /** Extracts the owner of `sym`, if any. */
-      def of(sym: u.Symbol): u.Symbol = {
-        assert(is.defined(sym), s"Undefined symbol `$sym` has no $this")
-        assert(has.owner(sym), s"Symbol `$sym` has no $this")
-        sym.owner
-      }
-
       /** Extracts the owner of `tree`, if any. */
       def of(tree: u.Tree): u.Symbol = tree
         .find(is.owner)
         .map(_.symbol.owner)
         .getOrElse(u.NoSymbol)
 
-      /** Extracts the owner of `tpe`, if any. */
-      def of(tpe: u.Type): u.Symbol =
-        Owner.of(Sym.of(tpe))
-
       /** Returns a chain of the owners of `sym` starting at `sym` and ending at `_root_`. */
       def chain(sym: u.Symbol): Stream[u.Symbol] =
         Stream.iterate(sym)(_.owner).takeWhile(is.defined)
-
-      /** Returns a chain of the owners of `tree` starting at `tree` and ending at `_root_`. */
-      def chain(tree: u.Tree): Stream[u.Symbol] =
-        chain(tree.symbol)
-
-      /** Returns a chain of the owners of `tpe` starting at `tpe` and ending at `_root_`. */
-      def chain(tpe: u.Type): Stream[u.Symbol] =
-        if (has.sym(tpe)) chain(Sym.of(tpe))
-        else Stream.empty
 
       /** Fixes the owner chain of a tree with `owner` at the root. */
       def at(owner: u.Symbol): u.Tree => u.Tree = {

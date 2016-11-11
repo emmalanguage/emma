@@ -35,6 +35,8 @@ trait Variables { this: AST =>
   trait VariableAPI { this: API =>
 
     import universe._
+    import internal._
+    import reificationSupport._
     import u.Flag._
 
     /** Variable (`var`) symbols. */
@@ -123,10 +125,7 @@ trait Variables { this: AST =>
         assert(has.tpe(rhs), s"$this RHS has no type:\n${Tree.showTypes(rhs)}")
         assert(rhs.tpe <:< lhs.info,
           s"$this LH type `${lhs.info}` is not a supertype of RH type `${rhs.tpe}`")
-
-        val mut = u.Assign(VarRef(lhs), rhs)
-        set(mut, tpe = u.NoType)
-        mut
+        setType(u.Assign(VarRef(lhs), rhs), u.NoType)
       }
 
       def unapply(mut: u.Assign): Option[(u.TermSymbol, u.Tree)] = mut match {

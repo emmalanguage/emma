@@ -266,7 +266,7 @@ trait Transversers { this: AST =>
     /** Inherits the owner of the current node. */
     def withOwner = inherit {
       case api.Owner(sym) => sym
-    } (Monoids.right(get.enclosingOwner))
+    } (Monoids.right(enclosingOwner))
 
     /** Inherits the owner chain of the current node. */
     def withOwnerChain = inherit(Attr.collect[Vector, Symbol] {

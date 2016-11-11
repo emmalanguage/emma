@@ -53,7 +53,7 @@ trait Compiler extends AlphaEq
 
   /** Standard pipeline suffix. Brings a tree into a form acceptable for `scalac` after being transformed. */
   lazy val postProcess: Seq[u.Tree => u.Tree] = Seq(
-    api.Owner.at(get.enclosingOwner),
+    api.Owner.at(enclosingOwner),
     qualifyStatics,
     restoreTypeTrees
   )
@@ -68,7 +68,7 @@ trait Compiler extends AlphaEq
 
     val bld = Seq.newBuilder[u.Tree => u.Tree]
     //@formatter:off
-    if (typeCheck) bld += { api.Type.check(_) }
+    if (typeCheck) bld += { this.typeCheck(_) }
     if (withPre)   bld ++= preProcess
     bld ++= transformations
     if (withPost)  bld ++= postProcess

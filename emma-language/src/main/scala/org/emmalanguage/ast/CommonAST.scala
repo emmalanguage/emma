@@ -18,7 +18,6 @@ package ast
 
 import scala.annotation.tailrec
 import scala.reflect.api.Universe
-import scala.reflect.macros.Attachments
 
 /**
  * Implements various utility functions that mitigate and/or workaround deficiencies in Scala's
@@ -34,13 +33,18 @@ trait CommonAST {
   val universe: Universe
   lazy val u: universe.type = universe
 
+  /** Syntax sugar for partial functions. */
   type =?>[-A, +B] = PartialFunction[A, B]
 
   import universe._
   import internal._
-  import decorators._
-  import reificationSupport._
   import u.Flag._
+
+  private[ast] def freshNameSuffix: Char
+
+  // ---------------------------
+  // Parsing and type-checking
+  // ---------------------------
 
   /** Raises an error and terminates compilation. */
   def abort(msg: String, pos: Position = NoPosition): Nothing
@@ -48,112 +52,38 @@ trait CommonAST {
   /** Raises a compiler warning. */
   def warning(msg: String, pos: Position = NoPosition): Unit
 
-  /** Constant limits. */
-  object Max {
-
-    /** Maximum number of lambda arguments. */
-    val FunParams = definitions.FunctionClass.seq.size
-
-    /** Maximum number of tuple elements. */
-    val TupleElems = definitions.TupleClass.seq.size
-  }
-
-  // ---------------------------
-  // Parsing and type-checking
-  // ---------------------------
-
-  /**
-   * Evaluates a snippet of code and returns a value of type `T`.
-   * Note: this can be called on typechecked trees (as opposed to the eval method in ToolBox).
-   */
-  private[emmalanguage] def eval[T](code: Tree): T
-
   /** Parses a snippet of source code and returns the AST. */
-  private[emmalanguage] def parse(code: String): Tree
+  def parse(code: String): Tree
 
   /** Type-checks a `tree` (use `typeMode=true` for type-trees). */
-  private[emmalanguage] def typeCheck(tree: Tree, typeMode: Boolean = false): Tree
+  def typeCheck(tree: Tree, typeMode: Boolean = false): Tree
 
   /** Removes all type and symbol attributes from a `tree`. */
   // FIXME: Replace with `c.untypecheck` or `tb.untypecheck` once SI-5464 is resolved.
-  private[emmalanguage] def unTypeCheck(tree: Tree): Tree =
+  def unTypeCheck(tree: Tree): Tree =
     parse(showCode(tree, printRootPkg = true))
 
-  /** Infers an implicit value from the enclosing context (if possible). */
-  private[emmalanguage] def inferImplicit(tpe: Type): Tree
+  /**
+   * Evaluates a snippet of code and returns a value of type `T`.
+   * Note: this can be called on type--checked trees (as opposed to the eval method in ToolBox).
+   */
+  def eval[T](code: Tree): T
 
   // ------------------------------
   // Abstract getters and setters
   // ------------------------------
 
-  /** Getter for the attributes of various compilation entities. */
-  val get: Getter
+  /** Returns the enclosing named entity (class, method, value, etc). */
+  def enclosingOwner: Symbol
 
-  /**
-   * Setter for the attributes of various compilation entities.
-   * WARN: Mutates in place.
-   */
-  private[ast] val set: Setter
+  /** Infers an implicit value from the enclosing context (if possible). */
+  def inferImplicit(tpe: Type): Option[Tree]
 
-  /** Getter for the attributes of various compilation entities. */
-  trait Getter {
+  /** Returns `tpt` with its original field set. */
+  private[ast] def setOriginal(tpt: TypeTree, original: Tree): TypeTree
 
-    // Symbols
-    def enclosingOwner: Symbol
-    def ans(sym: Symbol): Seq[Annotation] = sym.annotations
-    def ann[A: TypeTag](sym: Symbol): Option[Annotation] = ans(sym).find(_.tree.tpe =:= typeOf[A])
-    def flags(sym: Symbol): FlagSet = sym.flags
-    def meta(sym: Symbol): Attachments
-    def name(sym: Symbol): Name = sym.name
-    def owner(sym: Symbol): Symbol = sym.owner
-    def pos(sym: Symbol): Position = sym.pos
-    def tpe(sym: Symbol): Type = sym.info
-
-    // Trees
-    def meta(tree: Tree): Attachments
-    def original(tpt: TypeTree): Tree = tpt.original
-    def pos(tree: Tree): Position = tree.pos
-    def sym(tree: Tree): Symbol = tree.symbol
-    def tpe(tree: Tree): Type = tree.tpe
-
-    // Types
-    def pos(tpe: Type): Position =
-      if (has.typeSym(tpe)) tpe.typeSymbol.pos
-      else if (has.termSym(tpe)) tpe.termSymbol.pos
-      else NoPosition
-  }
-
-  /**
-   * Setter for the attributes of various compilation entities.
-   * WARN: Mutates in place.
-   */
-  private[ast] trait Setter {
-
-    /** Set multiple properties of a `tree` at once. */
-    def apply(tree: Tree,
-      pos: Position = NoPosition,
-      sym: Symbol = null,
-      tpe: Type = NoType): Unit = {
-
-      if (pos != null) set.pos(tree, pos)
-      if (tpe != null) set.tpe(tree, tpe)
-      if (sym != null) set.sym(tree, sym)
-    }
-
-    // Symbols
-    def ans(sym: Symbol, ans: Annotation*): Unit = setAnnotations(sym, ans.toList)
-    def flags(sym: Symbol, flags: FlagSet): Unit
-    def name(sym: Symbol, name: Name): Unit
-    def owner(sym: Symbol, owner: Symbol): Unit
-    def pos(sym: Symbol, pos: Position): Unit
-    def tpe(sym: Symbol, tpe: Type): Unit = setInfo(sym, tpe)
-
-    // Trees
-    def original(tpt: TypeTree, original: Tree): Unit
-    def pos(tree: Tree, pos: Position): Unit
-    def sym(tree: Tree, sym: Symbol): Unit = if (tree.symbol != sym) setSymbol(tree, sym)
-    def tpe(tree: Tree, tpe: Type): Unit = setType(tree, tpe)
-  }
+  /** Returns `tree` with its position set. */
+  private[ast] def setPos[T <: Tree](tree: T, pos: Position): T
 
   // ------------
   // Extractors
@@ -163,7 +93,7 @@ trait CommonAST {
   /** Extractor for the name of a symbol, if any. */
   object withName {
     def unapply(sym: Symbol): Option[(Symbol, Name)] =
-      if (has.name(sym)) Some(sym, sym.name) else None
+      if (has.nme(sym)) Some(sym, sym.name) else None
   }
 
   /** Extractor for the type of a symbol, if any. */
@@ -193,11 +123,11 @@ trait CommonAST {
 
     /** Does `sym` have the property encoded as flag(s)? */
     def apply(property: FlagSet)(sym: Symbol): Boolean =
-      are(property)(sym.flags)
+      are(property)(flags(sym))
 
     /** The opposite of `is(property)(sym)`. */
     def not(property: FlagSet)(sym: Symbol): Boolean =
-      are.not(property)(sym.flags)
+      are.not(property)(flags(sym))
 
     /** Is `name` non-degenerate? */
     def defined(name: Name): Boolean =
@@ -220,10 +150,11 @@ trait CommonAST {
       tpe != null && tpe != NoType
 
     /** Is `tpe` the type of a case class? */
-    def caseClass(tpe: u.Type) = tpe.typeSymbol match {
-      case clazz: u.ClassSymbol => clazz.isCaseClass
-      case _ => false
-    }
+    def caseClass(tpe: u.Type): Boolean =
+      tpe.typeSymbol match {
+        case cls: u.ClassSymbol => cls.isCaseClass
+        case _ => false
+      }
 
     /** Is `name` a legal identifier (i.e. consisting only of word `\w+` characters)? */
     def encoded(name: Name): Boolean =
@@ -245,25 +176,14 @@ trait CommonAST {
 
     /** Is `sym` the `_root_` symbol? */
     def root(sym: Symbol): Boolean =
-      sym.name == termNames.ROOTPKG || sym.name == rootMirror.RootClass.name // This is tricky for Java classes
-
-    /** Is `sym` a term symbol? */
-    def term(sym: Symbol): Boolean =
-      sym.isTerm
-
-    /** Is `sym` a type symbol? */
-    def tpe(sym: Symbol): Boolean =
-      sym.isType
+      // This is tricky for Java classes
+      sym.name == termNames.ROOTPKG || sym.name == rootMirror.RootClass.name
 
     /** Is `sym` a binding symbol (i.e. value, variable or parameter)? */
-    def binding(sym: Symbol): Boolean = is.term(sym) && {
+    def binding(sym: Symbol): Boolean = sym.isTerm && {
       val term = sym.asTerm
       term.isVal || term.isVar || term.isParameter
     }
-
-    /** Is `sym` a (method / lambda / class) parameter symbol? */
-    def param(sym: Symbol): Boolean =
-      sym.isParameter
 
     /** Is `sym` a value (`val`) symbol? */
     def value(sym: Symbol): Boolean =
@@ -273,10 +193,6 @@ trait CommonAST {
     def variable(sym: Symbol): Boolean =
       sym.isTerm && sym.asTerm.isVar
 
-    /** Is `sym` a `class` symbol? */
-    def clazz(sym: Symbol): Boolean =
-      sym.isClass
-
     /** Is `sym` a label (loop) symbol? */
     def label(sym: Symbol): Boolean =
       sym.isMethod && is(CONTRAVARIANT)(sym)
@@ -285,38 +201,32 @@ trait CommonAST {
     def method(sym: Symbol): Boolean =
       sym.isMethod && is.not(CONTRAVARIANT)(sym)
 
-    /** Is `sym` a module (`object`) symbol? */
-    def module(sym: Symbol): Boolean =
-      sym.isModule
-
-    /** Is `sym` a `package` symbol? */
-    def pkg(sym: Symbol): Boolean =
-      sym.isPackage
-
     /** Is `sym` a by-name parameter? */
     def byName(sym: Symbol): Boolean =
       sym.isTerm && sym.asTerm.isByNameParam
 
+    /** Is `sym` a stable identifier? */
+    def stable(sym: Symbol): Boolean =
+      sym.isTerm && sym.asTerm.isStable
+
     /** Is `tpe` legal for a term (i.e. not of a higher kind or method)? */
     def result(tpe: Type): Boolean =
-      !is.poly(tpe) && !is.method(tpe)
+      !tpe.takesTypeArgs && !is.method(tpe)
 
     /** Is `tpe` the type of a method (illegal for a term)? */
-    @tailrec
-    def method(tpe: Type): Boolean = tpe match {
-      case PolyType(_, result) => is.method(result)
-      case _: NullaryMethodType => true
-      case _: MethodType => true
+    def method(tpe: Type): Boolean =
+      !(tpe =:= tpe.finalResultType)
+
+    /** Is `sym` a stable path? */
+    @tailrec def stable(tpe: Type): Boolean = tpe match {
+      case u.SingleType(u.NoPrefix, _) => true
+      case u.SingleType(prefix, _) => is.stable(prefix)
       case _ => false
     }
 
-    /** Is `tpe` of a higher kind (taking type arguments)? */
-    def poly(tpe: Type): Boolean =
-      tpe.takesTypeArgs
-
     /** Does `tree` define a symbol that owns the children of `tree`? */
     def owner(tree: Tree): Boolean = tree match {
-      case _: Bind => false
+      case _: Bind     => false
       case _: Function => true
       case _: LabelDef => false
       case _ => tree.isDef
@@ -324,8 +234,8 @@ trait CommonAST {
 
     /** Is `tree` a statement? */
     def stat(tree: Tree): Boolean = tree match {
-      case _: Assign => true
-      case _: Bind => false
+      case _: Assign   => true
+      case _: Bind     => false
       case _: LabelDef => true
       case _ => tree.isDef
     }
@@ -333,8 +243,8 @@ trait CommonAST {
     /** Is `tree` a term? */
     def term(tree: Tree): Boolean = tree match {
       case Ident(termNames.WILDCARD) => false
-      case (_: Ident) withSym sym withType tpe => is.term(sym) && is.result(tpe)
-      case (_: Select) withSym sym withType tpe => is.term(sym) && is.result(tpe)
+      case (_: Ident) withSym sym withType tpe => sym.isTerm && is.result(tpe)
+      case (_: Select) withSym sym withType tpe => sym.isTerm && is.result(tpe)
       case (_: Apply) withType tpe => is.result(tpe)
       case (_: TypeApply) withType tpe => is.result(tpe)
       case _: Assign => false
@@ -344,21 +254,13 @@ trait CommonAST {
       case _ => tree.isTerm
     }
 
-    /** Is `tree` a quoted type-tree? */
-    def tpe(tree: Tree): Boolean = tree match {
-      case (_: Ident) withSym sym => is.tpe(sym)
-      case (_: Select) withSym sym => is.tpe(sym)
-      case _: New => true
-      case _ => tree.isType
-    }
-
     /** Is `tree` a valid pattern? */
     def pattern(tree: Tree): Boolean = tree match {
       case Ident(termNames.WILDCARD) => true
       case (_: Ident | _: Select) withSym sym withType tpe =>
-        is.term(sym) && sym.asTerm.isStable && is.result(tpe)
+        sym.isTerm && sym.asTerm.isStable && is.result(tpe)
       case Apply(target, args) withType tpe =>
-        is.tpe(target) && args.nonEmpty && is.result(tpe)
+        target.isType && args.nonEmpty && is.result(tpe)
       case _: Alternative => true
       case _: Bind => true
       case _: Literal => true
@@ -390,10 +292,6 @@ trait CommonAST {
     def terms(trees: Traversable[Tree]): Boolean =
       trees.forall(is.term)
 
-    /** Are all `trees` quoted type-trees? */
-    def types(trees: Traversable[Tree]): Boolean =
-      trees.forall(is.tpe)
-
     /** Are all `trees` valid patterns? */
     def patterns(trees: Traversable[Tree]): Boolean =
       trees.forall(is.pattern)
@@ -401,94 +299,56 @@ trait CommonAST {
 
   object has {
 
-    /** Does `sym` have a name? */
-    def name(sym: Symbol): Boolean =
-      is.defined(sym.name)
-
     /** Does `sym` have an owner? */
-    def owner(sym: Symbol): Boolean =
+    def own(sym: Symbol): Boolean =
       is.defined(sym.owner)
 
-    /** Does `tree` have an owner? */
-    def owner(tree: Tree): Boolean =
-      tree.exists(is.owner)
+    /** Does `sym` have a name? */
+    def nme(sym: Symbol): Boolean =
+      is.defined(sym.name)
 
-    /** Does `tpe` have an owner? */
-    def owner(tpe: Type): Boolean = has.owner {
-      if (has.typeSym(tpe)) tpe.typeSymbol
-      else tpe.termSymbol
-    }
+    /** Does `sym` have a type? */
+    def tpe(sym: Symbol): Boolean =
+      is.defined(sym.info)
 
     /** Does `sym` have a position? */
     def pos(sym: Symbol): Boolean =
       is.defined(sym.pos)
 
-    /** Does `tree` have a position? */
-    def pos(tree: Tree): Boolean =
-      is.defined(tree.pos)
-
     /** Does `tree` reference a symbol? */
     def sym(tree: Tree): Boolean =
       is.defined(tree.symbol)
-
-    /** Does `tpe` reference a symbol? */
-    def sym(tpe: Type): Boolean =
-      has.termSym(tpe) || has.typeSym(tpe)
-
-    /** Does `tree` reference a term symbol? */
-    def termSym(tree: Tree): Boolean =
-      has.sym(tree) && tree.symbol.isTerm
-
-    /** Does `tpe` reference a term symbol? */
-    def termSym(tpe: Type): Boolean =
-      is.defined(tpe.termSymbol)
-
-    /** Does `tree` reference a type symbol? */
-    def typeSym(tree: Tree): Boolean =
-      has.sym(tree) && tree.symbol.isType
-
-    /** Does `tpe` reference a type symbol? */
-    def typeSym(tpe: Type): Boolean =
-      is.defined(tpe.typeSymbol)
 
     /** Does `tree` have a type? */
     def tpe(tree: Tree): Boolean =
       is.defined(tree.tpe)
 
-    /** Does `sym` have a type? */
-    def tpe(sym: Symbol): Boolean =
-      is.defined(sym.info)
+    /** Does `tree` have a position? */
+    def pos(tree: Tree): Boolean =
+      is.defined(tree.pos)
   }
 
   object have {
 
-    /** Do all `symbols` have a name? */
-    def name(symbols: Traversable[Symbol]): Boolean =
-      symbols.forall(has.name)
-
     /** Do all `symbols` have an owner? */
-    def owner(symbols: Traversable[Symbol]): Boolean =
-      symbols.forall(has.owner)
+    def own(symbols: Traversable[Symbol]): Boolean =
+      symbols.forall(has.own)
 
-    /** Do all `trees` have a position? */
-    def pos(trees: Traversable[Tree]): Boolean =
-      trees.forall(has.pos)
+    /** Do all `symbols` have a name? */
+    def nme(symbols: Traversable[Symbol]): Boolean =
+      symbols.forall(has.nme)
 
     /** Do all `trees` have a symbol? */
     def sym(trees: Traversable[Tree]): Boolean =
       trees.forall(has.sym)
 
-    /** Do all `trees` have a term symbol? */
-    def termSym(trees: Traversable[Tree]): Boolean =
-      trees.forall(has.termSym)
-
-    /** Do all `trees` have a type symbol? */
-    def typeSym(trees: Traversable[Tree]): Boolean =
-      trees.forall(has.typeSym)
-
     /** Do all `trees` have a type? */
     def tpe(trees: Traversable[Tree]): Boolean =
       trees.forall(has.tpe)
+
+    /** Do all `trees` have a position? */
+    def pos(trees: Traversable[Tree]): Boolean =
+      trees.forall(has.pos)
   }
 
   // ------
@@ -537,5 +397,15 @@ trait CommonAST {
   trait Node {
     override def toString: String =
       getClass.getSimpleName.dropRight(1)
+  }
+
+  /** Constant limits. */
+  object Max {
+
+    /** Maximum number of lambda arguments. */
+    val FunParams = definitions.FunctionClass.seq.size
+
+    /** Maximum number of tuple elements. */
+    val TupleElems = definitions.TupleClass.seq.size
   }
 }
