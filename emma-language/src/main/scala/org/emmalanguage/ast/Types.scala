@@ -16,17 +16,15 @@
 package org.emmalanguage
 package ast
 
-import scala.annotation.tailrec
 import scala.language.higherKinds
 
 trait Types { this: AST =>
 
   trait TypeAPI { this: API =>
 
-    import u.Flag._
-    import u.internal._
-    import reificationSupport.freshTypeName
     import universe._
+    import internal._
+    import reificationSupport._
 
     /** Type names. */
     object TypeName extends Node {
@@ -107,7 +105,7 @@ trait Types { this: AST =>
       /** Creates a free type symbol (without an owner). */
       def free(name: u.TypeName, flags: u.FlagSet = u.NoFlags): u.FreeTypeSymbol = {
         assert(is.defined(name), s"$this name `$name` is not defined")
-        newFreeType(TypeName(name).toString, flags, null)
+        internal.newFreeType(TypeName(name).toString, flags, null)
       }
 
       /** Creates a free type symbol with the same attributes as the `original`. */
@@ -129,39 +127,39 @@ trait Types { this: AST =>
       // ------------------
 
       // Top and bottom
-      lazy val any = u.definitions.AnyTpe
+      lazy val any     = u.definitions.AnyTpe
       lazy val nothing = u.definitions.NothingTpe
 
       // Primitives
       lazy val anyVal = u.definitions.AnyValTpe
-      lazy val unit = u.definitions.UnitTpe
-      lazy val bool = u.definitions.BooleanTpe
-      lazy val char = u.definitions.CharTpe
-      lazy val byte = u.definitions.ByteTpe
-      lazy val short = u.definitions.ShortTpe
-      lazy val int = u.definitions.IntTpe
-      lazy val long = u.definitions.LongTpe
-      lazy val float = u.definitions.FloatTpe
+      lazy val unit   = u.definitions.UnitTpe
+      lazy val bool   = u.definitions.BooleanTpe
+      lazy val char   = u.definitions.CharTpe
+      lazy val byte   = u.definitions.ByteTpe
+      lazy val short  = u.definitions.ShortTpe
+      lazy val int    = u.definitions.IntTpe
+      lazy val long   = u.definitions.LongTpe
+      lazy val float  = u.definitions.FloatTpe
       lazy val double = u.definitions.DoubleTpe
 
       // Objects
       lazy val anyRef = u.definitions.AnyRefTpe
-      lazy val obj = u.definitions.ObjectTpe
-      lazy val null_ = u.definitions.NullTpe
+      lazy val obj    = u.definitions.ObjectTpe
+      lazy val null_  = u.definitions.NullTpe
       lazy val string = Type[String]
       lazy val bigInt = Type[BigInt]
       lazy val bigDec = Type[BigDecimal]
 
       // Java types
       object Java {
-        lazy val void = Type[java.lang.Void]
-        lazy val bool = Type[java.lang.Boolean]
-        lazy val char = Type[java.lang.Character]
-        lazy val byte = Type[java.lang.Byte]
-        lazy val short = Type[java.lang.Short]
-        lazy val int = Type[java.lang.Integer]
-        lazy val long = Type[java.lang.Long]
-        lazy val float = Type[java.lang.Float]
+        lazy val void   = Type[java.lang.Void]
+        lazy val bool   = Type[java.lang.Boolean]
+        lazy val char   = Type[java.lang.Character]
+        lazy val byte   = Type[java.lang.Byte]
+        lazy val short  = Type[java.lang.Short]
+        lazy val int    = Type[java.lang.Integer]
+        lazy val long   = Type[java.lang.Long]
+        lazy val float  = Type[java.lang.Float]
         lazy val double = Type[java.lang.Double]
         lazy val bigInt = Type[java.math.BigInteger]
         lazy val bigDec = Type[java.math.BigDecimal]
@@ -178,7 +176,7 @@ trait Types { this: AST =>
           assert(args.forall(is.defined), "Not all type arguments are defined")
           lazy val params = constructor.typeParams
           assert(params.size == args.size, s"Type params <-> args size mismatch for `$constructor`")
-          u.appliedType(fix(constructor), args.map(fix): _*)
+          u.appliedType(constructor, args.map(_.dealias.widen): _*)
         }
 
       /** Reifies a type from a tag. */
@@ -186,12 +184,10 @@ trait Types { this: AST =>
         kind0[T]
 
       /** Reifies a type from a weak tag. */
-      def weak[T: u.WeakTypeTag]: u.Type =
-        fix(u.weakTypeOf[T])
+      def weak[T: u.WeakTypeTag]: u.Type = u.weakTypeOf[T]
 
       /** Reifies a type of kind `*`. */
-      def kind0[T: u.TypeTag]: u.Type =
-        fix(u.typeOf[T])
+      def kind0[T: u.TypeTag]: u.Type = u.typeOf[T]
 
       /** Reifies a type of kind `* -> *`. */
       def kind1[F[_]](arg: u.Type)
@@ -235,9 +231,9 @@ trait Types { this: AST =>
       /** Extracts the i-th (1-based) type argument of the applied type `tpe`. */
       def arg(i: Int, tpe: u.Type): u.Type = {
         assert(is.defined(tpe), s"Undefined type `$tpe`")
-        val args = tpe.typeArgs
+        val args = tpe.dealias.widen.typeArgs
         assert(args.size >= i, s"Type `$tpe` has no type argument #$i")
-        fix(args(i - 1))
+        args(i - 1)
       }
 
 
@@ -263,15 +259,9 @@ trait Types { this: AST =>
         unTypeCheck(tree)
       }
 
-      /** Equivalent to `tpe.dealias.widen`. */
-      def fix(tpe: u.Type): u.Type = {
-        assert(is.defined(tpe), s"Undefined type `$tpe`")
-        tpe.dealias.widen
-      }
-
       /** Returns the least upper bound of all types. */
       def lub(types: u.Type*): u.Type =
-        u.lub(types.map(fix).toList)
+        u.lub(types.toList)
 
       /** Returns the weak (considering coercions) least upper bound of all types. */
       def weakLub(types: u.Type*): u.Type =
@@ -286,7 +276,7 @@ trait Types { this: AST =>
       def member(target: u.Type, member: u.TypeName): u.TypeSymbol = {
         assert(is.defined(target), s"Undefined target `$target`")
         assert(is.defined(member), s"Undefined type member `$member`")
-        fix(target).member(member).asType
+        target.member(member).asType
       }
 
       /** Looks for `member` in `target` and returns its symbol (possibly overloaded). */
@@ -302,7 +292,7 @@ trait Types { this: AST =>
         assert(paramss.flatten.forall(is.defined), "Not all method param types are defined")
         assert(is.defined(result), s"Undefined method return type `$result`")
 
-        val returnT = fix(result)
+        val returnT = result.dealias.widen
         val methodT = if (paramss.isEmpty) {
           nullaryMethodType(returnT)
         } else paramss.foldRight(returnT) { (params, ret) =>
@@ -313,34 +303,24 @@ trait Types { this: AST =>
         else polyType(tparams.toList, methodT)
       }
 
-      /** Extracts the type of `tree`, if any. */
-      def of(tree: u.Tree): u.Type =
-        fix(tree.tpe)
-
-      /** Extracts the type of `sym` (with an optional target), if any. */
-      def of(sym: u.Symbol, in: u.Type = u.NoType): u.Type =
-        fix(if (is.defined(in)) sym.infoIn(in) else sym.info)
-
       /** Extracts the result type of `tpe` if it's a lambda or a method type. */
-      def result(tpe: u.Type): u.Type = fix(tpe match {
-        case _ if has.typeSym(tpe) && Sym.funs(tpe.typeSymbol) => tpe.typeArgs.last
-        case _ => tpe.resultType
-      })
-
-      /** Extracts the final result type of `tpe` if it's a lambda or a method type. */
-      @tailrec
-      def finalResult(tpe: u.Type): u.Type = tpe match {
-        case _ if has.typeSym(tpe) && Sym.funs(tpe.typeSymbol) => finalResult(tpe.typeArgs.last)
-        case _ => fix(tpe.finalResultType)
+      def result(tpe: u.Type): u.Type = {
+        val wide = tpe.dealias.widen
+        if (Sym.funs(wide.typeSymbol)) wide.typeArgs.last
+        else wide.resultType
       }
 
       /** Extracts the type signature of `sym` (with an optional target), if any. */
       def signature(sym: u.Symbol, in: u.Type = u.NoType): u.Type = {
-        assert(is.defined(sym), s"Symbol `$sym` is not defined")
-        assert(has.tpe(sym), s"Symbol `$sym` has no type")
-        val sign = fix(if (is.defined(in)) sym.typeSignatureIn(in) else sym.typeSignature)
-        if (is(BYNAMEPARAM)(sym)) sign.typeArgs.head else sign
+        assert(is.defined(sym), s"Symbol $sym is not defined")
+        assert(has.tpe(sym),    s"Symbol $sym has no type signature")
+        val sign = if (is.defined(in)) sym.typeSignatureIn(in) else sym.typeSignature
+        if (is.byName(sym)) sign.typeArgs.head else sign
       }
+
+      /** Returns the type constructor of an applied type `tpe`. */
+      def constructor(tpe: u.Type): u.Type =
+        tpe.dealias.widen.typeConstructor
 
       /** Infers an implicit value from the enclosing context (if possible). */
       def inferImplicit(tpe: u.Type): Option[u.Tree] = {
@@ -424,7 +404,7 @@ trait Types { this: AST =>
       /** Reifies `tpe` as a tree. */
       def apply(tpe: u.Type): u.TypeTree = {
         assert(is.defined(tpe), s"$this type `$tpe` is not defined")
-        u.TypeTree(Type.fix(tpe))
+        u.TypeTree(tpe)
       }
 
       /** Reifies `sym`'s type as a tree. */

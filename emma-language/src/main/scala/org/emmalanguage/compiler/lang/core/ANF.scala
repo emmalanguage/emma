@@ -78,7 +78,7 @@ private[core] trait ANF extends Common {
         // Simplify expression
         case Attr.inh(src.TypeAscr(target, tpe), owner :: _) =>
           val (stats, expr) = decompose(target, unline = false)
-          if (tpe =:= api.Type.of(expr)) {
+          if (expr.tpe =:= tpe) {
             src.Block(stats: _*)(expr)
           } else {
             val nme = api.TermName.fresh(nameOf(expr))

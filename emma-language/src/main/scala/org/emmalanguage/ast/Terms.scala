@@ -97,14 +97,12 @@ trait Terms { this: AST =>
        */
       def apply(owner: u.Symbol, name: u.TermName, tpe: u.Type,
         flags: u.FlagSet = u.NoFlags,
-        pos: u.Position = u.NoPosition): u.TermSymbol = {
-
+        pos: u.Position = u.NoPosition
+      ): u.TermSymbol = {
         assert(is.defined(name), s"$this name `$name` is not defined")
         assert(is.defined(tpe), s"$this type `$tpe` is not defined")
-
         val sym = newTermSymbol(owner, TermName(name), pos, flags)
-        set.tpe(sym, Type.fix(tpe))
-        sym
+        setInfo(sym, tpe.dealias.widen)
       }
 
       /** Extracts the term symbol of `tree`, if any. */
@@ -118,10 +116,8 @@ trait Terms { this: AST =>
       def free(name: u.TermName, tpe: u.Type, flags: u.FlagSet = u.NoFlags): u.FreeTermSymbol = {
         assert(is.defined(name), s"$this name `$name` is not defined")
         assert(is.defined(tpe), s"$this type `$tpe` is not defined")
-
         val free = internal.newFreeTerm(TermName(name).toString, null, flags, null)
-        set.tpe(free, Type.fix(tpe))
-        free
+        setInfo(free, tpe.dealias.widen)
       }
 
       /** Creates a free term symbol with the same attributes as the `original`. */
@@ -145,7 +141,7 @@ trait Terms { this: AST =>
       def member(target: u.Type, member: u.TermName): u.TermSymbol = {
         assert(is.defined(target), s"Undefined target `$target`")
         assert(is.defined(member), s"Undefined term member `$member`")
-        Type.fix(target).member(member).asTerm
+        target.member(member).asTerm
       }
 
       /** Looks for `member` in `target` and returns its symbol (possibly overloaded). */
@@ -186,9 +182,8 @@ trait Terms { this: AST =>
       def apply(target: u.Tree, targs: u.Type*)(argss: Seq[u.Tree]*): u.Tree = {
         assert(is.defined(target), s"$this target is not defined: $target")
         assert(has.tpe(target), s"$this target has no type:\n${Tree.showTypes(target)}")
-
         if (targs.isEmpty) {
-          if (argss.isEmpty) Tree.copy(target)(tpe = Type.of(target).resultType)
+          if (argss.isEmpty) Tree.copy(target)(tpe = target.tpe.resultType)
           else argss.foldLeft(target)(apply)
         } else apply(TypeApp(target, targs: _*))(argss: _*)
       }
@@ -226,7 +221,7 @@ trait Terms { this: AST =>
       }
 
       def unapplySeq(tapp: u.TypeApply): Option[(u.Tree, Seq[u.Type])] =
-        Some(tapp.fun, tapp.args.map(Type.of))
+        Some(tapp.fun, tapp.args.map(_.tpe))
     }
 
     /** Term references (values, variables, parameters and modules). */
@@ -343,12 +338,8 @@ trait Terms { this: AST =>
         assert(is.term(expr), s"$this expr is not a term:\n${Tree.show(expr)}")
         assert(has.tpe(expr), s"$this expr has no type:\n${Tree.showTypes(expr)}")
         assert(is.defined(tpe), s"$this type `$tpe` is not defined")
-        lazy val (lhT, rhT) = (Type.of(expr), Type.fix(tpe))
-        assert(lhT weak_<:< rhT, s"Type `$lhT` cannot be casted to `$rhT`")
-
-        val ascr = u.Typed(expr, TypeQuote(rhT))
-        set(ascr, tpe = rhT)
-        ascr
+        assert(expr.tpe <:< tpe, s"Type `${expr.tpe}` cannot be casted to `$tpe`")
+        setType(u.Typed(expr, TypeQuote(tpe)), tpe)
       }
 
       def unapply(ascr: u.Typed): Option[(u.Tree, u.Type)] = ascr match {
@@ -375,7 +366,7 @@ trait Terms { this: AST =>
         assert(are.defined(argss.flatten), s"Not all $this args are defined")
         assert(have.tpe(argss.flatten), s"Not all $this args have type")
 
-        val clazz = Type.fix(target).typeConstructor
+        val clazz = Type.constructor(target)
         val constructor = clazz.decl(TermName.init)
         val init = Sym.resolveOverloaded(appliedType(clazz, targs: _*))(constructor)(argss: _*)
         val tpe = Type(clazz, targs: _*)
@@ -446,7 +437,7 @@ trait Terms { this: AST =>
           case _ => true
         }.toList
         val block = u.Block(compressed, expr)
-        set(block, tpe = Type.of(expr))
+        set(block, tpe = expr.tpe)
         block
       }
 
@@ -479,11 +470,10 @@ trait Terms { this: AST =>
         assert(has.tpe(cond), s"$this condition has no type:\n${Tree.showTypes(cond)}")
         assert(has.tpe(thn), s"$this then has no type:\n${Tree.showTypes(thn)}")
         assert(has.tpe(els), s"$this else has no type:\n${Tree.showTypes(els)}")
-        lazy val (condT, thnT, elsT) = (Type.of(cond), Type.of(thn), Type.of(els))
-        assert(condT =:= Type.bool, s"$this condition is not boolean:\n${Tree.showTypes(cond)}")
+        assert(cond.tpe <:< Type.bool, s"$this condition is not boolean:\n${Tree.showTypes(cond)}")
 
         val branch = u.If(cond, thn, els)
-        set(branch, tpe = Type.weakLub(thnT, elsT))
+        set(branch, tpe = Type.lub(thn.tpe, els.tpe))
         branch
       }
 

@@ -63,42 +63,39 @@ private[backend] trait TranslateToDataflows extends Common {
       val methods = API.sourceOps ++ ComprehensionCombinators.ops
       val staticCallsChanged = withHighContext.transformWith {
         case Attr.inh(core.DefCall(Some(api.ModuleRef(moduleSymbol)), method, targs, argss@_*), false :: _)
-          if moduleSymbols(moduleSymbol) && methods(method) => {
+          if moduleSymbols(moduleSymbol) && methods(method) =>
           val targetMethodDecl = backendSymbol.info.decl(method.name)
           assert(targetMethodDecl.alternatives.size == 1,
             s"Target method `${method.name}` (found as `$targetMethodDecl`) should have exactly one overload.")
           val targetMethod = targetMethodDecl.asMethod
           core.DefCall(Some(api.ModuleRef(backendSymbol)))(targetMethod, targs: _*)(argss: _*)
-        }
       }(disambiguatedTree).tree
 
       // Gather DataBag vals that are referenced from higher-order context
       val Attr.acc(_, valsRefdFromHigh :: _) =
         withHighContext.accumulateWith[Set[u.TermSymbol]] {
           case Attr.inh(core.ValRef(sym), true :: _)
-          if api.Type.of(sym).typeConstructor =:= API.DataBag =>
+          if api.Type.constructor(sym.info) =:= API.DataBag =>
             Set(sym)
-        }
-        .traverseAny(staticCallsChanged)
+        }.traverseAny(staticCallsChanged)
 
       // Insert fetch calls for the vals in valsRefdFromHigh (but only if they are defined at first-order)
       val collectsInserted0 =
         withHighContext.transformWith {
           case Attr.inh(api.ValDef(lhs, rhs, flags), false :: _)
-          if valsRefdFromHigh(lhs)
-          => {
-            val origSym = api.TermSym(lhs, api.TermName.fresh("orig"), api.Type.of(lhs)) // will be the original bag
+          if valsRefdFromHigh(lhs) =>
+            // will be the original bag
+            val origSym = api.TermSym(lhs, api.TermName.fresh("orig"), lhs.info)
             val fetchCall = core.DefCall(Some(api.ModuleRef(API.scalaSeqModuleSymbol))) (
               API.byFetch,
               Core.bagElemTpe(core.ValRef(lhs))) (
               Seq(core.ValRef(origSym)))
-            val fetchedSym = api.TermSym(lhs, api.TermName.fresh("fetched"), api.Type.of(fetchCall))
+            val fetchedSym = api.TermSym(lhs, api.TermName.fresh("fetched"), fetchCall.tpe)
             val fetchedVal = core.ValDef(fetchedSym, fetchCall, flags)
             core.ValDef(
               lhs,
               core.Let(api.ValDef(origSym, rhs), fetchedVal)()(core.ValRef(fetchedSym)),
               flags) // Note: the flags are present also here, and on fetchedVal.
-          }
         }(staticCallsChanged).tree
 
       Core.flatten(collectsInserted0) // This is because we put a Let on the rhs of a ValDef when inserting collects

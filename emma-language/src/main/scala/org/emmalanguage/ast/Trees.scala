@@ -20,7 +20,6 @@ import cats.std.all._
 import shapeless._
 
 import scala.annotation.tailrec
-import scala.collection.mutable
 
 trait Trees { this: AST =>
 
@@ -37,9 +36,9 @@ trait Trees { this: AST =>
 
       /** Creates a shallow copy of `tree`, preserving its type and setting new attributes. */
       def copy[T <: Tree](tree: T)(
-          pos: u.Position = tree.pos,
-          sym: u.Symbol   = tree.symbol,
-          tpe: u.Type     = tree.tpe): T = {
+        pos: u.Position = tree.pos,
+        sym: u.Symbol   = tree.symbol,
+        tpe: u.Type     = tree.tpe): T = {
 
         // Optimize when there are no changes.
         if (pos == tree.pos && sym == tree.symbol && tpe == tree.tpe) return tree
@@ -323,7 +322,7 @@ trait Trees { this: AST =>
         assert(has.tpe(target), s"$this target `$target` has no type")
         assert(is.encoded(target), s"$this target `$target` is not encoded")
 
-        val tpe = Type.of(target) match {
+        val tpe = target.info match {
           case u.NullaryMethodType(result) => result
           case other => other
         }
@@ -350,7 +349,7 @@ trait Trees { this: AST =>
 
         val mod = member.isPackageClass || member.isModuleClass
         val sym = if (mod) member.asClass.module else member
-        val tpe = Type.of(sym, in = target.tpe) match {
+        val tpe = sym.infoIn(target.tpe) match {
           case u.NullaryMethodType(result) => result
           case other => other
         }

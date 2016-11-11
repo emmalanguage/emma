@@ -121,8 +121,8 @@ trait Variables { this: AST =>
         assert(is.term(rhs), s"$this RHS is not a term:\n${Tree.show(rhs)}")
         assert(has.tpe(lhs), s"$this LHS `$lhs` has no type")
         assert(has.tpe(rhs), s"$this RHS has no type:\n${Tree.showTypes(rhs)}")
-        lazy val (lhT, rhT) = (Type.of(lhs), Type.of(rhs))
-        assert(rhT weak_<:< lhT, s"$this LH type `$lhT` is not a supertype of RH type `$rhT`")
+        assert(rhs.tpe <:< lhs.info,
+          s"$this LH type `${lhs.info}` is not a supertype of RH type `${rhs.tpe}`")
 
         val mut = u.Assign(VarRef(lhs), rhs)
         set(mut, tpe = u.NoType)

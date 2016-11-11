@@ -52,7 +52,7 @@ class ConvertersMacros(val c: blackbox.Context) extends MacroAST {
     if (T <:< api.Type[Product]) {
       val method = T.decl(api.TermName.init).alternatives.head.asMethod
       val params = method.typeSignatureIn(T).paramLists.head
-      val args = for (p <- params) yield fromCSV(api.Type.of(p), value)
+      val args = for (p <- params) yield fromCSV(p.info, value)
       q"new $T(..$args)"
     } else {
       if (T =:= unit || T =:= Java.void) api.Term.unit
