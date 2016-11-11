@@ -351,4 +351,20 @@ class ANFSpec extends BaseCompilerSpec {
       act shouldBe alphaEqTo(exp)
     }
   }
+
+  "variable length arguments" in {
+    val act = anfPipeline(u.reify {
+      Seq(Seq(1, 2, 3 + x): _*)
+    })
+
+    val exp = idPipeline(u.reify {
+      val x$1 = this.x
+      val sum$1 = 3 + x$1
+      val Seq$1 = Seq(1, 2, sum$1)
+      val Seq$2 = Seq(Seq$1: _*)
+      Seq$2
+    })
+
+    act shouldBe alphaEqTo(exp)
+  }
 }

@@ -105,26 +105,31 @@ trait Symbols { this: AST =>
         (sym: u.Symbol, targs: u.Type*)
         (argss: Seq[u.Tree]*): u.Symbol = if (is.overloaded(sym)) {
 
+        def check(zipped: Seq[(u.Symbol, u.Tree)]) = zipped
+          .forall { case (param, arg) => arg.tpe <:< Type.signature(param) }
+
         val matching = for {
-          alt <- sym.alternatives
-          signature = Type.signature(alt, in = target)
+          alternative <- sym.alternatives
+          signature = Type.signature(alternative, in = target)
           if signature.typeParams.size == targs.size
           paramss = Type(signature, targs: _*).paramLists
           (np, na) = (paramss.size, argss.size)
-          // NOTE: This allows to skip implicit parameters.
+          // This allows to skip implicit parameters.
           if np == na || (np == na + 1 && paramss.last.forall(is(IMPLICIT)))
-          if paramss.zip(argss).forall {
-            case (Seq(_ withInfo VarArgType(tpe)), args) =>
-              args.map(Type.of).forall(_ weak_<:< tpe)
-            case (params, args) => params.size == args.size &&
-              params.zip(args).forall { case (param, arg) =>
-                Type.of(arg) weak_<:< Type.signature(param)
-              }
+          if paramss zip argss forall {
+            // This allows to handle variable length arguments.
+            case (prefix :+ (_ withInfo VarArgType(tpe)), args) =>
+              check(prefix zip args) && (args drop prefix.length match {
+                case Seq(arg) if arg.tpe <:< Type.kind1[Seq](tpe) => true
+                case suffix => suffix.forall(_.tpe <:< tpe)
+              })
+            case (params, args) =>
+              params.size == args.size && check(params zip args)
           }
-        } yield alt
+        } yield alternative
 
-        assert(matching.nonEmpty, s"Cannot find variant of `$sym` with matching type signature")
-        assert(matching.size == 1, s"Ambiguous resolution of overloaded symbol `$sym`")
+        assert(matching.nonEmpty,  s"Cannot find variant of $sym with matching type signature")
+        assert(matching.size == 1, s"Ambiguous resolution of overloaded symbol $sym")
         matching.head
       } else sym
 
