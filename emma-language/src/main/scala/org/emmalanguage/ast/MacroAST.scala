@@ -16,7 +16,7 @@
 package org.emmalanguage
 package ast
 
-import scala.reflect.macros.{Attachments, blackbox}
+import scala.reflect.macros.blackbox
 import scala.tools.nsc.Global
 
 /**
@@ -27,11 +27,30 @@ import scala.tools.nsc.Global
 trait MacroAST extends AST {
 
   val c: blackbox.Context
-  override val universe: c.universe.type = c.universe
+  val universe: c.universe.type = c.universe
 
   import universe._
-  import internal._
-  import decorators._
+
+  def freshNameSuffix = 'm'
+
+  // ---------------------------
+  // Parsing and type-checking
+  // ---------------------------
+
+  def abort(msg: String, pos: Position = NoPosition) =
+    c.abort(pos, msg)
+
+  def warning(msg: String, pos: Position = NoPosition) =
+    c.warning(pos, msg)
+
+  def parse(code: String) =
+    c.parse(code)
+
+  def typeCheck(tree: Tree, typeMode: Boolean = false) =
+    if (typeMode) c.typecheck(tree, c.TYPEmode) else c.typecheck(tree)
+
+  def eval[T](code: Tree) =
+    c.eval[T](c.Expr[T](unTypeCheck(code)))
 
   /** Shows `tree` in a Swing AST browser. */
   def browse(tree: Tree): Unit = universe match {
@@ -46,49 +65,21 @@ trait MacroAST extends AST {
     case _ =>
   }
 
-  override def abort(msg: String, pos: Position = NoPosition): Nothing =
-    c.abort(pos, msg)
-
-  override def warning(msg: String, pos: Position = NoPosition): Unit =
-    c.warning(pos, msg)
-
-  override private[ast] def freshNameSuffix: Char = 'm'
-
-  // ---------------------------
-  // Parsing and type-checking
-  // ---------------------------
-
-  private[emmalanguage] def eval[T](code: Tree): T =
-    c.eval[T](c.Expr[T](unTypeCheck(code)))
-
-  private[emmalanguage] override def parse(code: String): Tree =
-    c.parse(code)
-
-  private[emmalanguage] override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
-    if (typeMode) c.typecheck(tree, c.TYPEmode) else c.typecheck(tree)
-
-  private[emmalanguage] override def inferImplicit(tpe: Type): Tree =
-    c.inferImplicitValue(tpe)
-
   // ------------------------
   // Abstract wrapper methods
   // ------------------------
 
-  override val get: Getter = new Getter {
-    override def enclosingOwner: Symbol = c.internal.enclosingOwner
-    override def meta(sym: Symbol): Attachments = attachments(sym)
-    override def meta(tree: Tree): Attachments = attachments(tree)
-  }
+  def enclosingOwner =
+    c.internal.enclosingOwner
 
-  private[ast] override val set: Setter = new Setter {
-    override def name(sym: Symbol, name: Name): Unit = setName(sym, name)
-    override def original(tpt: TypeTree, original: Tree): Unit = setOriginal(tpt, original)
-    override def owner(sym: Symbol, owner: Symbol): Unit = setOwner(sym, owner)
-    override def pos(sym: Symbol, pos: Position): Unit = updateAttachment(sym, pos)
-    override def pos(tree: Tree, pos: Position): Unit = setPos(tree, pos)
-    override def flags(sym: Symbol, flags: FlagSet): Unit = {
-      resetFlag(sym, sym.flags)
-      setFlag(sym, flags)
-    }
-  }
+  def inferImplicit(tpe: Type) = for {
+    value <- Option(c.inferImplicitValue(tpe))
+    if value.nonEmpty
+  } yield internal.setType(value, value.tpe.finalResultType)
+
+  def setOriginal(tpt: TypeTree, original: Tree) =
+    internal.setOriginal(tpt, original)
+
+  def setPos[T <: Tree](tree: T, pos: Position) =
+    internal.setPos(tree, pos)
 }

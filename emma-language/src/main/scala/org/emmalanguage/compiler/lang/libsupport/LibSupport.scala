@@ -223,8 +223,8 @@ trait LibSupport extends Common {
                   s <- (bndDefs diff parsUsedOnce).toSeq
                 } yield s -> Sym.copy(s)(
                   name = TermName.fresh(s),
-                  tpe = get.tpe(s).map(typesMap),
-                  flags = if (parsUsedMany(s)) u.NoFlags else get.flags(s)
+                  tpe = s.info.map(typesMap),
+                  flg = if (parsUsedMany(s)) u.NoFlags else Sym.flags(s)
                 ).asTerm
                 // compute term bindings sequence
                 val termsMap = termsSeq.toMap
@@ -434,7 +434,7 @@ trait LibSupport extends Common {
     /** Build a map of all library functions called in the given tree. */
     private lazy val libdefRefsIn: u.Tree => Map[u.TermSymbol, CG.LibDef] = _.collect({
       case DefCall(Some(TermRef(tgt)), sym withAST ast, targs, argss@_*)
-        if get.ann[emma.src](sym).isDefined => sym -> CG.LibDef(sym, ast)
+        if Sym.findAnn[emma.src](sym).isDefined => sym -> CG.LibDef(sym, ast)
     }).toMap
 
     /* Lirary function registry. */
@@ -452,7 +452,7 @@ trait LibSupport extends Common {
       /** Extractor for the `emma.src` annotation associated with a library function symbol. */
       object withAnn {
         def unapply(sym: u.MethodSymbol): Option[(u.MethodSymbol, u.Annotation)] =
-          get.ann[emma.src](sym) match {
+          Sym.findAnn[emma.src](sym) match {
             case Some(ann) => Some(sym, ann)
             case None => None
           }
@@ -465,7 +465,7 @@ trait LibSupport extends Common {
             case Lit(fldName: String) =>
               // build an `objSym.fldSym` selection expression
               val cls = sym.owner.asClass
-              val fld = get.tpe(cls).member(TermName(fldName)).asTerm
+              val fld = cls.info.member(TermName(fldName)).asTerm
               val sel = qualifyStatics(DefCall(Some(Ref(cls.module)))(fld)())
               // evaluate `objSym.fldSym` and grab the DefDef source
               val src = eval[String](sel)
@@ -491,7 +491,7 @@ trait LibSupport extends Common {
       private val fixDefDefSymbols = (original: u.MethodSymbol) =>
         TopDown.break.transform {
           case DefDef(quoted, flags, tparams, paramss, body) =>
-            DefDef(original, flags)(tparams: _*)(paramss.map(_.map(TermSym.of)): _*)(body)
+            DefDef(original, flags)(tparams: _*)(paramss.map(_.map(_.symbol.asTerm)): _*)(body)
         } andThen (_.tree)
     }
 

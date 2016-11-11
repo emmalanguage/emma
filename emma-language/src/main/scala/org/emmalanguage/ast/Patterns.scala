@@ -23,6 +23,8 @@ trait Patterns { this: AST =>
   trait PatternAPI { this: API =>
 
     import universe._
+    import internal._
+    import reificationSupport._
 
     /** Patterns. */
     object Pat extends Node {
@@ -42,11 +44,8 @@ trait Patterns { this: AST =>
         assert(alternatives.size >= 2, s"$this requires at least 2 alternatives")
         assert(are.patterns(alternatives), s"Not all $this alternatives are valid patterns")
         assert(have.tpe(alternatives), s"Not all $this alternatives have a type")
-
         val tpe = Type.lub(alternatives.map(_.tpe): _*)
-        val alt = u.Alternative(alternatives.toList)
-        set(alt, tpe = tpe)
-        alt
+        setType(u.Alternative(alternatives.toList), tpe)
       }
 
       def unapplySeq(alt: u.Alternative): Option[Seq[u.Tree]] =
@@ -57,11 +56,8 @@ trait Patterns { this: AST =>
     object PatAny extends Node {
 
       /** Creates a type-checked wildcard pattern. */
-      def apply(): u.Ident = {
-        val id = u.Ident(TermName.wildcard)
-        set(id, sym = u.NoSymbol)
-        id
-      }
+      def apply(): u.Ident =
+        setSymbol(u.Ident(TermName.wildcard), u.NoSymbol)
 
       def unapply(pat: u.Ident): Option[Unit] = pat match {
         case u.Ident(TermName.wildcard) => Some(())
@@ -82,10 +78,7 @@ trait Patterns { this: AST =>
         assert(is.defined(target), s"$this target is not defined: ${Tree.show(target)}")
         assert(is.pattern(target), s"$this target is not a pattern: ${Tree.show(target)}")
         assert(is.defined(tpe), s"$this type `$tpe` is not defined")
-
-        val ascr = u.Typed(target, TypeQuote(tpe))
-        set(ascr, tpe = tpe)
-        ascr
+        setType(u.Typed(target, TypeQuote(tpe)), tpe)
       }
 
       def unapply(pat: u.Typed): Option[(u.Tree, u.Type)] = pat match {
@@ -105,16 +98,13 @@ trait Patterns { this: AST =>
        */
       def apply(lhs: u.TermSymbol, rhs: u.Tree): u.Bind = {
         assert(is.defined(lhs), s"$this LHS `$lhs` is not defined")
-        assert(has.name(lhs), s"$this LHS `$lhs` has no name")
+        assert(has.nme(lhs), s"$this LHS `$lhs` has no name")
         assert(has.tpe(lhs), s"$this LHS `$lhs` has no type")
         assert(is.encoded(lhs), s"$this LHS `$lhs` is not encoded")
         assert(is.value(lhs), s"$this LHS `$lhs` is not a value")
         assert(is.defined(rhs), s"$this RHS is not defined: $rhs")
         assert(is.pattern(rhs), s"$this RHS is not a pattern:\n${Tree.show(rhs)}")
-
-        val at = u.Bind(lhs.name, rhs)
-        set(at, sym = lhs, tpe = lhs.info)
-        at
+        setType(setSymbol(u.Bind(lhs.name, rhs), lhs), lhs.info)
       }
 
       def unapply(at: u.Bind): Option[(u.TermSymbol, u.Tree)] = at match {
@@ -133,14 +123,12 @@ trait Patterns { this: AST =>
        */
       def apply(target: u.TermSymbol): u.Ident = {
         assert(is.defined(target), s"$this target `$target` is not defined")
-        assert(has.name(target), s"$this target `$target` has no name")
+        assert(has.nme(target), s"$this target `$target` has no name")
         assert(target.isStable, s"$this target `$target` is not stable")
-
         if (target.name.toString.head.isUpper) TermRef(target) else {
           assert(has.tpe(target), s"$this target `$target` has no type")
           val id = q"`$target`".asInstanceOf[u.Ident]
-          set(id, sym = target, tpe = target.info)
-          id
+          setType(setSymbol(id, target), target.info)
         }
       }
 
@@ -204,7 +192,7 @@ trait Patterns { this: AST =>
        */
       def apply(lhs: u.TermSymbol): u.Ident = {
         assert(is.defined(lhs), s"$this LHS `$lhs` is not defined")
-        assert(has.name(lhs), s"$this LHS `$lhs` has no name")
+        assert(has.nme(lhs), s"$this LHS `$lhs` has no name")
         assert(lhs.name.toString.head.isLower, s"$this LHS `$lhs` cannot be capitalized")
         ValRef(lhs)
       }
@@ -246,10 +234,7 @@ trait Patterns { this: AST =>
           assert(guard.tpe <:< Type.bool, s"$this guard is not boolean:\n${Tree.showTypes(guard)}")
           guard
         } else Empty()
-
-        val cse = u.CaseDef(pat, grd, body)
-        set(cse, tpe = body.tpe)
-        cse
+        setType(u.CaseDef(pat, grd, body), body.tpe)
       }
 
       def unapply(cse: u.CaseDef): Option[(u.Tree, u.Tree, u.Tree)] = cse match {
@@ -275,11 +260,8 @@ trait Patterns { this: AST =>
         assert(has.tpe(sel), s"$this selector has no type:\n${Tree.showTypes(sel)}")
         assert(are.defined(cases), s"Not all $this cases are defined")
         assert(have.tpe(cases), s"Not all $this cases have types")
-
-        val mat = u.Match(sel, cases.toList)
         val tpe = Type.lub(cases.map(_.tpe): _*)
-        set(mat, tpe = tpe)
-        mat
+        setType(u.Match(sel, cases.toList), tpe)
       }
 
       def unapplySeq(mat: u.Match): Option[(u.Tree, Seq[u.CaseDef])] = mat match {

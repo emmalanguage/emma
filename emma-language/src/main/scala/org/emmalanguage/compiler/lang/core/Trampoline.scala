@@ -33,6 +33,7 @@ private[core] trait Trampoline extends Common {
     import Monoids._
     import UniverseImplicits._
     import Core.{Lang => core}
+    import u.internal.flags
 
     private val module = u.rootMirror.staticModule("scala.util.control.TailCalls")
     private val TailCalls = Some(core.Ref(module))
@@ -56,10 +57,10 @@ private[core] trait Trampoline extends Common {
         case core.Let(_, defs, _) =>
           (for (core.DefDef(method, _, tparams, paramss, _) <- defs) yield {
             val (own, nme, pos) = (method.owner, method.name, method.pos)
-            val flg = get.flags(method)
+            val flg = flags(method)
             val pss = paramss.map(_.map(_.symbol.asTerm))
-            val Res = api.Type.kind1[TailRec](method.info.finalResultType)
-            method -> api.DefSym(own, nme, flg, pos)(tparams: _*)(pss: _*)(Res)
+            val res = api.Type.kind1[TailRec](method.info.finalResultType)
+            method -> api.DefSym(own, nme, flg, pos)(tparams: _*)(pss: _*)(res)
           }).toMap
       }.transformWith {
         // Return position in a method definition, wrap in trampoline.

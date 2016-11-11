@@ -49,7 +49,7 @@ trait Types { this: AST =>
       /** Extracts the type name of `sym`, if any. */
       def apply(sym: u.Symbol): u.TypeName = {
         assert(is.defined(sym), s"Undefined symbol `$sym`")
-        assert(has.name(sym), s"Symbol `$sym` has no name")
+        assert(has.nme(sym), s"Symbol `$sym` has no name")
         apply(sym.name)
       }
 
@@ -68,7 +68,7 @@ trait Types { this: AST =>
       /** Creates a fresh type name with the given symbol's name as `prefix`. */
       def fresh(prefix: u.Symbol): u.TypeName = {
         assert(is.defined(prefix), s"Undefined prefix `$prefix`")
-        assert(has.name(prefix), s"Prefix `$prefix` has no name")
+        assert(has.nme(prefix), s"Prefix `$prefix` has no name")
         fresh(prefix.name)
       }
 
@@ -95,13 +95,6 @@ trait Types { this: AST =>
         newTypeSymbol(owner, TypeName(name), pos, flags)
       }
 
-      /** Extracts the type symbol of `tree`, if any. */
-      def of[T <: u.Tree](tree: T): u.TypeSymbol = {
-        val sym = Sym.of(tree)
-        assert(is.tpe(sym), s"Symbol `$sym` is not a type")
-        sym.asType
-      }
-
       /** Creates a free type symbol (without an owner). */
       def free(name: u.TypeName, flags: u.FlagSet = u.NoFlags): u.FreeTypeSymbol = {
         assert(is.defined(name), s"$this name `$name` is not defined")
@@ -110,7 +103,7 @@ trait Types { this: AST =>
 
       /** Creates a free type symbol with the same attributes as the `original`. */
       def free(original: u.TypeSymbol): u.FreeTypeSymbol =
-        free(TypeName(original), get.flags(original))
+        free(TypeName(original), flags(original))
 
       /** Creates a fresh type symbol with the same attributes as the `original`. */
       def fresh(original: u.TypeSymbol): u.TypeSymbol =
@@ -172,7 +165,7 @@ trait Types { this: AST =>
       def apply(constructor: u.Type, args: u.Type*): u.Type =
         if (args.isEmpty) constructor else {
           assert(is.defined(constructor), s"Type constructor `$constructor` is not defined")
-          assert(is.poly(constructor), s"Type `$constructor` is not a type constructor")
+          assert(constructor.takesTypeArgs, s"Type `$constructor` is not a type constructor")
           assert(args.forall(is.defined), "Not all type arguments are defined")
           lazy val params = constructor.typeParams
           assert(params.size == args.size, s"Type params <-> args size mismatch for `$constructor`")
@@ -217,7 +210,7 @@ trait Types { this: AST =>
 
       /** Creates a `this` type of an enclosing class or module. */
       def thisOf(encl: u.Symbol): u.ThisType = {
-        assert(is.clazz(encl) || is.module(encl), s"Cannot reference this of `$encl`")
+        assert(encl.isClass || encl.isModule, s"Cannot reference this of `$encl`")
         thisType(encl).asInstanceOf[u.ThisType]
       }
 
@@ -236,29 +229,6 @@ trait Types { this: AST =>
         args(i - 1)
       }
 
-
-      /** Type-checks a `tree` (use `typeMode=true` for type-trees). */
-      def check(tree: u.Tree, typeMode: Boolean = false): u.Tree = {
-        assert(is.defined(tree), s"Cannot type-check undefined tree: $tree")
-        assert(!has.tpe(tree), s"Tree is already type-checked:\n${Tree.showTypes(tree)}")
-        typeCheck(tree, typeMode)
-      }
-
-      /** Type-checks a `tree` as if `imports` were in scope. */
-      def checkWith(imports: u.Tree*)(tree: u.Tree): u.Tree = {
-        assert(are.defined(imports), "Not all imports are defined")
-        assert(is.defined(tree), s"Cannot type-check undefined tree: $tree")
-        assert(!has.tpe(tree), s"Tree already type-checked:\n${Tree.showTypes(tree)}")
-        check(u.Block(imports.toList, tree)).asInstanceOf[u.Block].expr
-      }
-
-      /** Removes all type and symbol attributes from a `tree`. */
-      def unCheck(tree: u.Tree): u.Tree = {
-        assert(is.defined(tree), s"Cannot un-type-check undefined tree: $tree")
-        assert(has.tpe(tree), s"Untyped tree:\n${Tree.showTypes(tree)}")
-        unTypeCheck(tree)
-      }
-
       /** Returns the least upper bound of all types. */
       def lub(types: u.Type*): u.Type =
         u.lub(types.toList)
@@ -271,20 +241,6 @@ trait Types { this: AST =>
           else if (U weak_<:< T) T
           else lub(T, U)
         }
-
-      /** Looks for `member` in `target` and returns its symbol (possibly overloaded). */
-      def member(target: u.Type, member: u.TypeName): u.TypeSymbol = {
-        assert(is.defined(target), s"Undefined target `$target`")
-        assert(is.defined(member), s"Undefined type member `$member`")
-        target.member(member).asType
-      }
-
-      /** Looks for `member` in `target` and returns its symbol (possibly overloaded). */
-      def member(target: u.Symbol, member: u.TypeName): u.TypeSymbol = {
-        assert(is.defined(target), s"Undefined target `$target`")
-        assert(has.tpe(target), s"Target `$target` has no type")
-        Type.member(target.info, member)
-      }
 
       /** Returns a new method type (possibly generic and with multiple arg lists). */
       def method(tparams: u.TypeSymbol*)(paramss: Seq[u.TermSymbol]*)(result: u.Type): u.Type = {
@@ -322,73 +278,57 @@ trait Types { this: AST =>
       def constructor(tpe: u.Type): u.Type =
         tpe.dealias.widen.typeConstructor
 
-      /** Infers an implicit value from the enclosing context (if possible). */
-      def inferImplicit(tpe: u.Type): Option[u.Tree] = {
-        val opt = Option(Types.this.inferImplicit(tpe)).filter(is.defined)
-        for (value withType NullaryMethodType(result) <- opt) set.tpe(value, result)
-        opt
-      }
-
       /** Returns the original type-tree corresponding to `tpe`. */
       def tree(tpe: u.Type): u.Tree = {
-        def original(tpe: u.Type): u.Tree = {
-          val tpt = tpe match {
-            // Degenerate type: `this[staticID]`.
-            case u.ThisType(sym) if sym.isStatic =>
-              api.Tree.resolveStatic(sym)
-            // This type: `this[T]`.
-            case u.ThisType(sym) =>
-              api.This(sym)
-            // Super type: `this.super[T]`
-            case u.SuperType(ths, sup) =>
-              val sym = sup.typeSymbol.asType
-              val mix = u.Super(original(ths), sym.name)
-              set(mix, sym = sym)
-              mix
-            // Package or class ref: `package` or `Class`.
-            case u.SingleType(u.NoPrefix, target) if target.isPackage || target.isClass =>
-              api.Id(target)
-            // Singleton type: `stableID.tpe`.
-            case u.SingleType(u.NoPrefix, stableID) =>
-              u.SingletonTypeTree(api.Id(stableID))
-            // Qualified type: `pkg.T`.
-            case u.SingleType(pkg, target) =>
-              api.Sel(original(pkg), target)
-            // Abstract type ref: `T`.
-            case u.TypeRef(u.NoPrefix, target, Nil) =>
-              api.Id(target)
-            // Path dependent type: `path.T`.
-            case u.TypeRef(path, target, Nil) =>
-              api.Sel(original(path), target)
-            // Applied type: `T[A, B, ...]`.
-            case u.TypeRef(u.NoPrefix, target, args) =>
-              u.AppliedTypeTree(api.Id(target), args.map(Type.tree))
-            // Applied path dependent type: `path.T[A, B, ...]`
-            case u.TypeRef(path, target, args) =>
-              u.AppliedTypeTree(api.Sel(original(path), target), args.map(Type.tree))
-            // Type bounds: `T >: lo <: hi`.
-            case u.TypeBounds(lo, hi) =>
-              u.TypeBoundsTree(Type.tree(lo), Type.tree(hi))
-            // Existential type: `F[A, B, ...] forSome { type A; type B; ... }`
-            case u.ExistentialType(quantified, underlying) =>
-              u.ExistentialTypeTree(Type.tree(underlying), quantified.map(internal.typeDef))
-            // Annotated type: `A @ann1 @ann2 ...`
-            case AnnotatedType(annotations, underlying) =>
-              annotations.foldLeft(original(underlying))((res, ann) =>
-                u.Annotated(ann.tree, res)
-              )
-            // E.g. type refinement: `T { def size: Int }`
-            case _ =>
-              abort(s"Cannot convert type `$tpe` to a type-tree")
-          }
-
-          set.tpe(tpt, tpe)
-          tpt
-        }
-
-        val tpt = u.TypeTree(tpe)
-        set.original(tpt, original(tpe))
-        tpt
+        def original(tpe: u.Type): u.Tree = setType(tpe match {
+          // Degenerate type: `this[staticID]`.
+          case u.ThisType(sym) if sym.isStatic =>
+            api.Tree.resolveStatic(sym)
+          // This type: `this[T]`.
+          case u.ThisType(sym) =>
+            api.This(sym)
+          // Super type: `this.super[T]`
+          case u.SuperType(ths, sup) =>
+            val sym = sup.typeSymbol.asType
+            setSymbol(u.Super(original(ths), sym.name), sym)
+          // Package or class ref: `package` or `Class`.
+          case u.SingleType(u.NoPrefix, target)
+            if target.isPackage || target.isClass
+            => api.Id(target)
+          // Singleton type: `stableID.tpe`.
+          case u.SingleType(u.NoPrefix, stableID) =>
+            u.SingletonTypeTree(api.Id(stableID))
+          // Qualified type: `pkg.T`.
+          case u.SingleType(pkg, target) =>
+            api.Sel(original(pkg), target)
+          // Abstract type ref: `T`.
+          case u.TypeRef(u.NoPrefix, target, Nil) =>
+            api.Id(target)
+          // Path dependent type: `path.T`.
+          case u.TypeRef(path, target, Nil) =>
+            api.Sel(original(path), target)
+          // Applied type: `T[A, B, ...]`.
+          case u.TypeRef(u.NoPrefix, target, args) =>
+            u.AppliedTypeTree(api.Id(target), args.map(Type.tree))
+          // Applied path dependent type: `path.T[A, B, ...]`
+          case u.TypeRef(path, target, args) =>
+            u.AppliedTypeTree(api.Sel(original(path), target), args.map(Type.tree))
+          // Type bounds: `T >: lo <: hi`.
+          case u.TypeBounds(lo, hi) =>
+            u.TypeBoundsTree(Type.tree(lo), Type.tree(hi))
+          // Existential type: `F[A, B, ...] forSome { type A; type B; ... }`
+          case u.ExistentialType(quantified, underlying) =>
+            u.ExistentialTypeTree(Type.tree(underlying), quantified.map(internal.typeDef))
+          // Annotated type: `A @ann1 @ann2 ...`
+          case AnnotatedType(annotations, underlying) =>
+            annotations.foldLeft(original(underlying))((res, ann) =>
+              u.Annotated(ann.tree, res)
+            )
+          // E.g. type refinement: `T { def size: Int }`
+          case _ =>
+            abort(s"Cannot convert type `$tpe` to a type-tree")
+        }, tpe)
+        setOriginal(u.TypeTree(tpe), original(tpe))
       }
 
       /** Extractor for result types (legal for terms). */

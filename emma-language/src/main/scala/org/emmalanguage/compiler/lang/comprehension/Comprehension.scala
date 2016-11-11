@@ -59,8 +59,8 @@ trait Comprehension extends Common
 
       object Map extends MonadOp {
 
-        override val symbol = // API: access method directly
-          api.Term.member(monad, api.TermName("map")).asMethod
+        override val symbol = monad.info
+          .member(api.TermName("map")).asMethod
 
         override def apply(xs: u.Tree)(f: u.Tree): u.Tree = {
           assert(xs.tpe.typeConstructor == API.DataBag)
@@ -79,8 +79,8 @@ trait Comprehension extends Common
 
       object FlatMap extends MonadOp {
 
-        override val symbol = // API: access method directly
-          api.Term.member(monad, api.TermName("flatMap")).asMethod
+        override val symbol = monad.info
+          .member(api.TermName("flatMap")).asMethod
 
         override def apply(xs: u.Tree)(f: u.Tree): u.Tree = {
           assert(api.Type.arg(2, f.tpe).typeConstructor == API.DataBag)
@@ -99,8 +99,8 @@ trait Comprehension extends Common
 
       object WithFilter extends MonadOp {
 
-        override val symbol = // API: access method directly
-          api.Term.member(monad, api.TermName("withFilter")).asMethod
+        override val symbol = monad.info
+          .member(api.TermName("withFilter")).asMethod
 
         override def apply(xs: u.Tree)(p: u.Tree): u.Tree =
           core.DefCall(Some(xs))(symbol)(Seq(p))

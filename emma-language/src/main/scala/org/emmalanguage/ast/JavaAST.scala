@@ -19,10 +19,10 @@ package ast
 import com.typesafe.scalalogging.slf4j.Logger
 import org.slf4j.LoggerFactory
 
-import scala.reflect.macros.Attachments
 import scala.reflect.runtime
 import scala.reflect.runtime.JavaUniverse
 import scala.tools.reflect.ToolBox
+import scala.tools.reflect.ToolBoxError
 
 /**
  * Implements various utility functions that mitigate and/or workaround deficiencies in Scala's
@@ -34,76 +34,76 @@ trait JavaAST extends AST {
   require(runtime.universe.isInstanceOf[JavaUniverse],
     s"Unsupported universe ${runtime.universe}.\nThe runtime compiler supports only JVM.")
 
-  override val universe = runtime.universe.asInstanceOf[JavaUniverse]
+  val universe = runtime.universe.asInstanceOf[JavaUniverse]
   val tb: ToolBox[universe.type]
 
   import universe._
-  import internal._
 
   private val logger =
     Logger(LoggerFactory.getLogger(classOf[JavaAST]))
 
-  override def abort(msg: String, pos: Position = NoPosition): Nothing =
-    throw new RuntimeException(s"Error at $pos: $msg")
-
-  override def warning(msg: String, pos: Position = NoPosition): Unit =
-    logger.warn(s"Warning at $pos: $msg")
-
-  override private[ast] def freshNameSuffix: Char = 'r'
+  def freshNameSuffix = 'r'
 
   // ---------------------------
   // Parsing and type-checking
   // ---------------------------
 
-  private[emmalanguage] def eval[T](code: Tree): T =
-    compile(unTypeCheck(code))().asInstanceOf[T]
+  def abort(msg: String, pos: Position = NoPosition) =
+    throw ToolBoxError(s"Error at $pos:\n$msg")
 
-  private[emmalanguage] override def parse(code: String): Tree =
-    try tb.parse(code)
-    catch {
-      case ex: scala.tools.reflect.ToolBoxError => throw scala.tools.reflect.ToolBoxError(
-        s"Parsing failed for tree:\n================\n$code\n================\n", ex)
-    }
+  def warning(msg: String, pos: Position = NoPosition) =
+    logger.warn(s"Warning at $pos\n$msg")
 
-  private[emmalanguage] override def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
+  def parse(code: String) = try tb.parse(code) catch {
+    case err: ToolBoxError => throw ToolBoxError(s"""
+      |Parsing failed for tree:
+      |================
+      |$code
+      |================
+      |""".stripMargin.trim, err)
+  }
+
+  def typeCheck(tree: Tree, typeMode: Boolean = false) =
     try if (typeMode) tb.typecheck(tree, tb.TYPEmode) else tb.typecheck(tree)
-    catch {
-      case ex: scala.tools.reflect.ToolBoxError => throw scala.tools.reflect.ToolBoxError(
-        s"Typecheck failed for tree:\n================\n${api.Tree.show(tree)}\n================\n", ex)
+    catch { case err: ToolBoxError => throw ToolBoxError(s"""
+      |Type-check failed for tree:
+      |================
+      |${showCode(tree)}
+      |================
+      |""".stripMargin.trim, err)
     }
 
-  private[emmalanguage] override def inferImplicit(tpe: Type): Tree =
-    tb.inferImplicitValue(tpe)
+  def compile(tree: Tree): () => Any = try {
+    val binary = tb.compile(tree)
+    // This is a workaround for https://issues.scala-lang.org/browse/SI-9932
+    typeCheck(reify(()).tree)
+    binary
+  } catch { case err: ToolBoxError => throw ToolBoxError(s"""
+    |Compilation failed for tree:
+    |================
+    |${showCode(tree)}
+    |================
+    |""".stripMargin.trim, err)
+  }
 
-  private[emmalanguage] def compile(tree: Tree): () => Any =
-    try {
-      val res = tb.compile(tree)
-      typeCheck(u.reify {}.tree) // This is a workaround for https://issues.scala-lang.org/browse/SI-9932
-      res
-    } catch {
-      case ex: scala.tools.reflect.ToolBoxError => throw scala.tools.reflect.ToolBoxError(
-        s"Compilation failed for tree:\n================\n${api.Tree.show(tree)}\n================\n", ex)
-    }
+  def eval[T](code: Tree) =
+    compile(unTypeCheck(code))().asInstanceOf[T]
 
   // ------------------------
   // Abstract wrapper methods
   // ------------------------
 
-  override val get: Getter = new Getter {
-    override lazy val enclosingOwner: Symbol = typeCheck(q"val x = ()").symbol.owner
-    override def meta(sym: Symbol): Attachments = attachments(sym)
-    override def meta(tree: Tree): Attachments = attachments(tree)
-  }
+  lazy val enclosingOwner =
+    typeCheck(q"val x = ()").symbol.owner
 
-  private[ast] override val set: Setter = new Setter {
-    override def name(sym: Symbol, name: Name): Unit = sym.name = name
-    override def original(tpt: TypeTree, original: Tree): Unit = tpt.setOriginal(original)
-    override def owner(sym: Symbol, owner: Symbol): Unit = sym.owner = owner
-    override def pos(sym: Symbol, pos: Position): Unit = sym.pos = pos
-    override def pos(tree: Tree, pos: Position): Unit = tree.pos = pos
-    override def flags(sym: Symbol, flags: FlagSet): Unit = {
-      sym.resetFlags()
-      setFlag(sym, flags)
-    }
-  }
+  def inferImplicit(tpe: Type) = for {
+    value <- Option(tb.inferImplicitValue(tpe))
+    if value.nonEmpty
+  } yield value.setType(value.tpe.finalResultType)
+
+  def setOriginal(tpt: TypeTree, original: Tree) =
+    tpt.setOriginal(original)
+
+  def setPos[T <: Tree](tree: T, pos: Position) =
+    internal.setPos(tree, pos)
 }

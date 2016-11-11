@@ -60,7 +60,7 @@ private[core] trait DCE extends Common {
           }
 
           // Retain only those ValDefs which are referenced.
-          val liveVals = vals.filter(liveRefs compose api.TermSym.of)
+          val liveVals = vals.filter(liveRefs.compose(_.symbol.asTerm))
           if (liveVals.size == vals.size) let
           else core.Let(liveVals: _*)(defs: _*)(expr)
       }.andThen(_.tree)

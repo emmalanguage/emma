@@ -55,9 +55,10 @@ trait Methods { this: AST =>
    */
   trait MethodAPI { this: API =>
 
-    import u.Flag._
-    import u.internal.{newMethodSymbol, typeDef}
     import universe._
+    import internal._
+    import reificationSupport._
+    import u.Flag._
 
     /** Method (`def`) symbols. */
     object DefSym extends Node {
@@ -81,11 +82,10 @@ trait Methods { this: AST =>
         (result: u.Type): u.MethodSymbol = {
 
         assert(are.not(CONTRAVARIANT)(flags), s"$this `$name` cannot be a label")
-        val method = newMethodSymbol(owner, TermName(name), pos, flags)
-        val tps = tparams.map(Sym.copy(_)(owner = method, flags = DEFERRED | PARAM).asType)
-        val pss = paramss.map(_.map(Sym.copy(_)(owner = method, flags = PARAM).asTerm))
-        set.tpe(method, Type.method(tps: _*)(pss: _*)(result))
-        method
+        val sym = newMethodSymbol(owner, TermName(name), pos, flags)
+        val tps = tparams.map(Sym.copy(_)(owner = sym, flg = DEFERRED | PARAM).asType)
+        val pss = paramss.map(_.map(Sym.copy(_)(owner = sym, flg = PARAM).asTerm))
+        setInfo(sym, Type.method(tps: _*)(pss: _*)(result))
       }
 
       def unapply(sym: u.MethodSymbol): Option[u.MethodSymbol] =
@@ -123,8 +123,7 @@ trait Methods { this: AST =>
         }
 
         val app = TermApp(fun, targs: _*)(argss: _*)
-        set(app, tpe = app.tpe.finalResultType)
-        app
+        setType(app, app.tpe.finalResultType)
       }
 
       def unapplySeq(call: u.Tree)
@@ -148,25 +147,25 @@ trait Methods { this: AST =>
       /**
        * Creates a type-checked method definition.
        * @param sym Must be a method symbol.
-       * @param flags Any additional modifiers (e.g. access modifiers).
+       * @param flg Any additional modifiers (e.g. access modifiers).
        * @param tparams The symbols of type parameters (to be substituted with `sym.typeParams`).
        * @param paramss The symbols of all parameters (to be substituted with `sym.paramLists`).
        * @param body The body of this method (with parameters substituted), owned by `sym`.
        * @return `..flags def method[..tparams](...paramss) = body`.
        */
-      def apply(sym: u.MethodSymbol, flags: u.FlagSet = u.NoFlags)
+      def apply(sym: u.MethodSymbol, flg: u.FlagSet = u.NoFlags)
         (tparams: u.TypeSymbol*)
         (paramss: Seq[u.TermSymbol]*)
         (body: u.Tree): u.DefDef = {
 
         assert(is.defined(sym), s"$this symbol `$sym` is not defined")
         assert(is.method(sym), s"$this symbol `$sym` is not a method")
-        assert(has.name(sym), s"$this symbol `$sym` has no name")
+        assert(has.nme(sym), s"$this symbol `$sym` has no name")
         assert(is.encoded(sym), s"$this symbol `$sym` is not encoded")
         assert(has.tpe(sym), s"$this symbol `$sym` has no type")
         assert(tparams.forall(is.defined), s"Not all $this type parameters are defined")
         assert(paramss.flatten.forall(is.defined), s"Not all $this parameters are defined")
-        assert(have.name(paramss.flatten), s"Not all $this parameters have names")
+        assert(have.nme(paramss.flatten), s"Not all $this parameters have names")
         assert(paramss.flatten.forall(has.tpe), s"Not all $this parameters have types")
         assert(is.defined(body), s"$this body is not defined: $body")
         assert(is.term(body), s"$this body is not a term:\n${Tree.show(body)}")
@@ -181,20 +180,16 @@ trait Methods { this: AST =>
           (paramss.flatten zip sym.paramLists.flatten)
             .forall { case (p, q) => p.info.map(tpMap) =:= q.info }
         }, s"Not all $this parameters have the correct type")
-
-        val mods = u.Modifiers(get.flags(sym) | flags)
-        val tpeDefs = sym.typeParams.map(typeDef)
-        val parDefs = sym.paramLists.map(_.map(p => ParDef(p.asTerm)))
-        val original = tparams ++ paramss.flatten
-        val aliases = sym.typeParams ++ sym.paramLists.flatten
-        val rhs = Sym.subst(sym, original zip aliases: _*)(body)
+        val mod = u.Modifiers(flags(sym) | flg)
+        val tps = sym.typeParams.map(typeDef)
+        val pss = sym.paramLists.map(_.map(p => ParDef(p.asTerm)))
+        val src = tparams ++ paramss.flatten
+        val dst = sym.typeParams ++ sym.paramLists.flatten
+        val rhs = Sym.subst(sym, src zip dst: _*)(body)
         val res = sym.info.finalResultType
         assert(rhs.tpe <:< sym.info.finalResultType,
           s"$this body type `${rhs.tpe}` is not a subtype of return type `$res`")
-
-        val defn = u.DefDef(mods, sym.name, tpeDefs, parDefs, TypeQuote(res), rhs)
-        set(defn, sym = sym)
-        defn
+        setSymbol(u.DefDef(mod, sym.name, tps, pss, TypeQuote(res), rhs), sym)
       }
 
       def unapply(defn: u.DefDef)
@@ -205,7 +200,7 @@ trait Methods { this: AST =>
               "DefDef parameters with default parameter values are not supported.")
             assert(defDef.name.toString != "<init>", "DefDef.unapply encountered a constructor. " +
               "This shouldn't happen, since we don't allow class definitions in the source language.")
-            Some(method, mods.flags, tparams.map(TypeSym.of), paramss, body)
+            Some(method, mods.flags, tparams.map(_.symbol.asType), paramss, body)
           case _ => None
         }
     }

@@ -56,7 +56,7 @@ trait Parameters { this: AST =>
       }
 
       def unapply(sym: u.TermSymbol): Option[u.TermSymbol] =
-        Option(sym).filter(is.param)
+        Option(sym).filter(_.isParameter)
     }
 
     /** (method / lambda / class) Parameter references. */
@@ -69,7 +69,7 @@ trait Parameters { this: AST =>
        */
       def apply(target: u.TermSymbol): u.Ident = {
         assert(is.defined(target), s"$this target `$target` is not defined")
-        assert(is.param(target), s"$this target `$target` is not a parameter")
+        assert(target.isParameter, s"$this target `$target` is not a parameter")
         BindingRef(target)
       }
 
@@ -94,7 +94,7 @@ trait Parameters { this: AST =>
         flags: u.FlagSet = u.NoFlags): u.ValDef = {
 
         assert(is.defined(lhs), s"$this LHS `$lhs` is not defined")
-        assert(is.param(lhs), s"$this LHS `$lhs` is not a parameter")
+        assert(lhs.isParameter, s"$this LHS `$lhs` is not a parameter")
         assert(are.not(MUTABLE)(flags), s"$this LHS `$lhs` cannot be mutable")
         BindingDef(lhs, rhs, flags)
       }

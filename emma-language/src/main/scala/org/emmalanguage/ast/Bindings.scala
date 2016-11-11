@@ -40,6 +40,8 @@ trait Bindings { this: AST =>
   trait BindingAPI { this: API =>
 
     import universe._
+    import internal._
+    import reificationSupport._
     import u.Flag._
 
     /** Binding symbols (values, variables and parameters). */
@@ -90,34 +92,37 @@ trait Bindings { this: AST =>
        * Creates a type-checked binding definition.
        * @param lhs Must be a binding symbol.
        * @param rhs The value of this binding (empty by default), owned by `lhs`.
-       * @param flags Any additional modifiers (distinguish values, variables and parameters).
+       * @param flg Any additional modifiers (distinguish values, variables and parameters).
        * @return `..flags [val|var] lhs [= rhs]`.
        */
       def apply(lhs: u.TermSymbol,
         rhs: u.Tree = Empty(),
-        flags: u.FlagSet = u.NoFlags): u.ValDef = {
+        flg: u.FlagSet = u.NoFlags): u.ValDef = {
 
         assert(is.defined(lhs), s"$this LHS `$lhs` is not defined")
         assert(is.binding(lhs), s"$this LHS `$lhs` is not a binding")
-        assert(has.name(lhs), s"$this LHS `$lhs` has no name")
+        assert(has.nme(lhs), s"$this LHS `$lhs` has no name")
         assert(has.tpe(lhs), s"$this LHS `$lhs` has no type")
         assert(is.encoded(lhs), s"$this LHS `$lhs` is not encoded")
-        val mods = u.Modifiers(get.flags(lhs) | flags)
+        val mods = u.Modifiers(flags(lhs) | flg)
         assert(!mods.hasFlag(LAZY), s"$this LHS `$lhs` cannot be lazy")
-        val body = if (is.defined(rhs)) {
+        val (body, tpt) = if (is.defined(rhs)) {
           assert(is.term(rhs), s"$this RHS is not a term:\n${Tree.show(rhs)}")
           assert(has.tpe(rhs), s"$this RHS has no type:\n${Tree.showTypes(rhs)}")
           assert(rhs.tpe <:< lhs.info, s"""
             |$this LH type `${lhs.info}` is not a supertype of RH type `${rhs.tpe}`.
             |(lhs: `$lhs`, rhs:\n`${u.showCode(rhs)}`\n)
             |""".stripMargin.trim)
-          Owner.at(lhs)(rhs)
-        } else Empty()
-        val needsTpt = is.param(lhs) || !(lhs.info =:= rhs.tpe)
-        val tpt = if (needsTpt) TypeQuote(lhs.info) else u.TypeTree()
-        val bind = u.ValDef(mods, lhs.name, tpt, body)
-        set(bind, sym = lhs)
-        bind
+          (Owner.at(lhs)(rhs),
+            if (lhs.info =:= rhs.tpe.dealias.widen) u.TypeTree()
+            else TypeQuote(lhs.info))
+        } else {
+          assert(lhs.isParameter, s"$this RHS cannot be empty")
+          (Empty(), TypeQuote(lhs.info))
+        }
+
+        val dfn = u.ValDef(mods, lhs.name, tpt, body)
+        setSymbol(dfn, lhs)
       }
 
       def unapply(bind: u.ValDef): Option[(u.TermSymbol, u.Tree, u.FlagSet)] = bind match {
