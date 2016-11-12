@@ -128,9 +128,35 @@ trait Symbols { this: AST =>
           }
         } yield alternative
 
-        assert(matching.nonEmpty,  s"Cannot find variant of $sym with matching type signature")
-        assert(matching.size == 1, s"Ambiguous resolution of overloaded symbol $sym")
-        matching.head
+        def moreSpecificExists(m: u.Symbol, in: List[u.Symbol]): Boolean = {
+          val mSignature = Type.signature(m, in = target)
+          val mParamss = Type(mSignature, targs: _*).paramLists
+          in.filterNot(_ == m).exists(x => {
+            val xSignature = Type.signature(x, in = target)
+            val xParamss = Type(xSignature, targs: _*).paramLists
+            (mParamss zip xParamss) forall { case (mParams, xParams) =>
+              (mParams zip xParams) forall { case (mParam, xParam) =>
+                Type.signature(xParam) <:< Type.signature(mParam)
+              }
+            }
+          })
+        }
+
+        /* Prune matching methods whose signature is more general than another mathing methods. */
+        @annotation.tailrec
+        def prune(inp: List[u.Symbol]): List[u.Symbol] =
+          if (inp.size < 1) inp
+          else {
+            val res = inp.filterNot(m => moreSpecificExists(m, inp))
+            if (res.size == inp.size) inp
+            else prune(res)
+          }
+
+        val pruned = prune(matching)
+
+        assert(pruned.nonEmpty, s"Cannot find variant of `$sym` with matching type signature")
+        assert(pruned.size == 1, s"Ambiguous resolution of overloaded symbol `$sym`")
+        pruned.head
       } else sym
 
       /**
