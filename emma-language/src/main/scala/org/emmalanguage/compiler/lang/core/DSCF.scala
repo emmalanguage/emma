@@ -134,8 +134,9 @@ private[core] trait DSCF extends Common {
           core.BindingRef(latest(lhs, owners, trace).head)
 
         // Control-flow elimination
-        case Attr(block @ src.Block(stats, expr withType tpe), _, owners :: _, syn) =>
+        case Attr(block @ src.Block(stats, expr), _, owners :: _, syn) =>
           // Extract required attributes
+          val tpe = expr.tpe
           val owner = owners.lastOption.getOrElse(enclosingOwner)
           def uses(tree: u.Tree) = syn(tree)(Nat._2)
           def mods(tree: u.Tree) = syn(tree) match { case ms :: ds :: _ => ms diff ds.keySet }
@@ -289,7 +290,7 @@ private[core] trait DSCF extends Common {
 
     /** Variables -> Parameters mapping. */
     private def varPars(vars: SortedSet[u.TermSymbol]): Seq[u.TermSymbol] =
-      vars.toSeq.map(api.Sym.copy(_)(flg = PARAM).asTerm)
+      vars.toSeq.map(api.Sym.With(_)(flg = PARAM).asTerm)
 
     /** Variables -> Arguments mapping. */
     private def varArgs(vars: SortedSet[u.TermSymbol]): Seq[u.Ident] =

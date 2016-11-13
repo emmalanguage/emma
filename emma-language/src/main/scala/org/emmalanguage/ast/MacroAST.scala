@@ -79,7 +79,4 @@ trait MacroAST extends AST {
 
   def setOriginal(tpt: TypeTree, original: Tree) =
     internal.setOriginal(tpt, original)
-
-  def setPos[T <: Tree](tree: T, pos: Position) =
-    internal.setPos(tree, pos)
 }

@@ -83,8 +83,8 @@ trait Methods { this: AST =>
 
         assert(are.not(CONTRAVARIANT)(flags), s"$this `$name` cannot be a label")
         val sym = newMethodSymbol(owner, TermName(name), pos, flags)
-        val tps = tparams.map(Sym.copy(_)(owner = sym, flg = DEFERRED | PARAM).asType)
-        val pss = paramss.map(_.map(Sym.copy(_)(owner = sym, flg = PARAM).asTerm))
+        val tps = tparams.map(Sym.With(_)(own = sym, flg = DEFERRED | PARAM).asType)
+        val pss = paramss.map(_.map(Sym.With(_)(own = sym, flg = PARAM).asTerm))
         setInfo(sym, Type.method(tps: _*)(pss: _*)(result))
       }
 
@@ -127,18 +127,18 @@ trait Methods { this: AST =>
       }
 
       def unapplySeq(call: u.Tree)
-        : Option[(Option[u.Tree], u.MethodSymbol, Seq[u.Type], Seq[Seq[u.Tree]])] = call match {
-
-        case Id(DefSym(method)) withType Type.Result(_) =>
-          Some(None, method, Seq.empty, Seq.empty)
-        case Sel(Term(target), DefSym(method)) withType Type.Result(_) =>
-          Some(Some(target), method, Seq.empty, Seq.empty)
-        case TermApp(Id(DefSym(method)), targs, argss@_*) withType Type.Result(_) =>
-          Some(None, method, targs, argss)
-        case TermApp(Sel(Term(target), DefSym(method)), targs, argss@_*) withType Type.Result(_) =>
-          Some(Some(target), method, targs, argss)
-        case _ => None
-      }
+        : Option[(Option[u.Tree], u.MethodSymbol, Seq[u.Type], Seq[Seq[u.Tree]])]
+        = call match {
+          case ref @ Id(DefSym(met))
+            if is.result(ref.tpe) => Some(None, met, Seq.empty, Seq.empty)
+          case sel @ Sel(Term(tgt), DefSym(met))
+            if is.result(sel.tpe) => Some(Some(tgt), met, Seq.empty, Seq.empty)
+          case app @ TermApp(Id(DefSym(met)), targs, argss@_*)
+            if is.result(app.tpe) => Some(None, met, targs, argss)
+          case app @ TermApp(Sel(Term(tgt), DefSym(met)), targs, argss@_*)
+            if is.result(app.tpe) => Some(Some(tgt), met, targs, argss)
+          case _ => None
+        }
     }
 
     /** Method (`def`) definitions. */
@@ -195,12 +195,8 @@ trait Methods { this: AST =>
       def unapply(defn: u.DefDef)
         : Option[(u.MethodSymbol, u.FlagSet, Seq[u.TypeSymbol], Seq[Seq[u.ValDef]], u.Tree)]
         = defn match {
-          case defDef@u.DefDef(mods, _, tparams, paramss, _, Term(body)) withSym DefSym(method) =>
-            assert(paramss forall { _ forall { _.rhs == Empty() } },
-              "DefDef parameters with default parameter values are not supported.")
-            assert(defDef.name.toString != "<init>", "DefDef.unapply encountered a constructor. " +
-              "This shouldn't happen, since we don't allow class definitions in the source language.")
-            Some(method, mods.flags, tparams.map(_.symbol.asType), paramss, body)
+          case Tree.With.sym(u.DefDef(mods, _, tps, pss, _, Term(rhs)), DefSym(lhs)) =>
+            Some(lhs, mods.flags, tps.map(_.symbol.asType), pss, rhs)
           case _ => None
         }
     }

@@ -107,7 +107,7 @@ trait Types { this: AST =>
 
       /** Creates a fresh type symbol with the same attributes as the `original`. */
       def fresh(original: u.TypeSymbol): u.TypeSymbol =
-        Sym.copy(original)(name = TypeName.fresh(original)).asType
+        Sym.With(original)(nme = TypeName.fresh(original)).asType
 
       def unapply(sym: u.TypeSymbol): Option[u.TypeSymbol] =
         Option(sym)
@@ -330,12 +330,6 @@ trait Types { this: AST =>
         }, tpe)
         setOriginal(u.TypeTree(tpe), original(tpe))
       }
-
-      /** Extractor for result types (legal for terms). */
-      private[ast] object Result extends Node {
-        def unapply(tpe: u.Type): Option[u.Type] =
-          Option(tpe).filter(is.result)
-      }
     }
 
     /** Quoted type-trees. */
@@ -359,7 +353,7 @@ trait Types { this: AST =>
         apply(Type[T])
 
       def unapply(tree: u.Tree): Option[u.Type] = tree match {
-        case _ withType tpe if tree.isType => Some(tpe)
+        case Tree.With.tpe(_, tpe) if tree.isType => Some(tpe)
         case _ => None
       }
     }
