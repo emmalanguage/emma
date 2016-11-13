@@ -183,9 +183,9 @@ Add the *Emma* dependency
 ```xml
 <!-- Basic Emma API (required) -->
 <dependency>
-    <groupId>eu.stratosphere</groupId>
+    <groupId>org.emmalanguage</groupId>
     <artifactId>emma-language</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.2-SNAPSHOT</version>
     <scope>compile</scope>
 </dependency>
 ```
@@ -195,9 +195,9 @@ Optionally add either the *Flink* or *Spark* backend.
 ```xml
 <!-- Emma backend for Flink (optional) -->
 <dependency>
-    <groupId>eu.stratosphere</groupId>
+    <groupId>org.emmalanguage</groupId>
     <artifactId>emma-flink</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.2-SNAPSHOT</version>
     <scope>runtime</scope>
 </dependency>
 ```
@@ -205,9 +205,9 @@ Optionally add either the *Flink* or *Spark* backend.
 ```xml
 <!-- Emma backend for Spark (optional) -->
 <dependency>
-    <groupId>eu.stratosphere</groupId>
+    <groupId>org.emmalanguage</groupId>
     <artifactId>emma-spark</artifactId>
-    <version>1.0-SNAPSHOT</version>
+    <version>0.2-SNAPSHOT</version>
     <scope>runtime</scope>
 </dependency>
 ```

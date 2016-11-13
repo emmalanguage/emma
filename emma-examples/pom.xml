@@ -21,8 +21,8 @@
 
     <parent>
         <artifactId>emma</artifactId>
-        <groupId>eu.stratosphere</groupId>
-        <version>1.0-SNAPSHOT</version>
+        <groupId>org.emmalanguage</groupId>
+        <version>0.2-SNAPSHOT</version>
     </parent>
 
 
@@ -55,20 +55,20 @@
 
         <!-- Emma -->
         <dependency>
-            <groupId>eu.stratosphere</groupId>
+            <groupId>org.emmalanguage</groupId>
             <artifactId>emma-language</artifactId>
         </dependency>
         <dependency>
-            <groupId>eu.stratosphere</groupId>
+            <groupId>org.emmalanguage</groupId>
             <artifactId>emma-spark</artifactId>
         </dependency>
         <dependency>
-            <groupId>eu.stratosphere</groupId>
+            <groupId>org.emmalanguage</groupId>
             <artifactId>emma-flink</artifactId>
         </dependency>
         <!-- Emma (test jars) -->
         <dependency>
-            <groupId>eu.stratosphere</groupId>
+            <groupId>org.emmalanguage</groupId>
             <artifactId>emma-language</artifactId>
             <type>test-jar</type>
         </dependency>

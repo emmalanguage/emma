@@ -21,8 +21,8 @@
 
     <parent>
         <artifactId>emma</artifactId>
-        <groupId>eu.stratosphere</groupId>
-        <version>1.0-SNAPSHOT</version>
+        <groupId>org.emmalanguage</groupId>
+        <version>0.2-SNAPSHOT</version>
     </parent>
 
     <artifactId>emma-gui</artifactId>
@@ -35,11 +35,11 @@
     <dependencies>
         <!-- Emma -->
         <dependency>
-            <groupId>eu.stratosphere</groupId>
+            <groupId>org.emmalanguage</groupId>
             <artifactId>emma-examples</artifactId>
         </dependency>
         <dependency>
-            <groupId>eu.stratosphere</groupId>
+            <groupId>org.emmalanguage</groupId>
             <artifactId>emma-flink</artifactId>
         </dependency>
 
