@@ -134,14 +134,18 @@
         <scalatest.version>2.2.6</scalatest.version>
 
         <!-- Other dependencies -->
-        <argparse4j.version>0.4.4</argparse4j.version>
-        <reflections.version>0.9.9</reflections.version>
-        <scala.graph-core.version>1.9.0</scala.graph-core.version>
+        <argparse4j.version>0.4.4</argparse4j.version><!-- TODO: remove -->
+        <scopt.version>3.5.0</scopt.version>
+        <reflections.version>0.9.9</reflections.version><!-- TODO: remove -->
+        <scala.graph-core.version>1.9.0</scala.graph-core.version><!-- TODO: remove -->
         <scala-arm.version>1.4</scala-arm.version>
 
         <!-- Test configuration -->
         <excludedSurefireGroups>eu.stratosphere.emma.testutil.ExampleTest</excludedSurefireGroups>
         <compile-spec-pipelines>false</compile-spec-pipelines>
+        <spark.scope>provided</spark.scope>
+        <flink.scope>provided</flink.scope>
+        <hadoop.scope>provided</hadoop.scope>
 
         <!-- Deployment configuration -->
         <nexus.skipStaging>true</nexus.skipStaging>
@@ -235,13 +239,13 @@
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-common</artifactId>
                 <version>${hadoop.version}</version>
-                <scope>provided</scope>
+                <scope>${hadoop.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-hdfs</artifactId>
                 <version>${hadoop.version}</version>
-                <scope>provided</scope>
+                <scope>${hadoop.scope}</scope>
             </dependency>
 
             <!-- Flink -->
@@ -249,19 +253,19 @@
                 <groupId>org.apache.flink</groupId>
                 <artifactId>flink-scala_${scala.tools.version}</artifactId>
                 <version>${flink.version}</version>
-                <scope>provided</scope>
+                <scope>${flink.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.flink</groupId>
                 <artifactId>flink-java_${scala.tools.version}</artifactId>
                 <version>${flink.version}</version>
-                <scope>provided</scope>
+                <scope>${flink.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.flink</groupId>
                 <artifactId>flink-clients_${scala.tools.version}</artifactId>
                 <version>${flink.version}</version>
-                <scope>provided</scope>
+                <scope>${flink.scope}</scope>
             </dependency>
 
             <!-- Spark -->
@@ -269,13 +273,19 @@
                 <groupId>org.apache.spark</groupId>
                 <artifactId>spark-core_${scala.tools.version}</artifactId>
                 <version>${spark.version}</version>
-                <scope>provided</scope>
+                <scope>${spark.scope}</scope>
             </dependency>
             <dependency>
                 <groupId>org.apache.spark</groupId>
                 <artifactId>spark-sql_${scala.tools.version}</artifactId>
                 <version>${spark.version}</version>
-                <scope>provided</scope>
+                <scope>${spark.scope}</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-sql_${scala.tools.version}</artifactId>
+                <version>${spark.version}</version>
+                <scope>${spark.scope}</scope>
             </dependency>
 
             <!-- CSV -->
@@ -339,6 +349,12 @@
                 <groupId>net.sourceforge.argparse4j</groupId>
                 <artifactId>argparse4j</artifactId>
                 <version>${argparse4j.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.github.scopt</groupId>
+                <artifactId>scopt_${scala.tools.version}</artifactId>
+                <version>${scopt.version}</version>
+                <scope>compile</scope>
             </dependency>
 
             <!-- Dynamic loading -->

@@ -73,6 +73,30 @@
             <type>test-jar</type>
         </dependency>
 
+        <!-- Flink -->
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-scala_${scala.tools.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-java_${scala.tools.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.flink</groupId>
+            <artifactId>flink-clients_${scala.tools.version}</artifactId>
+        </dependency>
+
+        <!-- Spark -->
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-core_${scala.tools.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-sql_${scala.tools.version}</artifactId>
+        </dependency>
+
         <!-- HDFS -->
         <dependency>
             <groupId>org.apache.hadoop</groupId>
@@ -116,6 +140,10 @@
             <groupId>net.sourceforge.argparse4j</groupId>
             <artifactId>argparse4j</artifactId>
         </dependency>
+        <dependency>
+            <groupId>com.github.scopt</groupId>
+            <artifactId>scopt_${scala.tools.version}</artifactId>
+        </dependency>
 
         <!-- Dynamic loading -->
         <dependency>
@@ -143,22 +171,9 @@
             </activation>
             <properties>
                 <execution.backend>flink</execution.backend>
+                <flink.scope>compile</flink.scope>
+                <hadoop.scope>compile</hadoop.scope>
             </properties>
-            <dependencies>
-                <!-- Flink -->
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-scala_${scala.tools.version}</artifactId>
-                </dependency>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-java_${scala.tools.version}</artifactId>
-                </dependency>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-clients_${scala.tools.version}</artifactId>
-                </dependency>
-            </dependencies>
         </profile>
 
         <!-- profile that activates Spark-related dependencies -->
@@ -172,20 +187,9 @@
             </activation>
             <properties>
                 <execution.backend>spark</execution.backend>
+                <spark.scope>compile</spark.scope>
+                <hadoop.scope>compile</hadoop.scope>
             </properties>
-            <dependencies>
-                <!-- Spark -->
-                <dependency>
-                    <groupId>org.apache.spark</groupId>
-                    <artifactId>spark-core_${scala.tools.version}</artifactId>
-                </dependency>
-                <!-- Guava -->
-                <dependency>
-                    <groupId>com.google.guava</groupId>
-                    <artifactId>guava</artifactId>
-                    <version>18.0</version>
-                </dependency>
-            </dependencies>
         </profile>
     </profiles>
 
