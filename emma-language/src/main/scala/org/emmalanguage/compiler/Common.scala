@@ -36,6 +36,7 @@ trait Common extends AST {
   protected[emmalanguage] object API {
     //@formatter:off
     val apiModuleSymbol       = rootMirror.staticModule(s"$rootPkg.api.package")
+    val emmaModuleSymbol      = rootMirror.staticModule(s"$rootPkg.api.emma.package")
     val csvPkgSymbol          = rootMirror.staticPackage(s"$rootPkg.io.csv")
     val bagSymbol             = rootMirror.staticClass(s"$rootPkg.api.DataBag")
     val groupSymbol           = rootMirror.staticClass(s"$rootPkg.api.Group")
