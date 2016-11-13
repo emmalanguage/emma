@@ -114,7 +114,7 @@
         <!-- Flink -->
         <flink.version>0.10.0</flink.version>
         <!-- Spark -->
-        <spark.version>2.0.0</spark.version>
+        <spark.version>2.0.1</spark.version>
 
         <!-- Logging -->
         <log4j.version>1.2.17</log4j.version>
