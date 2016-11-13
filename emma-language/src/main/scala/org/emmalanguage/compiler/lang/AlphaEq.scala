@@ -100,13 +100,13 @@ trait AlphaEq extends Common {
           } yield eq
 
         case ( // Synthetic ToolBox owner
-          _ withName api.TermName.exprOwner,
-          _ withName api.TermName.exprOwner
+          api.Sym.With.nme(_, api.TermName.exprOwner),
+          api.Sym.With.nme(_, api.TermName.exprOwner)
           ) => pass
 
         case ( // Synthetic ToolBox owner
-          _ withName api.TermName.local,
-          _ withName api.TermName.local
+          api.Sym.With.nme(_, api.TermName.local),
+          api.Sym.With.nme(_, api.TermName.local)
           ) => pass
 
         case _ => for {

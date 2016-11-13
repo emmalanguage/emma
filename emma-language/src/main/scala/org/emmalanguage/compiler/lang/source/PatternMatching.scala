@@ -17,7 +17,6 @@ package org.emmalanguage
 package compiler.lang.source
 
 import compiler.Common
-import compiler.lang.core.Core
 
 import shapeless._
 
@@ -57,17 +56,15 @@ private[source] trait PatternMatching extends Common {
     lazy val destruct: u.Tree => u.Tree =
       api.BottomUp.withOwner.transformWith {
         case Attr.inh(
-          mat @ src.PatMat(target withType tpe, src.PatCase(pat, src.Empty(_), body), _*),
+          mat @ src.PatMat(target, src.PatCase(pat, src.Empty(_), body), _*),
           owner :: _) =>
 
           // remove potential type ascriptions from the target
           val (unascr, tpe) = target match {
             // of the form `(expr: T@unchecked)`, if the type of `expr` is `T`
-            case src.TypeAscr(expr withType tpe1, u.AnnotatedType(Seq(unchecked), tpe2))
-              if tpe1 =:= tpe2 => (expr, tpe1)
-            // otherwise
-            case _ withType tpe3 =>
-              (target, tpe3)
+            case src.TypeAscr(expr, u.AnnotatedType(Seq(_), underlying))
+              if expr.tpe =:= underlying => (expr, expr.tpe)
+            case other => (other, other.tpe)
           }
 
           unascr match {
@@ -116,9 +113,9 @@ private[source] trait PatternMatching extends Common {
           lazy val value = src.ValDef(lhs, target)
           irrefutable(src.ValRef(lhs), pat).map(value +: _)
 
-        case api.PatExtr(_, args@_*) withType tpe
-          if is.caseClass(tpe) && tpe.typeSymbol == target.tpe.typeSymbol =>
-            val init = tpe.typeSymbol.asClass.primaryConstructor
+        case extr @ api.PatExtr(_, args@_*)
+          if is.caseClass(extr.tpe) && extr.tpe.typeSymbol == target.tpe.typeSymbol =>
+            val init = extr.tpe.typeSymbol.asClass.primaryConstructor
             val getters = for {
               param <- init.infoIn(target.tpe).paramLists.head
               api.DefSym(accessor) <- target.tpe.member(param.name).alternatives

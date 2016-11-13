@@ -65,12 +65,13 @@ trait AST extends CommonAST
    */
   lazy val fixSymbolTypes: u.Tree => u.Tree =
     api.TopDown.traverse {
-      case lambda: u.Function => setInfo(lambda.symbol, lambda.tpe)
-      case u.DefDef(_, _, tparams, paramss, _ withType tpe, _) withSym method =>
+      case lambda: u.Function =>
+        setInfo(lambda.symbol, lambda.tpe)
+      case defn @ u.DefDef(_, _, tparams, paramss, tpt, _) =>
         val tps = tparams.map(_.symbol.asType)
         val pss = paramss.map(_.map(_.symbol.asTerm))
-        val res = tpe.finalResultType
-        setInfo(method, api.Type.method(tps: _*)(pss: _*)(res))
+        val res = tpt.tpe.finalResultType
+        setInfo(defn.symbol, api.Type.method(tps: _*)(pss: _*)(res))
     }.andThen(_.tree)
 
   /**
@@ -82,14 +83,16 @@ trait AST extends CommonAST
     api.TopDown.break.withParent.transformWith {
       // Leave `val/var` types to be inferred by the compiler.
       case Attr.inh(u.TypeTree(), Some(api.BindingDef(lhs, rhs, _)) :: _)
-        if !lhs.isParameter && rhs.nonEmpty => u.TypeTree()
-      case Attr.none(u.TypeTree() withType tpe) => api.TypeQuote(tpe)
+        if !lhs.isParameter && rhs.nonEmpty && lhs.info =:= rhs.tpe.dealias.widen
+        => u.TypeTree()
+      case Attr.none(api.Tree.With.tpe(u.TypeTree(), tpe))
+        => api.TypeQuote(tpe)
     }.andThen(_.tree)
 
   /** Restores [[u.TypeTree]]s with their `original` field set. */
   lazy val restoreTypeTrees: u.Tree => u.Tree =
     api.TopDown.break.transform {
-      case u.TypeTree() withType tpe => api.Type.tree(tpe)
+      case api.Tree.With.tpe(u.TypeTree(), tpe) => api.Type.tree(tpe)
     }.andThen(_.tree)
 
   /** Normalizes all statements in term position by wrapping them in a block. */
@@ -144,7 +147,7 @@ trait AST extends CommonAST
 
     // Custom build aliases using the helper `fresh` method.
     val aliases = for (sym <- clashes) yield
-      sym -> api.Sym.copy(sym)(name = fresh(sym.name)).asTerm
+      sym -> api.Sym.With(sym)(nme = fresh(sym.name)).asTerm
 
     api.Tree.rename(aliases: _*)(tree)
   }

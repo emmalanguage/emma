@@ -221,8 +221,8 @@ trait LibSupport extends Common {
                 // compute term bindings sequence
                 val termsSeq = for {
                   s <- (bndDefs diff parsUsedOnce).toSeq
-                } yield s -> Sym.copy(s)(
-                  name = TermName.fresh(s),
+                } yield s -> Sym.With(s)(
+                  nme = TermName.fresh(s),
                   tpe = s.info.map(typesMap),
                   flg = if (parsUsedMany(s)) u.NoFlags else Sym.flags(s)
                 ).asTerm

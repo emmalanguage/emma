@@ -90,10 +90,10 @@ private[core] trait ANF extends Common {
           }
 
         // Simplify target
-        case Attr.inh(src.ModuleAcc(target, module) withType tpe, owner :: _) =>
+        case Attr.inh(src.ModuleAcc(target, module), owner :: _) =>
           val (stats, expr) = decompose(target, unline = false)
           val nme = api.TermName.fresh(module)
-          val lhs = api.ValSym(owner, nme, tpe)
+          val lhs = api.ValSym(owner, nme, module.info)
           val rhs = core.ModuleAcc(expr, module)
           val dfn = core.ValDef(lhs, rhs)
           val ref = core.ValRef(lhs)
@@ -101,7 +101,7 @@ private[core] trait ANF extends Common {
 
         // Simplify target & arguments
         case Attr.inh(
-          src.DefCall(target, method, targs, argss@_*) withType tpe,
+          src.DefCall(target, method, targs, argss@_*),
           owner :: _ :: local :: _
         ) =>
           val (tgtStats, tgtExpr) = target
@@ -116,24 +116,24 @@ private[core] trait ANF extends Common {
             src.Block(allStats: _*)(call)
           } else {
             val nme = api.TermName.fresh(method)
-            val lhs = api.ValSym(owner, nme, tpe)
+            val lhs = api.ValSym(owner, nme, call.tpe)
             val dfn = core.ValDef(lhs, call)
             val ref = core.ValRef(lhs)
             src.Block(allStats :+ dfn: _*)(ref)
           }
 
         // Simplify arguments
-        case Attr.inh(src.Inst(cls, targs, argss@_*) withType tpe, owner :: _) =>
+        case Attr.inh(inst @ src.Inst(cls, targs, argss@_*), owner :: _) =>
           val (stats, exprss) = decompose(argss, unline = false)
           val nme = api.TermName.fresh(cls.typeSymbol)
-          val lhs = api.ValSym(owner, nme, tpe)
+          val lhs = api.ValSym(owner, nme, inst.tpe)
           val rhs = core.Inst(cls, targs: _*)(exprss: _*)
           val dfn = core.ValDef(lhs, rhs)
           val ref = core.ValRef(lhs)
           src.Block(stats :+ dfn: _*)(ref)
 
         // Flatten blocks
-        case Attr.inh(src.Block(outer, expr), owner :: _) =>
+        case Attr.none(src.Block(outer, expr)) =>
           val (inner, result) = decompose(expr, unline = false)
           val flat = outer.flatMap {
             case src.Block(stats, src.Atomic(_)) => stats
@@ -144,16 +144,16 @@ private[core] trait ANF extends Common {
           src.Block(flat ++ inner: _*)(result)
 
         // All lambdas on the RHS
-        case Attr.none(lambda @ src.Lambda(fun, _, _) withType tpe) =>
+        case Attr.none(lambda @ src.Lambda(fun, _, _)) =>
           val nme = api.TermName.fresh(api.TermName.lambda)
-          val lhs = api.ValSym(fun.owner, nme, tpe)
+          val lhs = api.ValSym(fun.owner, nme, lambda.tpe)
           val dfn = core.ValDef(lhs, lambda)
           val ref = core.ValRef(lhs)
           src.Block(dfn)(ref)
 
         // All branches on the RHS
         case Attr.inh(
-          src.Branch(cond, thn, els) withType tpe,
+          src.Branch(cond, thn, els),
           owner :: _ :: local :: _
         ) =>
           val (stats, expr) = decompose(cond, unline = false)
@@ -162,7 +162,7 @@ private[core] trait ANF extends Common {
             src.Block(stats: _*)(branch)
           } else {
             val nme = api.TermName.fresh("if")
-            val lhs = api.ValSym(owner, nme, tpe)
+            val lhs = api.ValSym(owner, nme, branch.tpe)
             val dfn = core.ValDef(lhs, branch)
             val ref = core.ValRef(lhs)
             src.Block(stats :+ dfn: _*)(ref)
@@ -277,7 +277,9 @@ private[core] trait ANF extends Common {
         case (core.ValDef(x, rhs @ core.Atomic(_), _), (core.ValRef(y), n))
           if x == y => (rhs, n + 1)
         case (_, (rhs, n)) =>
+          //scalastyle:off
           return (vals.dropRight(n), rhs)
+          //scalastyle:on
       }._1)
 
     /** Does the input `let` block contain nested `let` expressions? */

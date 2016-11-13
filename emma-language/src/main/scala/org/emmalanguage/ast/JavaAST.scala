@@ -103,7 +103,4 @@ trait JavaAST extends AST {
 
   def setOriginal(tpt: TypeTree, original: Tree) =
     tpt.setOriginal(original)
-
-  def setPos[T <: Tree](tree: T, pos: Position) =
-    internal.setPos(tree, pos)
 }

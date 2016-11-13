@@ -82,7 +82,7 @@ trait Patterns { this: AST =>
       }
 
       def unapply(pat: u.Typed): Option[(u.Tree, u.Type)] = pat match {
-        case u.Typed(Pat(target), _ withType tpe) => Some(target, tpe)
+        case u.Typed(Pat(tgt), tpt) => Some(tgt, tpt.tpe)
         case _ => None
       }
     }
@@ -108,7 +108,7 @@ trait Patterns { this: AST =>
       }
 
       def unapply(at: u.Bind): Option[(u.TermSymbol, u.Tree)] = at match {
-        case u.Bind(_, Pat(rhs)) withSym ValSym(lhs) => Some(lhs, rhs)
+        case Tree.With.sym(u.Bind(_, Pat(rhs)), ValSym(lhs)) => Some(lhs, rhs)
         case _ => None
       }
     }
@@ -145,8 +145,8 @@ trait Patterns { this: AST =>
     // TODO: Implement `apply()` constructor
     object PatExtr extends Node {
       def unapplySeq(extr: u.Tree): Option[(u.Tree, Seq[u.Tree])] = extr match {
-        case u.Apply(tpt @ TypeQuote(_), args) withType tpe
-          if is.caseClass(tpe) => Some(tpt, args)
+        case app @ u.Apply(tpt @ TypeQuote(_), args)
+          if is.caseClass(app.tpe) => Some(tpt, args)
         case u.UnApply(unApp, args) => Some(unApp, args)
         case _ => None
       }

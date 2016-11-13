@@ -29,6 +29,7 @@ trait Trees { this: AST =>
     import internal._
     import reificationSupport._
 
+    /** Copy / extractor for tree attributes. */
     object Tree extends Node {
 
       // Predefined trees
@@ -36,122 +37,146 @@ trait Trees { this: AST =>
       lazy val Java  = Sel(Root, u.definitions.JavaLangPackage)
       lazy val Scala = Sel(Root, u.definitions.ScalaPackage)
 
-      /** Creates a shallow copy of `tree`, preserving its type and setting new attributes. */
-      def copy[T <: Tree](tree: T)(
-        pos: u.Position = tree.pos,
-        sym: u.Symbol   = tree.symbol,
-        tpe: u.Type     = tree.tpe): T = {
+      object With {
 
-        // Optimize when there are no changes.
-        val noChange = pos == tree.pos &&
-          sym == tree.symbol &&
-          tpe == tree.tpe
+        /** Creates a shallow copy of `tree`, preserving its type and setting new attributes. */
+        def apply[T <: Tree](tree: T)(
+          sym: u.Symbol   = tree.symbol,
+          tpe: u.Type     = tree.tpe,
+          pos: u.Position = tree.pos
+        ): T = {
+          // Optimize when there are no changes.
+          val noChange = sym == tree.symbol &&
+            tpe == tree.tpe &&
+            pos == tree.pos
 
-        if (noChange) tree else {
-          val dup = tree match {
-            case _ if tree.isEmpty =>
-              u.EmptyTree
-            case u.Alternative(choices) =>
-              u.Alternative(choices)
-            case u.Annotated(target, arg) =>
-              u.Annotated(target, arg)
-            case u.AppliedTypeTree(target, args) =>
-              u.AppliedTypeTree(target, args)
-            case u.Apply(target, args) =>
-              u.Apply(target, args)
-            case u.Assign(lhs, rhs) =>
-              u.Assign(lhs, rhs)
-            case u.AssignOrNamedArg(lhs, rhs) =>
-              u.AssignOrNamedArg(lhs, rhs)
-            case u.Bind(_, pat) =>
-              u.Bind(sym.name, pat)
-            case u.Block(stats, expr) =>
-              u.Block(stats, expr)
-            case u.CaseDef(pat, guard, body) =>
-              u.CaseDef(pat, guard, body)
-            case u.ClassDef(mods, _, tparams, impl) =>
-              u.ClassDef(mods, sym.name.toTypeName, tparams, impl)
-            case u.CompoundTypeTree(templ) =>
-              u.CompoundTypeTree(templ)
-            case u.DefDef(mods, _, tparams, paramss, tpt, body) =>
-              u.DefDef(mods, sym.name.toTermName, tparams, paramss, tpt, body)
-            case u.ExistentialTypeTree(tpt, where) =>
-              u.ExistentialTypeTree(tpt, where)
-            case u.Function(params, body) =>
-              u.Function(params, body)
-            case u.Ident(_) =>
-              u.Ident(sym.name)
-            case u.If(cond, thn, els) =>
-              u.If(cond, thn, els)
-            case u.Import(qual, selectors) =>
-              u.Import(qual, selectors)
-            case u.LabelDef(_, params, body) =>
-              u.LabelDef(sym.name.toTermName, params, body)
-            case u.Literal(const) =>
-              u.Literal(const)
-            case u.Match(target, cases) =>
-              u.Match(target, cases)
-            case u.ModuleDef(mods, _, impl) =>
-              u.ModuleDef(mods, sym.name.toTermName, impl)
-            case u.New(tpt) =>
-              u.New(tpt)
-            case u.PackageDef(id, stats) =>
-              u.PackageDef(id, stats)
-            case u.ReferenceToBoxed(id) =>
-              u.ReferenceToBoxed(id)
-            case u.RefTree(qual, _) =>
-              u.RefTree(qual, sym.name)
-            case u.Return(expr) =>
-              u.Return(expr)
-            case u.Select(target, _) =>
-              u.Select(target, sym.name)
-            case u.SelectFromTypeTree(target, _) =>
-              u.SelectFromTypeTree(target, sym.name.toTypeName)
-            case u.SingletonTypeTree(ref) =>
-              u.SingletonTypeTree(ref)
-            case u.Star(elem) =>
-              u.Star(elem)
-            case u.Super(qual, _) =>
-              u.Super(qual, sym.name.toTypeName)
-            case u.Template(parents, self, body) =>
-              u.Template(parents, self, body)
-            case u.This(_) =>
-              u.This(sym.name.toTypeName)
-            case u.Throw(ex) =>
-              u.Throw(ex)
-            case u.Try(block, catches, finalizer) =>
-              u.Try(block, catches, finalizer)
-            case u.TypeApply(target, targs) =>
-              u.TypeApply(target, targs)
-            case u.TypeBoundsTree(lo, hi) =>
-              u.TypeBoundsTree(lo, hi)
-            case u.Typed(expr, tpt) =>
-              u.Typed(expr, tpt)
-            case u.TypeDef(mods, _, tparams, rhs) =>
-              u.TypeDef(mods, sym.name.toTypeName, tparams, rhs)
-            case _: u.TypeTree =>
-              u.TypeTree()
-            case u.UnApply(extr, args) =>
-              u.UnApply(extr, args)
-            case u.ValDef(mods, _, tpt, rhs) =>
-              u.ValDef(mods, sym.name.toTermName, tpt, rhs)
-            case other =>
-              other
+          if (noChange) tree else {
+            val dup = tree match {
+              case _ if tree.isEmpty =>
+                u.EmptyTree
+              case u.Alternative(choices) =>
+                u.Alternative(choices)
+              case u.Annotated(target, arg) =>
+                u.Annotated(target, arg)
+              case u.AppliedTypeTree(target, args) =>
+                u.AppliedTypeTree(target, args)
+              case u.Apply(target, args) =>
+                u.Apply(target, args)
+              case u.Assign(lhs, rhs) =>
+                u.Assign(lhs, rhs)
+              case u.AssignOrNamedArg(lhs, rhs) =>
+                u.AssignOrNamedArg(lhs, rhs)
+              case u.Bind(_, pat) =>
+                u.Bind(sym.name, pat)
+              case u.Block(stats, expr) =>
+                u.Block(stats, expr)
+              case u.CaseDef(pat, guard, body) =>
+                u.CaseDef(pat, guard, body)
+              case u.ClassDef(_, _, tparams, impl) =>
+                u.ClassDef(Sym.mods(sym), sym.name.toTypeName, tparams, impl)
+              case u.CompoundTypeTree(templ) =>
+                u.CompoundTypeTree(templ)
+              case u.DefDef(_, _, tparams, paramss, tpt, body) =>
+                u.DefDef(Sym.mods(sym), sym.name.toTermName, tparams, paramss, tpt, body)
+              case u.ExistentialTypeTree(tpt, where) =>
+                u.ExistentialTypeTree(tpt, where)
+              case u.Function(params, body) =>
+                u.Function(params, body)
+              case u.Ident(_) =>
+                u.Ident(sym.name)
+              case u.If(cond, thn, els) =>
+                u.If(cond, thn, els)
+              case u.Import(qual, selectors) =>
+                u.Import(qual, selectors)
+              case u.LabelDef(_, params, body) =>
+                u.LabelDef(sym.name.toTermName, params, body)
+              case u.Literal(const) =>
+                u.Literal(const)
+              case u.Match(target, cases) =>
+                u.Match(target, cases)
+              case u.ModuleDef(_, _, impl) =>
+                u.ModuleDef(Sym.mods(sym), sym.name.toTermName, impl)
+              case u.New(tpt) =>
+                u.New(tpt)
+              case u.PackageDef(id, stats) =>
+                u.PackageDef(id, stats)
+              case u.ReferenceToBoxed(id) =>
+                u.ReferenceToBoxed(id)
+              case u.RefTree(qual, _) =>
+                u.RefTree(qual, sym.name)
+              case u.Return(expr) =>
+                u.Return(expr)
+              case u.Select(target, _) =>
+                u.Select(target, sym.name)
+              case u.SelectFromTypeTree(target, _) =>
+                u.SelectFromTypeTree(target, sym.name.toTypeName)
+              case u.SingletonTypeTree(ref) =>
+                u.SingletonTypeTree(ref)
+              case u.Star(elem) =>
+                u.Star(elem)
+              case u.Super(qual, _) =>
+                u.Super(qual, sym.name.toTypeName)
+              case u.Template(parents, self, body) =>
+                u.Template(parents, self, body)
+              case u.This(_) =>
+                u.This(sym.name.toTypeName)
+              case u.Throw(ex) =>
+                u.Throw(ex)
+              case u.Try(block, catches, finalizer) =>
+                u.Try(block, catches, finalizer)
+              case u.TypeApply(target, targs) =>
+                u.TypeApply(target, targs)
+              case u.TypeBoundsTree(lo, hi) =>
+                u.TypeBoundsTree(lo, hi)
+              case u.Typed(expr, tpt) =>
+                u.Typed(expr, tpt)
+              case u.TypeDef(_, _, tparams, rhs) =>
+                u.TypeDef(Sym.mods(sym), sym.name.toTypeName, tparams, rhs)
+              case _: u.TypeTree =>
+                u.TypeTree()
+              case u.UnApply(extr, args) =>
+                u.UnApply(extr, args)
+              case u.ValDef(_, _, tpt, rhs) =>
+                u.ValDef(Sym.mods(sym), sym.name.toTermName, tpt, rhs)
+              case other =>
+                other
+            }
+
+            if (tpe != dup.tpe) setType(dup, tpe)
+            if (pos != dup.pos) atPos(pos)(dup)
+            if (sym != dup.symbol) setSymbol(dup, sym)
+            dup.asInstanceOf[T]
           }
+        }
 
-          if (pos != null && pos != dup.pos) setPos(dup, pos)
-          if (tpe != null && tpe != dup.tpe) setType(dup, tpe)
-          if (sym != null && sym != dup.symbol) setSymbol(dup, sym)
-          dup.asInstanceOf[T]
+        def unapply(tree: u.Tree): Option[(u.Tree, (u.Symbol, u.Type, u.Position))] =
+          for (t <- Option(tree) if tree.nonEmpty) yield t -> (t.symbol, t.tpe, t.pos)
+
+        object sym {
+          def apply[T <: u.Tree](tree: T, sym: u.Symbol): T = With(tree)(sym = sym)
+          def unapply(tree: u.Tree): Option[(u.Tree, u.Symbol)] =
+            for (t <- Option(tree) if tree.nonEmpty && has.sym(t)) yield t -> t.symbol
+        }
+
+        object tpe {
+          def apply[T <: u.Tree](tree: T, tpe: u.Type): T = With(tree)(tpe = tpe)
+          def unapply(tree: u.Tree): Option[(u.Tree, u.Type)] =
+            for (t <- Option(tree) if tree.nonEmpty && has.tpe(t)) yield t -> t.tpe
+        }
+
+        object pos {
+          def apply[T <: u.Tree](tree: T, pos: u.Position): T = With(tree)(pos = pos)
+          def unapply(tree: u.Tree): Option[(u.Tree, u.Position)] =
+            for (t <- Option(tree) if tree.nonEmpty && has.pos(t)) yield t -> t.pos
         }
       }
 
       /** Prints `tree` for debugging (most details). */
       def debug(tree: u.Tree): String =
         u.showCode(tree,
-          printIds = true,
+          printIds    = true,
           printOwners = true,
-          printTypes = true)
+          printTypes  = true)
 
       /** Prints `tree` in parseable form. */
       def show(tree: u.Tree): String =
@@ -195,7 +220,7 @@ trait Trees { this: AST =>
 
       /** Returns a set of all method (`def`) definitions in `tree`. */
       def methods(tree: u.Tree): Set[u.MethodSymbol] = tree.collect {
-        case (_: u.DefDef) withSym (method: u.MethodSymbol) => method
+        case defn: u.DefDef => defn.symbol.asMethod
       }.toSet
 
       /** Returns a set of all variable (`var`) mutations in `tree`. */
@@ -334,7 +359,7 @@ trait Trees { this: AST =>
       }
 
       def unapply(id: u.Ident): Option[u.Symbol] = id match {
-        case _ withSym target => Some(target)
+        case Tree.With.sym(_, target) => Some(target)
         case _ => None
       }
     }
@@ -359,7 +384,7 @@ trait Trees { this: AST =>
       }
 
       def unapply(sel: u.Select): Option[(u.Tree, u.Symbol)] = sel match {
-        case u.Select(target, _) withSym member => Some(target, member)
+        case Tree.With.sym(u.Select(target, _), member) => Some(target, member)
         case _ => None
       }
     }

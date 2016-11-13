@@ -82,39 +82,6 @@ trait CommonAST {
   /** Returns `tpt` with its original field set. */
   private[ast] def setOriginal(tpt: TypeTree, original: Tree): TypeTree
 
-  /** Returns `tree` with its position set. */
-  private[ast] def setPos[T <: Tree](tree: T, pos: Position): T
-
-  // ------------
-  // Extractors
-  // ------------
-  // scalastyle:off
-
-  /** Extractor for the name of a symbol, if any. */
-  object withName {
-    def unapply(sym: Symbol): Option[(Symbol, Name)] =
-      if (has.nme(sym)) Some(sym, sym.name) else None
-  }
-
-  /** Extractor for the type of a symbol, if any. */
-  object withInfo {
-    def unapply(sym: Symbol): Option[(Symbol, Type)] =
-      if (has.tpe(sym)) Some(sym, sym.info.dealias.widen) else None
-  }
-
-  /** Extractor for the symbol of a tree, if any. */
-  object withSym {
-    def unapply(tree: Tree): Option[(Tree, Symbol)] =
-      if (has.sym(tree)) Some(tree, tree.symbol) else None
-  }
-
-  /** Extractor for the type of a tree, if any. */
-  object withType {
-    def unapply(tree: Tree): Option[(Tree, Type)] =
-      if (has.tpe(tree)) Some(tree, tree.tpe.dealias.widen) else None
-  }
-
-  // scalastyle:on
   // ---------------
   // Property checks
   // ---------------
@@ -243,10 +210,10 @@ trait CommonAST {
     /** Is `tree` a term? */
     def term(tree: Tree): Boolean = tree match {
       case Ident(termNames.WILDCARD) => false
-      case (_: Ident) withSym sym withType tpe => sym.isTerm && is.result(tpe)
-      case (_: Select) withSym sym withType tpe => sym.isTerm && is.result(tpe)
-      case (_: Apply) withType tpe => is.result(tpe)
-      case (_: TypeApply) withType tpe => is.result(tpe)
+      case id: Ident => id.symbol.isTerm && is.result(id.tpe)
+      case sel: Select => sel.symbol.isTerm && is.result(sel.tpe)
+      case app: Apply => is.result(app.tpe)
+      case tapp: TypeApply => is.result(tapp.tpe)
       case _: Assign => false
       case _: Bind => false
       case _: LabelDef => false
@@ -257,10 +224,10 @@ trait CommonAST {
     /** Is `tree` a valid pattern? */
     def pattern(tree: Tree): Boolean = tree match {
       case Ident(termNames.WILDCARD) => true
-      case (_: Ident | _: Select) withSym sym withType tpe =>
-        sym.isTerm && sym.asTerm.isStable && is.result(tpe)
-      case Apply(target, args) withType tpe =>
-        target.isType && args.nonEmpty && is.result(tpe)
+      case id: Ident =>
+        is.stable(id.symbol) && is.result(id.tpe)
+      case app @ Apply(target, args) =>
+        target.isType && args.nonEmpty && is.result(app.tpe)
       case _: Alternative => true
       case _: Bind => true
       case _: Literal => true

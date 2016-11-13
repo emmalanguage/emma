@@ -119,7 +119,7 @@ trait Terms { this: AST =>
 
       /** Creates a fresh term symbol with the same attributes as the `original`. */
       def fresh(original: u.TermSymbol): u.TermSymbol =
-        Sym.copy(original)(name = TermName.fresh(original)).asTerm
+        Sym.With(original)(nme = TermName.fresh(original)).asTerm
 
       def unapply(sym: u.TermSymbol): Option[u.TermSymbol] =
         Option(sym)
@@ -162,7 +162,7 @@ trait Terms { this: AST =>
         assert(is.defined(target), s"$this target is not defined: $target")
         assert(has.tpe(target), s"$this target has no type:\n${Tree.showTypes(target)}")
         if (targs.isEmpty) {
-          if (argss.isEmpty) Tree.copy(target)(tpe = target.tpe.resultType)
+          if (argss.isEmpty) Tree.With(target)(tpe = target.tpe.resultType)
           else argss.foldLeft(target)(apply)
         } else apply(TypeApp(target, targs: _*))(argss: _*)
       }
@@ -192,7 +192,7 @@ trait Terms { this: AST =>
         assert(has.tpe(target), s"$this target has no type:\n${Tree.showTypes(target)}")
         assert(targs.nonEmpty, s"No type args supplied to $this")
         assert(targs.forall(is.defined), s"Not all $this type args are defined")
-        val tpts = targs.map(TypeQuote(_)).toList
+        val tpts = targs.map(targ => TypeQuote(targ.dealias.widen)).toList
         val tapp = u.TypeApply(target, tpts)
         setType(tapp, Type(target.tpe, targs: _*))
       }
@@ -340,16 +340,16 @@ trait Terms { this: AST =>
         assert(have.tpe(argss.flatten), s"Not all $this args have type")
         val cls = Type.constructor(target)
         val ini = cls.decl(TermName.init)
-        val ctr = Sym.resolveOverloaded(appliedType(cls, targs: _*))(ini)(argss: _*)
         val tpe = Type(cls, targs: _*)
+        val ctr = Sym.resolveOverloaded(tpe)(ini)(argss: _*)
         val tpt = setType(u.New(TypeQuote(tpe)), tpe)
         val app = TermApp(Sel(tpt, ctr))(argss: _*)
         setType(setSymbol(app, ctr), tpe)
       }
 
       def unapplySeq(tree: u.Tree): Option[(u.Type, Seq[u.Type], Seq[Seq[u.Tree]])] = tree match {
-        case TermApp(Sel(u.New(_ withType clazz), _), _, argss@_*) withType Type.Result(_) =>
-          Some(clazz.typeConstructor, clazz.typeArgs, argss)
+        case app @ TermApp(Sel(u.New(tpt), _), _, argss@_*) if is.result(app.tpe) =>
+          Some(tpt.tpe.typeConstructor, tpt.tpe.typeArgs, argss)
         case _ => None
       }
     }
@@ -379,8 +379,8 @@ trait Terms { this: AST =>
         setType(setSymbol(fun, sym), tpe)
       }
 
-      def unapply(lambda: u.Function): Option[(u.TermSymbol, Seq[u.ValDef], u.Tree)] = lambda match {
-        case u.Function(params, Term(body)) withSym TermSym(fun) => Some(fun, params, body)
+      def unapply(fun: u.Function): Option[(u.TermSymbol, Seq[u.ValDef], u.Tree)] = fun match {
+        case Tree.With.sym(u.Function(pss, Term(rhs)), TermSym(sym)) => Some(sym, pss, rhs)
         case _ => None
       }
     }

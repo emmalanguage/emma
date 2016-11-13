@@ -32,42 +32,12 @@ trait Symbols { this: AST =>
 
     object Sym extends Node {
 
+      // ------------------------------------------------------------------------------------------
       // Predefined symbols
+      // ------------------------------------------------------------------------------------------
+
       lazy val foreach = Type[TraversableOnce[Nothing]]
         .member(TermName.foreach).asMethod
-
-      /** Creates a copy of `sym`, optionally changing some of its attributes. */
-      def copy(sym: u.Symbol)(
-        name:  u.Name     = sym.name,
-        owner: u.Symbol   = sym.owner,
-        tpe:   u.Type     = sym.info,
-        pos:   u.Position = sym.pos,
-        flg: u.FlagSet    = flags(sym)): u.Symbol = {
-
-        // Optimize when there are no changes.
-        val noChange = name == sym.name &&
-          owner == sym.owner &&
-          tpe == sym.info &&
-          pos == sym.pos &&
-          flg == flags(sym)
-
-        if (noChange) sym else {
-          assert(is.defined(sym), s"Undefined symbol `$sym` cannot be copied")
-          assert(!sym.isPackage, s"Package symbol `$sym` cannot be copied")
-          assert(is.defined(name), s"Undefined name `$name`")
-          assert(is.defined(tpe), s"Undefined type `$tpe`")
-          setInfo(if (sym.isType) {
-            val typeName = name.encodedName.toTypeName
-            if (sym.isClass) newClassSymbol(owner, typeName, pos, flg)
-            else newTypeSymbol(owner, typeName, pos, flg)
-          } else {
-            val termName = name.encodedName.toTermName
-            if (sym.isModule) newModuleAndClassSymbol(owner, termName, pos, flg)._1
-            else if (sym.isMethod) newMethodSymbol(owner, termName, pos, flg)
-            else newTermSymbol(owner, termName, pos, flg)
-          }, tpe.dealias.widen)
-        }
-      }
 
       /** A map of all tuple symbols by number of elements. */
       lazy val tuple: Map[Int, u.ClassSymbol] =
@@ -81,12 +51,15 @@ trait Symbols { this: AST =>
 
       /** A map of all lambda function symbols by number of arguments. */
       lazy val fun: Map[Int, u.ClassSymbol] =
-        FunctionClass.seq.view.zipWithIndex
-          .map(_.swap).toMap
+        FunctionClass.seq.view.zipWithIndex.map(_.swap).toMap
 
       /** A set of all lambda function symbols. */
       lazy val funs: Set[u.Symbol] =
         FunctionClass.seq.toSet
+
+      // ------------------------------------------------------------------------------------------
+      // Utility methods
+      // ------------------------------------------------------------------------------------------
 
       /** Returns the flags associated with `sym`. */
       def flags(sym: u.Symbol): u.FlagSet =
@@ -95,6 +68,92 @@ trait Symbols { this: AST =>
       /** Returns any annotation of type `A` associated with `sym`. */
       def findAnn[A: TypeTag](sym: u.Symbol): Option[u.Annotation] =
         sym.annotations.find(_.tree.tpe =:= Type[A])
+
+      /** Returns modifiers corresponding to the definition of `sym`. */
+      def mods(sym: u.Symbol): u.Modifiers =
+        u.Modifiers(flags(sym), TypeName.empty, sym.annotations.map(_.tree))
+
+      /** Copy / extractor for symbol attributes. */
+      object With {
+
+        /** Creates a copy of `sym`, optionally changing some of its attributes. */
+        def apply[S <: u.Symbol](sym: S)(
+          own: u.Symbol          = sym.owner,
+          nme: u.Name            = sym.name,
+          tpe: u.Type            = sym.info,
+          pos: u.Position        = sym.pos,
+          flg: u.FlagSet         = flags(sym),
+          ans: Seq[u.Annotation] = Seq.empty
+        ): S = {
+          // Optimize when there are no changes.
+          val noChange = own == sym.owner &&
+            nme == sym.name &&
+            tpe == sym.info &&
+            pos == sym.pos &&
+            flg == flags(sym) &&
+            ans == sym.annotations
+
+          if (noChange) sym else {
+            assert(is.defined(sym), s"Undefined symbol `$sym` cannot be copied")
+            assert(!sym.isPackage,  s"Package symbol `$sym` cannot be copied")
+            assert(is.defined(nme), s"Undefined name `$nme`")
+            assert(is.defined(tpe), s"Undefined type `$tpe`")
+            val dup = (if (sym.isType) {
+              val typeNme = nme.encodedName.toTypeName
+              if (sym.isClass) newClassSymbol(own, typeNme, pos, flg)
+              else newTypeSymbol(own, typeNme, pos, flg)
+            } else {
+              val termNme = nme.encodedName.toTermName
+              if (sym.isModule) newModuleAndClassSymbol(own, termNme, pos, flg)._1
+              else if (sym.isMethod) newMethodSymbol(own, termNme, pos, flg)
+              else newTermSymbol(own, termNme, pos, flg)
+            }).asInstanceOf[S]
+            setInfo(dup, tpe.dealias.widen)
+            setAnnotations(dup, ans.toList)
+          }
+        }
+
+        def unapply(sym: u.Symbol)
+          : Option[(u.Symbol, (u.Symbol, u.Name, u.Type, u.Position, u.FlagSet, Seq[u.Annotation]))]
+          = for (s <- Option(sym) if s != u.NoSymbol)
+            yield s -> (s.owner, s.name, s.info, s.pos, flags(s), s.annotations)
+
+        object own {
+          def apply[S <: u.Symbol](sym: S, own: u.Symbol): S = With(sym)(own = own)
+          def unapply(sym: u.Symbol): Option[(u.Symbol, u.Symbol)] =
+            for (s <- Option(sym) if s != u.NoSymbol && has.own(s)) yield s -> s.owner
+        }
+
+        object nme {
+          def apply[S <: u.Symbol](sym: S, nme: u.Name): S = With(sym)(nme = nme)
+          def unapply(sym: u.Symbol): Option[(u.Symbol, u.Name)] =
+            for (s <- Option(sym) if s != u.NoSymbol && has.nme(s)) yield s -> s.name
+        }
+
+        object tpe {
+          def apply[S <: u.Symbol](sym: S, tpe: u.Type): S = With(sym)(tpe = tpe)
+          def unapply(sym: u.Symbol): Option[(u.Symbol, u.Type)] =
+            for (s <- Option(sym) if s != u.NoSymbol && has.tpe(s)) yield s -> s.info
+        }
+
+        object pos {
+          def apply[S <: u.Symbol](sym: S, pos: u.Position): S = With(sym)(pos = pos)
+          def unapply(sym: u.Symbol): Option[(u.Symbol, u.Position)] =
+            for (s <- Option(sym) if s != u.NoSymbol && has.pos(s)) yield s -> s.pos
+        }
+
+        object flg {
+          def apply[S <: u.Symbol](sym: S, flg: u.FlagSet): S = With(sym)(flg = flg)
+          def unapply(sym: u.Symbol): Option[(u.Symbol, u.FlagSet)] =
+            for (s <- Option(sym) if s != u.NoSymbol) yield s -> flags(s)
+        }
+
+        object ans {
+          def apply[S <: u.Symbol](sym: S, ans: Seq[u.Annotation]): S = With(sym)(ans = ans)
+          def unapply(sym: u.Symbol): Option[(u.Symbol, Seq[u.Annotation])] =
+            for (s <- Option(sym) if s != u.NoSymbol) yield s -> s.annotations
+        }
+      }
 
       /** Finds a version of an overloaded symbol with matching type signature, if possible. */
       def resolveOverloaded(target: u.Type = u.NoType)
@@ -114,7 +173,7 @@ trait Symbols { this: AST =>
           if np == na || (np == na + 1 && paramss.last.forall(is(IMPLICIT)))
           if paramss zip argss forall {
             // This allows to handle variable length arguments.
-            case (prefix :+ (_ withInfo VarArgType(tpe)), args) =>
+            case (prefix :+ With.tpe(_, VarArgType(tpe)), args) =>
               check(prefix zip args) && (args drop prefix.length match {
                 case Seq(arg) if arg.tpe <:< Type.kind1[Seq](tpe) => true
                 case suffix => suffix.forall(_.tpe <:< tpe)
@@ -205,7 +264,7 @@ trait Symbols { this: AST =>
                   vals :::= dst
                 }
               } else if (changed) {
-                val dup = copy(als)(owner = own, tpe = tpe)
+                val dup = With(als)(own = own, tpe = tpe)
                 dict += sym -> dup
                 keys ::= sym
                 vals ::= dup
@@ -216,7 +275,7 @@ trait Symbols { this: AST =>
           // because method calls might appear before their definition.
           if (dict.isEmpty) in else TopDown.transform { case tree
             if has.tpe(tree) || (has.sym(tree) && dict.contains(tree.symbol))
-            => Tree.copy(tree)(sym = dict(tree.symbol), tpe = tpeAlias(tree.tpe))
+            => Tree.With(tree)(sym = dict(tree.symbol), tpe = tpeAlias(tree.tpe))
           } (in).tree
         }
 

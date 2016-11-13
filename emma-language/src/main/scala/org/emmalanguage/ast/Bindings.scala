@@ -126,7 +126,8 @@ trait Bindings { this: AST =>
       }
 
       def unapply(bind: u.ValDef): Option[(u.TermSymbol, u.Tree, u.FlagSet)] = bind match {
-        case u.ValDef(mods, _, _, Term(rhs)) withSym BindingSym(lhs) => Some(lhs, rhs, mods.flags)
+        case Tree.With.sym(u.ValDef(mods, _, _, rhs), BindingSym(lhs)) =>
+          Some(lhs, rhs, mods.flags)
         case _ => None
       }
     }
