@@ -144,7 +144,7 @@ private[comprehension] trait ReDeSugar extends Common {
               val funcSym = api.TermSym.free(funcNme, funcRhs.tpe)
               val funcRef = core.Ref(funcSym)
               val funcVal = api.ValDef(funcSym, funcRhs)
-              val nextNme = api.TermName(cs.WithFilter.symbol)
+              val nextNme = api.TermName.fresh(cs.WithFilter.symbol)
               val nextSym = api.TermSym.free(nextNme, currSym.info)
               val nextVal = api.ValDef(nextSym, cs.WithFilter(currRef)(funcRef))
               (nextSym, currPfx :+ funcVal :+ nextVal)
