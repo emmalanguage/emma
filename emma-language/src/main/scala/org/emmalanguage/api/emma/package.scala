@@ -20,8 +20,9 @@ import macros.utility.UtilMacros
 
 import scala.language.experimental.macros
 
-object emma {
+package object emma {
 
   final def prettyPrint[T](e: T): String = macro UtilMacros.prettyPrint[T]
 
+  final def quote[T](e: T): String = macro QuoteMacro.quoteImpl[T]
 }
