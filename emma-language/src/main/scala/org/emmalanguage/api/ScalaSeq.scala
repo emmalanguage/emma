@@ -81,7 +81,7 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
   override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
     CSVScalaSupport(format).write(path)(rep)
 
-  override val fetch: Seq[A] =
+  override def fetch(): Seq[A] =
     rep
 
 }

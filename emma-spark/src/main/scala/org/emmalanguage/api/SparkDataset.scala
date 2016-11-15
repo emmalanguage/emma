@@ -93,7 +93,9 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
       .mode("overwrite")
       .csv(path)
 
-  override lazy val fetch: Seq[A] =
+  def fetch(): Seq[A] = collect
+
+  private lazy val collect: Seq[A] =
     rep.collect()
 
   // -----------------------------------------------------
