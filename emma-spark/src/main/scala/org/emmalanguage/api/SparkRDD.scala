@@ -93,7 +93,9 @@ class SparkRDD[A: Meta] private[api](@transient private[api] val rep: RDD[A])(im
       .csv(path)
   }
 
-  override lazy val fetch: Seq[A] =
+  def fetch(): Seq[A] = collect
+
+  private lazy val collect: Seq[A] =
     rep.collect()
 
   // -----------------------------------------------------

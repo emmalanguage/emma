@@ -105,7 +105,9 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
     rep.getExecutionEnvironment.execute()
   }
 
-  override lazy val fetch: Seq[A] =
+  def fetch(): Seq[A] = collect
+
+  private lazy val collect: Seq[A] =
     rep.collect()
 
   // -----------------------------------------------------
