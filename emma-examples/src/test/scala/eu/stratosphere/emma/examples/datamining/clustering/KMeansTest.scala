@@ -44,7 +44,7 @@ class KMeansTest extends FlatSpec with Matchers with BeforeAndAfter {
     deleteRecursive(new File(path))
   }
 
-  "KMeans" should "cluster points around the corners of a hypercube" in withRuntime() { rt =>
+  "KMeans" should "cluster points around the corners of a hypercube" ignore withRuntime() { rt =>
     val expected = clusters(Source
       .fromFile(s"$path/clusters.tsv")
       .getLines().map { line =>

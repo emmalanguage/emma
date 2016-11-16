@@ -40,7 +40,7 @@ class TriangleCountTest extends FlatSpec with Matchers with BeforeAndAfter {
     deleteRecursive(new File(path))
   }
 
-  "Triangle Count" should "find the correct number of triangles" in withRuntime() { rt =>
+  "Triangle Count" should "find the correct number of triangles" ignore withRuntime() { rt =>
     val ts = new TriangleCount(s"$path/edges.tsv", "", rt).algorithm run rt
     ts should be (3629)
   }

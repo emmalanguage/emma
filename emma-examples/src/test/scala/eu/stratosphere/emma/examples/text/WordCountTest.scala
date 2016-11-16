@@ -46,7 +46,7 @@ class WordCountTest extends FlatSpec with Matchers with BeforeAndAfter {
     deleteRecursive(Paths.get(path).toFile)
   }
 
-  "WordCount" should "count words" in withRuntime() { rt =>
+  "WordCount" should "count words" ignore withRuntime() { rt =>
     new WordCount(s"$path/hamlet.txt", s"$path/output.txt", rt).run()
 
     val act = DataBag(fromPath(s"$path/output.txt"))
