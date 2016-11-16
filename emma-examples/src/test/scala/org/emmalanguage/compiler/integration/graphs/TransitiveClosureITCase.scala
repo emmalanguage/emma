@@ -14,84 +14,60 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.integration
+package compiler.integration.graphs
 
+import api.Meta.Projections._
 import api._
-import api.model._
-import compiler.BaseCompilerSpec
+import compiler.integration.BaseCompilerITCase
 import compiler.ir.ComprehensionSyntax._
+import examples.graphs._
+import examples.graphs.model._
 import io.csv.CSV
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
-/** A spec for comprehension normalization. */
 @RunWith(classOf[JUnitRunner])
-class TransitiveClosureSpec extends BaseCompilerSpec {
-
-  import TransitiveClosureSpec._
+class TransitiveClosureITCase extends BaseCompilerITCase {
 
   import compiler._
-
-  // ---------------------------------------------------------------------------
-  // Transformation pipelines
-  // ---------------------------------------------------------------------------
-
-  val anfPipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
-      Core.anf
-    ).compose(_.tree)
-
-  val liftPipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
-      Core.lift
-    ).compose(_.tree)
 
   // ---------------------------------------------------------------------------
   // Program closure
   // ---------------------------------------------------------------------------
 
   // input parameters
-  val input = "file://path/to/input"
-  val output = "file://path/to/output"
+  val input: String = null
+  val output: String = null
+  val csv = CSV()
 
   // ---------------------------------------------------------------------------
   // Program representations
   // ---------------------------------------------------------------------------
 
   val sourceExpr = liftPipeline(u.reify {
-    // read in a directed graph
-    var paths = DataBag.readCSV[Edge[Long]](input, CSV()).distinct
-    var count = paths.size
-    var added = 0L
-
-    do {
-      val delta = for {
-        e1 <- paths
-        e2 <- paths
-        if e1.dst == e2.src
-      } yield Edge(e1.src, e2.dst)
-
-      paths = (paths union delta).distinct
-
-      added = paths.size - count
-      count = paths.size
-    } while (added > 0)
-
-    paths.writeCSV(output, CSV())
+    // read an initial collection of edges
+    val edges = DataBag.readCSV[Edge[Int]](input, csv)
+    // compute the transitive closure of the edges
+    val closure = TransitiveClosure(edges)
+    // write the results into a CSV file
+    closure.writeCSV(output, csv)
   })
 
   val coreExpr = anfPipeline(u.reify {
     // read in a directed graph
-    val paths$1 = DataBag.readCSV[Edge[Long]](input, CSV()).distinct
+    val input = this.input
+    val csv$1 = this.csv
+    val readCSV = DataBag.readCSV[Edge[Int]](input, csv$1)
+    val paths$1 = readCSV.distinct
     val count$1 = paths$1.size
     val added$1 = 0L
 
-    def doWhile$1(added$3: Long, count$3: Long, paths$3: DataBag[Edge[Long]]): Unit = {
+    def doWhile$1(added$3: Long, count$3: Long, paths$3: DataBag[Edge[Int]]): Unit = {
 
-      val closure = comprehension[Edge[Long], DataBag] {
-        val e1 = generator[Edge[Long], DataBag](paths$3)
-        val e2 = generator[Edge[Long], DataBag](paths$3)
+      val closure = comprehension[Edge[Int], DataBag] {
+        val e1 = generator[Edge[Int], DataBag](paths$3)
+        val e2 = generator[Edge[Int], DataBag](paths$3)
         guard(e1.dst == e2.src)
         head {
           Edge(e1.src, e2.dst)
@@ -104,7 +80,10 @@ class TransitiveClosureSpec extends BaseCompilerSpec {
       val isReady = added$2 > 0
 
       def suffix$1(): Unit = {
-        paths$2.writeCSV(output, CSV())
+        val closure = paths$2
+        val output = this.output
+        val csv$2 = this.csv;
+        closure.writeCSV(output, csv$2)
       }
 
       if (isReady) doWhile$1(added$2, count$2, paths$2)
@@ -120,11 +99,5 @@ class TransitiveClosureSpec extends BaseCompilerSpec {
 
   "lifting" in {
     sourceExpr shouldBe alphaEqTo(coreExpr)
-  }
-}
-
-object TransitiveClosureSpec {
-  case class Edge[VT](@id src: VT, @id dst: VT) extends Identity[Edge[VT]] {
-    def identity = Edge(src, dst)
   }
 }
