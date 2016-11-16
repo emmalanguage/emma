@@ -261,7 +261,7 @@ trait LibSupport extends Common {
                 val anyEq = u.typeOf[Any].member(TermName("==")).asMethod
                 val fixEqBody = BottomUp.transform({
                   case DefCall(Some(lhs), `anyEq`, Seq(), Seq(rhs)) =>
-                    val specializedEq = Type.of(lhs).member(anyEq.name).asTerm
+                    val specializedEq = lhs.tpe.member(anyEq.name).asTerm
                     DefCall(Some(lhs))(specializedEq)(Seq(rhs))
                 })(prefxBody).tree
 
@@ -301,10 +301,14 @@ trait LibSupport extends Common {
               })(Monoids.right(v))
               .inherit({
                 // inherit function type parameters of enclosing Lambda and DefDef nodes
-                case Lambda(_, params, _) =>
-                  params.map(Sym.of).filter(s => Sym.funs(Type.of(s).typeSymbol)).toList
-                case DefDef(_, _, _, paramss, _) =>
-                  paramss.flatten.map(Sym.of).filter(s => Sym.funs(Type.of(s).typeSymbol)).toList
+                case Lambda(_, params, _) => (for {
+                  param <- params.map(_.symbol)
+                  if Sym.funs(param.info.dealias.widen.typeSymbol)
+                } yield param).toList
+                case DefDef(_, _, _, paramss, _) => (for {
+                  param <- paramss.flatten.map(_.symbol)
+                  if Sym.funs(param.info.dealias.widen.typeSymbol)
+                } yield param).toList
               })
               .traverseWith({
                 // function parameter call

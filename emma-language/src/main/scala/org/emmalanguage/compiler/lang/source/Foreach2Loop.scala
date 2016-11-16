@@ -66,16 +66,15 @@ private[source] trait Foreach2Loop extends Common {
             (isForeach || overridesForeach) && modifiesClosure
           } =>
 
-          val Elem = api.Type.of(arg)
-          val elem = api.VarSym(owner, fresh(arg), Elem)
+          val elem = api.VarSym(owner, fresh(arg), arg.info)
           val (trav, tpe) = if (method == FM.foreach) {
             val Repr = api.Type.arg(2, xsTpe)
-            val CBF = api.Type.kind3[CanBuildFrom](Repr, Elem, Repr)
+            val CBF = api.Type.kind3[CanBuildFrom](Repr, arg.info, Repr)
             val cbf = api.Type.inferImplicit(CBF).map(unQualifyStatics)
             assert(cbf.isDefined, s"Cannot infer implicit value of type `$CBF`")
-            val x = api.ParSym(owner, fresh("x"), Elem)
+            val x = api.ParSym(owner, fresh("x"), arg.info)
             val id = src.Lambda(x)(api.ParRef(x))
-            (Some(src.DefCall(xs)(FM.map, Elem, Repr)(Seq(id), Seq(cbf.get))), Repr)
+            (Some(src.DefCall(xs)(FM.map, arg.info, Repr)(Seq(id), Seq(cbf.get))), Repr)
           } else (xs, xsTpe)
           val toIter = tpe.member(api.TermName("toIterator")).asTerm
           val Iter = api.Type.result(toIter.infoIn(tpe))
@@ -89,7 +88,7 @@ private[source] trait Foreach2Loop extends Common {
             src.ValDef(iter,
               src.DefCall(trav)(toIter)()),
             src.VarDef(elem,
-              src.DefCall(Some(src.Lit(null)))(asInst, Elem)()),
+              src.DefCall(Some(src.Lit(null)))(asInst, arg.info)()),
             src.While(
               src.DefCall(target)(hasNext)(),
               api.Tree.rename(arg -> elem)(body match {

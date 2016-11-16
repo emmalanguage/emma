@@ -76,7 +76,8 @@ private[backend] trait Order extends Common {
      */
     lazy val disambiguate: u.Tree => (u.Tree, Set[u.TermSymbol]) = tree => {
 
-      def isFun(sym: u.TermSymbol) = api.Sym.funs(api.Type.of(sym).typeSymbol)
+      def isFun(sym: u.TermSymbol) =
+        api.Sym.funs(sym.info.dealias.widen.typeSymbol)
 
       // The Set of symbols of ValDefs of functions
       val funs = tree.collect {

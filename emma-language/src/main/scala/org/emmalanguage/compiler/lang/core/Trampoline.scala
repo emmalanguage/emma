@@ -58,7 +58,7 @@ private[core] trait Trampoline extends Common {
             val (own, nme, pos) = (method.owner, method.name, method.pos)
             val flg = get.flags(method)
             val pss = paramss.map(_.map(_.symbol.asTerm))
-            val Res = api.Type.kind1[TailRec](api.Type.of(method).finalResultType)
+            val Res = api.Type.kind1[TailRec](method.info.finalResultType)
             method -> api.DefSym(own, nme, flg, pos)(tparams: _*)(pss: _*)(Res)
           }).toMap
       }.transformWith {
@@ -91,14 +91,13 @@ private[core] trait Trampoline extends Common {
 
         // Wrap a tail call.
         case core.DefCall(None, cont, targs, argss@_*) if local.contains(cont) =>
-          val Res = api.Type.of(cont).finalResultType
+          val Res = cont.info.finalResultType
           core.DefCall(TailCalls)(tailcall, Res)(Seq(
             core.DefCall(None)(local(cont), targs: _*)(argss: _*)))
 
         // Wrap a return value.
         case _ =>
-          val Res = api.Type.of(expr)
-          core.DefCall(TailCalls)(done, Res)(Seq(expr))
+          core.DefCall(TailCalls)(done, expr.tpe)(Seq(expr))
       }
   }
 }

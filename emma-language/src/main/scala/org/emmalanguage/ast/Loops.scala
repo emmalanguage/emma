@@ -80,8 +80,7 @@ trait Loops { this: AST =>
         assert(is.defined(cond), s"$this condition is not defined: $cond")
         assert(is.defined(body), s"$this body is not defined: $body")
         assert(has.tpe(cond), s"$this condition has no type:\n${Tree.showTypes(cond)}")
-        lazy val Cond = Type.of(cond)
-        assert(Cond =:= Type.bool, s"$this condition is not boolean:\n${Tree.showTypes(cond)}")
+        assert(cond.tpe <:< Type.bool, s"$this condition is not boolean:\n${Tree.showTypes(cond)}")
 
         val nme = TermName.fresh("while")
         val lbl = LabelSym(u.NoSymbol, nme)
@@ -110,8 +109,7 @@ trait Loops { this: AST =>
         assert(is.defined(cond), s"$this condition is not defined: $cond")
         assert(is.defined(body), s"$this body is not defined: $body")
         assert(has.tpe(cond), s"$this condition has no type:\n${Tree.showTypes(cond)}")
-        lazy val Cond = Type.of(cond)
-        assert(Cond =:= Type.bool, s"$this condition is not boolean:\n${Tree.showTypes(cond)}")
+        assert(cond.tpe <:< Type.bool, s"$this condition is not boolean:\n${Tree.showTypes(cond)}")
 
         val nme = TermName.fresh("doWhile")
         val lbl = LabelSym(u.NoSymbol, nme)

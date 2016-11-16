@@ -25,8 +25,9 @@ trait Symbols { this: AST =>
   trait SymbolAPI { this: API =>
 
     import universe._
-    import u.definitions._
-    import u.internal._
+    import definitions._
+    import internal._
+    import reificationSupport._
     import u.Flag.IMPLICIT
 
     object Sym extends Node {
@@ -50,11 +51,11 @@ trait Symbols { this: AST =>
 
       /** Creates a copy of `sym`, optionally changing some of its attributes. */
       def copy(sym: u.Symbol)(
-          name:  u.Name     = sym.name,
-          owner: u.Symbol   = sym.owner,
-          tpe:   u.Type     = sym.info,
-          pos:   u.Position = sym.pos,
-          flags: u.FlagSet  = get.flags(sym)): u.Symbol = {
+        name:  u.Name     = sym.name,
+        owner: u.Symbol   = sym.owner,
+        tpe:   u.Type     = sym.info,
+        pos:   u.Position = sym.pos,
+        flags: u.FlagSet  = get.flags(sym)): u.Symbol = {
 
         // Optimize when there are no changes.
         if (name == sym.name && owner == sym.owner && tpe == sym.info &&
@@ -77,8 +78,7 @@ trait Symbols { this: AST =>
           else newTermSymbol(owner, termName, pos, flags)
         }
 
-        set.tpe(dup, Type.fix(tpe))
-        dup
+        setInfo(dup, tpe.dealias.widen)
       }
 
       /** A map of all tuple symbols by number of elements. */
