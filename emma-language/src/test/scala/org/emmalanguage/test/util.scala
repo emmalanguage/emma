@@ -55,6 +55,18 @@ object util {
   def fromPath(path: String): List[String] = fromPath(new java.io.File(path))
 
   /**
+   * Compares the contents of two bags.
+   *
+   * @param exp The bag containing the expected contents.
+   * @param act The bag containing the actual contents.
+   * @tparam T The type of the bag's elements.
+   */
+  def compareBags[T](exp: Seq[T], act: Seq[T]) = {
+    assert((exp diff act) == Seq.empty[String], s"Unexpected elements in result: $exp")
+    assert((act diff exp) == Seq.empty[String], s"Unseen elements in result: $act")
+  }
+
+  /**
    * Reads The contents from file (or folder containing a list of files) as a string.
    *
    * @param path The path of the file (or folder containing a list of files) to be read.
