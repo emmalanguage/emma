@@ -38,6 +38,153 @@ class DSCFSpec extends BaseCompilerSpec {
       Core.anf
     ).compose(_.tree)
 
+  "While Loop" - {
+    "with trivial body" in {
+
+      val act = dscfPipeline(u.reify {
+        var i = 0
+        while (i < 100) {
+          i += 1
+        }
+        println(i)
+      })
+
+      val exp = anfPipeline(u.reify {
+        val i$1 = 0
+        def while$1(i$2: Int): Unit = {
+          val x$1 = i$2 < 100
+          def body$1(i$3: Int): Unit = {
+            val i$2 = i$3 + 1
+            while$1(i$2)
+          }
+          def suffix$1(i$4: Int): Unit = {
+            println(i$4)
+          }
+          if (x$1) body$1(i$2)
+          else suffix$1(i$2)
+        }
+        while$1(i$1)
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+
+    "with non-trivial body" in {
+
+      val act = dscfPipeline(u.reify {
+        var i = 0
+        while (i < 100) {
+          if (i % 2 == 0) i += 2
+          else i *= 2
+        }
+        println(i)
+      })
+
+      val exp = anfPipeline(u.reify {
+        val i$1 = 0
+        def while$1(i$2: Int): Unit = {
+          val x$1 = i$2 < 100
+          def body$1(i$2: Int): Unit = {
+            val x$2 = i$2 % 2
+            val x$3 = x$2 == 0
+            def then$1(): Unit = {
+              val i$3 = i$2 + 2
+              suffix$2(i$3)
+            }
+            def else$1(): Unit = {
+              val i$4 = i$2 * 2
+              suffix$2(i$4)
+            }
+            def suffix$2(i$5: Int): Unit = {
+              while$1(i$5)
+            }
+            if (x$3) then$1()
+            else else$1()
+          }
+          def suffix$1(i$6: Int): Unit = {
+            println(i$6)
+          }
+          if (x$1) body$1(i$2)
+          else suffix$1(i$2)
+        }
+        while$1(i$1)
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+  }
+
+  "Do-While Loop" - {
+
+    "with trivial body" in {
+
+      val act = dscfPipeline(u.reify {
+        var i = 0
+        do {
+          i += 1
+        } while (i < 100)
+        println(i)
+      })
+
+      val exp = anfPipeline(u.reify {
+        val i$1 = 0
+        def doWhile$1(i$2: Int): Unit = {
+          val i$3 = i$2 + 1
+          val x$1 = i$3 < 100
+          def suffix$1(): Unit = {
+            println(i$3)
+          }
+          if (x$1) doWhile$1(i$3)
+          else suffix$1()
+        }
+        doWhile$1(i$1)
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+
+    "with non-trivial body" in {
+
+      val act = dscfPipeline(u.reify {
+        var i = 0
+        do {
+          if (i % 2 == 0) i += 2
+          else i *= 2
+        } while (i < 100)
+        println(i)
+      })
+
+      val exp = anfPipeline(u.reify {
+        val i$1 = 0
+        def doWhile$1(i$2: Int): Unit = {
+          val x$2 = i$2 % 2
+          val x$3 = x$2 == 0
+          def then$1(): Unit = {
+            val i$3 = i$2 + 2
+            suffix$2(i$3)
+          }
+          def else$1(): Unit = {
+            val i$4 = i$2 * 2
+            suffix$2(i$4)
+          }
+          def suffix$2(i$5: Int): Unit = {
+            val x$1 = i$5 < 100
+            def suffix$1(): Unit = {
+              println(i$5)
+            }
+            if (x$1) doWhile$1(i$5)
+            else suffix$1()
+          }
+          if (x$3) then$1()
+          else else$1()
+        }
+        doWhile$1(i$1)
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+  }
+
   "Talor Series expansion for sin(x) around x = 0" in {
 
     val act = dscfPipeline(u.reify {
@@ -106,7 +253,7 @@ class DSCFSpec extends BaseCompilerSpec {
       sin(Math.PI / 2)
     })
 
-    act shouldBe alphaEqTo (exp)
+    act shouldBe alphaEqTo(exp)
   }
 
   "Google Code Jam 2015 A1 - Haircut (verified)" in {
@@ -200,7 +347,7 @@ class DSCFSpec extends BaseCompilerSpec {
       if (less$1) suffix$1(0L) else else$1()
     })
 
-    act shouldBe alphaEqTo (exp)
+    act shouldBe alphaEqTo(exp)
   }
 
   "Google Code Jam 2016 Qual - Counting sheep (verified)" in {
@@ -272,7 +419,7 @@ class DSCFSpec extends BaseCompilerSpec {
       if (eq$1) then$1() else else$1()
     })
 
-    act shouldBe alphaEqTo (exp)
+    act shouldBe alphaEqTo(exp)
   }
 
   "Google Code Jam 2016 Qual - Fractiles (verified)" in {
@@ -338,6 +485,6 @@ class DSCFSpec extends BaseCompilerSpec {
       while$1(check$1, infoGain$1, tile$1)
     })
 
-    act shouldBe alphaEqTo (exp)
+    act shouldBe alphaEqTo(exp)
   }
 }
