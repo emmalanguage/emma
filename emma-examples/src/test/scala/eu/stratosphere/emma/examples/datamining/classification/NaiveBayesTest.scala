@@ -43,7 +43,7 @@ class NaiveBayesTest extends FlatSpec with Matchers with BeforeAndAfter {
     deleteRecursive(new File(path))
   }
 
-  "NaiveBayes" should "create the correct model on Bernoulli house-votes-84 data set" in withRuntime() { rt =>
+  "NaiveBayes" should "create the correct model on Bernoulli house-votes-84 data set" ignore withRuntime() { rt =>
     val expectedModel = Source
       .fromFile(s"$path/model.txt")
       .getLines().map { line =>
