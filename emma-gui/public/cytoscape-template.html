@@ -1,0 +1,143 @@
+<!--
+
+    Copyright © 2014 TU Berlin (emma@dima.tu-berlin.de)
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+        http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test-Cytoscape</title>
+
+    <script src="http://code.jquery.com/jquery-2.0.3.min.js"></script>
+    <script src="http://js.cytoscape.org/js/cytoscape.min.js"></script>
+
+    <script src="https://cdn.rawgit.com/cpettitt/dagre/v0.7.4/dist/dagre.min.js"></script>
+    <script src="https://cdn.rawgit.com/cytoscape/cytoscape.js-dagre/1.1.2/cytoscape-dagre.js"></script>
+
+    <style>
+        body {
+            font-family: helvetica;
+            font-size: 14px;
+        }
+        #cy {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            z-index: 0;
+        }
+        h1 {
+            opacity: 0.5;
+            font-size: 1em;
+        }
+        #graphselection {
+            position: absolute;
+            left: 10px; top: 10px;
+            z-index: 1;
+            font-size: 14px;
+        }
+    </style>
+
+    <script type="application/javascript">
+        $(function() {
+          const cy = cytoscape({
+                container: $("#cy"),
+
+                layout: {
+                    // name: 'breadthfirst'
+                    name: 'dagre'
+                },
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'shape': 'rectangle',
+                            'background-color': '#983351', // primary medium
+                            'label': 'data(label)',
+                            'text-halign': 'center',
+                            'text-valign': 'center',
+                            'color': '#fad0e2', // primary very light
+                            'width': 'label',
+                            'height': 'label',
+                            'padding-top': '10',
+                            'padding-right': '10',
+                            'padding-bottom': '10',
+                            'padding-left': '10'
+                        }
+                    },
+                    {
+                        selector: ':parent',
+                        style: {
+                            'background-opacity': 0.333,
+                            'text-halign': "center",
+                            'text-valign': 'top',
+                            'color': '#333'
+                        }
+                    },
+                    {
+                        selector: ':parent node',
+                        style: {
+                            'background-color': '#226666' // Secondary (2) medium
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 3,
+                            'curve-style': 'bezier',
+                            'line-color': '#de839e', // primary medium
+                            'target-arrow-color': '#983351', // primary medium
+                            'target-arrow-shape': 'triangle',
+                            'target-arrow-fill': "filled",
+                            'label': 'data(label)'
+                        }
+                    }
+                ],
+                elements: new Promise((resolve, reject) => {
+                    $.getJSON("/graph/graph-json/", (data) => {
+                        const selectionList = $("#graphselection");
+                        data.map((c, i, a) => Object.keys(c)[0])
+                            .forEach((c, i, a) => {
+                                selectionList.append(
+                                    $('<option />', {
+                                        value: c,
+                                        text: c,
+                                        selected: i === 0
+                                    })
+                                );
+                            });
+                        selectionList.change(function() { // this is bound by jQ m(
+                            const value = $(this).val();
+                            const e = data.find((e) => Object.keys(e)[0] === value);
+                            cy.elements().remove();
+                            cy.add(e[value]);
+                            cy.layout({ name: "dagre"});
+                        });
+                        const first = data[0]
+                        resolve(first[Object.keys(first)[0]]);
+                    });
+                })
+            });
+        });
+    </script>
+</head>
+<body>
+<p><form><select id="graphselection"></select></form></p>
+<div id="cy" />
+</body>
+</html>
+
