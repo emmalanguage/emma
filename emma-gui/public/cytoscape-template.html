@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Test-Cytoscape</title>
+
+    <script src="/js/jquery-2.0.3.min.js"></script>
+    <script src="/js/cytoscape.min.js"></script>
+
+    <script src="/js/dagre.min.js"></script>
+    <script src="/js/cytoscape-dagre.js"></script>
+
+    <style>
+        body {
+            font-family: helvetica;
+            font-size: 14px;
+        }
+        #cy {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            left: 0;
+            top: 0;
+            z-index: 0;
+        }
+        h1 {
+            opacity: 0.5;
+            font-size: 1em;
+        }
+        #graphselection {
+            position: absolute;
+            left: 10px; top: 10px;
+            z-index: 1;
+            font-size: 14px;
+        }
+    </style>
+
+    <script type="application/javascript">
+        $(function() {
+          const cy = cytoscape({
+                container: $("#cy"),
+
+                layout: {
+                    // name: 'breadthfirst'
+                    name: 'dagre'
+                },
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'shape': 'rectangle',
+                            'background-color': '#ad1a66',
+                            'label': 'data(label)',
+                            'text-halign': 'center',
+                            'text-valign': 'center',
+                            'color': '#fff',
+                            'width': 'label',
+                            'height': 'label',
+                            'padding-top': '10',
+                            'padding-right': '10',
+                            'padding-bottom': '10',
+                            'padding-left': '10'
+                        }
+                    },
+                    {
+                        selector: ':parent',
+                        style: {
+                            'background-opacity': 0.333,
+                            'text-halign': "center",
+                            'text-valign': 'top',
+                            'color': '#333'
+                        }
+                    },
+                    {
+                        selector: ':parent node',
+                        style: {
+                            'background-color': 'navy'
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 3,
+                            'curve-style': 'bezier',
+                            'line-color': '#ad1a66',
+                            'target-arrow-color': '#ad1a66', // or #999
+                            'target-arrow-shape': 'triangle',
+                            'target-arrow-fill': "filled",
+                            'label': 'data(label)'
+                        }
+                    }
+                ],
+                elements: new Promise((resolve, reject) => {
+                    $.getJSON("/graph/graph-json/", (data) => {
+                        const selectionList = $("#graphselection");
+                        data.map((c, i, a) => Object.keys(c)[0])
+                            .forEach((c, i, a) => {
+                                selectionList.append(
+                                    $('<option />', {
+                                        value: c,
+                                        text: c,
+                                        selected: i === 0
+                                    })
+                                );
+                            });
+                        selectionList.change(function() { // this is bound by jQ m(
+                            const value = $(this).val();
+                            const e = data.find((e) => Object.keys(e)[0] === value);
+                            cy.elements().remove();
+                            cy.add(e[value]);
+                            cy.layout({ name: "dagre"});
+                        });
+                        const first = data[0]
+                        resolve(first[Object.keys(first)[0]]);
+                    });
+                })
+            });
+        });
+    </script>
+</head>
+<body>
+<p><form><select id="graphselection"></select></form></p>
+<div id="cy" />
+</body>
+</html>
+
