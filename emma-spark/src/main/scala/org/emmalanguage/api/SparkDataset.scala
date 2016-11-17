@@ -68,11 +68,10 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
   // Set operations
   // -----------------------------------------------------
 
-  override def union(that: DataBag[A]): DataBag[A] = that match {
+  override def union(that: DataBag[A]): SparkDataset[A] = that match {
     case dbag: ScalaSeq[A] => this.rep union SparkDataset(dbag.rep).rep
-    case dbag: SparkRDD[A] => this.rep union dbag.rep.toDS()
     case dbag: SparkDataset[A] => this.rep union dbag.rep
-    case _ => that union this
+    case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
 
   override def distinct: SparkDataset[A] =
