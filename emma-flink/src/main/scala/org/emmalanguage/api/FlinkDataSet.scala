@@ -205,17 +205,27 @@ object FlinkDataSet {
   // (these should correspond to `compiler.ir.ComprehensionCombinators`)
   // ---------------------------------------------------------------------------
 
-  def cross[A : Meta, B : Meta]
-    (xs: DataBag[A], ys: DataBag[B])
-    (implicit flink: FlinkEnv): DataBag[(A,B)] = (xs, ys) match {
+  def cross[A: Meta, B: Meta](
+    xs: DataBag[A], ys: DataBag[B]
+  )(implicit flink: FlinkEnv): FlinkDataSet[(A, B)] = (xs, ys) match {
     case (xs: FlinkDataSet[A], ys: FlinkDataSet[B]) => xs.rep.cross(ys.rep)
   }
 
-  def equiJoin[A : Meta, B : Meta, K : Meta]
-    (keyx: A => K, keyy: B => K)
-    (xs: DataBag[A], ys: DataBag[B])
-    (implicit flink: FlinkEnv): DataBag[(A,B)] = (xs, ys) match {
-    case (xs: FlinkDataSet[A], ys: FlinkDataSet[B]) =>
-      xs.rep.join(ys.rep).where(keyx).equalTo(keyy)
+  def equiJoin[A: Meta, B: Meta, K: Meta](
+    keyx: A => K, keyy: B => K)(xs: DataBag[A], ys: DataBag[B]
+  )(implicit flink: FlinkEnv): FlinkDataSet[(A, B)] = {
+    val rddOf = new DataSetExtractor(flink)
+    (xs, ys) match {
+      case (rddOf(xsDS), rddOf(ysDS)) =>
+        (xsDS join ysDS) where keyx equalTo keyy
+    }
   }
+
+  private class DataSetExtractor(flink: FlinkEnv) {
+    def unapply[A: Meta](bag: DataBag[A]): Option[DataSet[A]] = bag match {
+      case bag: FlinkDataSet[A] => Some(bag.rep)
+      case _ => Some(flink.fromCollection(bag.fetch()))
+    }
+  }
+
 }
