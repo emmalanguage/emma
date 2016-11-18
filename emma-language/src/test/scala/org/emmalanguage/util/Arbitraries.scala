@@ -17,7 +17,6 @@ package org.emmalanguage
 package util
 
 import shapeless._
-import shapeless.labelled._
 import org.scalacheck.Arbitrary
 import org.scalacheck.Gen
 
@@ -29,13 +28,11 @@ trait Arbitraries {
     Arbitrary(Gen.const(HNil))
 
   /** Arbitrary generic products. */
-  implicit def hConsArb[H, T <: HList]
-    (implicit H: Arbitrary[H], T: Arbitrary[T]): Arbitrary[H :: T]
-    = Arbitrary(for { h <- H.arbitrary; t <- T.arbitrary } yield h :: t)
-
-  /** Arbitrary labelled fields. */
-  implicit def fieldArb[K, V](implicit V: Arbitrary[V]): Arbitrary[FieldType[K, V]] =
-    Arbitrary(V.arbitrary.map(field[K](_)))
+  implicit def hConsArb[H, T <: HList](implicit H: Arbitrary[H], T: Arbitrary[T])
+    : Arbitrary[H :: T] = Arbitrary(for {
+      h <- H.arbitrary
+      t <- T.arbitrary
+    } yield h :: t)
 }
 
 /** Missing instances of [[org.scalacheck.Arbitrary]]. */
