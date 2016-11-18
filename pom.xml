@@ -130,7 +130,6 @@
 
         <!-- Testing -->
         <junit.version>4.12</junit.version>
-        <scalacheck.version>1.12.5</scalacheck.version>
         <scalatest.version>2.2.6</scalatest.version>
 
         <!-- Other dependencies -->
@@ -329,12 +328,6 @@
                 <groupId>junit</groupId>
                 <artifactId>junit</artifactId>
                 <version>${junit.version}</version>
-                <scope>test</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.scalacheck</groupId>
-                <artifactId>scalacheck_${scala.tools.version}</artifactId>
-                <version>${scalacheck.version}</version>
                 <scope>test</scope>
             </dependency>
             <dependency>
