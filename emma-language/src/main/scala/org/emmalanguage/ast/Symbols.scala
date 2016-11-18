@@ -16,6 +16,9 @@
 package org.emmalanguage
 package ast
 
+import util.Monoids._
+
+import cats.std.all._
 import shapeless._
 
 import scala.annotation.tailrec
@@ -28,7 +31,7 @@ trait Symbols { this: AST =>
     import definitions._
     import internal._
     import reificationSupport._
-    import u.Flag.IMPLICIT
+    import Flag.IMPLICIT
 
     object Sym extends Node {
 
@@ -221,27 +224,10 @@ trait Symbols { this: AST =>
        * @param aliases Pairs of symbols to substitute from -> to.
        * @return A structurally equivalent tree, owned by `at`, with all `aliases` substituted.
        */
-      def subst(at: u.Symbol,
-        aliases: Seq[(u.Symbol, u.Symbol)] = Seq.empty
-      ): u.Tree => u.Tree = tree =>
-        if (!is.defined(at) && aliases.isEmpty) tree else {
-          // NOTE: This mutable state could be avoided if Transducers had attribute initializers.
-          var (keys, vals) = aliases.toList.unzip
-          var dict = aliases.toMap.withDefault(identity)
-          // Handle method types as well.
-          def subst(tpe: u.Type): u.Type =
-            if (is.defined(tpe)) {
-              if (tpe.typeParams.exists(dict.contains) ||
-                tpe.paramLists.iterator.flatten.exists(dict.contains)) {
-                val tps = tpe.typeParams.map(dict(_).asType)
-                val pss = tpe.paramLists.map(_.map(dict(_).asTerm))
-                val res = tpe.finalResultType.substituteSymbols(keys, vals)
-                Type.method(tps, pss, res)
-              } else tpe.substituteSymbols(keys, vals)
-            } else tpe
-
-          TopDown.withOwner(at).traverseWith {
-            case Attr.inh(Owner(sym), cur :: _) =>
+      def subst(at: u.Symbol, aliases: Seq[(u.Symbol, u.Symbol)] = Seq.empty): u.Tree => u.Tree =
+        if (!is.defined(at) && aliases.isEmpty) identity else TopDown.withOwner(at)
+          .accumulateInit(aliases.toMap.withDefault(identity), aliases.toList.unzip) {
+            case Attr(Owner(sym), (dict, (keys, vals)) :: _, cur :: _, _) =>
               val als = dict(sym)
               val own = dict(cur)
               val tpe = als.info.substituteSymbols(keys, vals)
@@ -260,25 +246,31 @@ trait Symbols { this: AST =>
                   val dup = DefSym(own, nme, tps, pss, res, flg, pos, ans)
                   val src = sym :: met.typeParams ::: met.paramLists.flatten
                   val dst = dup :: dup.typeParams ::: dup.paramLists.flatten
-                  dict ++= src.iterator zip dst.iterator
-                  keys :::= src
-                  vals :::= dst
-                }
+                  ((src.iterator zip dst.iterator).toMap, (src, dst))
+                } else (Map.empty, (Nil, Nil))
               } else if (changed) {
                 val dup = With(als)(own = own, tpe = tpe)
-                dict += sym -> dup
-                keys ::= sym
-                vals ::= dup
-              }
-          } (tree)
-
-          // Can't be fused with the traversal above,
-          // because method calls might appear before their definition.
-          if (dict.isEmpty) tree else TopDown.transform { case t
-            if has.tpe(t) || (has.sym(t) && dict.contains(t.symbol))
-            => Tree.With(t)(sym = dict(t.symbol), tpe = subst(t.tpe))
-          } (tree).tree
-        }
+                (Map(sym -> dup), (sym :: Nil, dup :: Nil))
+              } else (Map.empty, (Nil, Nil))
+          } (tuple2Monoid(overwrite, tuple2Monoid(reverse, reverse)))
+          .traverseAny.andThen { case Attr.acc(tree, (dict, (keys, vals)) :: _) =>
+            // Handle method types as well.
+            def subst(tpe: u.Type) = if (is.defined(tpe)) {
+              if (tpe.typeParams.exists(dict.contains) ||
+                tpe.paramLists.iterator.flatten.exists(dict.contains)) {
+                val tps = tpe.typeParams.map(dict(_).asType)
+                val pss = tpe.paramLists.map(_.map(dict(_).asTerm))
+                val res = tpe.finalResultType.substituteSymbols(keys, vals)
+                Type.method(tps, pss, res)
+              } else tpe.substituteSymbols(keys, vals)
+            } else tpe
+            // Can't be fused with the traversal above,
+            // because method calls might appear before their definition.
+            if (dict.isEmpty) tree else TopDown.transform { case t
+              if has.tpe(t) || (has.sym(t) && dict.contains(t.symbol))
+              => Tree.With(t)(sym = dict(t.symbol), tpe = subst(t.tpe))
+            }._tree(tree)
+          }
 
       def unapply(sym: u.Symbol): Option[u.Symbol] =
         Option(sym).filter(is.defined)
