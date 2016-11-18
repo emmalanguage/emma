@@ -56,10 +56,7 @@ trait Transversers { this: AST =>
   )(implicit
     val MAcc: Monoid[A],
     val MInh: Monoid[I],
-    val MSyn: Monoid[S],
-    val skipAcc: IsEmpty[A],
-    val skipInh: IsEmpty[I],
-    val skipSyn: IsEmpty[S]
+    val MSyn: Monoid[S]
   ) {
 
     /** Prepends an accumulated (along the traversal path) attribute. */
@@ -134,7 +131,7 @@ trait Transversers { this: AST =>
 
     /** A function from tree to synthesized attributes. */
     final lazy val syn: Tree => S =
-      if (grammar.skipSyn()) const(grammar.initSyn)
+      if (grammar.initSyn == HNil) const(grammar.initSyn)
       else Memo.recur[Tree, S]({ syn => tree =>
         val children = tree.children
         val prev = if (children.isEmpty) grammar.initSyn
@@ -161,7 +158,7 @@ trait Transversers { this: AST =>
 
     /** Inherit attributes for `tree`. */
     protected final def at[X](tree: Tree)(f: => X): X =
-      if (grammar.skipInh()) f else {
+      if (inh == HNil) f else {
         stack ::= inh |+| inheritance(tree)
         val result = f
         stack = stack.tail
@@ -170,7 +167,7 @@ trait Transversers { this: AST =>
 
     /** Accumulate attributes for `tree`. */
     protected final def accumulate(tree: Tree): Unit =
-      if (!grammar.skipAcc()) state = acc |+| accumulation(tree)
+      if (acc != HNil) state = acc |+| accumulation(tree)
 
     /** Resets the state so that another tree can be traversed. */
     protected final def reset(): Unit = {
@@ -178,6 +175,9 @@ trait Transversers { this: AST =>
       stack = grammar.initInh :: Nil
       cache.clear()
     }
+
+    def prepend[L <: HList]=
+      ops.hlist.Prepend[Int :: HNil, L]
   }
 
   /**
