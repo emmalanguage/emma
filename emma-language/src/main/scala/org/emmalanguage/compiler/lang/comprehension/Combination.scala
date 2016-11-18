@@ -18,25 +18,30 @@ package compiler.lang.comprehension
 
 import compiler.Common
 import compiler.lang.core.Core
+import util.Functions._
+
+import shapeless._
 
 import scala.annotation.tailrec
+import scala.collection.breakOut
 
 private[comprehension] trait Combination extends Common {
   self: Core with Comprehension =>
 
-  import Comprehension.{splitAt,Combinators}
-  import Core.{Lang => core}
-  import UniverseImplicits._
-
   private[comprehension] object Combination {
 
-    private val cs = new Comprehension.Syntax(API.bagSymbol)
+    import UniverseImplicits._
+    import Comprehension.{splitAt, Combinators}
+    import Core.{Lang => core}
 
-    //@formatter:off
-    private val tuple2   = api.Type[(Nothing, Nothing)]
-    private val tuple2_1 = tuple2.member(api.TermName("_1")).asTerm
-    private val tuple2_2 = tuple2.member(api.TermName("_2")).asTerm
-    //@formatter:on
+    private type Rule = (u.Symbol, u.Tree) =?> u.Tree
+    private val cs = new Comprehension.Syntax(API.bagSymbol)
+    private val tuple2 = core.Ref(api.Sym.tuple(2).companion.asModule)
+    private val tuple2App = tuple2.tpe.member(api.TermName.app).asMethod
+    private val Seq(_1, _2) = {
+      val tuple2 = api.Type[(Nothing, Nothing)]
+      for (i <- 1 to 2) yield tuple2.member(api.TermName(s"_$i")).asTerm
+    }
 
     // TODO: Split conjunctive filter predicates.
 
@@ -52,10 +57,11 @@ private[comprehension] trait Combination extends Common {
      *
      * - An ANF tree with no mock-comprehensions.
      */
-    lazy val transform: u.Tree => u.Tree = root =>
-      api.TopDown.transform {
-        case comp@cs.Comprehension(_,_) => combine(comp)
-      }(root).tree
+    lazy val transform: u.Tree => u.Tree =
+      api.TopDown.withOwner.transformWith {
+        case Attr.inh(comp @ cs.Comprehension(_, _), owner :: _) =>
+          combine(owner, comp)
+      }.andThen(_.tree)
 
     /**
      * Performs the combination for one comprehension. That is, the root of the given tree
@@ -65,9 +71,8 @@ private[comprehension] trait Combination extends Common {
      * of the rules would be interleaved across the outer and the nested comprehensions, which
      * would mess up the order of rule applications for a single comprehension.
      */
-    lazy val combine: u.Tree => u.Tree = root0 => {
-
-      var root = root0
+    def combine(owner: u.Symbol, tree: u.Tree) = {
+      var root = tree
 
       //@formatter:off
       // states for the state machine
@@ -81,18 +86,14 @@ private[comprehension] trait Combination extends Common {
       object Residuals extends RewriteState
       object End       extends RewriteState
 
-      def applyOnce(rule: u.Tree =?> u.Tree): Boolean = {
-        if (rule.isDefinedAt(root)) {
-          val prevRoot = root
-          root = rule(root)
-          root != prevRoot
-        } else {
-          false
-        }
+      def applyOnce(rule: Rule): Boolean = {
+        val prevRoot = root
+        root = complete(rule)(owner, root)(root)
+        root != prevRoot
       }
 
       @tailrec
-      def applyExhaustively(rule: u.Tree =?> u.Tree): Unit = {
+      def applyExhaustively(rule: Rule): Unit = {
         if (applyOnce(rule)) applyExhaustively(rule)
       }
 
@@ -160,44 +161,24 @@ private[comprehension] trait Combination extends Common {
      *   }
      * }}}
      */
-    val MatchFilter: u.Tree =?> u.Tree = Function.unlift((tree: u.Tree) => tree match {
-      case cs.Comprehension(qs, hd) =>
-
-        val allGenVars = (for {
-          cs.Generator(x, _) <- qs
-        } yield x).toSet
-
-        (for {
-          grd@cs.Guard(grdBlk@core.Let(pVals, Seq(), pExpr)) <- qs.view // (Seq() is to disallow control flow)
-          (qs12, qs3) = splitAt(grd)(qs)
-          gen@cs.Generator(x, core.Let(xVals, Seq(), xExpr)) <- qs12
-          (qs1, qs2) = splitAt[u.Tree](gen)(qs12)
-          if {
-            val refdGens = api.Tree.refs(grd) intersect allGenVars
-            refdGens.isEmpty || (refdGens.size == 1 && refdGens.head == x)
-          }
-        } yield {
-
-          val pArg = api.TermSym.free(api.TermName.fresh("pArg"), Core.bagElemTpe(xExpr))
-          val pBdy = replaceRefs(x, pArg)(grdBlk)
-          val (pRef, pVal) = valDefAndRef("p", core.Lambda(pArg)(pBdy))
-          val (irRef, irVal) = valDefAndRef("ir", cs.WithFilter(xExpr)(pRef))
-
-          //@formatter:off
-          cs.Comprehension(
-            qs1 ++
-            Seq(cs.Generator(x, core.Let(
-              xVals :+ pVal :+ irVal: _*
-            )()(irRef))) ++
-            qs2 ++ qs3,
-            hd
-          )
-          //@formatter:on
-
-        }).headOption
-
-      case _ => None
-    })
+    val MatchFilter: Rule = {
+      case (owner, comp @ cs.Comprehension(qs, hd)) => (for {
+        // Seq() is to disallow control flow
+        grd @ cs.Guard(pred @ core.Let(_, Seq(), _)) <- qs.view
+        (qs12, qs3) = splitAt(grd)(qs)
+        gen @ cs.Generator(x, core.Let(xVals, Seq(), xExpr)) <- qs12.view
+        (qs1, qs2) = splitAt[u.Tree](gen)(qs12)
+        refd = api.Tree.refs(grd) intersect gens(qs12)
+        if refd.isEmpty || (refd.size == 1 && refd.head == x)
+      } yield {
+        val (pRef, pVal) = valRefAndDef(owner, "p", core.Lambda(x)(pred))
+        val (irRef, irVal) = valRefAndDef(owner, "ir", cs.WithFilter(xExpr)(pRef))
+        val vals = Seq.concat(xVals, Seq(pVal, irVal))
+        val gen = cs.Generator(x, core.Let(vals: _*)()(irRef))
+        val combined = Seq.concat(qs1, Seq(gen), qs2, qs3)
+        cs.Comprehension(combined, hd)
+      }).headOption.getOrElse(comp)
+    }
 
 
     /**
@@ -241,43 +222,24 @@ private[comprehension] trait Combination extends Common {
      *   }
      * }}}
      */
-    val MatchFlatMap: u.Tree =?> u.Tree = Function.unlift((tree: u.Tree) => tree match {
-      case cs.Comprehension(qs, hd) =>
-
-        val allGenVars = (for {
-          cs.Generator(x, _) <- qs
-        } yield x).toSet
-
-        (for {
-          xGen@cs.Generator(x, core.Let(xVals, Seq(), xExpr)) <- qs.view // (Seq() is to disallow control flow)
-          (qs1, qs23) = splitAt[u.Tree](xGen)(qs)
-          yGen@cs.Generator(y, yBlk@core.Let(_, Seq(), _)) <- qs23
-          (qs2, qs3) = splitAt[u.Tree](yGen)(qs23)
-          if (api.Tree.refs(yGen) intersect allGenVars) == Set(x)
-          if (qs2 ++ qs3 :+ hd).forall(!api.Tree.refs(_).contains(x))
-        } yield {
-
-          val fArg = api.TermSym.free(api.TermName.fresh("fArg"), Core.bagElemTpe(xExpr))
-          val fBdy = replaceRefs(x, fArg)(yBlk)
-          val (fRef, fVal) = valDefAndRef("f", core.Lambda(fArg)(fBdy))
-          val (irRef, irVal) = valDefAndRef("ir", cs.FlatMap(xExpr)(fRef))
-
-          //@formatter:off
-          cs.Comprehension(
-            qs1 ++ qs2 ++
-            Seq(cs.Generator(y, core.Let(
-              xVals :+ fVal :+ irVal: _*
-            )()(irRef))) ++
-            qs3,
-            hd
-          )
-          //@formatter:on
-
-        }).headOption
-
-      case _ =>
-        None
-    })
+    val MatchFlatMap: Rule = {
+      case (owner, comp @ cs.Comprehension(qs, hd)) => (for {
+        // (Seq() is to disallow control flow)
+        xGen @ cs.Generator(x, core.Let(xVals, Seq(), xExpr)) <- qs.view
+        (qs1, qs23) = splitAt[u.Tree](xGen)(qs)
+        yGen @ cs.Generator(y, yLet @ core.Let(_, Seq(), _)) <- qs23.view
+        (qs2, qs3) = splitAt[u.Tree](yGen)(qs23)
+        if (api.Tree.refs(yGen) intersect gens(qs)) == Set(x)
+        if (qs2 ++ qs3 :+ hd).forall(!api.Tree.refs(_).contains(x))
+      } yield {
+        val (fRef, fVal) = valRefAndDef(owner, "f", core.Lambda(x)(yLet))
+        val (irRef, irVal) = valRefAndDef(owner, "ir", cs.FlatMap(xExpr)(fRef))
+        val vals = Seq.concat(xVals, Seq(fVal, irVal))
+        val gen = cs.Generator(y, core.Let(vals: _*)()(irRef))
+        val combined = Seq.concat(qs1, qs2, Seq(gen), qs3)
+        cs.Comprehension(combined, hd)
+      }).headOption.getOrElse(comp)
+    }
 
     /**
      * Creates a flatMap combinator. The difference between this and the other flatMap rule, is that
@@ -330,70 +292,38 @@ private[comprehension] trait Combination extends Common {
      *   }
      * }}}
      */
-    val MatchFlatMap2: u.Tree =?> u.Tree = Function.unlift((tree: u.Tree) => tree match {
-      case cs.Comprehension(qs, hd) =>
-
-        val allGenVars = (for {
-          cs.Generator(x, _) <- qs
-        } yield x).toSet
-
-        (for {
-          xGen@cs.Generator(x, core.Let(xVals, Seq(), xExpr)) <- qs.view // (Seq() is to disallow control flow)
-          (qs1, qs23) = splitAt[u.Tree](xGen)(qs)
-          yGen@cs.Generator(y, yBlk@core.Let(yVals, Seq(), yExpr)) <- qs23
-          (qs2, qs3) = splitAt[u.Tree](yGen)(qs23)
-          if (api.Tree.refs(yGen) intersect allGenVars) == Set(x)
-        } yield {
-
-          val fArg = api.TermSym.free(api.TermName.fresh("fArg"), Core.bagElemTpe(xExpr))
-          val fArgRef = core.Ref(fArg)
-          val xTofArg = (tree: u.Tree) => replaceRefs(x, fArg)(tree)
-          val yValsRepl = yVals map { case core.ValDef(lhs, rhs, fs) => core.ValDef(lhs, xTofArg(rhs), fs) }
-          val yExprRepl = xTofArg(yExpr)
-          val gArg = api.TermSym.free(api.TermName.fresh("gArg"), Core.bagElemTpe(yExpr))
-          val gArgRef = core.Ref(gArg)
-          val (ir2Ref, ir2Val) = valDefAndRef("ir2", core.Inst(tuple2, fArgRef.tpe, gArgRef.tpe)(
-            Seq(fArgRef, gArgRef)))
-          val gBdy = core.Let(ir2Val)()(ir2Ref)
-          val (gRef, gVal) = valDefAndRef("g", core.Lambda(gArg)(gBdy))
-          val (xy0Ref, xy0Val) = valDefAndRef("xy0", cs.Map(yExprRepl)(gRef))
-          val fBdy = core.Let(yValsRepl :+ gVal :+ xy0Val: _*)()(xy0Ref)
-          val (fRef, fVal) = valDefAndRef("f", core.Lambda(fArg)(fBdy))
-          val (irRef, irVal) = valDefAndRef("ir", cs.FlatMap(xExpr)(fRef))
-
-          //@formatter:off
-          val xyTpe = Core.bagElemTpe(irRef)
-          assert(xyTpe.typeConstructor == api.Sym.tuple(2).toTypeConstructor)
-          val xySym = api.TermSym.free(api.TermName.fresh("xy"), xyTpe)
-          val xyRef = core.Ref(xySym)
-          val xy_1  = core.DefCall(Some(xyRef))(tuple2_1)()
-          val xy_2  = core.DefCall(Some(xyRef))(tuple2_2)()
-
-          val replaceXYandANF =
-            api.Tree.replace(core.Ref(x), xy_1) andThen
-            api.Tree.replace(core.Ref(y), xy_2) andThen
-            Core.anf
-
-          val qsReplFunc = this.qsReplFunc(replaceXYandANF)
-          val qs2Repl = qs2 map qsReplFunc
-          val qs3Repl = qs3 map qsReplFunc
-          val hdRepl = cs.Head(Comprehension.asLet(replaceXYandANF(cs.Head.unapply(hd).get)))
-
-          cs.Comprehension(
-            qs1 ++
-            Seq(cs.Generator(xySym, core.Let(
-              xVals :+ fVal :+ irVal: _*
-            )()(irRef))) ++
-            qs2Repl ++ qs3Repl,
-            hdRepl
-          )
-          //@formatter:on
-
-        }).headOption
-
-      case _ =>
-        None
-    })
+    val MatchFlatMap2: Rule = {
+      case (owner, comp @ cs.Comprehension(qs, hd)) => (for {
+        // (Seq() is to disallow control flow)
+        xGen @ cs.Generator(x, core.Let(xVals, Seq(), xExpr)) <- qs.view
+        (qs1, qs23) = splitAt[u.Tree](xGen)(qs)
+        yGen @ cs.Generator(y, yLet @ core.Let(yVals, Seq(), yExpr)) <- qs23.view
+        (qs2, qs3) = splitAt[u.Tree](yGen)(qs23)
+        if (api.Tree.refs(yGen) intersect gens(qs)) == Set(x)
+      } yield {
+        val gArg = api.TermSym.free(api.TermName.fresh(y), Core.bagElemTpe(yExpr))
+        val ir2Args = Seq(core.Ref(x), core.Ref(gArg))
+        val ir2Rhs = core.DefCall(Some(tuple2))(tuple2App, x.info, gArg.info)(ir2Args)
+        val (ir2Ref, ir2Val) = valRefAndDef(owner, "ir2", ir2Rhs)
+        val gBody = core.Let(ir2Val)()(ir2Ref)
+        val (gRef, gVal) = valRefAndDef(owner, "g", core.Lambda(gArg)(gBody))
+        val (xy0Ref, xy0Val) = valRefAndDef(owner, "xy0", cs.Map(yExpr)(gRef))
+        val fBody = core.Let(yVals :+ gVal :+ xy0Val: _*)()(xy0Ref)
+        val (fRef, fVal) = valRefAndDef(owner, "f", core.Lambda(x)(fBody))
+        val (irRef, irVal) = valRefAndDef(owner, "ir", cs.FlatMap(xExpr)(fRef))
+        val xyTpe = Core.bagElemTpe(irRef)
+        assert(xyTpe.typeConstructor == api.Sym.tuple(2).toTypeConstructor)
+        val xy = api.ValSym(owner, api.TermName.fresh("xy"), xyTpe)
+        val xyRef = core.Ref(xy)
+        val xy1 = core.ValDef(x, core.DefCall(Some(xyRef))(_1)())
+        val xy2 = core.ValDef(y, core.DefCall(Some(xyRef))(_2)())
+        val bind = prepend(Seq(xy1, xy2)) _
+        val vals = Seq.concat(xVals, Seq(fVal, irVal))
+        val gen = cs.Generator(xy, core.Let(vals: _*)()(irRef))
+        val combined = Seq.concat(qs1, Seq(gen), qs2.view.map(bind), qs3.view.map(bind))
+        cs.Comprehension(combined, bind(hd))
+      }).headOption.getOrElse(comp)
+    }
 
     /**
      * Creates a cross combinator.
@@ -436,51 +366,29 @@ private[comprehension] trait Combination extends Common {
      *   }
      * }}}
      */
-    val MatchCross: u.Tree =?> u.Tree = Function.unlift((tree: u.Tree) => tree match {
-      case cs.Comprehension(qs, hd) =>
-
-        (for {
-          xGen@cs.Generator(x, core.Let(xVals, Seq(), xExpr)) <- qs.view // (Seq() is to disallow control flow)
-          (qs1, qs23) = splitAt[u.Tree](xGen)(qs)
-          yGen@cs.Generator(y, core.Let(yVals, Seq(), yExpr)) <- qs23
-          (qs2, qs3) = splitAt[u.Tree](yGen)(qs23)
-          if qs2.isEmpty
-          if !api.Tree.refs(yGen).contains(x)
-        } yield {
-
-          val (irRef, irVal) = valDefAndRef("ir", Combinators.Cross(xExpr, yExpr))
-
-          //@formatter:off
-          val cTpe = Core.bagElemTpe(irRef)
-          assert(cTpe.typeConstructor == api.Sym.tuple(2).toTypeConstructor)
-          val cSym = api.TermSym.free(api.TermName.fresh("c"), cTpe)
-          val cRef = core.Ref(cSym)
-          val cx   = core.DefCall(Some(cRef))(tuple2_1)()
-          val cy   = core.DefCall(Some(cRef))(tuple2_2)()
-
-          val replaceXYandANF =
-            api.Tree.replace(core.Ref(x), cx) andThen
-            api.Tree.replace(core.Ref(y), cy) andThen
-            Core.anf
-
-          val qs3Repl = qs3 map qsReplFunc(replaceXYandANF)
-          val hdRepl = cs.Head(Comprehension.asLet(replaceXYandANF(cs.Head.unapply(hd).get)))
-
-          cs.Comprehension(
-            qs1 ++
-            Seq(cs.Generator(cSym, core.Let(
-              xVals ++ yVals :+ irVal: _*
-            )()(irRef))) ++
-            qs3Repl,
-            hdRepl
-          )
-          //@formatter:on
-
-        }).headOption
-
-      case _ =>
-        None
-    })
+    val MatchCross: Rule = {
+      case (owner, comp @ cs.Comprehension(qs, hd)) => (for {
+        // (Seq() is to disallow control flow)
+        xGen @ cs.Generator(x, core.Let(xVals, Seq(), xExpr)) <- qs.view
+        (qs1, qs23) = splitAt[u.Tree](xGen)(qs)
+        yGen @ cs.Generator(y, core.Let(yVals, Seq(), yExpr)) <- qs23.view
+        (qs2, qs3) = splitAt[u.Tree](yGen)(qs23)
+        if qs2.isEmpty && !api.Tree.refs(yGen).contains(x)
+      } yield {
+        val (irRef, irVal) = valRefAndDef(owner, "ir", Combinators.Cross(xExpr, yExpr))
+        val cTpe = Core.bagElemTpe(irRef)
+        assert(cTpe.typeConstructor == api.Sym.tuple(2).toTypeConstructor)
+        val c = api.ValSym(owner, api.TermName.fresh("c"), cTpe)
+        val cRef = core.Ref(c)
+        val cx = core.ValDef(x, core.DefCall(Some(cRef))(_1)())
+        val cy = core.ValDef(y, core.DefCall(Some(cRef))(_2)())
+        val bind = prepend(Seq(cx, cy)) _
+        val vals = Seq.concat(xVals, yVals, Seq(irVal))
+        val gen = cs.Generator(c, core.Let(vals: _*)()(irRef))
+        val combined = Seq.concat(qs1, Seq(gen), qs3.view.map(bind))
+        cs.Comprehension(combined, bind(hd))
+      }).headOption.getOrElse(comp)
+    }
 
     /**
      * Creates a join combinator.
@@ -540,88 +448,55 @@ private[comprehension] trait Combination extends Common {
      *   }
      * }}}
      */
-    val MatchEquiJoin: u.Tree =?> u.Tree = Function.unlift((tree: u.Tree) => tree match {
-      case cs.Comprehension(qs, hd) =>
+    val MatchEquiJoin: Rule = {
+      case (owner, comp @ cs.Comprehension(qs, hd)) => (for {
+        // (Seq() is to disallow control flow)
+        xGen @ cs.Generator(x, core.Let(xVals, Seq(), xExpr)) <- qs.view
+        (qs1, qs234) = splitAt[u.Tree](xGen)(qs)
+        yGen @ cs.Generator(y, core.Let(yVals, Seq(), yExpr)) <- qs234.view
+        (qs2, qs34) = splitAt[u.Tree](yGen)(qs234)
+        if qs2.isEmpty && !api.Tree.refs(yGen).contains(x)
+        grd @ cs.Guard(core.Let(grdVals, Seq(), core.Ref(jcr))) <- qs34.view
+        if (api.Tree.refs(grd) intersect gens(qs)) == Set(x, y)
+        jcrVal @ core.ValDef(`jcr`, core.DefCall(Some(eqLhs), eq, _, Seq(eqRhs)), _) <- grdVals
+        if eq.name.toString == "$eq$eq"
+        joinVals = grdVals.filter(_ != jcrVal)
+        (kxExpr, kyExpr) <- Seq((eqLhs, eqRhs), (eqRhs, eqLhs))
+        kxBody = Core.dce(core.Let(joinVals: _*)()(kxExpr))
+        if !api.Tree.refs(kxBody).contains(y)
+        kyBody = Core.dce(core.Let(joinVals: _*)()(kyExpr))
+        if !api.Tree.refs(kyBody).contains(x)
+        (qs3, qs4) = splitAt[u.Tree](grd)(qs34)
+      } yield {
+        // It can happen that the key functions have differing return types (e.g. Long and Int).
+        // In this case, we add casts before the return expr of the key functions to the weakLub.
+        def maybeCast(tree: u.Tree) = if (kxExpr.tpe =:= kyExpr.tpe) tree else tree match {
+          case core.Let(valDefs, _, expr) =>
+            val asInstanceOf = expr.tpe.member(api.TermName("asInstanceOf")).asTerm
+            val kLub = api.Type.weakLub(kxExpr.tpe, kyExpr.tpe)
+            val cast = core.DefCall(Some(expr))(asInstanceOf, kLub)()
+            val (castRef, castVal) = valRefAndDef(owner, "cast", cast)
+            core.Let(valDefs :+ castVal: _*)()(castRef)
+          case other => other
+        }
 
-        val allGenVars = (for {
-          cs.Generator(x, _) <- qs
-        } yield x).toSet
-
-        (for {
-          xGen@cs.Generator(x, core.Let(xVals, Seq(), xExpr)) <- qs.view // (Seq() is to disallow control flow)
-          (qs1, qs234) = splitAt[u.Tree](xGen)(qs)
-          yGen@cs.Generator(y, core.Let(yVals, Seq(), yExpr)) <- qs234
-          (qs2, qs34) = splitAt[u.Tree](yGen)(qs234)
-          if qs2.isEmpty
-          if !api.Tree.refs(yGen).contains(x)
-          grd@cs.Guard(grdBlk@core.Let(joinCondVals, Seq(), joinCondExpr@core.Ref(jcr))) <- qs34
-          if (api.Tree.refs(grd) intersect allGenVars) == Set(x, y)
-          jcrVal@core.ValDef(`jcr`, core.DefCall(Some(eqeqLhs), method, _, Seq(eqeqRhs)), _) <- joinCondVals
-          if method.name.toString == "$eq$eq"
-          joinCondVals0 = joinCondVals.filter(_ != jcrVal)
-          (kxExpr, kyExpr) <- Seq((eqeqLhs, eqeqRhs), (eqeqRhs, eqeqLhs))
-          kxBdy0 = Core.dce(core.Let(joinCondVals0: _*)()(kxExpr))
-          if !api.Tree.refs(kxBdy0).contains(y)
-          kyBdy0 = Core.dce(core.Let(joinCondVals0: _*)()(kyExpr))
-          if !api.Tree.refs(kyBdy0).contains(x)
-          (qs3, qs4) = splitAt[u.Tree](grd)(qs34)
-        } yield {
-
-          // It can happen that the key functions have differing return types (e.g. Long and Int).
-          // In this case, we add casts before the return expression of the key functions to the weakLub.
-          val maybeAddCast = (t: u.Tree) => if (kxExpr.tpe == kyExpr.tpe) t
-          else t match {
-            case core.Let(valDefs, _, expr) =>
-              val asInstanceOf = expr.tpe.member(api.TermName("asInstanceOf")).asTerm
-              val kLub = api.Type.weakLub(kxExpr.tpe, kyExpr.tpe)
-              val (castRef, castVal) = valDefAndRef("cast", core.DefCall(Some(expr))(asInstanceOf, kLub)())
-              core.Let(valDefs :+ castVal: _*)()(castRef)
-          }
-
-          val kxArg = api.TermSym.free(api.TermName.fresh("kxArg"), Core.bagElemTpe(xExpr))
-          val kxBdy = replaceRefs(x, kxArg)(maybeAddCast(kxBdy0))
-          val (kxRef, kxVal) = valDefAndRef("kx", core.Lambda(kxArg)(kxBdy))
-
-          val kyArg = api.TermSym.free(api.TermName.fresh("kyArg"), Core.bagElemTpe(yExpr))
-          val kyBdy = api.TopDown.transform { case core.Ref(`y`) => core.Ref(kyArg) }(
-            api.Tree.refreshAll(maybeAddCast(kyBdy0))).tree
-          val (kyRef, kyVal) = valDefAndRef("ky", core.Lambda(kyArg)(kyBdy))
-
-          val (irRef, irVal) = valDefAndRef("ir", Combinators.EquiJoin(kxRef, kyRef)(xExpr, yExpr))
-
-          //@formatter:off
-          val jTpe = Core.bagElemTpe(irRef)
-          assert(jTpe.typeConstructor == api.Sym.tuple(2).toTypeConstructor)
-          val jSym = api.TermSym.free(api.TermName.fresh("j"), jTpe)
-          val jRef = core.Ref(jSym)
-          val jx   = core.DefCall(Some(jRef))(tuple2_1)()
-          val jy   = core.DefCall(Some(jRef))(tuple2_2)()
-
-          val replaceXYandANF =
-            api.Tree.replace(core.Ref(x), jx) andThen
-            api.Tree.replace(core.Ref(y), jy) andThen
-            Core.anf
-
-          val qsReplFunc = this.qsReplFunc(replaceXYandANF)
-          val qs3Repl = qs3 map qsReplFunc
-          val qs4Repl = qs4 map qsReplFunc
-          val hdRepl  = cs.Head(Comprehension.asLet(replaceXYandANF(cs.Head.unapply(hd).get)))
-
-          cs.Comprehension(
-            qs1 ++
-            Seq(cs.Generator(jSym, core.Let(
-              xVals ++ yVals :+ kxVal :+ kyVal :+ irVal: _*
-            )()(irRef))) ++
-            qs3Repl ++ qs4Repl,
-            hdRepl
-          )
-          //@formatter:on
-
-        }).headOption
-
-      case _ =>
-        None
-    })
+        val (kxRef, kxVal) = valRefAndDef(owner, "kx", core.Lambda(x)(maybeCast(kxBody)))
+        val (kyRef, kyVal) = valRefAndDef(owner, "ky", core.Lambda(y)(maybeCast(kyBody)))
+        val join = Combinators.EquiJoin(kxRef, kyRef)(xExpr, yExpr)
+        val (irRef, irVal) = valRefAndDef(owner, "ir", join)
+        val jTpe = Core.bagElemTpe(irRef)
+        assert(jTpe.typeConstructor == api.Sym.tuple(2).toTypeConstructor)
+        val j = api.ValSym(owner, api.TermName.fresh("j"), jTpe)
+        val jRef = core.Ref(j)
+        val jx = core.ValDef(x, core.DefCall(Some(jRef))(_1)())
+        val jy = core.ValDef(y, core.DefCall(Some(jRef))(_2)())
+        val bind = prepend(Seq(jx, jy)) _
+        val vals = Seq.concat(xVals, yVals, Seq(kxVal, kyVal, irVal))
+        val gen = cs.Generator(j, core.Let(vals: _*)()(irRef))
+        val combined = Seq.concat(qs1, Seq(gen), qs3.view.map(bind), qs4.view.map(bind))
+        cs.Comprehension(combined, bind(hd))
+      }).headOption.getOrElse(comp)
+    }
 
     /**
      * Eliminates the residual comprehension.
@@ -650,33 +525,38 @@ private[comprehension] trait Combination extends Common {
      *   $ir
      * }}}
      */
-    val MatchResidual: u.Tree =?> u.Tree = Function.unlift((tree: u.Tree) => tree match {
-      case cs.Comprehension(Seq(cs.Generator(x, core.Let(xVals, Seq(), xExpr))), cs.Head(hd)) =>
-
-        val fArg = api.TermSym.free(api.TermName.fresh("fArg"), Core.bagElemTpe(xExpr))
-        val (fRef, fVal) = valDefAndRef("f", core.Lambda(fArg)(replaceRefs(x, fArg)(hd)))
-        val (irRef, irVal) = valDefAndRef("ir", cs.Map(xExpr)(fRef))
-
-        Some(core.Let(xVals :+ fVal :+ irVal :_*)()(irRef))
-
-      case _ =>
-        None
-    })
-
-    private def replaceRefs(find: u.TermSymbol, repl: u.TermSymbol)(t: u.Tree): u.Tree = {
-      api.Tree.replace(core.Ref(find), core.Ref(repl))(t)
+    val MatchResidual: Rule = {
+      case (own, cs.Comprehension(Seq(cs.Generator(x, core.Let(vs, Seq(), expr))), cs.Head(hd))) =>
+        val (fRef, fVal) = valRefAndDef(own, "f", core.Lambda(x)(hd))
+        val (irRef, irVal) = valRefAndDef(own, "ir", cs.Map(expr)(fRef))
+        core.Let(vs ++ Seq(fVal, irVal): _*)()(irRef)
     }
 
-    private def qsReplFunc(f: u.Tree => u.Tree): u.Tree =?> u.Tree = {
-      case cs.Generator(sym, blk) => cs.Generator(sym, Comprehension.asLet(f(blk)))
-      case cs.Guard(blk) => cs.Guard(Comprehension.asLet(f(blk)))
+    private def prepend(vals: Seq[u.ValDef])(in: u.Tree): u.Tree = {
+      val refs = api.Tree.refs(in)
+      val prefix = vals.filter(v => refs(v.symbol.asTerm))
+      def prepend(let: u.Tree): u.Block = let match {
+        case core.Let(suffix, defs, expr) =>
+          core.Let(prefix ++ suffix: _*)(defs: _*)(expr)
+        case expr =>
+          core.Let(prefix: _*)()(expr)
+      }
+
+      in match {
+        case cs.Generator(x, gen) => cs.Generator(x, prepend(gen))
+        case cs.Guard(pred) => cs.Guard(prepend(pred))
+        case cs.Head(expr) => cs.Head(prepend(expr))
+        case tree => prepend(tree)
+      }
     }
 
     /** Creates a ValDef, and returns its Ident on the left hand side. */
-    private def valDefAndRef(name: String, rhs: u.Tree): (u.Ident, u.ValDef) = {
-      val sym = api.TermSym.free(api.TermName.fresh(name), rhs.tpe)
-      (core.Ref(sym), api.ValDef(sym, rhs))
+    private def valRefAndDef(own: u.Symbol, name: String, rhs: u.Tree): (u.Ident, u.ValDef) = {
+      val lhs = api.ValSym(own, api.TermName.fresh(name), rhs.tpe)
+      (core.Ref(lhs), core.ValDef(lhs, rhs))
     }
-  }
 
+    private def gens(qs: Seq[u.Tree]): Set[u.TermSymbol] =
+      qs.collect { case cs.Generator(x, _) => x } (breakOut)
+  }
 }

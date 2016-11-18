@@ -22,6 +22,8 @@ import compiler.ir.ComprehensionSyntax._
 import compiler.ir.ComprehensionCombinators._
 import test.schema.Marketing._
 
+import shapeless._
+
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
@@ -48,12 +50,19 @@ class CombinationSpec extends BaseCompilerSpec {
       Core.flatten
     ).compose(_.tree)
 
-  def applyOnce(rule: u.Tree =?> u.Tree): u.Expr[Any] => u.Tree =
+  def applyOnce(rule: (u.Symbol, u.Tree) =?> u.Tree): u.Expr[Any] => u.Tree = {
+    val transform = api.TopDown.withOwner.transformWith {
+      case Attr.inh(tree, owner :: _) if rule.isDefinedAt(owner, tree) =>
+        rule(owner, tree)
+    }.andThen(_.tree)
+
     pipeline(typeCheck = true)(
       Core.lnf,
-      tree => time(api.TopDown.transform(rule)(tree).tree, "match rule"),
-      Core.flatten
+      tree => time(transform(tree), "match rule"),
+      Core.flatten,
+      Core.dce
     ).compose(_.tree)
+  }
 
   // ---------------------------------------------------------------------------
   // Spec tests
@@ -183,21 +192,21 @@ class CombinationSpec extends BaseCompilerSpec {
       val exp = u.reify {
         comprehension[(User, Long), DataBag] {
           val xy = generator[(User, Long), DataBag] {
-            val f = (fFuncArg: User) => {
-              val ir1 = fFuncArg.id
+            val f = (fArg: User) => {
+              val ir1 = fArg.id
               val ir2 = Seq(ir1, ir1)
               val ir3 = DataBag(ir2)
-              val gFunc = (gFuncArg: Long) => {
-                new Tuple2(fFuncArg, gFuncArg)
-              }
-              val ir5 = ir3 map gFunc
+              val g = (gArg: Long) => (fArg, gArg)
+              val ir5 = ir3 map g
               ir5
             }
             val ir4 = users$1 flatMap f
             ir4
           }
           guard {
-            xy._1.id != xy._2
+            val xy1 = xy._1
+            val xy2 = xy._2
+            xy1.id != xy2
           }
           val z = generator[User, DataBag] {
             DataBag(Seq(xy._1))
@@ -275,13 +284,16 @@ class CombinationSpec extends BaseCompilerSpec {
             cross(u, DataBag(Seq(1,2,3)) union DataBag(Seq(4,5,6)))
           }
           val z = generator[Long, DataBag] {
-            DataBag(Seq(c._1.id + c._1.id))
+            val c1 = c._1
+            DataBag(Seq(c1.id + c1.id))
           }
           guard {
             c._2 != 0
           }
           head {
-            (c._1.id + c._2 + z).toString
+            val c1 = c._1
+            val c2 = c._2
+            (c1.id + c2 + z).toString
           }
         }
       }
@@ -454,16 +466,18 @@ class CombinationSpec extends BaseCompilerSpec {
             DataBag(Seq(3L, 6L))
           }
           guard {
-            z != j._1 && z != j._2.id
+            val j1 = j._1
+            val j2 = j._2
+            z != j1 && z != j2.id
           }
           head[Short] {
             //(j._1 + j._2.name.first.length - z).asInstanceOf[Short]
-            val _2$14 = j._2
-            val name$6 = _2$14.name
+            val j1 = j._1
+            val j2 = j._2
+            val name$6 = j2.name
             val first$6 = name$6.first
             val length$6 = first$6.length
-            val _1$14 = j._1
-            val `+$18` = _1$14 + length$6
+            val `+$18` = j1 + length$6
             val `-$6` = `+$18` - z
             val asInstanceOf$8 = `-$6`.asInstanceOf[Short]
             asInstanceOf$8
@@ -528,8 +542,12 @@ class CombinationSpec extends BaseCompilerSpec {
             users$1 union users
           ),
           DataBag(Seq(1, 2, 3))
-        ) map {
-          c => (c._1._1, c._1._2, c._2)
+        ) map { c =>
+          val c1 = c._1
+          val c2 = c._2
+          val c11 = c1._1
+          val c12 = c1._2
+          (c11, c12, c2)
         }
       }
 
@@ -559,9 +577,11 @@ class CombinationSpec extends BaseCompilerSpec {
         cross(
           users,
           users
-        ).withFilter(
-          a => a._1.id != a._2.id
-        ) map {
+        ).withFilter { a =>
+          val a1 = a._1
+          val a2 = a._2
+          a1.id != a2.id
+        } map {
           c => (c._1, c._2)
         }
       }
@@ -689,22 +709,22 @@ class CombinationSpec extends BaseCompilerSpec {
           }
           val ir1 = plus$9 map f$30
           val g$8 = (gArg$8: Long) => {
-            val ir2$8 = new Tuple2(fArg$26, gArg$8)
+            val ir2$8 = (fArg$26, gArg$8)
             ir2$8
           }
           val xy0$8 = ir1 map g$8
           xy0$8
         }
         val ir$58 = apply$121 flatMap f$26
-        val f$28 = (fArg$28: (DataBag[User], Long)) => {
-          val _1$75 = fArg$28._1
+        val f$28 = (fArg: (DataBag[User], Long)) => {
+          val fArg1 = fArg._1
+          val fArg2 = fArg._2
           val p$11 = (pArg$11: User) => {
             val id$69 = pArg$11.id
-            val _2$55 = fArg$28._2
-            val `!=$32` = id$69 != _2$55
+            val `!=$32` = id$69 != fArg2
             `!=$32`
           }
-          val ir$64 = _1$75 withFilter p$11
+          val ir$64 = fArg1 withFilter p$11
           val f$32 = (fArg$32: User) => {
             fArg$32
           }

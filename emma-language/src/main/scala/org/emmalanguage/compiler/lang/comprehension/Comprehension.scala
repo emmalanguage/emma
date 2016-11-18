@@ -229,8 +229,7 @@ trait Comprehension extends Common
 
         def apply(kx: u.Tree, ky: u.Tree)(xs: u.Tree, ys: u.Tree): u.Tree = {
           val keyTpe = api.Type.arg(2, kx.tpe)
-          // See comment before maybeAddCast in Combination
-          assert(keyTpe == api.Type.arg(2, ky.tpe))
+          assert(keyTpe =:= api.Type.arg(2, ky.tpe))
 
           core.DefCall(module)(symbol,
             Core.bagElemTpe(xs), Core.bagElemTpe(ys), keyTpe)(
