@@ -21,6 +21,8 @@ import compiler.Common
 
 import shapeless._
 
+import scala.collection.breakOut
+
 private[comprehension] trait Normalize extends Common {
   self: Core with Comprehension =>
 
@@ -75,16 +77,16 @@ private[comprehension] trait Normalize extends Common {
      *
      * {{{
      * {
-     *   $vals1
+     *   $vals
      *   flatten {
-     *     $vals2
+     *     $outerVals
      *     comprehension {
-     *       $qs1
+     *       $outerQs
      *       head {
-     *         $vals3
+     *         $innerVals
      *         comprehension {
-     *           $qs2
-     *           head $hd2
+     *           $innerQs
+     *           head $innerHd
      *         } // child comprehension
      *       }
      *     } // outer comprehension
@@ -97,42 +99,42 @@ private[comprehension] trait Normalize extends Common {
      *
      * {{{
      * {
-     *   $vals1a
+     *   $enclPre
      *   val x = flatten {
-     *     $vals2
+     *     $outerVals
      *     comprehension {
-     *       $qs1
+     *       $outerQs
      *       head {
-     *         $vals3
+     *         $innerVals
      *         comprehension {
-     *           $qs2
-     *           head $hd2
+     *           $innerQs
+     *           head $innerHd
      *         } // child comprehension
      *       }
      *     } // outer comprehension
      *   } // parent valdef
-     *   $vals1b
-     *   $expr1 // parent expression
+     *   $enclSuf
+     *   $expr // parent expression
      * } // enclosing block
      * }}}
      *
      * ==Rewrite==
      *
-     * Let $vals3 decompose into the following two subsets:
-     * - $vals3i (transitively) depends on symbols defined in $qs1, and
-     * - $vals3o is the independent complement $vals3 \ $vals3i.
+     * Let $innerVals decompose into the following two subsets:
+     * - $dep (transitively) depends on symbols defined in $outerQs, and
+     * - $indep is the independent complement $innerVals \ $dep.
      *
      * For a match of type (1):
      *
      * {{{
      * {
-     *   $vals1
-     *   $vals2
-     *   $vals3o
+     *   $vals
+     *   $outerVals
+     *   $indep
      *   comprehension {
-     *     $qs1
-     *     $qs2' // where let blocks are prefixed with $vals3i
-     *     head $hd' // where let blocks are prefixed with $vals3i
+     *     $outerQs
+     *     $innerQs' // where let blocks are prefixed with $dep
+     *     head $innerHd' // where let blocks are prefixed with $dep
      *   } // flattened result comprehension
      * } // enclosing block
      * }}}
@@ -141,28 +143,28 @@ private[comprehension] trait Normalize extends Common {
      *
      * {{{
      * {
-     *   $vals1a
-     *   $vals2
-     *   $vals3o
+     *   $enclPre
+     *   $outerVals
+     *   $indep
      *   val x = comprehension {
-     *     $qs1
-     *     $qs2' // where let blocks are prefixed with $vals3i
-     *     head $hd' // where let blocks are prefixed with $vals3i
+     *     $outerQs
+     *     $innerQs' // where let blocks are prefixed with $dep
+     *     head $innerHd' // where let blocks are prefixed with $dep
      *   } // flattened result comprehension
-     *   $vals1b
-     *   $expr1
+     *   $enclSuf
+     *   $expr
      * } // enclosing block
      * }}}
      */
     private[Normalize] val UnnestHead: Rule = {
       case Attr.none(core.Let(vals, defs, expr)) =>
         vals.map(v => v -> v.rhs) :+ (expr -> expr) collectFirst {
-          case (encl, Flatten(core.Let(enclVals, Seq(),
-            outer @ Comprehension(outerQs,
-              Head(core.Let(outerVals, Seq(),
+          case (encl, Flatten(core.Let(outerVals, Seq(),
+            Comprehension(outerQs,
+              Head(core.Let(innerVals, Seq(),
                 DataBagExprToCompr(innerQs, Head(innerHd)))))))) =>
 
-            val (dep, indep) = split(outerVals, outerQs)
+            val (dep, indep) = split(innerVals, outerQs)
             val qs = outerQs ++ innerQs.map(capture(self, dep, prune = false))
             val hd = capture(self, dep, prune = false)(Head(innerHd))
             val flat = Core.inlineLetExprs(Comprehension(qs, hd))
@@ -170,9 +172,9 @@ private[comprehension] trait Normalize extends Common {
               case encl @ core.ValDef(lhs, _) =>
                 val (enclPre, enclSuf) = splitAt(encl)(vals)
                 val flatVal = core.ValDef(lhs, flat)
-                (Seq.concat(enclPre, enclVals, indep, Seq(flatVal), enclSuf), expr)
+                (Seq.concat(enclPre, outerVals, indep, Seq(flatVal), enclSuf), expr)
               case _ =>
-                (Seq.concat(vals, enclVals, indep), flat)
+                (Seq.concat(vals, outerVals, indep), flat)
             }
 
             core.Let(flatVals, defs, flatExpr)
@@ -201,25 +203,21 @@ private[comprehension] trait Normalize extends Common {
     /** Splits `vals` in two: vals dependent on generators bound in `qs`, and complement. */
     private def split(vals: Seq[u.ValDef], qs: Seq[u.Tree]): (Seq[u.ValDef], Seq[u.ValDef]) = {
       // symbols referenced in vals
-      val refMap = (for {
-        core.ValDef(lhs, rhs) <- vals
-      } yield lhs -> api.Tree.refs(rhs)).toMap
+      val valRefs = for (core.ValDef(lhs, rhs) <- vals)
+        yield lhs -> api.Tree.refs(rhs)
 
-      // symbols defined in vals which directly depend on symbols from qs
-      var dependent = (for {
-        Generator(lhs, _) <- qs
-      } yield lhs).toSet
-
-      // compute the transitive closure of dependent, i.e. extend with indirect dependencies
-      var delta = 0
-      do {
-        val size = dependent.size
+      var dependent: Set[u.TermSymbol] = qs.collect {
+        case Generator(lhs, _) => lhs
+      } (breakOut)
+      var size = 0
+      while (size != dependent.size) {
+        size = dependent.size
         dependent ++= (for {
-          (lhs, refs) <- refMap
-          if refs.exists(dependent)
+          (lhs, refs) <- valRefs
+          if refs exists dependent
         } yield lhs)
-        delta = dependent.size - size
-      } while (delta > 0)
+      }
+
       vals.partition(dependent.compose(_.symbol.asTerm))
     }
 
@@ -236,17 +234,17 @@ private[comprehension] trait Normalize extends Common {
      *
      * {{{
      * {
-     *   $vals1a
+     *   $yPre
      *   val y = comprehension {
-     *     $qs2
-     *     head $hd2
+     *     $yQs
+     *     head $yHd
      *   } // child comprehension
-     *   $vals1b
+     *   $ySuf
      *   comprehension {
-     *     $qs1a
+     *     $xPre
      *     val x = generator(y) // gen
-     *     $qs1b
-     *     head $hd1
+     *     $xSuf
+     *     head $enclHd
      *   } // parent comprehension
      * } // enclosing block
      * }}}
@@ -256,20 +254,20 @@ private[comprehension] trait Normalize extends Common {
      *
      * {{{
      * {
-     *   $vals1a
+     *   $yPre
      *   val y = comprehension {
-     *     $qs2
-     *     head $hd2
+     *     $yQs
+     *     head $yHd
      *   } // child comprehension
-     *   $vals1b
+     *   $ySuf
      *   val z = comprehension {
-     *     $qs1a
+     *     $xPre
      *     val x = generator(y) // gen
-     *     $qs1b
-     *     head $hd1
+     *     $xSuf
+     *     head $enclHd
      *   } // parent comprehension
-     *   $vals1c
-     *   $expr1
+     *   $enclSuf
+     *   $expr
      * } // enclosing block
      * }}}
      *
@@ -279,13 +277,13 @@ private[comprehension] trait Normalize extends Common {
      *
      * {{{
      * {
-     *   $vals1a
-     *   $vals1b
+     *   $yPre
+     *   $ySuf
      *   comprehension {
-     *     $qs1a
-     *     $qs2
-     *     $qs1b [ $hd2 \ x ]
-     *     head $hd1 [ $hd2 \ x ]
+     *     $xPre
+     *     $yQs
+     *     $xSuf [ $enclHd \ x ]
+     *     head $yHd [ $enclHd \ x ]
      *   } // unnested result comprehension
      * } // enclosing block
      * }}}
@@ -294,16 +292,16 @@ private[comprehension] trait Normalize extends Common {
      *
      * {{{
      * {
-     *   $vals1a
-     *   $vals1b
+     *   $yPre
+     *   $ySuf
      *   val z = comprehension {
-     *     $qs1a
-     *     $qs2
-     *     $qs1b [ $hd2 \ x ]
-     *     head $hd1 [ $hd2 \ x ]
+     *     $xPre
+     *     $yQs
+     *     $xSuf [ $enclHd \ x ]
+     *     head $yHd [ $enclHd \ x ]
      *   } // unnested result comprehension
-     *   $vals1c
-     *   $expr1
+     *   $enclSuf
+     *   $expr
      * } // enclosing block
      * }}}
      */
@@ -314,7 +312,7 @@ private[comprehension] trait Normalize extends Common {
         (yPre, ySuf) = splitAt(yVal)(vals)
         enclosing = ySuf.view.map(x => x -> x.rhs) :+ (expr -> expr)
         (encl, Comprehension(enclQs, Head(enclHd))) <- enclosing
-        gen @ Generator(x, core.Let(Seq(), Seq(), core.ValRef(`y`))) <- enclQs.view
+        xGen @ Generator(x, core.Let(Seq(), Seq(), core.ValRef(`y`))) <- enclQs.view
       } yield {
         // define a substitution function `· [ $hd2 \ x ]`
         val subst = yHd match {
@@ -322,8 +320,8 @@ private[comprehension] trait Normalize extends Common {
           case _ => api.Tree.subst(Seq(x -> yHd))
         }
 
-        val (genPre, genSuf) = splitAt[u.Tree](gen)(enclQs)
-        val qs = Seq.concat(genPre, yQs, genSuf map subst)
+        val (xPre, xSuf) = splitAt[u.Tree](xGen)(enclQs)
+        val qs = Seq.concat(xPre, yQs, xSuf map subst)
         val flat = Comprehension(qs, Head(asLet(subst(enclHd))))
         val (flatVals, flatExpr) = encl match {
           case encl @ core.ValDef(lhs, _) =>
