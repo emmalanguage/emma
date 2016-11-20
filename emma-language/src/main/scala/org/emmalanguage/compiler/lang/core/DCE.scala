@@ -39,30 +39,38 @@ private[core] trait DCE extends Common {
      * - All unused value definitions are pruned.
      */
     lazy val transform: u.Tree => u.Tree =
-      api.BottomUp.withValUses.transformSyn {
+      api.BottomUp.withDefCalls.withValUses.transformSyn {
         case Attr(let @ core.Let(vals, defs, expr), _, _, syn) =>
           def refs(tree: u.Tree) = syn(tree).head.keySet
+          def calls(tree: u.Tree) = syn(tree).tail.head.keySet
+
+          var liveDefs = defs
+          var size = 0
+          while (size != liveDefs.size) {
+            size = liveDefs.size
+            liveDefs = liveDefs.filter { d =>
+              val m = d.symbol.asMethod
+              calls(expr)(m) || liveDefs.exists(calls(_)(m))
+            }
+          }
 
           // Gather refs in DefDefs.
-          val refsInDefs: Set[u.TermSymbol] = defs.flatMap(refs)(breakOut)
+          val refsInDefs: Set[u.TermSymbol] = liveDefs.flatMap(refs)(breakOut)
 
           // Decide for each ValDef whether it is needed.
           // Start with the refs in the expr and refs in the DefDefs, then go through the ValDefs backwards.
           val liveRefs = vals.foldRight(refs(expr) | refsInDefs) {
-
             // When we have a DefCall that is returning a unit, then treat this val as used
-            case (core.ValDef(lhs, rhs@api.DefCall(_, method, _, _)), live)
-              if method.returnType =:= api.Type[Unit] =>
-              live | refs(rhs) + lhs
-
+            case (core.ValDef(lhs, rhs @ api.DefCall(_, method, _, _)), live)
+              if method.returnType =:= api.Type[Unit] => live | refs(rhs) + lhs
             case (core.ValDef(lhs, rhs), live) =>
               if (live(lhs)) live | refs(rhs) else live
           }
 
           // Retain only those ValDefs which are referenced.
           val liveVals = vals.filter(liveRefs.compose(_.symbol.asTerm))
-          if (liveVals.size == vals.size) let
-          else core.Let(liveVals, defs, expr)
+          if (liveVals.size == vals.size && liveDefs.size == defs.size) let
+          else core.Let(liveVals, liveDefs, expr)
       }.andThen(_.tree)
   }
 }
