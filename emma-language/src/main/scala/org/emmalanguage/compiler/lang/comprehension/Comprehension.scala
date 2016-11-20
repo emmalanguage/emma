@@ -275,17 +275,41 @@ trait Comprehension extends Common
     // General helpers
     // -------------------------------------------------------------------------
 
+    /** Wraps `tree` in a Let block if necessary. */
     private[comprehension] def asLet(tree: u.Tree): u.Block = tree match {
       case let @ core.Let(_, _, _) => let
-      case other => core.Let()()(other)
+      case _ => core.Let()()(tree)
     }
 
-    /* Splits a `Seq[A]` into a prefix and suffix. */
-    private[comprehension] def splitAt[A](e: A): Seq[A] => (Seq[A], Seq[A]) = {
-      (_: Seq[A]).span(_ != e)
-    } andThen {
-      case (pre, Seq(_, suf@_*)) => (pre, suf)
+    /** Splits a `Seq[A]` into a prefix and suffix, excluding `pivot`. */
+    private[comprehension] def splitAt[A](pivot: A)(xs: Seq[A]): (Seq[A], Seq[A]) =
+      xs.span(_ != pivot) match {
+        case (prefix, Seq(_, suffix @ _*)) => (prefix, suffix)
+        case (prefix, _) => (prefix, Seq.empty)
+      }
+
+    /** Prepends and binds free variables in `tree` to `vals`. */
+    private[comprehension] def capture(
+      cs: Comprehension.Syntax,
+      vals: Seq[u.ValDef],
+      prune: Boolean = true
+    )(tree: u.Tree): u.Tree = {
+      val prefix = if (!prune) vals
+        else vals.filter(api.Tree.refs(tree).compose(_.symbol.asTerm))
+
+      def prepend(let: u.Tree): u.Block = let match {
+        case core.Let(suffix, defs, expr) =>
+          core.Let(prefix ++ suffix: _*)(defs: _*)(expr)
+        case expr =>
+          core.Let(prefix: _*)()(expr)
+      }
+
+      tree match {
+        case cs.Generator(x, gen) => cs.Generator(x, prepend(gen))
+        case cs.Guard(pred) => cs.Guard(prepend(pred))
+        case cs.Head(expr) => cs.Head(prepend(expr))
+        case _ => prepend(tree)
+      }
     }
   }
-
 }

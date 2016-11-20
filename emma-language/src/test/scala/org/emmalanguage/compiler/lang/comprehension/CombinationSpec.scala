@@ -50,10 +50,9 @@ class CombinationSpec extends BaseCompilerSpec {
       Core.flatten
     ).compose(_.tree)
 
-  def applyOnce(rule: (u.Symbol, u.Tree) =?> u.Tree): u.Expr[Any] => u.Tree = {
+  def applyOnce(rule: (u.Symbol, u.Tree) => Option[u.Tree]): u.Expr[Any] => u.Tree = {
     val transform = api.TopDown.withOwner.transformWith {
-      case Attr.inh(tree, owner :: _) if rule.isDefinedAt(owner, tree) =>
-        rule(owner, tree)
+      case Attr.inh(tree, owner :: _) => rule(owner, tree).getOrElse(tree)
     }.andThen(_.tree)
 
     pipeline(typeCheck = true)(
