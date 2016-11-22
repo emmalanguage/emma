@@ -134,10 +134,10 @@ private[comprehension] trait Combination extends Common {
         refd = api.Tree.refs(guard) intersect gens(qs12)
         if refd.isEmpty || (refd.size == 1 && refd.head == x)
       } yield {
-        val (pRef, pVal) = valRefAndDef(owner, "p", core.Lambda(x)(pred))
+        val (pRef, pVal) = valRefAndDef(owner, "p", core.Lambda(Seq(x), pred))
         val (fRef, fVal) = valRefAndDef(owner, "filtered", cs.WithFilter(xExpr)(pRef))
         val vals = Seq.concat(xVals, Seq(pVal, fVal))
-        val gen = cs.Generator(x, core.Let(vals: _*)()(fRef))
+        val gen = cs.Generator(x, core.Let(vals, Seq.empty, fRef))
         val combined = Seq.concat(qs1, Seq(gen), qs2, qs3)
         cs.Comprehension(combined, hd)
       }).headOption
@@ -197,10 +197,10 @@ private[comprehension] trait Combination extends Common {
         if (api.Tree.refs(yGen) intersect gens(qs)) == Set(x)
         if Seq.concat(qs2, qs3, Seq(hd)).forall(!api.Tree.refs(_).contains(x))
       } yield {
-        val (fRef, fVal) = valRefAndDef(owner, "f", core.Lambda(x)(yRhs))
+        val (fRef, fVal) = valRefAndDef(owner, "f", core.Lambda(Seq(x), yRhs))
         val (fmRef, fmVal) = valRefAndDef(owner, "fmapped", cs.FlatMap(xExpr)(fRef))
         val vals = Seq.concat(xVals, Seq(fVal, fmVal))
-        val gen = cs.Generator(y, core.Let(vals: _*)()(fmRef))
+        val gen = cs.Generator(y, core.Let(vals, Seq.empty, fmRef))
         val combined = Seq.concat(qs1, qs2, Seq(gen), qs3)
         cs.Comprehension(combined, hd)
       }).headOption
@@ -270,23 +270,23 @@ private[comprehension] trait Combination extends Common {
       } yield {
         val y1 = api.TermSym.free(api.TermName.fresh(y), Core.bagElemTpe(yExpr))
         val irArgs = Seq(core.Ref(x), core.Ref(y1))
-        val irRhs = core.DefCall(Some(tuple2))(tuple2App, x.info, y1.info)(irArgs)
+        val irRhs = core.DefCall(Some(tuple2), tuple2App, Seq(x.info, y1.info), Seq(irArgs))
         val (irRef, irVal) = valRefAndDef(owner, "ir", irRhs)
-        val gBody = core.Let(irVal)()(irRef)
-        val (gRef, gVal) = valRefAndDef(owner, "g", core.Lambda(y1)(gBody))
+        val gBody = core.Let(Seq(irVal), Seq.empty, irRef)
+        val (gRef, gVal) = valRefAndDef(owner, "g", core.Lambda(Seq(y1), gBody))
         val (mRef, mVal) = valRefAndDef(owner, "mapped", cs.Map(yExpr)(gRef))
-        val fBody = core.Let(yVals ++ Seq(gVal, mVal): _*)()(mRef)
-        val (fRef, fVal) = valRefAndDef(owner, "f", core.Lambda(x)(fBody))
+        val fBody = core.Let(yVals ++ Seq(gVal, mVal), Seq.empty, mRef)
+        val (fRef, fVal) = valRefAndDef(owner, "f", core.Lambda(Seq(x), fBody))
         val (fmRef, fmVal) = valRefAndDef(owner, "fmapped", cs.FlatMap(xExpr)(fRef))
         val xyTpe = Core.bagElemTpe(fmRef)
         assert(xyTpe.typeConstructor =:= api.Sym.tuple(2).toTypeConstructor)
         val xy = api.ValSym(owner, api.TermName.fresh("xy"), xyTpe)
         val xyRef = core.Ref(xy)
-        val xy1 = core.ValDef(x, core.DefCall(Some(xyRef))(_1)())
-        val xy2 = core.ValDef(y, core.DefCall(Some(xyRef))(_2)())
+        val xy1 = core.ValDef(x, core.DefCall(Some(xyRef), _1, Seq.empty, Seq.empty))
+        val xy2 = core.ValDef(y, core.DefCall(Some(xyRef), _2, Seq.empty, Seq.empty))
         val bind = capture(cs, Seq(xy1, xy2)) _
         val vals = Seq.concat(xVals, Seq(fVal, fmVal))
-        val gen = cs.Generator(xy, core.Let(vals: _*)()(fmRef))
+        val gen = cs.Generator(xy, core.Let(vals, Seq.empty, fmRef))
         val combined = Seq.concat(qs1, Seq(gen), qs2.view map bind, qs3.view map bind)
         cs.Comprehension(combined, bind(hd))
       }).headOption
@@ -349,11 +349,11 @@ private[comprehension] trait Combination extends Common {
         assert(xyTpe.typeConstructor =:= api.Sym.tuple(2).toTypeConstructor)
         val xy = api.ValSym(owner, api.TermName.fresh("xy"), xyTpe)
         val xyRef = core.Ref(xy)
-        val xy1 = core.ValDef(x, core.DefCall(Some(xyRef))(_1)())
-        val xy2 = core.ValDef(y, core.DefCall(Some(xyRef))(_2)())
+        val xy1 = core.ValDef(x, core.DefCall(Some(xyRef), _1, Seq.empty, Seq.empty))
+        val xy2 = core.ValDef(y, core.DefCall(Some(xyRef), _2, Seq.empty, Seq.empty))
         val bind = capture(cs, Seq(xy1, xy2)) _
         val vals = Seq.concat(xVals, yVals, Seq(cVal))
-        val gen = cs.Generator(xy, core.Let(vals: _*)()(cRef))
+        val gen = cs.Generator(xy, core.Let(vals, Seq.empty, cRef))
         val combined = Seq.concat(qs1, Seq(gen), qs3.view map bind)
         cs.Comprehension(combined, bind(hd))
       }).headOption
@@ -430,13 +430,13 @@ private[comprehension] trait Combination extends Common {
         if qs2.isEmpty && !api.Tree.refs(yGen).contains(x)
         grd @ cs.Guard(core.Let(grdVals, Seq(), core.Ref(cond))) <- qs34.view
         if (api.Tree.refs(grd) intersect gens(qs)) == Set(x, y)
-        condVal @ core.ValDef(`cond`, core.DefCall(Some(eqLhs), eq, _, Seq(eqRhs)), _) <- grdVals
+        condVal @ core.ValDef(`cond`, core.DefCall(Some(eqLhs), eq, _, Seq(Seq(eqRhs)))) <- grdVals
         if eq.name.toString == "$eq$eq"
         joinVals = grdVals.filter(_ != condVal)
         (kxExpr, kyExpr) <- Seq((eqLhs, eqRhs), (eqRhs, eqLhs))
-        kxBody = Core.dce(core.Let(joinVals: _*)()(kxExpr))
+        kxBody = Core.dce(core.Let(joinVals, Seq.empty, kxExpr))
         if !api.Tree.refs(kxBody).contains(y)
-        kyBody = Core.dce(core.Let(joinVals: _*)()(kyExpr))
+        kyBody = Core.dce(core.Let(joinVals, Seq.empty, kyExpr))
         if !api.Tree.refs(kyBody).contains(x)
         (qs3, qs4) = splitAt[u.Tree](grd)(qs34)
       } yield {
@@ -445,26 +445,26 @@ private[comprehension] trait Combination extends Common {
         def maybeCast(tree: u.Tree) = if (kxExpr.tpe =:= kyExpr.tpe) tree else tree match {
           case core.Let(valDefs, _, expr) =>
             val asInstanceOf = expr.tpe.member(api.TermName("asInstanceOf")).asTerm
-            val kLub = api.Type.weakLub(kxExpr.tpe, kyExpr.tpe)
-            val cast = core.DefCall(Some(expr))(asInstanceOf, kLub)()
+            val kLub = api.Type.weakLub(Seq(kxExpr.tpe, kyExpr.tpe))
+            val cast = core.DefCall(Some(expr), asInstanceOf, Seq(kLub), Seq.empty)
             val (castRef, castVal) = valRefAndDef(owner, "cast", cast)
-            core.Let(valDefs :+ castVal: _*)()(castRef)
+            core.Let(valDefs :+ castVal, Seq.empty, castRef)
           case other => other
         }
 
-        val (kxRef, kxVal) = valRefAndDef(owner, "kx", core.Lambda(x)(maybeCast(kxBody)))
-        val (kyRef, kyVal) = valRefAndDef(owner, "ky", core.Lambda(y)(maybeCast(kyBody)))
+        val (kxRef, kxVal) = valRefAndDef(owner, "kx", core.Lambda(Seq(x), maybeCast(kxBody)))
+        val (kyRef, kyVal) = valRefAndDef(owner, "ky", core.Lambda(Seq(y), maybeCast(kyBody)))
         val join = Combinators.EquiJoin(kxRef, kyRef)(xExpr, yExpr)
         val (jRef, jVal) = valRefAndDef(owner, "joined", join)
         val xyTpe = Core.bagElemTpe(jRef)
         assert(xyTpe.typeConstructor =:= api.Sym.tuple(2).toTypeConstructor)
         val xy = api.ValSym(owner, api.TermName.fresh("xy"), xyTpe)
         val xyRef = core.Ref(xy)
-        val xy1 = core.ValDef(x, core.DefCall(Some(xyRef))(_1)())
-        val xy2 = core.ValDef(y, core.DefCall(Some(xyRef))(_2)())
+        val xy1 = core.ValDef(x, core.DefCall(Some(xyRef), _1, Seq.empty, Seq.empty))
+        val xy2 = core.ValDef(y, core.DefCall(Some(xyRef), _2, Seq.empty, Seq.empty))
         val bind = capture(cs, Seq(xy1, xy2)) _
         val vals = Seq.concat(xVals, yVals, Seq(kxVal, kyVal, jVal))
-        val gen = cs.Generator(xy, core.Let(vals: _*)()(jRef))
+        val gen = cs.Generator(xy, core.Let(vals, Seq.empty, jRef))
         val combined = Seq.concat(qs1, Seq(gen), qs3.view map bind, qs4.view map bind)
         cs.Comprehension(combined, bind(hd))
       }).headOption
@@ -501,9 +501,9 @@ private[comprehension] trait Combination extends Common {
      */
     val MatchResidual: Rule = {
       case (own, cs.Comprehension(Seq(cs.Generator(x, core.Let(vs, Seq(), expr))), cs.Head(hd))) =>
-        val (fRef, fVal) = valRefAndDef(own, "f", core.Lambda(x)(hd))
+        val (fRef, fVal) = valRefAndDef(own, "f", core.Lambda(Seq(x), hd))
         val (mRef, mVal) = valRefAndDef(own, "mapped", cs.Map(expr)(fRef))
-        Some(core.Let(vs ++ Seq(fVal, mVal): _*)()(mRef))
+        Some(core.Let(vs ++ Seq(fVal, mVal), Seq.empty, mRef))
       case _ => None
     }
 
