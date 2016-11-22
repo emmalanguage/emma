@@ -184,31 +184,31 @@ trait LibSupport extends Common {
 
     private[libsupport] lazy val inline: (CG.Callee, CG.Snippet) => CG.Snippet = (callee, snippet) => {
       val result = callee match {
-        case CG.Lambda(sym, fun@Lambda(_, params, body)) =>
+        case CG.Lambda(sym, Lambda(_, _, _)) =>
           val result = BottomUp.withDefs.transformWith({
-            case Attr.syn(call@DefCall(Some(TermRef(`sym`)), _, Seq(), argss@_*), enclDefs :: _) =>
+            case Attr.none(call@DefCall(Some(TermRef(`sym`)), _, Seq(), _)) =>
               call
           })(snippet.tree).tree
 
           result
 
-        case CG.LibDef(sym, fun@DefDef(_, flags, tparams, paramss, body)) =>
+        case CG.LibDef(sym, fun@DefDef(_, tparams, paramss, body)) =>
           // collect parameter uses for `fun`
           val (bndDefs, parUses) = defDefAttrs(fun)
 
           // partition function parameters into two sets:
           // parameters used mostly once and parameters used more than once
           val (parsUsedOnce, parsUsedMany) = paramss.flatten.map {
-            case ParDef(par, _, _) => par
+            case ParDef(par, _) => par
           }.toSet.partition(parUses(_) <= 1)
 
           val result = BottomUp
             .accumulate({
-              case defn@api.TermDef(s) => Set[u.Name](s.name)
+              case api.TermDef(s) => Set[u.Name](s.name)
             })
             .withOwner
             .transformWith({
-              case Attr(call@DefCall(Some(TermRef(_)), `sym`, targs, argss@_*), enclDefs :: _, owner :: _, _) =>
+              case Attr(DefCall(Some(TermRef(_)), `sym`, targs, argss), _, owner :: _, _) =>
                 // compute type bindings sequence
                 val typesSeq = for {
                   (tp, ta) <- tparams zip targs
@@ -231,7 +231,7 @@ trait LibSupport extends Common {
 
                 // compute a sequence of `symbol -> tree` substitutions
                 val substSeq = for {
-                  (ParDef(p, _, _), a) <- paramss.flatten zip argss.flatten
+                  (ParDef(p, _), a) <- paramss.flatten zip argss.flatten
                 } yield {
                   if (parsUsedOnce(p)) p -> a
                   else p -> Ref(termsMap(p))
@@ -239,30 +239,30 @@ trait LibSupport extends Common {
 
                 // compute prefix of ValDefs derived from ParDefs used more than once
                 val prefxSeq = for {
-                  (ParDef(p, _, _), a) <- paramss.flatten zip argss.flatten
+                  (ParDef(p, _), a) <- paramss.flatten zip argss.flatten
                   if parsUsedMany(p)
                 } yield ValDef(termsMap(p), a)
 
                 // substitute terms and types and inline arguments in the body
                 val substBody = ({
-                  Tree.rename(termsSeq ++ typesSeq: _*)
+                  Tree.rename(termsSeq ++ typesSeq)
                 } andThen {
-                  Tree.subst(substSeq: _*)
+                  Tree.subst(substSeq)
                 }) (body)
 
                 // prepend ValDefs prefix to the substitution result
                 val prefxBody =
                 if (prefxSeq.isEmpty) substBody
                 else substBody match {
-                  case Block(stats, expr) => Block(prefxSeq ++ stats: _*)(expr)
-                  case expr => Block(prefxSeq: _*)(expr)
+                  case Block(stats, expr) => Block(prefxSeq ++ stats, expr)
+                  case expr => Block(prefxSeq, expr)
                 }
 
                 val anyEq = u.typeOf[Any].member(TermName("==")).asMethod
                 val fixEqBody = BottomUp.transform({
                   case DefCall(Some(lhs), `anyEq`, Seq(), Seq(rhs)) =>
                     val specializedEq = lhs.tpe.member(anyEq.name).asTerm
-                    DefCall(Some(lhs))(specializedEq)(Seq(rhs))
+                    DefCall(Some(lhs), specializedEq, Seq.empty, Seq(rhs))
                 })(prefxBody).tree
 
                 Owner.at(owner)(fixEqBody)
@@ -296,7 +296,7 @@ trait LibSupport extends Common {
             TopDown
               .inherit({
                 // inherit enclosing caller lambda or library function
-                case ValDef(sym, Lambda(_, _, _), _) =>
+                case ValDef(sym, Lambda(_, _, _)) =>
                   lambdas.getOrElse(sym, v)
               })(Monoids.right(v))
               .inherit({
@@ -305,24 +305,24 @@ trait LibSupport extends Common {
                   param <- params.map(_.symbol)
                   if Sym.funs(param.info.dealias.widen.typeSymbol)
                 } yield param).toList
-                case DefDef(_, _, _, paramss, _) => (for {
+                case DefDef(_, _, paramss, _) => (for {
                   param <- paramss.flatten.map(_.symbol)
                   if Sym.funs(param.info.dealias.widen.typeSymbol)
                 } yield param).toList
               })
               .traverseWith({
                 // function parameter call
-                case Attr.inh(DefCall(Some(TermRef(tgt)), sym, _, argss@_*), enclFunPars :: caller :: _)
+                case Attr.inh(DefCall(Some(TermRef(tgt)), sym, _, argss), enclFunPars :: caller :: _)
                   if enclFunPars.contains(tgt) =>
                   edgBldr += CG.Calls(caller, CG.FunPar(tgt))
                   addBnds(argss, sym)
                 // lambda function call
-                case Attr.inh(DefCall(Some(TermRef(tgt)), sym, _, argss@_*), _ :: caller :: _)
+                case Attr.inh(DefCall(Some(TermRef(tgt)), sym, _, argss), _ :: caller :: _)
                   if lambdas.contains(tgt) =>
                   edgBldr += CG.Calls(caller, lambdas(tgt))
                   addBnds(argss, sym)
                 // library function call
-                case Attr.inh(DefCall(Some(TermRef(tgt)), sym, _, argss@_*), _ :: caller :: _)
+                case Attr.inh(DefCall(Some(TermRef(_)), sym, _, argss), _ :: caller :: _)
                   if LibDefRegistry(sym).isDefined =>
                   edgBldr += CG.Calls(caller, CG.LibDef(sym, LibDefRegistry(sym).get))
                   addBnds(argss, sym)
@@ -410,10 +410,9 @@ trait LibSupport extends Common {
       val assignment = assign()
 
       // transform the component map into a nested set of strongly connected components
-      assignment.toSet[(CG.Vertex, CG.Vertex)]
-        .groupBy { case (v, c) => c }
-        .values.toSet[Set[(CG.Vertex, CG.Vertex)]]
-        .map(_.map { case (v, c) => v })
+      assignment.toSeq.groupBy(_._2)
+        .mapValues(_.map(_._1).toSet)
+        .values.toSet
     }
 
     // -------------------------------------------------------------------------
@@ -428,12 +427,12 @@ trait LibSupport extends Common {
 
     /** Build a map of all lambdas defined in the given tree. */
     private lazy val lambdaDefsIn: u.Tree => Map[u.TermSymbol, CG.Lambda] = _.collect({
-      case ValDef(sym, lambda@Lambda(_, _, _), _) => sym -> CG.Lambda(sym, lambda)
+      case ValDef(sym, lambda@Lambda(_, _, _)) => sym -> CG.Lambda(sym, lambda)
     }).toMap
 
     /** Build a map of all library functions called in the given tree. */
     private lazy val libdefRefsIn: u.Tree => Map[u.TermSymbol, CG.LibDef] = _.collect({
-      case DefCall(Some(TermRef(tgt)), sym withAST ast, targs, argss@_*)
+      case DefCall(Some(TermRef(_)), sym withAST ast, _, _)
         if Sym.findAnn[emma.src](sym).isDefined => sym -> CG.LibDef(sym, ast)
     }).toMap
 
@@ -466,7 +465,7 @@ trait LibSupport extends Common {
               // build an `objSym.fldSym` selection expression
               val cls = sym.owner.asClass
               val fld = cls.info.member(TermName(fldName)).asTerm
-              val sel = qualifyStatics(DefCall(Some(Ref(cls.module)))(fld)())
+              val sel = qualifyStatics(DefCall(Some(Ref(cls.module)), fld))
               // evaluate `objSym.fldSym` and grab the DefDef source
               val src = eval[String](sel)
               // parse the source and grab the DefDef AST
@@ -478,7 +477,7 @@ trait LibSupport extends Common {
 
       /** Extracts the first DefDef from an input tree. */
       private lazy val extractDef: u.Tree =?> u.DefDef = {
-        case dd@DefDef(_, _, _, _, _) => dd
+        case dd@DefDef(_, _, _, _) => dd
       }
 
       /** Parses a DefDef AST from a string. */
@@ -490,8 +489,8 @@ trait LibSupport extends Common {
       /** Replaces the top-level DefDef symbol of the quoted tree with the corrsponding original symbol. */
       private val fixDefDefSymbols = (original: u.MethodSymbol) =>
         TopDown.break.transform {
-          case DefDef(quoted, flags, tparams, paramss, body) =>
-            DefDef(original, flags)(tparams: _*)(paramss.map(_.map(_.symbol.asTerm)): _*)(body)
+          case DefDef(_, tparams, paramss, body) =>
+            DefDef(original, tparams, paramss.map(_.map(_.symbol.asTerm)), body)
         } andThen (_.tree)
     }
 

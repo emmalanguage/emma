@@ -106,7 +106,7 @@ private class libMacro(val c: whitebox.Context) extends MacroCompiler {
 
   /** Construct the AST for `@emma.src("$v")` annotation. */
   def src(v: String): Tree =
-    api.Inst(srcSym.toTypeConstructor)(Seq(api.Lit(v)))
+    api.Inst(srcSym.toTypeConstructor, argss = Seq(Seq(api.Lit(v))))
 
   /** Show the code for the given Tree and wrap it as a string literal. */
   def codeLiteralFor(tree: Tree): Literal =
