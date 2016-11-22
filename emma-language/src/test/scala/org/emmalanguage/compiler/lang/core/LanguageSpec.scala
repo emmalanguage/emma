@@ -185,8 +185,8 @@ class LanguageSpec extends BaseCompilerSpec {
     }
 
     "can be constructed and destructed" in {
-      examples foreach { case x @ core.ValDef(lhs, rhs, flags) =>
-        x shouldBe alphaEqTo (core.ValDef(lhs, rhs, flags))
+      examples foreach { case x @ core.ValDef(lhs, rhs) =>
+        x shouldBe alphaEqTo (core.ValDef(lhs, rhs))
       }
     }
   }
@@ -250,8 +250,8 @@ class LanguageSpec extends BaseCompilerSpec {
     }
 
     "can be constructed and destructed" in {
-      examples foreach { case x @ core.DefCall(None, method, targs, argss@_*) =>
-        x shouldBe alphaEqTo (core.DefCall()(method, targs: _*)(argss: _*))
+      examples foreach { case x @ core.DefCall(None, method, targs, argss) =>
+        x shouldBe alphaEqTo (core.DefCall(None, method, targs, argss))
       }
     }
   }
@@ -290,8 +290,8 @@ class LanguageSpec extends BaseCompilerSpec {
     }
 
     "can be constructed and destructed" in {
-      examples foreach { case x @ core.DefCall(target, method, targs, argss@_*) =>
-        x shouldBe alphaEqTo (core.DefCall(target)(method, targs: _*)(argss: _*))
+      examples foreach { case x @ core.DefCall(target, method, targs, argss) =>
+        x shouldBe alphaEqTo (core.DefCall(target, method, targs, argss))
       }
     }
   }
@@ -344,9 +344,9 @@ class LanguageSpec extends BaseCompilerSpec {
     }
 
     "can be constructed and destructed" in {
-      examples foreach { case x @ core.DefDef(method, flags, tparams, paramss, body) =>
-        x shouldBe alphaEqTo (core.DefDef(method, flags)(tparams: _*)(
-          paramss.map(_.map(_.symbol.asTerm)): _*)(body))
+      examples foreach { case x @ core.DefDef(method, tparams, paramss, body) =>
+        x shouldBe alphaEqTo (core.DefDef(method, tparams,
+          paramss.map(_.map(_.symbol.asTerm)), body))
       }
     }
   }
@@ -424,8 +424,8 @@ class LanguageSpec extends BaseCompilerSpec {
     }
 
     "can be constructed and destructed" in {
-      examples foreach { case x @ core.Inst(clazz, targs, argss@_*) =>
-        x shouldBe alphaEqTo (core.Inst(clazz, targs: _*)(argss: _*))
+      examples foreach { case x @ core.Inst(clazz, targs, argss) =>
+        x shouldBe alphaEqTo (core.Inst(clazz, targs, argss))
       }
     }
   }
@@ -463,7 +463,7 @@ class LanguageSpec extends BaseCompilerSpec {
 
     "can be constructed and destructed" in {
       examples foreach { case x @ core.Lambda(_, params, body) =>
-        x shouldBe alphaEqTo (core.Lambda(params.map(_.symbol.asTerm): _*)(body))
+        x shouldBe alphaEqTo (core.Lambda(params.map(_.symbol.asTerm), body))
       }
     }
   }
@@ -557,7 +557,7 @@ class LanguageSpec extends BaseCompilerSpec {
 
     "can be constructed and destructed" in {
       examples foreach { case x @ core.Let(vals, defs, expr) =>
-        x shouldBe alphaEqTo (core.Let(vals: _*)(defs: _*)(expr))
+        x shouldBe alphaEqTo (core.Let(vals, defs, expr))
       }
     }
   }

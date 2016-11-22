@@ -55,12 +55,13 @@ private[core] trait Trampoline extends Common {
     lazy val transform: u.Tree => u.Tree = api.BottomUp.withAncestors
       .inherit { // Local method definitions.
         case core.Let(_, defs, _) =>
-          (for (core.DefDef(method, _, tparams, paramss, _) <- defs) yield {
+          (for (core.DefDef(method, tparams, paramss, _) <- defs) yield {
             val (own, nme, pos) = (method.owner, method.name, method.pos)
             val flg = flags(method)
             val pss = paramss.map(_.map(_.symbol.asTerm))
             val res = api.Type.kind1[TailRec](method.info.finalResultType)
-            method -> api.DefSym(own, nme, flg, pos)(tparams: _*)(pss: _*)(res)
+            val ans = method.annotations
+            method -> api.DefSym(own, nme, tparams, pss, res, flg, pos, ans)
           }).toMap
       }.transformWith {
         // Return position in a method definition, wrap in trampoline.
@@ -68,19 +69,17 @@ private[core] trait Trampoline extends Common {
           if tree == expr => wrap(expr, local)
 
         // Local method definition, returns a trampoline.
-        case Attr.inh(
-          core.DefDef(method, flags, tparams, paramss, core.Let(vals, defs, expr)),
+        case Attr.inh(core.DefDef(method, tparams, paramss, core.Let(vals, defs, expr)),
           local :: _) =>
           val pss = paramss.map(_.map(_.symbol.asTerm))
-          core.DefDef(local(method), flags)(tparams: _*)(pss: _*)(
-            core.Let(vals: _*)(defs: _*)(expr))
+          core.DefDef(local(method), tparams, pss, core.Let(vals, defs, expr))
 
         // Local method call outside, retrieve the trampoline result.
-        case Attr.inh(core.DefCall(None, cont, targs, argss@_*), local :: ancestors :: _)
+        case Attr.inh(core.DefCall(None, cont, targs, argss), local :: ancestors :: _)
           if local.contains(cont) && ancestors.forall {
             case _: u.DefDef => false
             case _ => true
-          } => core.DefCall(Some(core.DefCall(None)(local(cont), targs: _*)(argss: _*)))(result)()
+          } => core.DefCall(Some(core.DefCall(None, local(cont), targs, argss)), result)
       }.andThen(_.tree)
 
     /** Wraps the return value / tail call of a method in a trampoline. */
@@ -91,14 +90,14 @@ private[core] trait Trampoline extends Common {
           core.Branch(cond, wrap(thn, local), wrap(els, local))
 
         // Wrap a tail call.
-        case core.DefCall(None, cont, targs, argss@_*) if local.contains(cont) =>
+        case core.DefCall(None, cont, targs, argss) if local.contains(cont) =>
           val Res = cont.info.finalResultType
-          core.DefCall(TailCalls)(tailcall, Res)(Seq(
-            core.DefCall(None)(local(cont), targs: _*)(argss: _*)))
+          core.DefCall(TailCalls, tailcall, Seq(Res),
+            Seq(Seq(core.DefCall(None, local(cont), targs, argss))))
 
         // Wrap a return value.
         case _ =>
-          core.DefCall(TailCalls)(done, expr.tpe)(Seq(expr))
+          core.DefCall(TailCalls, done, Seq(expr.tpe), Seq(Seq(expr)))
       }
   }
 }

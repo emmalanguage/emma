@@ -42,23 +42,23 @@ private[core] trait ANF extends Common {
       }.withParent.withOwner.transformWith {
         // Bypass atomics (except in lambdas, methods and comprehensions)
         case Attr.inh(src.Atomic(atom), _ :: Some(parent) :: _) => parent match {
-          case src.Lambda(_, _, _) => src.Block()(atom)
-          case core.DefDef(_, _, _, _, _) => src.Block()(atom)
-          case Comprehension(_) => src.Block()(atom)
+          case src.Lambda(_, _, _)     => src.Block(expr = atom)
+          case core.DefDef(_, _, _, _) => src.Block(expr = atom)
+          case Comprehension(_)        => src.Block(expr = atom)
           case _ => atom
         }
 
         // Bypass parameters
-        case Attr.none(param @ src.ParDef(_, _, _)) =>
+        case Attr.none(param @ src.ParDef(_, _)) =>
           param
 
         // Bypass comprehensions
         case Attr.none(comprehension @ Comprehension(_)) =>
-          src.Block()(comprehension)
+          src.Block(expr = comprehension)
 
         // Bypass local method calls in branches
         case Attr.inh(
-          call @ src.DefCall(_, method, _, _*),
+          call @ src.DefCall(_, method, _, _),
           _ :: Some(src.Branch(_, _, _)) :: local :: _
         ) if local(method) => call
 
@@ -67,26 +67,26 @@ private[core] trait ANF extends Common {
           val (stats, expr) = decompose(rhs, unline = true)
           val mut = src.VarMut(lhs, expr)
           if (stats.isEmpty) mut
-          else src.Block(stats :+ mut: _*)()
+          else src.Block(stats :+ mut)
 
         // Simplify RHS
-        case Attr.none(src.BindingDef(lhs, rhs, flags)) =>
+        case Attr.none(src.BindingDef(lhs, rhs)) =>
           val (stats, expr) = decompose(rhs, unline = true)
-          val dfn = core.BindingDef(lhs, expr, flags)
-          src.Block(stats :+ dfn: _*)()
+          val dfn = core.BindingDef(lhs, expr)
+          src.Block(stats :+ dfn)
 
         // Simplify expression
         case Attr.inh(src.TypeAscr(target, tpe), owner :: _) =>
           val (stats, expr) = decompose(target, unline = false)
           if (expr.tpe =:= tpe) {
-            src.Block(stats: _*)(expr)
+            src.Block(stats, expr)
           } else {
             val nme = api.TermName.fresh(nameOf(expr))
             val lhs = api.ValSym(owner, nme, tpe)
             val rhs = core.TypeAscr(expr, tpe)
             val dfn = core.ValDef(lhs, rhs)
             val ref = core.ValRef(lhs)
-            src.Block(stats :+ dfn: _*)(ref)
+            src.Block(stats :+ dfn, ref)
           }
 
         // Simplify target
@@ -97,11 +97,11 @@ private[core] trait ANF extends Common {
           val rhs = core.ModuleAcc(expr, module)
           val dfn = core.ValDef(lhs, rhs)
           val ref = core.ValRef(lhs)
-          src.Block(stats :+ dfn: _*)(ref)
+          src.Block(stats :+ dfn, ref)
 
         // Simplify target & arguments
         case Attr.inh(
-          src.DefCall(target, method, targs, argss@_*),
+          src.DefCall(target, method, targs, argss),
           owner :: _ :: local :: _
         ) =>
           val (tgtStats, tgtExpr) = target
@@ -111,26 +111,26 @@ private[core] trait ANF extends Common {
 
           val (argStats, argExprss) = decompose(argss, unline = false)
           val allStats = tgtStats ++ argStats
-          val call = core.DefCall(tgtExpr)(method, targs: _*)(argExprss: _*)
+          val call = core.DefCall(tgtExpr, method, targs, argExprss)
           if (local contains method) {
-            src.Block(allStats: _*)(call)
+            src.Block(allStats, call)
           } else {
             val nme = api.TermName.fresh(method)
             val lhs = api.ValSym(owner, nme, call.tpe)
             val dfn = core.ValDef(lhs, call)
             val ref = core.ValRef(lhs)
-            src.Block(allStats :+ dfn: _*)(ref)
+            src.Block(allStats :+ dfn, ref)
           }
 
         // Simplify arguments
-        case Attr.inh(inst @ src.Inst(cls, targs, argss@_*), owner :: _) =>
+        case Attr.inh(inst @ src.Inst(cls, targs, argss), owner :: _) =>
           val (stats, exprss) = decompose(argss, unline = false)
           val nme = api.TermName.fresh(cls.typeSymbol)
           val lhs = api.ValSym(owner, nme, inst.tpe)
-          val rhs = core.Inst(cls, targs: _*)(exprss: _*)
+          val rhs = core.Inst(cls, targs, exprss)
           val dfn = core.ValDef(lhs, rhs)
           val ref = core.ValRef(lhs)
-          src.Block(stats :+ dfn: _*)(ref)
+          src.Block(stats :+ dfn, ref)
 
         // Flatten blocks
         case Attr.none(src.Block(outer, expr)) =>
@@ -141,7 +141,7 @@ private[core] trait ANF extends Common {
             case stat => Some(stat)
           }
 
-          src.Block(flat ++ inner: _*)(result)
+          src.Block(flat ++ inner, result)
 
         // All lambdas on the RHS
         case Attr.none(lambda @ src.Lambda(fun, _, _)) =>
@@ -149,7 +149,7 @@ private[core] trait ANF extends Common {
           val lhs = api.ValSym(fun.owner, nme, lambda.tpe)
           val dfn = core.ValDef(lhs, lambda)
           val ref = core.ValRef(lhs)
-          src.Block(dfn)(ref)
+          src.Block(Seq(dfn), ref)
 
         // All branches on the RHS
         case Attr.inh(
@@ -159,13 +159,13 @@ private[core] trait ANF extends Common {
           val (stats, expr) = decompose(cond, unline = false)
           val branch = core.Branch(expr, thn, els)
           if (isDSCF(branch)(local)) {
-            src.Block(stats: _*)(branch)
+            src.Block(stats, branch)
           } else {
             val nme = api.TermName.fresh("if")
             val lhs = api.ValSym(owner, nme, branch.tpe)
             val dfn = core.ValDef(lhs, branch)
             val ref = core.ValRef(lhs)
-            src.Block(stats :+ dfn: _*)(ref)
+            src.Block(stats :+ dfn, ref)
           }
       }.andThen(_.tree)
 
@@ -198,7 +198,7 @@ private[core] trait ANF extends Common {
         case Attr.syn(src.Block(stats, src.ValRef(target)), uses :: defs :: _)
           if defs.contains(target) && uses(target) == 1 =>
             val value = defs(target)
-            src.Block(stats.filter(_ != value): _*)(value.rhs)
+            src.Block(stats.filter(_ != value), value.rhs)
       }.andThen(_.tree)
 
     /**
@@ -214,7 +214,7 @@ private[core] trait ANF extends Common {
     lazy val uninlineLetExprs: u.Tree => u.Tree = api.TopDown
       // Accumulate all method definitions seen so far.
       .accumulate { case core.Let(_, defs, _) =>
-        (for (core.DefDef(method, _, _, _, _) <- defs) yield method).toSet
+        (for (core.DefDef(method, _, _, _) <- defs) yield method).toSet
       }.withOwner.transformWith {
         case Attr.acc(let @ core.Let(_, _, expr), local :: _)
           if isDSCF(expr)(local) => let
@@ -224,7 +224,7 @@ private[core] trait ANF extends Common {
           val lhs = api.ValSym(owner, nme, expr.tpe)
           val ref = core.Ref(lhs)
           val dfn = core.ValDef(lhs, expr)
-          core.Let(vals :+ dfn: _*)(defs: _*)(ref)
+          core.Let(vals :+ dfn, defs, ref)
       }.andThen(_.tree)
 
     /**
@@ -241,14 +241,14 @@ private[core] trait ANF extends Common {
         case parent @ core.Let(vals, defs, expr) if hasNestedLets(parent) =>
           // Flatten nested let expressions in value position without control flow.
           val flatVals = vals.flatMap {
-            case core.ValDef(lhs, core.Let(nestedVals, Seq(), nestedExpr), flags) =>
+            case core.ValDef(lhs, core.Let(nestedVals, Seq(), nestedExpr)) =>
               (nestedVals, nestedExpr) match {
                 // Match: { ..vals; val x = expr; x }
-                case (prefix :+ core.ValDef(x, rhs, _), core.ValRef(y))
-                  if x == y => prefix :+ core.ValDef(lhs, rhs, flags)
+                case (prefix :+ core.ValDef(x, rhs), core.ValRef(y))
+                  if x == y => prefix :+ core.ValDef(lhs, rhs)
                 // Match: { ..vals; expr }
                 case (prefix, rhs) =>
-                  prefix :+ core.ValDef(lhs, rhs, flags)
+                  prefix :+ core.ValDef(lhs, rhs)
               }
             case value =>
               Some(value)
@@ -263,7 +263,7 @@ private[core] trait ANF extends Common {
           }
 
           val (trimmedVals, trimmedExpr) = trimVals(flatVals ++ exprVals, flatExpr)
-          core.Let(trimmedVals: _*)(defs: _*)(trimmedExpr)
+          core.Let(trimmedVals, defs, trimmedExpr)
       }.andThen(_.tree)
 
     // ---------------
@@ -274,7 +274,7 @@ private[core] trait ANF extends Common {
     // { ..vals; val x2 = x3; val x1 = x2; x1 }
     private def trimVals(vals: Seq[u.ValDef], expr: u.Tree): (Seq[u.ValDef], u.Tree) =
       (Seq.empty, vals.foldRight(expr, 0) {
-        case (core.ValDef(x, rhs @ core.Atomic(_), _), (core.ValRef(y), n))
+        case (core.ValDef(x, rhs @ core.Atomic(_)), (core.ValRef(y), n))
           if x == y => (rhs, n + 1)
         case (_, (rhs, n)) =>
           //scalastyle:off
@@ -285,7 +285,7 @@ private[core] trait ANF extends Common {
     /** Does the input `let` block contain nested `let` expressions? */
     private def hasNestedLets(let: u.Block): Boolean = {
       def inStats = let.stats.exists {
-        case core.ValDef(_, core.Let(_, Seq(), _), _) => true
+        case core.ValDef(_, core.Let(_, Seq(), _)) => true
         case _ => false
       }
       def inExpr = let.expr match {
@@ -312,7 +312,7 @@ private[core] trait ANF extends Common {
     /** Decomposes a [[src.Block]] into statements and expressions. */
     private def decompose(tree: u.Tree, unline: Boolean)
       : (Seq[u.Tree], u.Tree) = tree match {
-        case src.Block(stats :+ src.ValDef(x, rhs, _), src.ValRef(y))
+        case src.Block(stats :+ src.ValDef(x, rhs), src.ValRef(y))
           if unline && x == y => (stats, rhs)
         case src.Block(stats, expr) =>
           (stats, expr)
@@ -367,7 +367,7 @@ private[core] trait ANF extends Common {
     /** Extractor for arbitrary comprehensions. */
     private object Comprehension {
       def unapply(tree: u.Tree): Option[u.Tree] = tree match {
-        case src.DefCall(Some(_), method, _, _*)
+        case src.DefCall(Some(_), method, _, _)
           if ComprehensionSyntax.ops(method) => Some(tree)
         case _ => None
       }

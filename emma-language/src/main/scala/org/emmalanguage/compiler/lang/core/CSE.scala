@@ -58,19 +58,19 @@ private[core] trait CSE extends Common {
           vals.foldLeft(revTab, aliases, Vector.empty[u.ValDef]) {
             case ((tab, dict, uniq), value) => value match {
               // Propagate copies.
-              case core.ValDef(x, rhs @ core.Ref(y), _) =>
+              case core.ValDef(x, rhs @ core.Ref(y)) =>
                 val alias = dict.getOrElse(y, rhs)
                 (tab, dict + (x -> alias), uniq)
 
               // Propagate constants.
-              case core.ValDef(x, core.Atomic(rhs), _) =>
+              case core.ValDef(x, core.Atomic(rhs)) =>
                 (tab, dict + (x -> rhs), uniq)
 
               // Eliminate subexpressions.
-              case core.ValDef(x, rhs, flags) =>
+              case core.ValDef(x, rhs) =>
                 // Transform the RHS before hashing.
                 val xRhs = transform(tab, dict)(rhs)
-                val xVal = core.ValDef(x, xRhs, flags)
+                val xVal = core.ValDef(x, xRhs)
                 val hKey = new HKey(hash(xRhs, dict), xVal)
                 tab.get(hKey) match {
                   // Subexpression already seen, add new alias.
@@ -83,7 +83,7 @@ private[core] trait CSE extends Common {
             // Transform the rest of the let block.
             val xform = transform(tab, dict)
             val xDefs = defs.map(xform).asInstanceOf[Seq[u.DefDef]]
-            core.Let(uniq: _*)(xDefs: _*)(xform(expr))
+            core.Let(uniq, xDefs, xform(expr))
           }
       }.andThen(_.tree)
 
@@ -107,8 +107,8 @@ private[core] trait CSE extends Common {
       // If the hashes are equal, check for alpha equivalence.
       override def equals(obj: Any): Boolean = obj match {
         case that: HKey if this.hash == that.hash =>
-          val core.ValDef(_, rhs, flags) = that.value
-          alphaEq(value, core.ValDef(lhs, rhs, flags)).isGood
+          val core.ValDef(_, rhs) = that.value
+          alphaEq(value, core.ValDef(lhs, rhs)).isGood
         case _ => false
       }
     }
@@ -183,15 +183,15 @@ private[core] trait CSE extends Common {
 
       // Definitions
 
-      override def valDef(lhs: u.TermSymbol, rhs: Hash, flags: u.FlagSet): Hash = Hash(lhs) {
-        tab => combine(seed.valDef)(tab(lhs), hashType(lhs.info), rhs(tab), hashFlags(flags))
+      override def valDef(lhs: u.TermSymbol, rhs: Hash): Hash = Hash(lhs) {
+        tab => combine(seed.valDef)(tab(lhs), hashType(lhs.info), rhs(tab))
       }
 
-      override def parDef(lhs: u.TermSymbol, rhs: Hash, flags: u.FlagSet): Hash = Hash(lhs) {
-        tab => combine(seed.parDef)(tab(lhs), hashType(lhs.info), rhs(tab), hashFlags(flags))
+      override def parDef(lhs: u.TermSymbol, rhs: Hash): Hash = Hash(lhs) {
+        tab => combine(seed.parDef)(tab(lhs), hashType(lhs.info), rhs(tab))
       }
 
-      override def defDef(sym: u.MethodSymbol, flags: u.FlagSet,
+      override def defDef(sym: u.MethodSymbol,
         tparams: S[u.TypeSymbol], paramss: SS[Hash], body: Hash)
         : Hash = Hash(sym) { tab =>
           val hSym = tab(sym)
@@ -199,7 +199,7 @@ private[core] trait CSE extends Common {
           val hTparams = tparams.size.hashCode
           val alphaTab = tab ++ genTab(paramss.flatten, hSym)
           val hParamss = hashSS(alphaTab, paramss)
-          combine(seed.defDef)(hSym, hTparams, hParamss, body(alphaTab), hashFlags(flags))
+          combine(seed.defDef)(hSym, hTparams, hParamss, body(alphaTab))
         }
 
       // Other
@@ -293,12 +293,6 @@ private[core] trait CSE extends Common {
       private def genTab(hs: S[Hash], seed: Int = seqSeed): Seq[(u.Symbol, Int)] = {
         val rand = new Random(seed)
         hs.map(_.sym) zip Stream.continually(rand.nextInt())
-      }
-
-      /** Calculates the hash of a FlagSet, with disregarding the "synthetic" flag and compiler internal flags. */
-      private def hashFlags(flags: u.FlagSet): Int = {
-        val mods = u.Modifiers(flags)
-        MurmurHash3.setHash(FlagsNoSynthetic filter mods.hasFlag)
       }
     }
   }
