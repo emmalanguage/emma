@@ -20,7 +20,8 @@ import compiler.Common
 
 import shapeless._
 
-import scala.collection.generic.{CanBuildFrom, FilterMonadic}
+import scala.collection.generic.CanBuildFrom
+import scala.collection.generic.FilterMonadic
 
 /** Eliminates `foreach` calls and replaces them with `while` loops. */
 private[source] trait Foreach2Loop extends Common {
@@ -57,7 +58,7 @@ private[source] trait Foreach2Loop extends Common {
         .transformWith {
           case Attr.all(
             src.DefCall(xsOpt @ Some(xs), method, _,
-              Seq(src.Lambda(_, Seq(src.ParDef(arg, _, _)), body))),
+              Seq(Seq(src.Lambda(_, Seq(src.ParDef(arg, _)), body)))),
             _, owner :: _, muts :: defs :: _
           ) if {
             def isForeach = method == FM.foreach || method == api.Sym.foreach
@@ -73,8 +74,9 @@ private[source] trait Foreach2Loop extends Common {
             val cbf = inferImplicit(CBF).map(unQualifyStatics)
             assert(cbf.isDefined, s"Cannot infer implicit value of type `$CBF`")
             val x = api.ParSym(owner, fresh("x"), arg.info)
-            val id = src.Lambda(x)(api.ParRef(x))
-            (Some(src.DefCall(xsOpt)(FM.map, arg.info, Repr)(Seq(id), Seq(cbf.get))), Repr)
+            val id = src.Lambda(Seq(x), api.ParRef(x))
+            val call = src.DefCall(xsOpt, FM.map, Seq(arg.info, Repr), Seq(Seq(id), Seq(cbf.get)))
+            (Some(call), Repr)
           } else (xsOpt, xs.tpe)
           val toIter = tpe.member(api.TermName("toIterator")).asTerm
           val Iter = toIter.infoIn(tpe).finalResultType
@@ -82,19 +84,21 @@ private[source] trait Foreach2Loop extends Common {
           val target = Some(src.ValRef(iter))
           val hasNext = Iter.member(api.TermName("hasNext")).asTerm
           val next = Iter.member(api.TermName("next")).asTerm
-          val mut = src.VarMut(elem, src.DefCall(target)(next)(Seq.empty))
+          val mut = src.VarMut(elem, src.DefCall(target, next, Seq(), Seq(Seq.empty)))
 
           src.Block(
-            src.ValDef(iter,
-              src.DefCall(trav)(toIter)()),
-            src.VarDef(elem,
-              src.DefCall(Some(src.Lit(null)))(asInst, arg.info)()),
-            src.While(
-              src.DefCall(target)(hasNext)(),
-              api.Tree.rename(arg -> elem)(body match {
-                case src.Block(stats, expr) => src.Block(mut +: stats: _*)(expr)
-                case _ => src.Block(mut, body)()
-              })))()
+            Seq(
+              src.ValDef(iter,
+                src.DefCall(trav, toIter)),
+              src.VarDef(elem,
+                src.DefCall(Some(src.Lit(null)), asInst, Seq(arg.info))),
+              src.While(
+                src.DefCall(target, hasNext),
+                api.Tree.rename(Seq(arg -> elem))(body match {
+                  case src.Block(stats, expr) => src.Block(mut +: stats, expr)
+                  case _ => src.Block(Seq(mut), body)
+                }))),
+            api.Term.unit)
       }.andThen(_.tree)
     }
 

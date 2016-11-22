@@ -75,7 +75,7 @@ private[source] trait SourceValidate extends Common {
       }
 
       lazy val ParDef: Validator = {
-        case src.ParDef(_, src.Empty(_), _) => pass
+        case src.ParDef(_, src.Empty(_)) => pass
       }
 
       // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ private[source] trait SourceValidate extends Common {
       }
 
       lazy val ValDef: Validator = {
-        case src.ValDef(_, rhs, _) =>
+        case src.ValDef(_, rhs) =>
           rhs is Term otherwise s"Invalid ${src.ValDef} RHS"
       }
 
@@ -100,7 +100,7 @@ private[source] trait SourceValidate extends Common {
       }
 
       lazy val VarDef: Validator = {
-        case src.VarDef(_, rhs, _) =>
+        case src.VarDef(_, rhs) =>
           rhs is Term otherwise s"Invalid ${src.VarDef} RHS"
       }
 
@@ -137,9 +137,9 @@ private[source] trait SourceValidate extends Common {
       // ---------------------------------------------------------------------------
 
       lazy val DefCall: Validator = {
-        case src.DefCall(None, _, _, argss@_*) =>
+        case src.DefCall(None, _, _, argss) =>
           all (argss.flatten) are Term otherwise s"Invalid ${src.DefCall} argument"
-        case src.DefCall(Some(target), _, _, argss@_*) => {
+        case src.DefCall(Some(target), _, _, argss) => {
           target is Term otherwise s"Invalid ${src.DefCall} target"
         } and {
           all (argss.flatten) are Term otherwise s"Invalid ${src.DefCall} argument"
@@ -175,7 +175,7 @@ private[source] trait SourceValidate extends Common {
 
       lazy val Pat: Validator = {
         lazy val Alt: Validator = {
-          case api.PatAlt(alternatives@_*) =>
+          case api.PatAlt(alternatives) =>
             all (alternatives) are Pat otherwise s"Invalid ${api.PatAlt} alternative"
         }
 
@@ -202,7 +202,7 @@ private[source] trait SourceValidate extends Common {
         }
 
         lazy val Extr: Validator = {
-          case api.PatExtr(_, args@_*) =>
+          case api.PatExtr(_, args) =>
             all (args) are Pat otherwise s"Invalid ${api.PatExtr} argument"
         }
 
@@ -227,7 +227,7 @@ private[source] trait SourceValidate extends Common {
       }
 
       lazy val PatMat: Validator = {
-        case src.PatMat(target, cases@_*) => {
+        case src.PatMat(target, cases) => {
           target is Term otherwise s"Invalid ${src.PatMat} target"
         } and {
           all (cases) are PatCase otherwise s"Invalid ${src.PatMat} case"
@@ -255,7 +255,7 @@ private[source] trait SourceValidate extends Common {
       }
 
       lazy val Inst: Validator = {
-        case src.Inst(_, _, argss@_*) =>
+        case src.Inst(_, _, argss) =>
           all (argss.flatten) are Term otherwise s"Invalid ${src.Inst} argument"
       }
 

@@ -56,7 +56,7 @@ private[source] trait PatternMatching extends Common {
     lazy val destruct: u.Tree => u.Tree =
       api.BottomUp.withOwner.transformWith {
         case Attr.inh(
-          mat @ src.PatMat(target, src.PatCase(pat, src.Empty(_), body), _*),
+          mat @ src.PatMat(target, Seq(src.PatCase(pat, src.Empty(_), body), _*)),
           owner :: _) =>
 
           // remove potential type ascriptions from the target
@@ -71,13 +71,13 @@ private[source] trait PatternMatching extends Common {
             case src.Ref(lhs) =>
               val vals = irrefutable(src.Ref(lhs), pat)
               assert(vals.isDefined, s"Unsupported refutable pattern matching:\n${api.Tree.show(mat)}")
-              src.Block(vals.get: _*)(body)
+              src.Block(vals.get, body)
             case _ =>
               val nme = api.TermName.fresh("x")
               val lhs = api.ValSym(owner, nme, tpe)
               val vals = irrefutable(src.Ref(lhs), pat)
               assert(vals.isDefined, s"Unsupported refutable pattern matching:\n${api.Tree.show(mat)}")
-              src.Block(src.ValDef(lhs, unascr) +: vals.get: _*)(body)
+              src.Block(src.ValDef(lhs, unascr) +: vals.get, body)
           }
       }.andThen(_.tree)
 
@@ -100,7 +100,7 @@ private[source] trait PatternMatching extends Common {
     private def irrefutable(target: u.Tree, pattern: u.Tree): Option[Seq[u.ValDef]] =
       pattern match {
         // Alternative patterns don't allow binding
-        case api.PatAlt(alternatives@_*) =>
+        case api.PatAlt(alternatives) =>
           alternatives.flatMap(irrefutable(target, _)).headOption
 
         case api.PatAny(_) =>
@@ -113,14 +113,14 @@ private[source] trait PatternMatching extends Common {
           lazy val value = src.ValDef(lhs, target)
           irrefutable(src.ValRef(lhs), pat).map(value +: _)
 
-        case extr @ api.PatExtr(_, args@_*)
+        case extr @ api.PatExtr(_, args)
           if is.caseClass(extr.tpe) && extr.tpe.typeSymbol == target.tpe.typeSymbol =>
             val init = extr.tpe.typeSymbol.asClass.primaryConstructor
             val getters = for {
               param <- init.infoIn(target.tpe).paramLists.head
               api.DefSym(accessor) <- target.tpe.member(param.name).alternatives
               if accessor.isGetter
-            } yield src.DefCall(Some(target))(accessor)()
+            } yield src.DefCall(Some(target), accessor)
             val patterns = getters zip args map (irrefutable _).tupled
             if (patterns.exists(_.isEmpty)) None
             else Some(patterns.flatMap(_.get))
