@@ -81,7 +81,7 @@ private[backend] trait Order extends Common {
 
       // The Set of symbols of ValDefs of functions
       val funs = tree.collect {
-        case core.ValDef(sym, _, _) if isFun(sym) => sym
+        case core.ValDef(sym, _) if isFun(sym) => sym
       }.toSet
 
       val Attr.all(_, topLevRefs :: combRefs :: _, _, funGraph :: _) =
@@ -93,7 +93,7 @@ private[backend] trait Order extends Common {
         })
         // funGraph
         .synthesizeWith[Map[u.TermSymbol, Set[u.TermSymbol]]] {
-          case Attr.syn(api.ValDef(sym, rhs, _), _ :: funRefs :: _) if isFun(sym) =>
+          case Attr.syn(api.ValDef(sym, rhs), _ :: funRefs :: _) if isFun(sym) =>
             Map(sym -> funRefs.toSet)
         }
         // Am I inside a lambda?
@@ -102,7 +102,7 @@ private[backend] trait Order extends Common {
         }(Monoids.disj)
         // Am I inside a combinator call?
         .inherit {
-          case api.DefCall(_, method, _, _*) if combinators contains method => true
+          case api.DefCall(_, method, _, _) if combinators contains method => true
         }(Monoids.disj)
         // Funs given as arguments to combinators (combRefs)
         .accumulateWith[Vector[u.TermSymbol]] {
@@ -146,8 +146,8 @@ private[backend] trait Order extends Common {
       // Note that if a fun is defined inside a high lambda, then it won't be in highFuns,
       // because of the refresh. But this is not a problem, since isHighContext will be inherited to it anyway.
       val isHighContext: u.Tree =?> Boolean = {
-        case core.ValDef(sym, _, _) if highFuns contains sym => true
-        case api.DefCall(_, method, _, _*) if combinators contains method => true
+        case core.ValDef(sym, _) if highFuns contains sym => true
+        case api.DefCall(_, method, _, _) if combinators contains method => true
       }
 
       val disambiguatedTree = api.TopDown
@@ -155,14 +155,14 @@ private[backend] trait Order extends Common {
         .transformWith {
 
           case Attr.none(core.Let(vals, defs, expr)) =>
-            val newVals = vals flatMap { case v@core.ValDef(lhs, rhs, flags) =>
+            val newVals = vals flatMap { case v@core.ValDef(lhs, rhs) =>
               if (ambiguousFuns contains lhs) {
-                Seq(v, core.ValDef(ambiguousFunMap(lhs), api.Tree.refreshAll(rhs), flags))
+                Seq(v, core.ValDef(ambiguousFunMap(lhs), api.Tree.refreshAll(rhs)))
               } else {
                 Seq(v)
               }
             }
-            core.Let(newVals: _*)(defs: _*)(expr)
+            core.Let(newVals, defs, expr)
 
           case Attr.inh(api.ValRef(sym), true :: _) if ambiguousFuns(sym) => api.ValRef(ambiguousFunMap(sym))
 
