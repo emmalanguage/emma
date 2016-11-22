@@ -19,12 +19,10 @@ package compiler.lang.core
 import compiler.Common
 import compiler.lang.source.Source
 
-
 /** Core language pickling. */
 private[core] trait Pickling extends Common {
   this: Source with Core =>
 
-  import Core.{Lang => core}
   import UniverseImplicits._
 
   private[core] object Pickle {
@@ -122,13 +120,13 @@ private[core] trait Pickling extends Common {
           printSym(target)
 
         // Definitions
-        def valDef(lhs: u.TermSymbol, rhs: D, flags: u.FlagSet): D = offset =>
+        def valDef(lhs: u.TermSymbol, rhs: D): D = offset =>
           s"val ${printSym(lhs)} = ${rhs(offset)}"
 
-        def parDef(lhs: u.TermSymbol, rhs: D, flags: u.FlagSet): D = offset =>
+        def parDef(lhs: u.TermSymbol, rhs: D): D = offset =>
           s"${printSym(lhs)}: ${printTpe(lhs.info)}"
 
-        def defDef(sym: u.MethodSymbol, flags: u.FlagSet, tparams: S[u.TypeSymbol], paramss: SS[D], body: D): D =
+        def defDef(sym: u.MethodSymbol, tparams: S[u.TypeSymbol], paramss: SS[D], body: D): D =
           offset => {
             val tparamsStr = tparams match {
               case Nil => (tparams map printSym).mkString(", ")

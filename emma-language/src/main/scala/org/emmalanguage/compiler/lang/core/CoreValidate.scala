@@ -78,7 +78,7 @@ private[core] trait CoreValidate extends Common {
       }
 
       lazy val ParDef: Validator = {
-        case core.ParDef(_, core.Empty(_), _) => pass
+        case core.ParDef(_, core.Empty(_)) => pass
       }
 
       // ---------------------------------------------------------------------------
@@ -90,7 +90,7 @@ private[core] trait CoreValidate extends Common {
       }
 
       lazy val ValDef: Validator = {
-        case core.ValDef(_, rhs, _) =>
+        case core.ValDef(_, rhs) =>
           rhs is Term otherwise s"Invalid ${core.ValDef} RHS"
       }
 
@@ -122,9 +122,9 @@ private[core] trait CoreValidate extends Common {
       // ---------------------------------------------------------------------------
 
       lazy val DefCall: Validator = {
-        case core.DefCall(None, _, _, argss@_*) =>
+        case core.DefCall(None, _, _, argss) =>
           all (argss.flatten) are Atomic otherwise s"Invalid ${core.DefCall} argument"
-        case core.DefCall(Some(target), _, _, argss@_*) => {
+        case core.DefCall(Some(target), _, _, argss) => {
           target is Atomic otherwise s"Invalid ${core.DefCall} target"
         } and {
           all (argss.flatten) are Atomic otherwise s"Invalid ${core.DefCall} argument"
@@ -132,7 +132,7 @@ private[core] trait CoreValidate extends Common {
       }
 
       lazy val DefDef: Validator = {
-        case core.DefDef(_, _, _, paramss, body) => {
+        case core.DefDef(_, _, paramss, body) => {
           all (paramss.flatten) are ParDef otherwise s"Invalid ${core.DefDef} parameter"
         } and {
           body is Let otherwise s"Invalid ${core.DefDef} body"
@@ -159,7 +159,7 @@ private[core] trait CoreValidate extends Common {
       }
 
       lazy val Inst: Validator = {
-        case core.Inst(_, _, argss@_*) =>
+        case core.Inst(_, _, argss) =>
           all (argss.flatten) are Atomic otherwise s"Invalid ${core.Inst} argument"
       }
 

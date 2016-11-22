@@ -245,9 +245,9 @@ trait Core extends Common
           // Other
           case Lang.TypeAscr(target, tpe) =>
             a.typeAscr(fold(target), tpe)
-          case Lang.DefCall(target, method, targs, argss@_*) =>
+          case Lang.DefCall(target, method, targs, argss) =>
             a.defCall(target map fold, method, targs, argss map (_ map fold))
-          case Lang.Inst(target, targs, argss@_*) =>
+          case Lang.Inst(target, targs, argss) =>
             a.inst(target, targs, argss map (_ map fold))
           case Lang.Lambda(sym, params, body) =>
             a.lambda(sym, params map fold, fold(body))

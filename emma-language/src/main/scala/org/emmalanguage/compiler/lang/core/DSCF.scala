@@ -29,13 +29,11 @@ import scala.collection.SortedSet
 private[core] trait DSCF extends Common {
   this: Source with Core =>
 
+  import u.Flag._
   import Monoids._
-
+  import UniverseImplicits._
   import Core.{Lang => core}
   import Source.{Lang => src}
-  import UniverseImplicits._
-  import api.TermName.fresh
-  import u.Flag._
 
   /**
    * Converts the control-flow in input tree in ANF in the direct-style.
@@ -110,26 +108,26 @@ private[core] trait DSCF extends Common {
         case src.VarMut(lhs, _) => lhs
       })
       // Accumulate all parameters (to refresh them at the end).
-      .accumulate { case core.DefDef(_, _, _, paramss, _) =>
-        (for (core.ParDef(lhs, _, _) <- paramss.flatten) yield lhs).toVector
+      .accumulate { case core.DefDef(_, _, paramss, _) =>
+        (for (core.ParDef(lhs, _) <- paramss.flatten) yield lhs).toVector
       }
       // Accumulate the two latest values of a variable in a map per owner.
       .accumulateWith[Trace] {
-        case Attr.inh(src.VarDef(lhs, _, _), owners :: _) =>
+        case Attr.inh(src.VarDef(lhs, _), owners :: _) =>
           trace(lhs, owners)
         case Attr.inh(src.VarMut(lhs, _), owners :: _) =>
           trace(lhs, owners)
-        case Attr.none(core.DefDef(method, _, _, paramss, _)) =>
-          (for (core.ParDef(lhs, _, _) <- paramss.flatten)
+        case Attr.none(core.DefDef(method, _, paramss, _)) =>
+          (for (core.ParDef(lhs, _) <- paramss.flatten)
             yield (method, lhs.name) -> List(lhs)).toMap
       } (Monoids.merge(Monoids.sliding(2)))
       .transformWithSyn {
         // Linear transformations
-        case Attr(src.VarDef(lhs, rhs, _), trace :: _, owners :: _, _) =>
+        case Attr(src.VarDef(lhs, rhs), trace :: _, owners :: _, _) =>
           core.ValDef(latest(lhs, owners, trace).head, rhs)
         case Attr(src.VarMut(lhs, rhs), trace :: _, owners :: _, _) =>
           val curr #:: prev #:: _ = latest(lhs, owners, trace)
-          core.ValDef(curr, api.Tree.rename(lhs -> prev)(rhs))
+          core.ValDef(curr, api.Tree.rename(Seq(lhs -> prev))(rhs))
         case Attr(src.VarRef(lhs), trace :: _, owners :: _, _) =>
           core.BindingRef(latest(lhs, owners, trace).head)
 
@@ -142,7 +140,7 @@ private[core] trait DSCF extends Common {
           def mods(tree: u.Tree) = syn(tree) match { case ms :: ds :: _ => ms diff ds.keySet }
 
           stats.span { // Split blocks
-            case src.ValDef(_, src.Branch(_, _, _), _) => false
+            case src.ValDef(_, src.Branch(_, _, _)) => false
             case src.Loop(_, _) => false
             case _ => true
           } match {
@@ -153,54 +151,49 @@ private[core] trait DSCF extends Common {
             case (prefix, Seq(
               core.ValDef(x,
                 branch @ core.Branch(_,
-                  core.Atomic(_) | core.DefCall(_, _, _, _*),
-                  core.Atomic(_) | core.DefCall(_, _, _, _*)), _),
+                  core.Atomic(_) | core.DefCall(_, _, _, _),
+                  core.Atomic(_) | core.DefCall(_, _, _, _))),
               suffix@_*)) if (expr match {
                 case core.ValRef(`x`) => true
                 case _ => false
               }) && suffix.forall {
-                case core.DefDef(_, _, _, _, _) => true
+                case core.DefDef(_, _, _, _) => true
                 case _ => false
               } => block
 
             // If branch
-            case (prefix, Seq(src.ValDef(lhs, src.Branch(cond, thn, els), _), suffix@_*)) =>
+            case (prefix, Seq(src.ValDef(lhs, src.Branch(cond, thn, els)), suffix@_*)) =>
               // Suffix
-              val sufBody = src.Block(suffix: _*)(expr)
+              val sufBody = src.Block(suffix, expr)
               val sufUses = uses(sufBody)
               val sufVars = (mods(thn) | mods(els)) & sufUses.keySet
               val sufArgs = varArgs(sufVars)
               val usesRes = sufUses(lhs) > 0
               val sufPars = varPars(sufVars) ++ (if (usesRes) Some(lhs) else None)
-              val sufMeth = api.DefSym(owner, fresh("suffix"))()(sufPars)(tpe)
+              val sufName = api.TermName.fresh("suffix")
+              val sufMeth = api.DefSym(owner, sufName, pss = Seq(sufPars), res = tpe)
 
               def branchDefCall(name: u.TermName, body: u.Tree) = body match {
                 case src.Block(branchStats, branchExpr) =>
-                  val meth = api.DefSym(owner, name)()(Seq.empty)(tpe)
-                  val call = core.DefCall()(meth)(Seq.empty)
+                  val meth = api.DefSym(owner, name, pss = Seq(Seq.empty), res = tpe)
+                  val call = core.DefCall(None, meth, argss = Seq(Seq.empty))
                   val args = sufArgs ++ (if (usesRes) Some(branchExpr) else None)
-                  val defn = core.DefDef(meth)()(Seq.empty)(
-                    src.Block(branchStats: _*)(
-                      core.DefCall()(sufMeth)(args)))
+                  val defn = core.DefDef(meth, paramss = Seq(Seq.empty),
+                    body = src.Block(branchStats, core.DefCall(None, sufMeth, argss = Seq(args))))
                   (Some(defn), call)
 
                 case _ =>
-                  val call = core.DefCall()(sufMeth)(sufArgs ++
-                    (if (usesRes) Some(body) else None))
+                  val call = core.DefCall(None, sufMeth,
+                    argss = Seq(sufArgs ++ (if (usesRes) Some(body) else None)))
                   (None, call)
               }
 
               // Branches
-              val (thnDefn, thnCall) = branchDefCall(fresh("then"), thn)
-              val (elsDefn, elsCall) = branchDefCall(fresh("else"), els)
-
-              src.Block(
-                prefix ++ Seq(
-                  thnDefn,
-                  elsDefn,
-                  Some(core.DefDef(sufMeth)()(sufPars)(sufBody))
-                ).flatten: _*)(
-                core.Branch(cond, thnCall, elsCall))
+              val (thnDefn, thnCall) = branchDefCall(api.TermName.fresh("then"), thn)
+              val (elsDefn, elsCall) = branchDefCall(api.TermName.fresh("else"), els)
+              src.Block(prefix ++ Seq(thnDefn, elsDefn,
+                Some(core.DefDef(sufMeth, paramss = Seq(sufPars), body = sufBody))
+              ).flatten, core.Branch(cond, thnCall, elsCall))
 
             // While loop
             case (prefix, Seq(loop @ src.While(cond, src.Block(bodyStats, _)), suffix@_*)) =>
@@ -210,31 +203,34 @@ private[core] trait DSCF extends Common {
               val loopVars = mods(loop)
               val loopArgs = varArgs(loopVars)
               val loopPars = varPars(loopVars)
-              val loopMeth = api.DefSym(owner, api.TermName.fresh("while"))()(loopPars)(tpe)
-              val loopCall = core.DefCall()(loopMeth)(loopArgs)
+              val loopName = api.TermName.fresh("while")
+              val loopMeth = api.DefSym(owner, loopName, pss = Seq(loopPars), res = tpe)
+              val loopCall = core.DefCall(None, loopMeth, argss = Seq(loopArgs))
 
               // Suffix
-              val sufBody = src.Block(suffix: _*)(expr)
+              val sufBody = src.Block(suffix, expr)
               val sufVars = loopVars & uses(sufBody).keySet
               val sufArgs = if (sufVars.size == loopVars.size) loopArgs else varArgs(sufVars)
               val sufPars = if (sufVars.size == loopVars.size) loopPars else varPars(sufVars)
-              val sufMeth = api.DefSym(loopMeth, fresh("suffix"))()(sufPars)(tpe)
+              val sufName = api.TermName.fresh("suffix")
+              val sufMeth = api.DefSym(loopMeth, sufName, pss = Seq(sufPars), res = tpe)
 
               // Loop body
-              val bodyVars = loopVars & uses(src.Block(bodyStats: _*)()).keySet
+              val bodyVars = loopVars & uses(src.Block(bodyStats)).keySet
               val bodyArgs = if (bodyVars.size == loopVars.size) loopArgs else varArgs(bodyVars)
               val bodyPars = if (bodyVars.size == loopVars.size) loopPars else varPars(bodyVars)
-              val bodyMeth = api.DefSym(loopMeth, fresh("body"))()(bodyPars)(tpe)
+              val bodyName = api.TermName.fresh("body")
+              val bodyMeth = api.DefSym(loopMeth, bodyName, pss = Seq(bodyPars), res = tpe)
 
               src.Block(prefix :+
-                core.DefDef(loopMeth)()(loopPars)(
-                  src.Block(condStats ++ Seq(
-                    core.DefDef(bodyMeth)()(bodyPars)(
-                      src.Block(bodyStats: _*)(loopCall)),
-                    core.DefDef(sufMeth)()(sufPars)(sufBody)): _*)(
+                core.DefDef(loopMeth, paramss = Seq(loopPars),
+                  body = src.Block(condStats ++ Seq(
+                    core.DefDef(bodyMeth, paramss = Seq(bodyPars),
+                      body = src.Block(bodyStats, loopCall)),
+                    core.DefDef(sufMeth, paramss = Seq(sufPars), body = sufBody)),
                     core.Branch(condExpr,
-                      core.DefCall()(bodyMeth)(bodyArgs),
-                      core.DefCall()(sufMeth)(sufArgs)))): _*)(
+                      core.DefCall(None, bodyMeth, argss = Seq(bodyArgs)),
+                      core.DefCall(None, sufMeth, argss = Seq(sufArgs))))),
                 loopCall)
 
             // Do-while loop
@@ -245,24 +241,25 @@ private[core] trait DSCF extends Common {
               val loopVars = mods(loop)
               val loopArgs = varArgs(loopVars)
               val loopPars = varPars(loopVars)
-              val loopMeth = api.DefSym(owner, api.TermName.fresh("doWhile"))()(loopPars)(tpe)
-              val loopCall = core.DefCall()(loopMeth)(loopArgs)
+              val loopName = api.TermName.fresh("doWhile")
+              val loopMeth = api.DefSym(owner, loopName, pss = Seq(loopPars), res = tpe)
+              val loopCall = core.DefCall(None, loopMeth, argss = Seq(loopArgs))
 
               // Suffix
-              val sufMeth = api.DefSym(loopMeth, fresh("suffix"))()(Seq.empty)(tpe)
+              val sufName = api.TermName.fresh("suffix")
+              val sufMeth = api.DefSym(loopMeth, sufName, pss = Seq(Seq.empty), res = tpe)
 
               src.Block(prefix :+
-                core.DefDef(loopMeth)()(loopPars)(
-                  src.Block(bodyStats ++ condStats ++ Seq(
-                    core.DefDef(sufMeth)()(Seq.empty)(
-                      src.Block(suffix: _*)(expr))): _*)(
-                    core.Branch(condExpr,
-                      loopCall,
-                      core.DefCall()(sufMeth)(Seq.empty)))): _*)(
+                core.DefDef(loopMeth, paramss = Seq(loopPars),
+                  body = src.Block(bodyStats ++ condStats ++ Seq(
+                    core.DefDef(sufMeth, paramss = Seq(Seq.empty),
+                      body = src.Block(suffix, expr))),
+                    core.Branch(condExpr, loopCall,
+                      core.DefCall(None, sufMeth, argss = Seq(Seq.empty))))),
                 loopCall)
           }
       }.andThen { case Attr.acc(tree, _ :: params :: _) =>
-        api.Tree.refresh(params: _*)(tree) // Refresh all DefDef parameters.
+        api.Tree.refresh(params)(tree) // Refresh all DefDef parameters.
       }
 
     // ---------------
