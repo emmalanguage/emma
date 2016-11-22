@@ -350,13 +350,13 @@ class LibSupportSpec extends LibSupportExamples {
 
   private def lambdaVertex(name: String, tree: u.Tree): CG.Lambda =
     tree.collect({
-      case ValDef(sym, lambda@Lambda(_, _, _), _)
+      case ValDef(sym, lambda@Lambda(_, _, _))
         if sym.name == u.TermName(name) => CG.Lambda(sym, lambda)
     }).head
 
   private def funparVertex(name: String, tree: u.Tree): CG.FunPar =
     tree.collect({
-      case ParDef(sym, _, _)
+      case ParDef(sym, _)
         if sym.name == u.TermName(name) => CG.FunPar(sym)
     }).head
 
