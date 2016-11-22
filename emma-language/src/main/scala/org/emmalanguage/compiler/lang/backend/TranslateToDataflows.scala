@@ -62,7 +62,7 @@ private[backend] trait TranslateToDataflows extends Common {
       val moduleSymbols = Set(API.bagModuleSymbol, ComprehensionCombinators.module)
       val methods = API.sourceOps ++ ComprehensionCombinators.ops
       val staticCallsChanged = withHighContext.transformWith {
-        case Attr.inh(core.DefCall(Some(api.ModuleRef(moduleSymbol)), method, targs, argss@_*), false :: _)
+        case Attr.inh(core.DefCall(Some(api.ModuleRef(moduleSymbol)), method, targs, argss), false :: _)
           if moduleSymbols(moduleSymbol) && methods(method) =>
           val targetMethodDecl = backendSymbol.info.decl(method.name)
           assert(targetMethodDecl.alternatives.size == 1,
