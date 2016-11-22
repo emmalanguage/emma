@@ -104,18 +104,18 @@ private[compiler] trait CFG extends Common {
       val cs = new Comprehension.Syntax(monad)
       api.TopDown.withBindUses.withBindDefs
         .inherit { // Enclosing comprehension / lambda, if any
-          case core.ValDef(lhs, cs.Comprehension(_, _), _) => Option(lhs)
-          case core.ValDef(lhs, core.Lambda(_, _, _), _) => Option(lhs)
+          case core.ValDef(lhs, cs.Comprehension(_, _)) => Option(lhs)
+          case core.ValDef(lhs, core.Lambda(_, _, _)) => Option(lhs)
         } (Monoids.right(None)).inherit { // Accessible methods
           case core.Let(_, defs, _) => defs.map(_.symbol.asTerm).toSet
         }.accumulateWith[Map[u.TermSymbol, Set[u.TermSymbol]]] { // Dataflow edges
-          case Attr.syn(core.ValDef(lhs, _, _), defs :: uses :: _) =>
+          case Attr.syn(core.ValDef(lhs, _), defs :: uses :: _) =>
             Map(lhs -> uses.keySet.diff(defs.keySet).filterNot(_.isStatic))
         }.accumulateWith[Map[u.TermSymbol, Set[u.TermSymbol]]] { // Contains edges
-          case Attr.inh(core.ValDef(lhs, _, _), _ :: Some(encl) :: _) =>
+          case Attr.inh(core.ValDef(lhs, _), _ :: Some(encl) :: _) =>
             Map(encl -> Set(lhs))
         } (Monoids.merge).accumulateWith[Map[u.TermSymbol, Vector[u.Tree]]] { // Phi choices
-          case Attr.inh(core.DefCall(None, method, _, argss@_*), local :: _) if local(method) => {
+          case Attr.inh(core.DefCall(None, method, _, argss), local :: _) if local(method) => {
             for ((param, arg) <- method.paramLists.flatten zip argss.flatten)
               yield param.asTerm -> Vector(arg)
           }.toMap
@@ -127,9 +127,9 @@ private[compiler] trait CFG extends Common {
 
             val values = defs.collect {
               case value @ (api.ValSym(_), _) => value
-              case (_, core.ParDef(lhs, _, flags)) if choices.contains(lhs) =>
-                val rhs = core.DefCall(module)(phi, lhs.info)(choices(lhs))
-                lhs -> core.ParDef(lhs, rhs, flags)
+              case (_, core.ParDef(lhs, _)) if choices.contains(lhs) =>
+                val rhs = core.DefCall(module, phi, Seq(lhs.info), Seq(choices(lhs)))
+                lhs -> core.ParDef(lhs, rhs)
             }
 
             Graph(uses, values, dataFlow, nest)
