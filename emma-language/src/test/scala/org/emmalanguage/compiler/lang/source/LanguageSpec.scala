@@ -164,8 +164,8 @@ class LanguageSpec extends BaseCompilerSpec {
     }
 
     "can be constructed and destructed" in {
-      examples foreach { case x @ src.BindingDef(lhs, rhs, flags) =>
-        x shouldBe alphaEqTo (src.BindingDef(lhs, rhs, flags))
+      examples foreach { case x @ src.BindingDef(lhs, rhs) =>
+        x shouldBe alphaEqTo (src.BindingDef(lhs, rhs))
       }
     }
   }
@@ -199,8 +199,8 @@ class LanguageSpec extends BaseCompilerSpec {
     }
 
     "can be constructed and destructed" in {
-      examples foreach { case x @ src.DefCall(target, method, targs, argss@_*) =>
-        x shouldBe alphaEqTo (src.DefCall(target)(method, targs: _*)(argss: _*))
+      examples foreach { case x @ src.DefCall(target, method, targs, argss) =>
+        x shouldBe alphaEqTo (src.DefCall(target, method, targs, argss))
       }
     }
   }
@@ -297,10 +297,10 @@ class LanguageSpec extends BaseCompilerSpec {
     }
 
     "can be constructed and destructed" in {
-      examples foreach { case x @ src.PatMat(target, cases@_*) =>
+      examples foreach { case x @ src.PatMat(target, cases) =>
         x shouldBe alphaEqTo (src.PatMat(target, cases.map {
           case src.PatCase(pat, guard, body) => src.PatCase(pat, guard, body)
-        }: _*))
+        }))
       }
     }
   }
@@ -327,7 +327,7 @@ class LanguageSpec extends BaseCompilerSpec {
 
     "can be constructed and destructed" in {
       examples foreach { case x @ src.Block(stats, expr) =>
-        x shouldBe alphaEqTo (src.Block(stats: _*)(expr))
+        x shouldBe alphaEqTo (src.Block(stats, expr))
       }
     }
   }
@@ -373,8 +373,8 @@ class LanguageSpec extends BaseCompilerSpec {
     }
 
     "can be constructed and destructed" in {
-      examples foreach { case x @ src.Inst(clazz, targs, argss@_*) =>
-        x shouldBe alphaEqTo (src.Inst(clazz, targs: _*)(argss: _*))
+      examples foreach { case x @ src.Inst(clazz, targs, argss) =>
+        x shouldBe alphaEqTo (src.Inst(clazz, targs, argss))
       }
     }
   }
@@ -400,7 +400,7 @@ class LanguageSpec extends BaseCompilerSpec {
 
     "can be constructed and destructed" in {
       examples foreach { case x @ src.Lambda(_, params, body) =>
-        x shouldBe alphaEqTo (src.Lambda(params.map(_.symbol.asTerm): _*)(body))
+        x shouldBe alphaEqTo (src.Lambda(params.map(_.symbol.asTerm), body))
       }
     }
   }

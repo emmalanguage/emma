@@ -25,8 +25,9 @@ import org.scalatest.junit.JUnitRunner
 @RunWith(classOf[JUnitRunner])
 class PatternMatchingSpec extends BaseCompilerSpec {
 
-  import compiler._
   import PatternMatchingSpec._
+
+  import compiler._
 
   val destructPatternMatchesPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true, withPre = false)(

@@ -191,14 +191,14 @@ trait Source extends Common
 
         def matchingImplicits(args: List[u.Tree], params: List[u.Symbol]): Boolean = {
           // args binds to implicit parameter lsit
-          lazy val isImplicit = params.forall(is(u.Flag.IMPLICIT))
+          lazy val isImplicit = params.forall(is(u.Flag.IMPLICIT, _))
           // args exclusively from the given `types` list
           lazy val isMatching = args.forall(arg => types.exists(_ =:= arg.tpe.typeConstructor))
           args.size == params.size && args.nonEmpty && isImplicit && isMatching
         }
 
         def unapply(tree: u.Tree): Option[u.Tree] = tree match {
-          case api.DefCall(target, method, targs, argss@_*) =>
+          case api.DefCall(target, method, targs, argss) =>
             argss.map(_.toList).toList zip method.paramLists match {
               case _ :+ Tuple2(args, params) if matchingImplicits(args, params) => Some(tree)
               case _ => None
@@ -208,8 +208,8 @@ trait Source extends Common
       }
 
       api.TopDown.transform {
-        case Matching(api.DefCall(target, method, targs, argss@_*)) =>
-          api.DefCall(target)(method, targs: _*)(argss.init: _*)
+        case Matching(api.DefCall(target, method, targs, argss)) =>
+          api.DefCall(target, method, targs, argss.init)
       }.andThen(_.tree)
     }
   }
