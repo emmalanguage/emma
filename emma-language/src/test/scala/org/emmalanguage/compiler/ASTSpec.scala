@@ -37,7 +37,7 @@ class ASTSpec extends BaseCompilerSpec {
 
       for ((dim, exp) <- Seq(Seq(1), Seq(1, 2), Seq(1, 2, 3)) zip examples) {
         val argss = Seq(dim.map(api.Lit(_)), Seq(api.Lit('!')))
-        val act = api.DefCall(Some(seq))(fill, api.Type.char)(argss: _*)
+        val act = api.DefCall(Some(seq), fill, Seq(api.Type.char), argss)
         act shouldBe alphaEqTo (exp)
       }
     }
