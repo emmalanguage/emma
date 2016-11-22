@@ -167,15 +167,15 @@ private[comprehension] trait Normalize extends Common {
             val hd = capture(self, dep, prune = false)(Head(innerHd))
             val flat = Core.inlineLetExprs(Comprehension(qs, hd))
             val (flatVals, flatExpr) = encl match {
-              case encl @ core.ValDef(lhs, _, flg) =>
+              case encl @ core.ValDef(lhs, _) =>
                 val (enclPre, enclSuf) = splitAt(encl)(vals)
-                val flatVal = core.ValDef(lhs, flat, flg)
+                val flatVal = core.ValDef(lhs, flat)
                 (Seq.concat(enclPre, enclVals, indep, Seq(flatVal), enclSuf), expr)
               case _ =>
                 (Seq.concat(vals, enclVals, indep), flat)
             }
 
-            core.Let(flatVals: _*)(defs: _*)(flatExpr)
+            core.Let(flatVals, defs, flatExpr)
         }
 
       case _ => None
@@ -191,8 +191,8 @@ private[comprehension] trait Normalize extends Common {
         case _ if tree.tpe.dealias.widen.typeConstructor =:= Monad =>
           val tpe = api.Type.arg(1, tree.tpe.dealias.widen)
           val lhs = api.TermSym.free(api.TermName.fresh("x"), tpe)
-          val rhs = core.Let()()(tree)
-          val ref = core.Let()()(api.TermRef(lhs))
+          val rhs = core.Let(expr = tree)
+          val ref = core.Let(expr = api.TermRef(lhs))
           Some(Seq(Generator(lhs, rhs)), Head(ref))
         case _ => None
       }
@@ -202,7 +202,7 @@ private[comprehension] trait Normalize extends Common {
     private def split(vals: Seq[u.ValDef], qs: Seq[u.Tree]): (Seq[u.ValDef], Seq[u.ValDef]) = {
       // symbols referenced in vals
       val refMap = (for {
-        core.ValDef(lhs, rhs, _) <- vals
+        core.ValDef(lhs, rhs) <- vals
       } yield lhs -> api.Tree.refs(rhs)).toMap
 
       // symbols defined in vals which directly depend on symbols from qs
@@ -309,7 +309,7 @@ private[comprehension] trait Normalize extends Common {
      */
     private[Normalize] val UnnestGenerator: Rule = {
       case Attr.syn(core.Let(vals, defs, expr), valUses :: _) => (for {
-        yVal @ core.ValDef(y, Comprehension(yQs, Head(yHd)), _) <- vals.view
+        yVal @ core.ValDef(y, Comprehension(yQs, Head(yHd))) <- vals.view
         if valUses(y) == 1
         (yPre, ySuf) = splitAt(yVal)(vals)
         enclosing = ySuf.view.map(x => x -> x.rhs) :+ (expr -> expr)
@@ -318,23 +318,23 @@ private[comprehension] trait Normalize extends Common {
       } yield {
         // define a substitution function `· [ $hd2 \ x ]`
         val subst = yHd match {
-          case core.Let(Seq(), Seq(), wrapped) => api.Tree.subst(x -> wrapped)
-          case _ => api.Tree.subst(x -> yHd)
+          case core.Let(Seq(), Seq(), wrapped) => api.Tree.subst(Seq(x -> wrapped))
+          case _ => api.Tree.subst(Seq(x -> yHd))
         }
 
         val (genPre, genSuf) = splitAt[u.Tree](gen)(enclQs)
         val qs = Seq.concat(genPre, yQs, genSuf map subst)
         val flat = Comprehension(qs, Head(asLet(subst(enclHd))))
         val (flatVals, flatExpr) = encl match {
-          case encl @ core.ValDef(lhs, _, flg) =>
+          case encl @ core.ValDef(lhs, _) =>
             val (enclPre, enclSuf) = splitAt(encl)(ySuf)
-            val flatVal = core.ValDef(lhs, flat, flg)
+            val flatVal = core.ValDef(lhs, flat)
             (Seq.concat(yPre, enclPre, Seq(flatVal), enclSuf), expr)
           case _ =>
             (Seq.concat(yPre, ySuf), flat)
         }
 
-        core.Let(flatVals: _*)(defs: _*)(flatExpr)
+        core.Let(flatVals, defs, flatExpr)
       }).headOption
 
       case _ => None

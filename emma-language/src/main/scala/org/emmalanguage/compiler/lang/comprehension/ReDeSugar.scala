@@ -57,21 +57,21 @@ private[comprehension] trait ReDeSugar extends Common {
 
         lambdas.get(f).map { case (arg, body) =>
           val sym = api.Sym.With(arg)(flg = u.NoFlags).asTerm
-          sym -> api.Tree.rename(arg -> sym)(body)
+          sym -> api.Tree.rename(Seq(arg -> sym))(body)
         }.getOrElse {
           val nme = api.TermName.fresh("x")
           val tpe = f.info.dealias.widen.typeArgs.last
           val arg = api.ValSym(owner, nme, tpe)
           val tgt = Some(core.ValRef(f))
           val app = f.info.member(api.TermName.app).asMethod
-          arg -> core.DefCall(tgt)(app)(Seq(core.ValRef(arg)))
+          arg -> core.DefCall(tgt, app, Seq(), Seq(Seq(core.ValRef(arg))))
         }
       }
 
       api.TopDown.withOwner
         // Accumulate a LHS -> (arg, body) Map from lambdas
         .accumulate(Attr.group {
-          case core.ValDef(lhs, core.Lambda(_, Seq(core.ParDef(arg, _, _)), body), _) =>
+          case core.ValDef(lhs, core.Lambda(_, Seq(core.ParDef(arg, _)), body)) =>
             lhs -> (arg, body)
         })
         // Re-sugar comprehensions
