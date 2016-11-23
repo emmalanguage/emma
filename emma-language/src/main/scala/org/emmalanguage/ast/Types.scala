@@ -81,30 +81,37 @@ trait Types { this: AST =>
     object TypeSym extends Node {
 
       /**
-       * Creates a new type symbol.
-       * @param owner The symbol of the enclosing named entity where this type is defined.
-       * @param name The name of this type (will be encoded).
-       * @param flags Any additional modifiers (e.g. deferred).
+       * Creates a type-checked type symbol.
+       * @param own The symbol of the enclosing named entity where this type is defined.
+       * @param nme The name of this type (will be encoded).
+       * @param flg Any (optional) modifiers (e.g. final, abstract).
        * @param pos The (optional) source code position where this type is defined.
+       * @param ans Any (optional) annotations associated with this type.
        * @return A new type symbol.
        */
-      def apply(owner: u.Symbol, name: u.TypeName,
-        flags: u.FlagSet = u.NoFlags,
-        pos: u.Position = u.NoPosition
+      def apply(own: u.Symbol, nme: u.TypeName,
+        flg: u.FlagSet         = u.NoFlags,
+        pos: u.Position        = u.NoPosition,
+        ans: Seq[u.Annotation] = Seq.empty
       ): u.TypeSymbol = {
-        assert(is.defined(name), s"$this name is not defined")
-        newTypeSymbol(owner, TypeName(name), pos, flags)
+        assert(is.defined(nme), s"$this name is not defined")
+        val sym = newTypeSymbol(own, TypeName(nme), pos, flg)
+        setAnnotations(sym, ans.toList)
       }
 
       /** Creates a free type symbol (without an owner). */
-      def free(name: u.TypeName, flags: u.FlagSet = u.NoFlags): u.FreeTypeSymbol = {
+      def free(name: u.TypeName,
+        flg: u.FlagSet         = u.NoFlags,
+        ans: Seq[u.Annotation] = Seq.empty
+      ): u.FreeTypeSymbol = {
         assert(is.defined(name), s"$this name is not defined")
-        internal.newFreeType(TypeName(name).toString, flags, null)
+        val free = internal.newFreeType(TypeName(name).toString, flg, null)
+        setAnnotations(free, ans.toList)
       }
 
       /** Creates a free type symbol with the same attributes as the `original`. */
       def free(original: u.TypeSymbol): u.FreeTypeSymbol =
-        free(TypeName(original), flags(original))
+        free(TypeName(original), flags(original), original.annotations)
 
       /** Creates a fresh type symbol with the same attributes as the `original`. */
       def fresh(original: u.TypeSymbol): u.TypeSymbol =
@@ -161,10 +168,10 @@ trait Types { this: AST =>
 
       // Other
       lazy val none = u.NoType
-      lazy val loop = Type.method()(Seq.empty)(unit)
+      lazy val loop = Type.method(pss = Seq(Seq.empty))
 
       /** Applies a type `constructor` to the supplied arguments. */
-      def apply(constructor: u.Type, args: u.Type*): u.Type =
+      def apply(constructor: u.Type, args: Seq[u.Type]): u.Type =
         if (args.isEmpty) constructor else {
           assert(is.defined(constructor),    "Type constructor is not defined")
           assert(constructor.takesTypeArgs, s"Type $constructor takes no type arguments")
@@ -187,34 +194,34 @@ trait Types { this: AST =>
       /** Reifies a type of kind `* -> *`. */
       def kind1[F[_]](arg: u.Type)
         (implicit tag: u.TypeTag[F[Nothing]]): u.Type
-        = apply(apply(tag).typeConstructor, arg)
+        = apply(apply(tag).typeConstructor, Seq(arg))
 
       /** Reifies a type of kind `* -> * -> *`. */
       def kind2[F[_, _]](arg1: u.Type, arg2: u.Type)
         (implicit tag: u.TypeTag[F[Nothing, Nothing]]): u.Type
-        = apply(apply(tag).typeConstructor, arg1, arg2)
+        = apply(apply(tag).typeConstructor, Seq(arg1, arg2))
 
       /** Reifies a type of kind `* -> * -> * -> *`. */
       def kind3[F[_, _, _]](arg1: u.Type, arg2: u.Type, arg3: u.Type)
         (implicit tag: u.TypeTag[F[Nothing, Nothing, Nothing]]): u.Type
-        = apply(apply(tag).typeConstructor, arg1, arg2, arg3)
+        = apply(apply(tag).typeConstructor, Seq(arg1, arg2, arg3))
 
       /** Creates a new array type. */
       def arrayOf(elements: u.Type): u.Type =
         kind1[Array](elements)
 
       /** Creates a new function (lambda) type. */
-      def fun(params: u.Type*)(result: u.Type): u.Type = {
+      def fun(params: Seq[u.Type] = Seq.empty, result: u.Type = Type.unit): u.Type = {
         val n = params.size
         assert(n <= Max.FunParams, s"Cannot have $n > ${Max.FunParams} lambda parameters")
-        apply(Sym.fun(n).toTypeConstructor, params :+ result: _*)
+        apply(Sym.fun(n).toTypeConstructor, params :+ result)
       }
 
       /** Creates a new tuple type. */
-      def tupleOf(first: u.Type, rest: u.Type*): u.Type = {
-        val n = rest.size + 1
+      def tupleOf(elements: Seq[u.Type]): u.Type = {
+        val n = elements.size
         assert(n <= Max.TupleElems, s"Cannot have $n > ${Max.TupleElems} tuple elements")
-        apply(Sym.tuple(n).toTypeConstructor, first +: rest: _*)
+        apply(Sym.tuple(n).toTypeConstructor, elements)
       }
 
       /** Extracts the i-th (1-based) type argument of the applied type `tpe`. */
@@ -226,31 +233,35 @@ trait Types { this: AST =>
       }
 
       /** Returns the least upper bound of all types. */
-      def lub(types: u.Type*): u.Type =
+      def lub(types: Seq[u.Type]): u.Type =
         u.lub(types.toList)
 
       /** Returns the weak (considering coercions) least upper bound of all types. */
-      def weakLub(types: u.Type*): u.Type =
+      def weakLub(types: Seq[u.Type]): u.Type =
         if (types.isEmpty) nothing
         else types.reduce { (T, U) =>
           if (T weak_<:< U) U
           else if (U weak_<:< T) T
-          else lub(T, U)
+          else lub(Seq(T, U))
         }
 
       /** Returns a new method type (possibly generic and with multiple arg lists). */
-      def method(tparams: u.TypeSymbol*)(paramss: Seq[u.TermSymbol]*)(result: u.Type): u.Type = {
-        assert(tparams.forall(is.defined),         "Not all method type params are defined")
-        assert(paramss.flatten.forall(is.defined), "Not all method param types are defined")
-        assert(is.defined(result),                 "Undefined method return type")
-        val mono = if (paramss.isEmpty) {
-          nullaryMethodType(result.dealias.widen)
-        } else paramss.foldRight(result.dealias.widen) {
+      def method(
+        tps: Seq[u.TypeSymbol]      = Seq.empty,
+        pss: Seq[Seq[u.TermSymbol]] = Seq.empty,
+        res:  u.Type                = Type.unit
+      ): u.Type = {
+        assert(tps.forall(is.defined),         "Not all method type params are defined")
+        assert(pss.flatten.forall(is.defined), "Not all method param types are defined")
+        assert(is.defined(res),                "Undefined method return type")
+        val mono = if (pss.isEmpty) {
+          nullaryMethodType(res.dealias.widen)
+        } else pss.foldRight(res.dealias.widen) {
           (params, ret) => methodType(params.toList, ret)
         }
 
-        if (tparams.isEmpty) mono
-        else polyType(tparams.toList, mono)
+        if (tps.isEmpty) mono
+        else polyType(tps.toList, mono)
       }
 
       /** Extracts the type signature of `sym` (with an optional target), if any. */

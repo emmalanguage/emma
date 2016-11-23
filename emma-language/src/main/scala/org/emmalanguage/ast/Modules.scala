@@ -31,22 +31,25 @@ trait Modules { this: AST =>
     object ModuleSym extends Node {
 
       /**
-       * Creates a new module symbol.
-       * @param owner The enclosing named entity where this module is defined.
-       * @param name The name of this module (will be encoded).
-       * @param flags Any additional modifiers (cannot be mutable or parameter).
+       * Creates a type-checked module symbol.
+       * @param own The enclosing named entity where this module is defined.
+       * @param nme The name of this module (will be encoded).
+       * @param flg Any (optional) modifiers (e.g. case, final, implicit).
        * @param pos The (optional) source code position where this module is defined.
-       * @return A new module symbol.
+       * @param ans Any (optional) annotations associated with this module.
+       * @return A new type-checked module symbol.
        */
-      def apply(owner: u.Symbol, name: u.TermName,
-        flags: u.FlagSet = u.NoFlags,
-        pos: u.Position = u.NoPosition
+      def apply(own: u.Symbol, nme: u.TermName,
+        flg: u.FlagSet         = u.NoFlags,
+        pos: u.Position        = u.NoPosition,
+        ans: Seq[u.Annotation] = Seq.empty
       ): u.ModuleSymbol = {
-        assert(is.defined(name),        s"$this name is not defined")
-        assert(are.not(MUTABLE)(flags), s"$this $name cannot be mutable")
-        assert(are.not(PARAM)(flags),   s"$this $name cannot be a parameter")
-        val mod = newModuleAndClassSymbol(owner, TermName(name), pos, flags)._1
+        assert(is.defined(nme),       s"$this name is not defined")
+        assert(are.not(MUTABLE, flg), s"$this $nme cannot be mutable")
+        assert(are.not(PARAM, flg),   s"$this $nme cannot be a parameter")
+        val mod = newModuleAndClassSymbol(own, TermName(nme), pos, flg)._1
         setInfo(mod, singleType(u.NoPrefix, mod))
+        setAnnotations(mod, ans.toList)
       }
 
       def unapply(sym: u.ModuleSymbol): Option[u.ModuleSymbol] =

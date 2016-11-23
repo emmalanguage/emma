@@ -43,20 +43,22 @@ trait Variables { this: AST =>
     object VarSym extends Node {
 
       /**
-       * Creates a new variable symbol.
-       * @param owner The enclosing named entity where this variable is defined.
-       * @param name The name of this variable (will be encoded).
+       * Creates a type-checked variable symbol.
+       * @param own The enclosing named entity where this variable is defined.
+       * @param nme The name of this variable (will be encoded).
        * @param tpe The type of this variable (will be dealiased and widened).
-       * @param flags Any additional modifiers (cannot be parameter).
+       * @param flg Any (optional) modifiers (e.g. private, protected).
        * @param pos The (optional) source code position where this variable is defined.
-       * @return A new variable symbol.
+       * @param ans Any (optional) annotations associated with this variable.
+       * @return A new type-checked variable symbol.
        */
-      def apply(owner: u.Symbol, name: u.TermName, tpe: u.Type,
-        flags: u.FlagSet = u.NoFlags,
-        pos: u.Position = u.NoPosition
+      def apply(own: u.Symbol, nme: u.TermName, tpe: u.Type,
+        flg: u.FlagSet         = u.NoFlags,
+        pos: u.Position        = u.NoPosition,
+        ans: Seq[u.Annotation] = Seq.empty
       ): u.TermSymbol = {
-        assert(are.not(PARAM)(flags), s"$this $name cannot be a parameter")
-        BindingSym(owner, name, tpe, flags | MUTABLE, pos)
+        assert(are.not(PARAM, flg), s"$this $nme cannot be a parameter")
+        BindingSym(own, nme, tpe, flg | MUTABLE, pos, ans)
       }
 
       def unapply(sym: u.TermSymbol): Option[u.TermSymbol] =
@@ -90,18 +92,17 @@ trait Variables { this: AST =>
        * Creates a type-checked variable definition.
        * @param lhs Must be a variable symbol.
        * @param rhs The initial value of this variable, owned by `lhs`.
-       * @param flags Any additional modifiers (cannot be parameter).
-       * @return `..flags var lhs = rhs`.
+       * @return `var lhs = rhs`.
        */
-      def apply(lhs: u.TermSymbol, rhs: u.Tree, flags: u.FlagSet = u.NoFlags): u.ValDef = {
+      def apply(lhs: u.TermSymbol, rhs: u.Tree): u.ValDef = {
         assert(is.defined(lhs),  s"$this LHS is not defined")
         assert(is.variable(lhs), s"$this LHS $lhs is not a variable")
         assert(is.defined(rhs),  s"$this RHS is not defined")
-        BindingDef(lhs, rhs, flags)
+        BindingDef(lhs, rhs)
       }
 
-      def unapply(bind: u.ValDef): Option[(u.TermSymbol, u.Tree, u.FlagSet)] = bind match {
-        case BindingDef(VarSym(lhs), rhs, flags) => Some(lhs, rhs, flags)
+      def unapply(bind: u.ValDef): Option[(u.TermSymbol, u.Tree)] = bind match {
+        case BindingDef(VarSym(lhs), rhs) => Some(lhs, rhs)
         case _ => None
       }
     }

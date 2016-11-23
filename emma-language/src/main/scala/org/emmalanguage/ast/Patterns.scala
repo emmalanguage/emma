@@ -42,16 +42,16 @@ trait Patterns { this: AST =>
        * @param alternatives Must be at least 2 valid patterns.
        * @return `case alternatives(0) | alternatives(1) | ... =>`
        */
-      def apply(alternatives: u.Tree*): u.Alternative = {
+      def apply(alternatives: Seq[u.Tree]): u.Alternative = {
         assert(alternatives.size >= 2,     s"$this requires at least 2 alternatives")
         assert(are.patterns(alternatives), s"Not all $this alternatives are valid patterns")
         assert(have.tpe(alternatives),     s"Not all $this alternatives have a type")
-        val tpe = Type.lub(alternatives.map(_.tpe): _*)
+        val tpe = Type.lub(alternatives.map(_.tpe))
         val alt = u.Alternative(alternatives.toList)
         setType(alt, tpe)
       }
 
-      def unapplySeq(alt: u.Alternative): Option[Seq[u.Tree]] =
+      def unapply(alt: u.Alternative): Option[Seq[u.Tree]] =
         Some(alt.trees)
     }
 
@@ -73,15 +73,15 @@ trait Patterns { this: AST =>
 
       /**
        * Creates a type-checked typed pattern.
-       * @param target Must be a valid pattern.
+       * @param tgt Must be a valid pattern.
        * @param tpe Must be a valid type.
        * @return `case target: tpe =>`
        */
-      def apply(target: u.Tree, tpe: u.Type): u.Typed = {
-        assert(is.defined(target), s"$this target is not defined")
-        assert(is.pattern(target), s"$this target is not a pattern:\n${Tree.show(target)}")
-        assert(is.defined(tpe),    s"$this type $tpe is not defined")
-        val tpd = u.Typed(target, TypeQuote(tpe))
+      def apply(tgt: u.Tree, tpe: u.Type): u.Typed = {
+        assert(is.defined(tgt), s"$this target is not defined")
+        assert(is.pattern(tgt), s"$this target is not a pattern:\n${Tree.show(tgt)}")
+        assert(is.defined(tpe), s"$this type $tpe is not defined")
+        val tpd = u.Typed(tgt, TypeQuote(tpe))
         setType(tpd, tpe)
       }
 
@@ -151,7 +151,7 @@ trait Patterns { this: AST =>
     /** Extractor patterns (case class destructors and `unapply` calls). */
     // TODO: Implement `apply()` constructor
     object PatExtr extends Node {
-      def unapplySeq(extr: u.Tree): Option[(u.Tree, Seq[u.Tree])] = extr match {
+      def unapply(extr: u.Tree): Option[(u.Tree, Seq[u.Tree])] = extr match {
         case app @ u.Apply(tpt @ TypeQuote(_), args)
           if is.caseClass(app.tpe) => Some(tpt, args)
         case u.UnApply(unApp, args) => Some(unApp, args)
@@ -167,7 +167,7 @@ trait Patterns { this: AST =>
 
       /**
        * Creates a type-checked qualified pattern.
-       * @param qual Must be a valid qualifier.
+       * @param qual   Must be a valid qualifier.
        * @param member Must be a stable member of `qual`.
        * @return `case target.member =>`
        */
@@ -260,18 +260,19 @@ trait Patterns { this: AST =>
        * @param cases The rest cases of the pattern `match`.
        * @return `sel match { cse; ..cases }`.
        */
-      def apply(sel: u.Tree, cases: u.CaseDef*): u.Match = {
+      def apply(sel: u.Tree, cases: Seq[u.CaseDef]): u.Match = {
+        assert(cases.nonEmpty,     s"$this requires at least one case")
         assert(is.defined(sel),    s"$this selector is not defined")
         assert(is.term(sel),       s"$this selector is not a term: ${Tree.show(sel)}")
         assert(has.tpe(sel),       s"$this selector has no type:\n${Tree.showTypes(sel)}")
         assert(are.defined(cases), s"Not all $this cases are defined")
         assert(have.tpe(cases),    s"Not all $this cases have types")
         val mat = u.Match(sel, cases.toList)
-        val tpe = Type.lub(cases.map(_.tpe): _*)
+        val tpe = Type.lub(cases.map(_.tpe))
         setType(mat, tpe)
       }
 
-      def unapplySeq(mat: u.Match): Option[(u.Tree, Seq[u.CaseDef])] = mat match {
+      def unapply(mat: u.Match): Option[(u.Tree, Seq[u.CaseDef])] = mat match {
         case u.Match(Term(target), cases) => Some(target, cases)
         case _ => None
       }

@@ -134,13 +134,16 @@ trait Core extends Common
       object Let {
         import ComprehensionSyntax.head
 
-        def apply(vals: u.ValDef*)(defs: u.DefDef*)(expr: u.Tree = Term.unit): u.Block =
-          api.Block(vals ++ defs: _*)(expr)
+        def apply(
+          vals: Seq[u.ValDef] = Seq.empty,
+          defs: Seq[u.DefDef] = Seq.empty,
+          expr: u.Tree        = Term.unit
+        ): u.Block = api.Block(vals ++ defs, expr)
 
         def unapply(let: u.Block): Option[(Seq[u.ValDef], Seq[u.DefDef], u.Tree)] = let match {
           case api.Block(stats, Term(expr)) if !isComprehensionHead(expr) => for {
-            (vals, stats) <- collectWhile(stats) { case value @ ValDef(_, _, _) => value }
-            (defs, Seq()) <- collectWhile(stats) { case defn @ DefDef(_, _, _, _, _) => defn }
+            (vals, stats) <- collectWhile(stats) { case value @ ValDef(_, _) => value }
+            (defs, Seq()) <- collectWhile(stats) { case defn @ DefDef(_, _, _, _) => defn }
           } yield (vals, defs, expr)
 
           case _ => None
@@ -177,9 +180,9 @@ trait Core extends Common
       def moduleRef(target: u.ModuleSymbol): A
 
       // Definitions
-      def valDef(lhs: u.TermSymbol, rhs: A, flags: u.FlagSet): A
-      def parDef(lhs: u.TermSymbol, rhs: A, flags: u.FlagSet): A
-      def defDef(sym: u.MethodSymbol, flags: u.FlagSet, tparams: S[u.TypeSymbol], paramss: SS[A], body: A): A
+      def valDef(lhs: u.TermSymbol, rhs: A): A
+      def parDef(lhs: u.TermSymbol, rhs: A): A
+      def defDef(sym: u.MethodSymbol, tparams: S[u.TypeSymbol], paramss: SS[A], body: A): A
 
       // Other
       def typeAscr(target: A, tpe: u.Type): A
@@ -232,12 +235,12 @@ trait Core extends Common
             a.bindingRef(sym)
 
           // Definitions
-          case Lang.ValDef(lhs, rhs, flags) =>
-            a.valDef(lhs, fold(rhs), flags)
-          case Lang.ParDef(lhs, rhs, flags) =>
-            a.parDef(lhs, fold(rhs), flags)
-          case Lang.DefDef(sym, flags, tparams, paramss, body) =>
-            a.defDef(sym, flags, tparams, paramss map (_ map fold), fold(body))
+          case Lang.ValDef(lhs, rhs) =>
+            a.valDef(lhs, fold(rhs))
+          case Lang.ParDef(lhs, rhs) =>
+            a.parDef(lhs, fold(rhs))
+          case Lang.DefDef(sym, tparams, paramss, body) =>
+            a.defDef(sym, tparams, paramss map (_ map fold), fold(body))
 
           // Other
           case Lang.TypeAscr(target, tpe) =>
@@ -329,38 +332,6 @@ trait Core extends Common
 
     /** Delegates to [[Trampoline.transform]] */
     lazy val trampoline = Trampoline.transform
-
-    // -------------------------------------------------------------------------
-    // Meta Information API
-    // -------------------------------------------------------------------------
-
-    /**
-     * Provides commonly used meta-information for an input [[u.Tree]].
-     *
-     * == Assumptions ==
-     * - The input [[u.Tree]] is in LNF form.
-     */
-    class Meta(tree: u.Tree) {
-
-      val defs: Map[u.Symbol, u.ValDef] = tree.collect {
-        case value@Lang.ParDef(symbol, _, _) =>
-          symbol -> value
-      }.toMap
-
-      val uses: Map[u.Symbol, Int] =
-        tree.collect { case id: u.Ident => id.symbol }
-          .view.groupBy(identity)
-          .mapValues(_.size)
-          .withDefaultValue(0)
-
-      @inline
-      def valdef(sym: u.Symbol): Option[u.ValDef] =
-        defs.get(sym)
-
-      @inline
-      def valuses(sym: u.Symbol): Int =
-        uses(sym)
-    }
 
     // -------------------------------------------------------------------------
     // Miscellaneous utilities

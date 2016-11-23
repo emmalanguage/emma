@@ -209,7 +209,7 @@ trait Trees { this: AST =>
 
       /** Returns a set of all binding definitions in `tree`. */
       def bindings(tree: u.Tree): Set[u.TermSymbol] =
-        tree.collect { case BindingDef(lhs, _, _) => lhs }.toSet
+        tree.collect { case BindingDef(lhs, _) => lhs }.toSet
 
       /** Returns a set of all lambdas in `tree`. */
       def lambdas(tree: u.Tree): Set[u.TermSymbol] =
@@ -231,15 +231,15 @@ trait Trees { this: AST =>
 
       /** Returns a set of all parameter definitions in `tree`. */
       def parameters(tree: u.Tree): Set[u.TermSymbol] =
-        tree.collect { case ParDef(lhs, _, _) => lhs }.toSet
+        tree.collect { case ParDef(lhs, _) => lhs }.toSet
 
       /** Returns a set of all value (`val`) definitions in `tree`. */
       def values(tree: u.Tree): Set[u.TermSymbol] =
-        tree.collect { case ValDef(lhs, _, _) => lhs }.toSet
+        tree.collect { case ValDef(lhs, _) => lhs }.toSet
 
       /** Returns a set of all variable (`var`) definitions in `tree`. */
       def variables(tree: u.Tree): Set[u.TermSymbol] =
-        tree.collect { case VarDef(lhs, _, _) => lhs }.toSet
+        tree.collect { case VarDef(lhs, _) => lhs }.toSet
 
       /** Returns a fully-qualified reference to `target` (must be static). */
       def resolveStatic(target: u.Symbol): u.Tree = {
@@ -251,37 +251,37 @@ trait Trees { this: AST =>
       }
 
       /** Inlines a sequence of binding definitions in a tree by replacing LHS with RHS. */
-      def inline(bindings: u.ValDef*): u.Tree => u.Tree =
+      def inline(bindings: Seq[u.ValDef]): u.Tree => u.Tree =
         if (bindings.isEmpty) identity else {
           val dict = bindings.map(bind => bind.symbol -> bind.rhs).toMap
           TopDown.break.transform {
-            case BindingDef(lhs, _, _) if dict contains lhs => Term.unit
+            case BindingDef(lhs, _) if dict contains lhs => Term.unit
             case TermRef(target) if dict contains target => dict(target)
           }.andThen(_.tree)
         }
 
       /** Replaces a sequence of `symbols` in a tree with freshly named ones. */
-      def refresh(symbols: u.Symbol*): u.Tree => u.Tree =
-        rename(symbols.map(sym => sym -> {
+      def refresh(symbols: Seq[u.Symbol]): u.Tree => u.Tree =
+        rename(for (sym <- symbols) yield sym -> {
           if (sym.isTerm) TermSym.fresh(sym.asTerm)
           else TypeSym.fresh(sym.asType)
-        }): _*)
+        })
 
       /** Refreshes all `symbols` in a tree that are defined within (including lambdas). */
       def refreshAll(tree: u.Tree): u.Tree =
         refresh(tree.collect {
           case TermDef(sym) => sym
           case Lambda(fun, _, _) => fun
-        }: _*)(tree)
+        })(tree)
 
       /**
        * Replaces a sequence of term symbols with references to their `aliases`.
        * Dependent symbols are changed as well, such as children symbols with renamed owners,
        * and method symbols with renamed (type) parameters.
        */
-      def rename(aliases: (u.Symbol, u.Symbol)*): u.Tree => u.Tree =
+      def rename(aliases: Seq[(u.Symbol, u.Symbol)]): u.Tree => u.Tree =
         if (aliases.isEmpty) identity
-        else tree => Sym.subst(Owner.of(tree), aliases: _*)(tree)
+        else tree => Sym.subst(Owner.of(tree), aliases)(tree)
 
       /** Replaces occurrences of `find` with `repl` in a tree. */
       def replace(find: u.Tree, repl: u.Tree): u.Tree => u.Tree =
@@ -290,7 +290,7 @@ trait Trees { this: AST =>
         }.andThen(_.tree)
 
       /** Substitutes a sequence of symbol-value pairs in a tree. */
-      def subst(kvs: (u.Symbol, u.Tree)*): u.Tree => u.Tree =
+      def subst(kvs: Seq[(u.Symbol, u.Tree)]): u.Tree => u.Tree =
         subst(kvs.toMap)
 
       /** Substitutes a dictionary of symbol-value pairs in a tree. */
@@ -307,7 +307,7 @@ trait Trees { this: AST =>
             dict(target)
           }.andThen { case Attr.acc(tree, defs :: _) =>
             val capture = for (d <- defs if closure(d.name)) yield d
-            refresh(capture.toSeq: _*)(tree)
+            refresh(capture.toSeq)(tree)
           }
         }
 
@@ -315,7 +315,7 @@ trait Trees { this: AST =>
       def curry(lambda: u.Function): u.Function = lambda match {
         case Lambda(_, params, body) =>
           if (params.size <= 1) lambda else params.foldRight(body) {
-            case (ParDef(lhs, _, _), rhs) => Lambda(lhs)(rhs)
+            case (ParDef(lhs, _), rhs) => Lambda(Seq(lhs), rhs)
           }.asInstanceOf[u.Function]
       }
 
