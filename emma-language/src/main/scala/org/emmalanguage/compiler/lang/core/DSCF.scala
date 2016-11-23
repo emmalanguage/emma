@@ -137,7 +137,7 @@ private[core] trait DSCF extends Common {
         case Attr(block @ src.Block(stats, expr), _, owners :: _, syn) =>
           // Extract required attributes
           val tpe = expr.tpe
-          val owner = owners.lastOption.getOrElse(enclosingOwner)
+          val owner = owners.lastOption.getOrElse(api.Owner.encl)
           def uses(tree: u.Tree) = syn(tree)(Nat._2)
           def mods(tree: u.Tree) = syn(tree) match { case ms :: ds :: _ => ms diff ds.keySet }
 
@@ -277,7 +277,7 @@ private[core] trait DSCF extends Common {
 
     /** Creates a fresh symbol for the latest value of a variable. */
     private def trace(variable: u.TermSymbol, owners: Seq[u.Symbol]) = {
-      val owner = owners.lastOption.getOrElse(enclosingOwner)
+      val owner = owners.lastOption.getOrElse(api.Owner.encl)
       val name = api.TermName.fresh(variable)
       val value = api.ValSym(owner, name, variable.info)
       Map((owner, variable.name) -> List(value.asTerm))
@@ -285,7 +285,7 @@ private[core] trait DSCF extends Common {
 
     /** Returns a stream of the latest values of a variable. */
     private def latest(variable: u.TermSymbol, owners: Seq[u.Symbol], trace: Trace) =
-      (enclosingOwner +: owners).reverseIterator
+      (api.Owner.encl +: owners).reverseIterator
         .flatMap(trace(_, variable.name).reverse).toStream
 
     /** Variables -> Parameters mapping. */

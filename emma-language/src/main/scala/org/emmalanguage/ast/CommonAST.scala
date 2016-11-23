@@ -37,20 +37,30 @@ trait CommonAST {
   type =?>[-A, +B] = PartialFunction[A, B]
 
   import universe._
+  import definitions._
   import internal._
-  import u.Flag._
+  import Flag._
+
+  // ----------------------------------------------------------------------------------------------
+  // Abstract methods
+  // ----------------------------------------------------------------------------------------------
 
   private[ast] def freshNameSuffix: Char
 
-  // ---------------------------
-  // Parsing and type-checking
-  // ---------------------------
+  /** Returns `tpt` with its original field set. */
+  private[ast] def setOriginal(tpt: TypeTree, original: Tree): TypeTree
 
-  /** Raises an error and terminates compilation. */
-  def abort(msg: String, pos: Position = NoPosition): Nothing
+  /** Returns the enclosing named entity (class, method, value, etc). */
+  def enclosingOwner: Symbol
+
+  /** Infers an implicit value from the enclosing context (if possible). */
+  def inferImplicit(tpe: Type): Option[Tree]
 
   /** Raises a compiler warning. */
   def warning(msg: String, pos: Position = NoPosition): Unit
+
+  /** Raises an error and terminates compilation. */
+  def abort(msg: String, pos: Position = NoPosition): Nothing
 
   /** Parses a snippet of source code and returns the AST. */
   def parse(code: String): Tree
@@ -69,22 +79,19 @@ trait CommonAST {
    */
   def eval[T](code: Tree): T
 
-  // ------------------------------
-  // Abstract getters and setters
-  // ------------------------------
-
-  /** Returns the enclosing named entity (class, method, value, etc). */
-  def enclosingOwner: Symbol
-
-  /** Infers an implicit value from the enclosing context (if possible). */
-  def inferImplicit(tpe: Type): Option[Tree]
-
-  /** Returns `tpt` with its original field set. */
-  private[ast] def setOriginal(tpt: TypeTree, original: Tree): TypeTree
-
-  // ---------------
+  // ----------------------------------------------------------------------------------------------
   // Property checks
-  // ---------------
+  // ----------------------------------------------------------------------------------------------
+
+  /** Constant limits. */
+  object Max {
+
+    /** Maximum number of lambda arguments. */
+    val FunParams = FunctionClass.seq.size
+
+    /** Maximum number of tuple elements. */
+    val TupleElems = TupleClass.seq.size
+  }
 
   object is {
 
@@ -187,7 +194,7 @@ trait CommonAST {
     /** Is `sym` a stable path? */
     @tailrec def stable(tpe: Type): Boolean = tpe match {
       case u.SingleType(u.NoPrefix, _) => true
-      case u.SingleType(prefix, _) => is.stable(prefix)
+      case u.SingleType(prefix, _)     => is.stable(prefix)
       case _ => false
     }
 
@@ -210,14 +217,14 @@ trait CommonAST {
     /** Is `tree` a term? */
     def term(tree: Tree): Boolean = tree match {
       case Ident(termNames.WILDCARD) => false
-      case id: Ident => id.symbol.isTerm && is.result(id.tpe)
-      case sel: Select => sel.symbol.isTerm && is.result(sel.tpe)
-      case app: Apply => is.result(app.tpe)
+      case id: Ident       => id.symbol.isTerm && is.result(id.tpe)
+      case sel: Select     => sel.symbol.isTerm && is.result(sel.tpe)
+      case app: Apply      => is.result(app.tpe)
       case tapp: TypeApply => is.result(tapp.tpe)
-      case _: Assign => false
-      case _: Bind => false
-      case _: LabelDef => false
-      case _: New => false
+      case _: Assign       => false
+      case _: Bind         => false
+      case _: LabelDef     => false
+      case _: New          => false
       case _ => tree.isTerm
     }
 
@@ -226,13 +233,13 @@ trait CommonAST {
       case Ident(termNames.WILDCARD) => true
       case id: Ident =>
         is.stable(id.symbol) && is.result(id.tpe)
-      case app @ Apply(target, args) =>
-        target.isType && args.nonEmpty && is.result(app.tpe)
+      case Apply(target, args) =>
+        target.isType && args.nonEmpty && is.result(tree.tpe)
       case _: Alternative => true
-      case _: Bind => true
-      case _: Literal => true
-      case _: Typed => true
-      case _: UnApply => true
+      case _: Bind        => true
+      case _: Literal     => true
+      case _: Typed       => true
+      case _: UnApply     => true
       case _ => false
     }
   }
@@ -318,9 +325,12 @@ trait CommonAST {
       trees.forall(has.pos)
   }
 
-  // ------
+  // ----------------------------------------------------------------------------------------------
   // Flags
-  // ------
+  // ----------------------------------------------------------------------------------------------
+
+  lazy val FlagsNoSynthetic =
+    Flags - Flag.SYNTHETIC
 
   /** All explicit flags. */
   lazy val Flags = Set(
@@ -354,25 +364,13 @@ trait CommonAST {
     Flag.SYNTHETIC,
     Flag.TRAIT)
 
-  lazy val FlagsNoSynthetic = Flags - Flag.SYNTHETIC
-
-  // ---------------
+  // ----------------------------------------------------------------------------------------------
   // Virtual nodes
-  // ---------------
+  // ----------------------------------------------------------------------------------------------
 
   /** Common parent for all virtual AST nodes. */
   trait Node {
     override def toString: String =
       getClass.getSimpleName.dropRight(1)
-  }
-
-  /** Constant limits. */
-  object Max {
-
-    /** Maximum number of lambda arguments. */
-    val FunParams = definitions.FunctionClass.seq.size
-
-    /** Maximum number of tuple elements. */
-    val TupleElems = definitions.TupleClass.seq.size
   }
 }

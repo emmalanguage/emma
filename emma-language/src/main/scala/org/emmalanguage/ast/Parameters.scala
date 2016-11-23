@@ -32,8 +32,8 @@ trait Parameters { this: AST =>
    */
   trait ParameterAPI { this: API =>
 
-    import u.Flag._
     import universe._
+    import Flag._
 
     /** (method / lambda / class) Parameter symbols. */
     object ParSym extends Node {
@@ -49,9 +49,9 @@ trait Parameters { this: AST =>
        */
       def apply(owner: u.Symbol, name: u.TermName, tpe: u.Type,
         flags: u.FlagSet = u.NoFlags,
-        pos: u.Position = u.NoPosition): u.TermSymbol = {
-
-        assert(are.not(MUTABLE)(flags), s"$this `$name` cannot be mutable")
+        pos: u.Position = u.NoPosition
+      ): u.TermSymbol = {
+        assert(are.not(MUTABLE)(flags), s"$this $name cannot be mutable")
         BindingSym(owner, name, tpe, flags | PARAM, pos)
       }
 
@@ -68,8 +68,8 @@ trait Parameters { this: AST =>
        * @return `target`.
        */
       def apply(target: u.TermSymbol): u.Ident = {
-        assert(is.defined(target), s"$this target `$target` is not defined")
-        assert(target.isParameter, s"$this target `$target` is not a parameter")
+        assert(is.defined(target), s"$this target is not defined")
+        assert(target.isParameter, s"$this target $target is not a parameter")
         BindingRef(target)
       }
 
@@ -91,11 +91,10 @@ trait Parameters { this: AST =>
        */
       def apply(lhs: u.TermSymbol,
         rhs: u.Tree = Empty(),
-        flags: u.FlagSet = u.NoFlags): u.ValDef = {
-
-        assert(is.defined(lhs), s"$this LHS `$lhs` is not defined")
-        assert(lhs.isParameter, s"$this LHS `$lhs` is not a parameter")
-        assert(are.not(MUTABLE)(flags), s"$this LHS `$lhs` cannot be mutable")
+        flags: u.FlagSet = u.NoFlags
+      ): u.ValDef = {
+        assert(is.defined(lhs), s"$this LHS is not defined")
+        assert(lhs.isParameter, s"$this LHS $lhs is not a parameter")
         BindingDef(lhs, rhs, flags)
       }
 

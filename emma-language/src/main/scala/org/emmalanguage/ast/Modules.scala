@@ -16,18 +16,18 @@
 package org.emmalanguage
 package ast
 
-/** Modules (`object`s). */
+/** Modules (objects). */
 trait Modules { this: AST =>
 
-  /** Modules (`object`s). */
+  /** Modules (objects). */
   trait ModuleAPI { this: API =>
 
     import universe._
     import internal._
     import reificationSupport._
-    import u.Flag._
+    import Flag._
 
-    /** Module (`object`) symbols. */
+    /** Module (object) symbols. */
     object ModuleSym extends Node {
 
       /**
@@ -40,20 +40,20 @@ trait Modules { this: AST =>
        */
       def apply(owner: u.Symbol, name: u.TermName,
         flags: u.FlagSet = u.NoFlags,
-        pos: u.Position = u.NoPosition): u.ModuleSymbol = {
-
-        assert(is.defined(name), s"$this name `$name` is not defined")
-        assert(are.not(MUTABLE)(flags), s"$this `$name` cannot be mutable")
-        assert(are.not(PARAM)(flags), s"$this `$name` cannot be a parameter")
-        val obj = newModuleAndClassSymbol(owner, TermName(name), pos, flags)._1
-        setInfo(obj, singleType(u.NoPrefix, obj))
+        pos: u.Position = u.NoPosition
+      ): u.ModuleSymbol = {
+        assert(is.defined(name),        s"$this name is not defined")
+        assert(are.not(MUTABLE)(flags), s"$this $name cannot be mutable")
+        assert(are.not(PARAM)(flags),   s"$this $name cannot be a parameter")
+        val mod = newModuleAndClassSymbol(owner, TermName(name), pos, flags)._1
+        setInfo(mod, singleType(u.NoPrefix, mod))
       }
 
       def unapply(sym: u.ModuleSymbol): Option[u.ModuleSymbol] =
         Option(sym)
     }
 
-    /** Module (`object`) references. */
+    /** Module (object) references. */
     object ModuleRef extends Node {
 
       /**
@@ -70,7 +70,7 @@ trait Modules { this: AST =>
       }
     }
 
-    /** Module (`object`) accesses. */
+    /** Module (`bject`) accesses. */
     object ModuleAcc extends Node {
 
       /**

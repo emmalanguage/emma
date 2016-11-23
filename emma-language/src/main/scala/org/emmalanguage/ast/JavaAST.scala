@@ -31,39 +31,47 @@ import scala.tools.reflect.ToolBoxError
  */
 trait JavaAST extends AST {
 
-  require(runtime.universe.isInstanceOf[JavaUniverse],
-    s"Unsupported universe ${runtime.universe}.\nThe runtime compiler supports only JVM.")
+  require(runtime.universe.isInstanceOf[JavaUniverse], s"""
+    |Unsupported universe ${runtime.universe}.
+    |The runtime compiler supports only JVM.
+    |""".stripMargin.trim)
 
   val universe = runtime.universe.asInstanceOf[JavaUniverse]
   val tb: ToolBox[universe.type]
-
   import universe._
 
   private val logger =
     Logger(LoggerFactory.getLogger(classOf[JavaAST]))
 
-  def freshNameSuffix = 'r'
+  private[ast] def freshNameSuffix: Char = 'r'
 
-  // ---------------------------
-  // Parsing and type-checking
-  // ---------------------------
+  private[ast] def setOriginal(tpt: TypeTree, original: Tree): TypeTree =
+    tpt.setOriginal(original)
 
-  def abort(msg: String, pos: Position = NoPosition) =
-    throw ToolBoxError(s"Error at $pos:\n$msg")
+  lazy val enclosingOwner =
+    typeCheck(q"val x = ()").symbol.owner
 
-  def warning(msg: String, pos: Position = NoPosition) =
+  def inferImplicit(tpe: Type): Option[Tree] = for {
+    value <- Option(tb.inferImplicitValue(tpe)) if value.nonEmpty
+  } yield value.setType(value.tpe.finalResultType)
+
+  def warning(msg: String, pos: Position = NoPosition): Unit =
     logger.warn(s"Warning at $pos\n$msg")
 
-  def parse(code: String) = try tb.parse(code) catch {
-    case err: ToolBoxError => throw ToolBoxError(s"""
+  def abort(msg: String, pos: Position = NoPosition): Nothing =
+    throw ToolBoxError(s"Error at $pos:\n$msg")
+
+  def parse(code: String): Tree =
+    try tb.parse(code)
+    catch { case err: ToolBoxError => throw ToolBoxError(s"""
       |Parsing failed for tree:
       |================
       |$code
       |================
       |""".stripMargin.trim, err)
-  }
+    }
 
-  def typeCheck(tree: Tree, typeMode: Boolean = false) =
+  def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
     try if (typeMode) tb.typecheck(tree, tb.TYPEmode) else tb.typecheck(tree)
     catch { case err: ToolBoxError => throw ToolBoxError(s"""
       |Type-check failed for tree:
@@ -86,21 +94,6 @@ trait JavaAST extends AST {
     |""".stripMargin.trim, err)
   }
 
-  def eval[T](code: Tree) =
+  def eval[T](code: Tree): T =
     compile(unTypeCheck(code))().asInstanceOf[T]
-
-  // ------------------------
-  // Abstract wrapper methods
-  // ------------------------
-
-  lazy val enclosingOwner =
-    typeCheck(q"val x = ()").symbol.owner
-
-  def inferImplicit(tpe: Type) = for {
-    value <- Option(tb.inferImplicitValue(tpe))
-    if value.nonEmpty
-  } yield value.setType(value.tpe.finalResultType)
-
-  def setOriginal(tpt: TypeTree, original: Tree) =
-    tpt.setOriginal(original)
 }

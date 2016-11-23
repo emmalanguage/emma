@@ -28,28 +28,37 @@ trait MacroAST extends AST {
 
   val c: blackbox.Context
   val universe: c.universe.type = c.universe
-
   import universe._
 
-  def freshNameSuffix = 'm'
+  private[ast] def freshNameSuffix: Char = 'm'
+
+  private[ast] def setOriginal(tpt: TypeTree, original: Tree): TypeTree =
+    internal.setOriginal(tpt, original)
+
+  def enclosingOwner: Symbol =
+    c.internal.enclosingOwner
+
+  def inferImplicit(tpe: Type): Option[Tree] = for {
+    value <- Option(c.inferImplicitValue(tpe)) if value.nonEmpty
+  } yield internal.setType(value, value.tpe.finalResultType)
 
   // ---------------------------
   // Parsing and type-checking
   // ---------------------------
 
-  def abort(msg: String, pos: Position = NoPosition) =
-    c.abort(pos, msg)
-
-  def warning(msg: String, pos: Position = NoPosition) =
+  def warning(msg: String, pos: Position = NoPosition): Unit =
     c.warning(pos, msg)
+
+  def abort(msg: String, pos: Position = NoPosition): Nothing =
+    c.abort(pos, msg)
 
   def parse(code: String) =
     c.parse(code)
 
-  def typeCheck(tree: Tree, typeMode: Boolean = false) =
+  def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
     if (typeMode) c.typecheck(tree, c.TYPEmode) else c.typecheck(tree)
 
-  def eval[T](code: Tree) =
+  def eval[T](code: Tree): T =
     c.eval[T](c.Expr[T](unTypeCheck(code)))
 
   /** Shows `tree` in a Swing AST browser. */
@@ -64,19 +73,4 @@ trait MacroAST extends AST {
       lock.acquire()
     case _ =>
   }
-
-  // ------------------------
-  // Abstract wrapper methods
-  // ------------------------
-
-  def enclosingOwner =
-    c.internal.enclosingOwner
-
-  def inferImplicit(tpe: Type) = for {
-    value <- Option(c.inferImplicitValue(tpe))
-    if value.nonEmpty
-  } yield internal.setType(value, value.tpe.finalResultType)
-
-  def setOriginal(tpt: TypeTree, original: Tree) =
-    internal.setOriginal(tpt, original)
 }

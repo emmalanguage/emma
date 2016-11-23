@@ -16,7 +16,7 @@
 package org.emmalanguage
 package ast
 
-/** Values (`val`s). */
+/** Values (vals). */
 trait Values { this: AST =>
 
   /**
@@ -38,7 +38,7 @@ trait Values { this: AST =>
 
     import u.Flag._
 
-    /** Value (`val`) symbols. */
+    /** Value (val) symbols. */
     object ValSym extends Node {
 
       /**
@@ -52,10 +52,10 @@ trait Values { this: AST =>
        */
       def apply(owner: u.Symbol, name: u.TermName, tpe: u.Type,
         flags: u.FlagSet = u.NoFlags,
-        pos: u.Position = u.NoPosition): u.TermSymbol = {
-
-        assert(are.not(MUTABLE)(flags), s"$this `$name` cannot be mutable")
-        assert(are.not(PARAM)(flags), s"$this `$name` cannot be a parameter")
+        pos: u.Position = u.NoPosition
+      ): u.TermSymbol = {
+        assert(are.not(MUTABLE)(flags), s"$this $name cannot be mutable")
+        assert(are.not(PARAM)(flags),   s"$this $name cannot be a parameter")
         BindingSym(owner, name, tpe, flags, pos)
       }
 
@@ -63,7 +63,7 @@ trait Values { this: AST =>
         Option(sym).filter(is.value)
     }
 
-    /** Value (`val`) references. */
+    /** Value (val) references. */
     object ValRef extends Node {
 
       /**
@@ -72,8 +72,8 @@ trait Values { this: AST =>
        * @return `target`.
        */
       def apply(target: u.TermSymbol): u.Ident = {
-        assert(is.defined(target), s"$this target `$target` is not defined")
-        assert(is.value(target), s"$this target `$target` is not a value")
+        assert(is.defined(target), s"$this target is not defined")
+        assert(is.value(target),   s"$this target $target is not a value")
         BindingRef(target)
       }
 
@@ -83,7 +83,7 @@ trait Values { this: AST =>
       }
     }
 
-    /** Value (`val`) definitions. */
+    /** Value (val) definitions. */
     object ValDef extends Node {
 
       /**
@@ -94,11 +94,9 @@ trait Values { this: AST =>
        * @return `..flags val lhs = rhs`.
        */
       def apply(lhs: u.TermSymbol, rhs: u.Tree, flags: u.FlagSet = u.NoFlags): u.ValDef = {
-        assert(is.defined(lhs), s"$this LHS `$lhs` is not defined")
-        assert(is.value(lhs), s"$this LHS `$lhs` is not a value")
-        assert(are.not(MUTABLE)(flags), s"$this LHS `$lhs` cannot be mutable")
-        assert(are.not(PARAM)(flags), s"$this LHS `$lhs` cannot be a parameter")
-        assert(is.defined(rhs), s"$this RHS is not defined: $rhs")
+        assert(is.defined(lhs), s"$this LHS is not defined")
+        assert(is.value(lhs),   s"$this LHS $lhs is not a value")
+        assert(is.defined(rhs), s"$this RHS is not defined")
         BindingDef(lhs, rhs, flags)
       }
 
