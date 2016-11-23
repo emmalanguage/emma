@@ -114,19 +114,14 @@ trait Core extends Common
       val ValRef = api.ValRef
       val ValDef = api.ValDef
 
-      // Modules
-      val ModuleRef = api.ModuleRef
-      val ModuleAcc = api.ModuleAcc
-
       // Methods
       val DefCall = api.DefCall
       val DefDef  = api.DefDef
 
-      // Definitions
-      val TermDef = api.TermDef
-
       // Terms
       val Term     = api.Term
+      val TermAcc  = api.TermAcc
+      val TermDef  = api.TermDef
       val Branch   = api.Branch
       val Inst     = api.Inst
       val Lambda   = api.Lambda
@@ -198,7 +193,6 @@ trait Core extends Common
       def ref(target: u.TermSymbol): A
 
       // References (with defaults)
-      def moduleRef(target: u.ModuleSymbol): A = ref(target)
       def bindingRef(target: u.TermSymbol): A = ref(target)
       def valRef(target: u.TermSymbol): A = bindingRef(target)
       def parRef(target: u.TermSymbol): A = bindingRef(target)
@@ -213,7 +207,7 @@ trait Core extends Common
 
       // Other
       def typeAscr(target: A, tpe: u.Type): A
-      def moduleAcc(target: A, member: u.ModuleSymbol): A
+      def termAcc(target: A, member: u.TermSymbol): A
       def defCall(target: Option[A], method: u.MethodSymbol, targs: Seq[u.Type], argss: Seq[Seq[A]]): A
       def inst(target: u.Type, targs: Seq[u.Type], argss: Seq[Seq[A]]): A
       def lambda(sym: u.TermSymbol, params: Seq[A], body: A): A
@@ -253,26 +247,30 @@ trait Core extends Common
           a.lit(value)
         case Lang.This(encl) =>
           a.this_(encl)
-        case Lang.ModuleRef(target) =>
-          a.moduleRef(target)
         case Lang.ValRef(target) =>
           a.valRef(target)
         case Lang.ParRef(target) =>
           a.parRef(target)
+        case Lang.BindingRef(target) =>
+          a.bindingRef(target)
+        case Lang.Ref(target) =>
+          a.ref(target)
 
         // Definitions
         case Lang.ValDef(lhs, rhs) =>
           a.valDef(lhs, fold(rhs))
         case Lang.ParDef(lhs, rhs) =>
           a.parDef(lhs, fold(rhs))
+        case Lang.BindingDef(lhs, rhs) =>
+          a.bindingDef(lhs, fold(rhs))
         case Lang.DefDef(sym, tparams, paramss, body) =>
           a.defDef(sym, tparams, paramss.map(_.map(fold)), fold(body))
 
         // Other
         case Lang.TypeAscr(target, tpe) =>
           a.typeAscr(fold(target), tpe)
-        case Lang.ModuleAcc(target, member) =>
-          a.moduleAcc(fold(target), member)
+        case Lang.TermAcc(target, member) =>
+          a.termAcc(fold(target), member)
         case Lang.DefCall(target, method, targs, argss) =>
           a.defCall(target.map(fold), method, targs, argss.map(_.map(fold)))
         case Lang.Inst(target, targs, argss) =>

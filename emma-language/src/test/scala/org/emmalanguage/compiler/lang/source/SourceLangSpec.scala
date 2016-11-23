@@ -25,7 +25,7 @@ import org.example.foo.Bar
 import org.example.foo.Baz
 
 /** A spec defining the core fragment of Scala supported by Emma. */
-class LanguageSpec extends BaseCompilerSpec {
+class SourceLangSpec extends BaseCompilerSpec {
 
   import compiler._
   import Source.valid
@@ -116,7 +116,7 @@ class LanguageSpec extends BaseCompilerSpec {
 
     val examples = extractFrom(u.reify {
       class Unqualified { println(this.toString) }
-      class Qualified { println(LanguageSpec.this.x) }
+      class Qualified { println(SourceLangSpec.this.x) }
       object Module { println(this.hashCode) }
       Module: AnyRef
     }).map(_.collect {

@@ -133,16 +133,15 @@ private[core] trait CSE extends Common {
         // Empty tree
         val empty = rand.nextInt()
         // Atomics
-        val lit        = rand.nextInt()
-        val this_      = rand.nextInt()
-        val bindingRef = rand.nextInt()
-        val moduleRef  = rand.nextInt()
+        val lit   = rand.nextInt()
+        val this_ = rand.nextInt()
+        val ref   = rand.nextInt()
         // Definitions
         val bindingDef = rand.nextInt()
         val defDef     = rand.nextInt()
         // Other
         val typeAscr  = rand.nextInt()
-        val moduleAcc = rand.nextInt()
+        val termAcc   = rand.nextInt()
         val defCall   = rand.nextInt()
         val inst      = rand.nextInt()
         val lambda    = rand.nextInt()
@@ -172,14 +171,8 @@ private[core] trait CSE extends Common {
         const(mix(seed.this_, sym.##))
       }
 
-      def ref(target: u.TermSymbol) = ???
-
-      override def bindingRef(target: u.TermSymbol) = Hash(target) {
-        _.getOrElse(target, mix(seed.bindingRef, target.hashCode))
-      }
-
-      override def moduleRef(target: u.ModuleSymbol) = Hash(target) {
-        const(mix(seed.moduleRef, target.hashCode))
+      def ref(sym: u.TermSymbol): Hash = Hash(sym) {
+        _.getOrElse(sym, mix(seed.ref, sym.hashCode))
       }
 
       // Definitions
@@ -205,8 +198,8 @@ private[core] trait CSE extends Common {
         const(mix(seed.typeAscr, hashType(tpe)))
       }
 
-      def moduleAcc(target: Hash, member: u.ModuleSymbol) = Hash(member) {
-        tab => combine(seed.moduleAcc)(target(tab), member.##)
+      def termAcc(target: Hash, member: u.TermSymbol) = Hash(member) {
+        tab => combine(seed.termAcc)(target(tab), member.##)
       }
 
       def defCall(target: Option[Hash], method: u.MethodSymbol,

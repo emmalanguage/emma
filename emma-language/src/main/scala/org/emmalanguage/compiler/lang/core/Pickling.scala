@@ -146,7 +146,7 @@ private[core] trait Pickling extends Common {
         def typeAscr(target: D, tpe: u.Type) = offset =>
           s"${target(offset)}: ${printTpe(tpe)}"
 
-        def moduleAcc(target: D, member: u.ModuleSymbol) = offset =>
+        def termAcc(target: D, member: u.TermSymbol) = offset =>
           s"${target(offset)}.${printSym(member)}"
 
         def defCall(target: Option[D], method: u.MethodSymbol,
@@ -160,7 +160,7 @@ private[core] trait Pickling extends Common {
             s"${tgt(offset)}${printMethod(".", method, "")}[${(targs map printTpe).mkString}]"
           case (Some(tgt), Nil) if isUnary(method) =>
             s"${printSym(method)}${tgt(offset)}"
-          case (Some(tgt), _) if isApply(method) && api.Sym.tuples.contains(method.owner.companion) =>
+          case (Some(_), _) if isApply(method) && api.Sym.tuples.contains(method.owner.companion) =>
             s"${printArgss(argss, offset)}"
           case (Some(tgt), _) =>
             s"${tgt(offset)}${printMethod(".", method, "")}${printArgss(argss, offset)}"

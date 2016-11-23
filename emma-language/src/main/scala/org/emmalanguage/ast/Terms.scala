@@ -231,13 +231,8 @@ trait Terms { this: AST =>
       }
     }
 
-    /**
-     * Term accesses (values, variables, parameters and modules).
-     *
-     * NOTE: All terms except fields with `private[this]` visibility and objects are accessed via
-     * getter methods (thus covered by [[DefCall]]).
-     */
-    private[ast] object TermAcc extends Node {
+    /** Term accesses (modules and private[this] values and variables). */
+    object TermAcc extends Node {
 
       /**
        * Creates a type-checked term access.

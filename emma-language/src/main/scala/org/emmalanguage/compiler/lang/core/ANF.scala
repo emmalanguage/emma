@@ -71,10 +71,10 @@ private[core] trait ANF extends Common {
           }
 
         // { ..stats; atom }.module
-        case Attr.inh(src.ModuleAcc(AsBlock(stats, expr), module), owner :: _) =>
+        case Attr.inh(src.TermAcc(AsBlock(stats, expr), module), owner :: _) =>
           val nme = api.TermName.fresh(module)
           val lhs = api.ValSym(owner, nme, module.info)
-          val rhs = core.ModuleAcc(expr, module)
+          val rhs = core.TermAcc(expr, module)
           val tmp = core.ValDef(lhs, rhs)
           val ref = core.Ref(lhs)
           src.Block(stats :+ tmp, ref)

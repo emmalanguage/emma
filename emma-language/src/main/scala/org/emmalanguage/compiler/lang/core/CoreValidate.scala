@@ -58,8 +58,9 @@ private[core] trait CoreValidate extends Common {
         case core.Lit(_) => pass
       }
 
-      lazy val Ref: Validator =
-        oneOf(BindingRef, ModuleRef)
+      lazy val Ref: Validator = {
+        case core.Ref(x) if !x.isVar => pass
+      }
 
       lazy val This: Validator = {
         case core.This(_) => pass
@@ -104,19 +105,6 @@ private[core] trait CoreValidate extends Common {
         oneOf(ValDef, ParDef)
 
       // ---------------------------------------------------------------------------
-      // Modules
-      // ---------------------------------------------------------------------------
-
-      lazy val ModuleRef: Validator = {
-        case core.ModuleRef(_) => pass
-      }
-
-      lazy val ModuleAcc: Validator = {
-        case core.ModuleAcc(target, _) =>
-          target is Atomic otherwise s"Invalid ${core.ModuleAcc} target"
-      }
-
-      // ---------------------------------------------------------------------------
       // Methods
       // ---------------------------------------------------------------------------
 
@@ -149,6 +137,11 @@ private[core] trait CoreValidate extends Common {
       // Terms
       // ---------------------------------------------------------------------------
 
+      lazy val TermAcc: Validator = {
+        case core.TermAcc(target, _) =>
+          target is Atomic otherwise s"Invalid ${core.TermAcc} target"
+      }
+
       lazy val Branch: Validator = {
         case core.Branch(cond, thn, els) => {
           cond is Atomic otherwise s"Invalid ${core.Branch} condition"
@@ -176,7 +169,7 @@ private[core] trait CoreValidate extends Common {
       }
 
       lazy val Term: Validator =
-        oneOf(Atomic, ModuleAcc, Inst, DefCall, Branch, Lambda, TypeAscr)
+        oneOf(Atomic, TermAcc, Inst, DefCall, Branch, Lambda, TypeAscr)
 
       // ---------------------------------------------------------------------------
       // Let-in blocks

@@ -23,7 +23,6 @@ trait AST extends CommonAST
   with Bindings
   with Loops
   with Methods
-  with Modules
   with Parameters
   with Patterns
   with Symbols
@@ -39,7 +38,6 @@ trait AST extends CommonAST
     extends BindingAPI
     with LoopAPI
     with MethodAPI
-    with ModuleAPI
     with ParameterAPI
     with PatternAPI
     with SymbolAPI
