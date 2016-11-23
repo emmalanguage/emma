@@ -159,10 +159,10 @@ trait Symbols { this: AST =>
       }
 
       /** Finds a version of an overloaded symbol with matching type signature, if possible. */
-      def resolveOverloaded(target: u.Type = Type.none)
-        (sym: u.Symbol, targs: u.Type*)
-        (argss: Seq[u.Tree]*): u.Symbol = if (!is.overloaded(sym)) sym else {
-
+      def resolveOverloaded(target: u.Type, sym: u.Symbol,
+        targs: Seq[u.Type]      = Seq.empty,
+        argss: Seq[Seq[u.Tree]] = Seq.empty
+      ): u.Symbol = if (!is.overloaded(sym)) sym else {
         def check(zipped: Seq[(u.Symbol, u.Tree)]) = zipped.forall {
           case (param, arg) => arg.tpe <:< Type.signature(param)
         }
@@ -171,10 +171,10 @@ trait Symbols { this: AST =>
           alternative <- sym.alternatives
           signature = Type.signature(alternative, in = target)
           if signature.typeParams.size == targs.size
-          paramss = Type(signature, targs: _*).paramLists
+          paramss = Type(signature, targs).paramLists
           (np, na) = (paramss.size, argss.size)
           // This allows to skip implicit parameters.
-          if np == na || (np == na + 1 && paramss.last.forall(is(IMPLICIT)))
+          if np == na || (np == na + 1 && paramss.last.forall(is(IMPLICIT, _)))
           if paramss zip argss forall {
             // This allows to handle variable length arguments.
             case (prefix :+ With.tpe(_, VarArgType(tpe)), args) =>
@@ -189,10 +189,10 @@ trait Symbols { this: AST =>
 
         def moreSpecificExists(overloaded: u.Symbol, in: Seq[u.Symbol]) = {
           val overSign = Type.signature(overloaded, in = target)
-          val xss = Type(overSign, targs: _*).paramLists
+          val xss = Type(overSign, targs).paramLists
           in.filter(_ != overloaded).exists { candidate =>
             val candSign = Type.signature(candidate, in = target)
-            val yss = Type(candSign, targs: _*).paramLists
+            val yss = Type(candSign, targs).paramLists
             (xss zip yss) forall { case (xs, ys) =>
               (xs zip ys) forall { case (x, y) =>
                 Type.signature(y) <:< Type.signature(x)
@@ -219,11 +219,12 @@ trait Symbols { this: AST =>
        * Performs a symbol substitution, given a set of `aliases` and a new owner.
        * @param at The new owner of the tree.
        * @param aliases Pairs of symbols to substitute from -> to.
-       * @param in The tree to perform substitution in.
        * @return A structurally equivalent tree, owned by `at`, with all `aliases` substituted.
        */
-      def subst(at: u.Symbol, aliases: (u.Symbol, u.Symbol)*)(in: u.Tree): u.Tree =
-        if (!is.defined(at) && aliases.isEmpty) in else {
+      def subst(at: u.Symbol,
+        aliases: Seq[(u.Symbol, u.Symbol)] = Seq.empty
+      ): u.Tree => u.Tree = tree =>
+        if (!is.defined(at) && aliases.isEmpty) tree else {
           // NOTE: This mutable state could be avoided if Transducers had attribute initializers.
           var (keys, vals) = aliases.toList.unzip
           var dict = aliases.toMap.withDefault(identity)
@@ -234,8 +235,8 @@ trait Symbols { this: AST =>
                 tpe.paramLists.iterator.flatten.exists(dict.contains)) {
                 val tps = tpe.typeParams.map(dict(_).asType)
                 val pss = tpe.paramLists.map(_.map(dict(_).asTerm))
-                val Res = tpe.finalResultType.substituteSymbols(keys, vals)
-                Type.method(tps: _*)(pss: _*)(Res)
+                val res = tpe.finalResultType.substituteSymbols(keys, vals)
+                Type.method(tps, pss, res)
               } else tpe.substituteSymbols(keys, vals)
             } else tpe
 
@@ -249,13 +250,14 @@ trait Symbols { this: AST =>
                 val met = als.asMethod
                 if (changed || met.typeParams.exists(dict.contains) ||
                   met.paramLists.iterator.flatten.exists(dict.contains)) {
+                  val nme = als.name.toTermName
                   val tps = met.typeParams.map(dict(_).asType)
                   val pss = met.paramLists.map(_.map(dict(_).asTerm))
-                  val nme = als.name.toTermName
+                  val res = tpe.finalResultType
                   val flg = flags(als)
                   val pos = als.pos
-                  val res = tpe.finalResultType
-                  val dup = DefSym(own, nme, flg, pos)(tps: _*)(pss: _*)(res)
+                  val ans = als.annotations
+                  val dup = DefSym(own, nme, tps, pss, res, flg, pos, ans)
                   val src = sym :: met.typeParams ::: met.paramLists.flatten
                   val dst = dup :: dup.typeParams ::: dup.paramLists.flatten
                   dict ++= src.iterator zip dst.iterator
@@ -268,14 +270,14 @@ trait Symbols { this: AST =>
                 keys ::= sym
                 vals ::= dup
               }
-          } (in)
+          } (tree)
 
           // Can't be fused with the traversal above,
           // because method calls might appear before their definition.
-          if (dict.isEmpty) in else TopDown.transform { case tree
-            if has.tpe(tree) || (has.sym(tree) && dict.contains(tree.symbol))
-            => Tree.With(tree)(sym = dict(tree.symbol), tpe = subst(tree.tpe))
-          } (in).tree
+          if (dict.isEmpty) tree else TopDown.transform { case t
+            if has.tpe(t) || (has.sym(t) && dict.contains(t.symbol))
+            => Tree.With(t)(sym = dict(t.symbol), tpe = subst(t.tpe))
+          } (tree).tree
         }
 
       def unapply(sym: u.Symbol): Option[u.Symbol] =

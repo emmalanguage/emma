@@ -96,12 +96,12 @@ trait CommonAST {
   object is {
 
     /** Does `sym` have the property encoded as flag(s)? */
-    def apply(property: FlagSet)(sym: Symbol): Boolean =
-      are(property)(flags(sym))
+    def apply(property: FlagSet, sym: Symbol): Boolean =
+      are(property, flags(sym))
 
-    /** The opposite of `is(property)(sym)`. */
-    def not(property: FlagSet)(sym: Symbol): Boolean =
-      are.not(property)(flags(sym))
+    /** The opposite of `is(property, sym)`. */
+    def not(property: FlagSet, sym: Symbol): Boolean =
+      are.not(property, flags(sym))
 
     /** Is `name` non-degenerate? */
     def defined(name: Name): Boolean =
@@ -169,11 +169,11 @@ trait CommonAST {
 
     /** Is `sym` a label (loop) symbol? */
     def label(sym: Symbol): Boolean =
-      sym.isMethod && is(CONTRAVARIANT)(sym)
+      sym.isMethod && is(CONTRAVARIANT, sym)
 
     /** Is `sym` a method (`def`) symbol? */
     def method(sym: Symbol): Boolean =
-      sym.isMethod && is.not(CONTRAVARIANT)(sym)
+      sym.isMethod && is.not(CONTRAVARIANT, sym)
 
     /** Is `sym` a by-name parameter? */
     def byName(sym: Symbol): Boolean =
@@ -247,11 +247,11 @@ trait CommonAST {
   object are {
 
     /** Are `flags` a superset of `property`? */
-    def apply(property: FlagSet)(flags: FlagSet): Boolean =
+    def apply(property: FlagSet, flags: FlagSet): Boolean =
       (flags | property) == flags
 
-    /** The opposite of `are(property)(flags)`. */
-    def not(property: FlagSet)(flags: FlagSet): Boolean =
+    /** The opposite of `are(property, flags)`. */
+    def not(property: FlagSet, flags: FlagSet): Boolean =
       (flags | property) != flags
 
     /** Are all `trees` non-degenerate? */

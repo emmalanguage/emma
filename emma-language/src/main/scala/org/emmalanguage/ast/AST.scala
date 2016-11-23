@@ -64,10 +64,10 @@ trait AST extends CommonAST
   lazy val fixSymbolTypes = api.TopDown.traverse {
     case lambda @ api.Lambda(fun, _, _) =>
       setInfo(fun, lambda.tpe)
-    case api.DefDef(method, _, tparams, paramss, _) =>
+    case api.DefDef(method, tparams, paramss, _) =>
       val pss = paramss.map(_.map(_.symbol.asTerm))
       val res = method.info.finalResultType
-      setInfo(method, api.Type.method(tparams: _*)(pss: _*)(res))
+      setInfo(method, api.Type.method(tparams, pss, res))
   }.andThen(_.tree)
 
   /**
@@ -78,7 +78,7 @@ trait AST extends CommonAST
   lazy val stubTypeTrees = api.TopDown.break
     .withParent.transformWith {
       // Leave `val/var` types to be inferred by the compiler.
-      case Attr.inh(api.TypeQuote(tpe), Some(api.BindingDef(lhs, rhs, _)) :: _)
+      case Attr.inh(api.TypeQuote(tpe), Some(api.BindingDef(lhs, rhs)) :: _)
         if !lhs.isParameter && rhs.nonEmpty && tpe =:= rhs.tpe.dealias.widen =>
         api.TypeQuote.empty
       case Attr.none(api.TypeQuote(tpe)) =>
@@ -102,19 +102,19 @@ trait AST extends CommonAST
       case Attr.inh(tree, Some(_: u.Block) :: _)
         if isStat(tree) => tree
       case Attr.none(tree)
-        if isStat(tree) => api.Block(tree)()
+        if isStat(tree) => api.Block(Seq(tree))
       case Attr.none(u.Block(stats, expr))
-        if isStat(expr) => api.Block(stats :+ expr: _*)()
+        if isStat(expr) => api.Block(stats :+ expr)
       case Attr.none(body @ api.WhileBody(_, _, api.Block(_, api.Lit(())))) => body
       case Attr.none(body @ api.DoWhileBody(_, _, api.Block(_, api.Lit(())))) => body
       case Attr.none(api.WhileBody(lbl, cond, api.Block(stats, stat))) =>
-        api.WhileBody(lbl, cond, api.Block(stats :+ stat: _*)())
+        api.WhileBody(lbl, cond, api.Block(stats :+ stat))
       case Attr.none(api.DoWhileBody(lbl, cond, api.Block(stats, stat))) =>
-        api.DoWhileBody(lbl, cond, api.Block(stats :+ stat: _*)())
+        api.DoWhileBody(lbl, cond, api.Block(stats :+ stat))
       case Attr.none(api.WhileBody(lbl, cond, stat)) =>
-        api.WhileBody(lbl, cond, api.Block(stat)())
+        api.WhileBody(lbl, cond, api.Block(Seq(stat)))
       case Attr.none(api.DoWhileBody(lbl, cond, stat)) =>
-        api.DoWhileBody(lbl, cond, api.Block(stat)())
+        api.DoWhileBody(lbl, cond, api.Block(Seq(stat)))
     }.andThen(_.tree)
   }
 
@@ -132,7 +132,7 @@ trait AST extends CommonAST
 
   /** Ensures that all definitions within `tree` have unique names. */
   lazy val resolveNameClashes: u.Tree => u.Tree =
-    tree => api.Tree.refresh(nameClashes(tree): _*)(tree)
+    tree => api.Tree.refresh(nameClashes(tree))(tree)
 
   /**
    * Prints `tree` for debugging.

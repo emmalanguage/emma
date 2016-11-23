@@ -47,18 +47,20 @@ trait Bindings { this: AST =>
     object BindingSym extends Node {
 
       /**
-       * Creates a new binding symbol.
-       * @param owner The enclosing named entity where this binding is defined.
-       * @param name The name of this binding (will be encoded).
+       * Creates a type-checked binding symbol.
+       * @param own The enclosing named entity where this binding is defined.
+       * @param nme The name of this binding (will be encoded).
        * @param tpe The type of this binding (will be dealiased and widened).
-       * @param flags Any additional modifiers (distinguish between vals, vars and parameters).
+       * @param flg Any (optional) modifiers (e.g. var, parameter, implicit, lazy).
        * @param pos The (optional) source code position where this binding is defined.
+       * @param ans Any (optional) annotations associated with this binding.
        * @return A new binding symbol.
        */
-      def apply(owner: u.Symbol, name: u.TermName, tpe: u.Type,
-        flags: u.FlagSet = u.NoFlags,
-        pos: u.Position = u.NoPosition
-      ): u.TermSymbol = TermSym(owner, name, tpe, flags, pos)
+      def apply(own: u.Symbol, nme: u.TermName, tpe: u.Type,
+        flg: u.FlagSet         = u.NoFlags,
+        pos: u.Position        = u.NoPosition,
+        ans: Seq[u.Annotation] = Seq.empty
+      ): u.TermSymbol = TermSym(own, nme, tpe, flg, pos, ans)
 
       def unapply(sym: u.TermSymbol): Option[u.TermSymbol] =
         Option(sym).filter(is.binding)
@@ -91,13 +93,9 @@ trait Bindings { this: AST =>
        * Creates a type-checked binding definition.
        * @param lhs Must be a binding symbol.
        * @param rhs The value of this binding (empty by default), owned by `lhs`.
-       * @param flg Any additional modifiers (distinguish values, variables and parameters).
-       * @return `..flags [val|var] lhs [= rhs]`.
+       * @return `[val|var] lhs [= rhs]`.
        */
-      def apply(lhs: u.TermSymbol,
-        rhs: u.Tree = Empty(),
-        flg: u.FlagSet = u.NoFlags
-      ): u.ValDef = {
+      def apply(lhs: u.TermSymbol, rhs: u.Tree = Empty()): u.ValDef = {
         assert(is.defined(lhs), s"$this LHS is not defined")
         assert(is.binding(lhs), s"$this LHS $lhs is not a binding")
         assert(has.nme(lhs),    s"$this LHS $lhs has no name")
@@ -122,11 +120,11 @@ trait Bindings { this: AST =>
         setSymbol(dfn, lhs)
       }
 
-      def unapply(bind: u.ValDef): Option[(u.TermSymbol, u.Tree, u.FlagSet)] = bind match {
-        case Tree.With.sym(u.ValDef(mods, _, _, rhs), BindingSym(lhs)) =>
-          Some(lhs, rhs, mods.flags)
-        case _ => None
-      }
+      def unapply(bind: u.ValDef): Option[(u.TermSymbol, u.Tree)] =
+        bind.symbol match {
+          case BindingSym(lhs) => Some(lhs, bind.rhs)
+          case _ => None
+        }
     }
   }
 }

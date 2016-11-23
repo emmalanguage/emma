@@ -283,27 +283,27 @@ trait Transversers { this: AST =>
 
     /** Synthesizes all binding definitions contained in the current node and its children. */
     def withBindDefs = synthesize(Attr.group {
-      case bind @ api.BindingDef(lhs, _, _) => lhs -> bind
+      case bind @ api.BindingDef(lhs, _) => lhs -> bind
     })
 
     /** Synthesizes all value definitions contained in the current node and its children. */
     def withValDefs = synthesize(Attr.group {
-      case value @ api.ValDef(lhs, _, _) => lhs -> value
+      case value @ api.ValDef(lhs, _) => lhs -> value
     })
 
     /** Synthesizes all variable definitions contained in the current node and its children. */
     def withVarDefs = synthesize(Attr.group {
-      case variable @ api.VarDef(lhs, _, _) => lhs -> variable
+      case variable @ api.VarDef(lhs, _) => lhs -> variable
     })
 
     /** Synthesizes all parameter definitions contained in the current node and its children. */
     def withParDefs = synthesize(Attr.group {
-      case param @ api.ParDef(lhs, _, _) => lhs -> param
+      case param @ api.ParDef(lhs, _) => lhs -> param
     })
 
     /** Synthesizes all method definitions contained in the current node and its children. */
     def withDefDefs = synthesize(Attr.group {
-      case defn @ api.DefDef(method, _, _, _, _) => method -> defn
+      case defn @ api.DefDef(method, _, _, _) => method -> defn
     })
 
     /** Counts all term references contained in the current node and its children. */
@@ -338,7 +338,7 @@ trait Transversers { this: AST =>
 
     /** Counts all method calls contained in the current node and its children. */
     def withDefCalls = synthesize(Attr.group {
-      case api.DefCall(_, method, _, _*) => method -> 1
+      case api.DefCall(_, method, _, _) => method -> 1
     })(Monoids.merge)
 
     /** Converts a partial function over trees to a partial function over attributed trees. */

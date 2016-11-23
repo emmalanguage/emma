@@ -30,8 +30,8 @@ trait Loops { this: AST =>
     /** Converts `tree` to a statement (block with `Unit` expression). */
     private def asStat(tree: u.Tree) = tree match {
       case Block(_, Lit(())) => tree
-      case u.Block(stats, stat) => Block(stats :+ stat: _*)()
-      case _ => Block(tree)()
+      case u.Block(stats, stat) => Block(stats :+ stat)
+      case _ => Block(Seq(tree))
     }
 
     /** Label (loop) symbols. */
@@ -133,13 +133,12 @@ trait Loops { this: AST =>
       def apply(lbl: u.MethodSymbol, cond: u.Tree, stat: u.Tree): u.If = {
         assert(is.defined(lbl), s"$this label is not defined")
         assert(is.label(lbl),   s"$this label $lbl is not a label")
-        Branch(cond, Block(stat)(TermApp(Id(lbl), Seq.empty)))
+        Branch(cond, Block(Seq(stat), LoopCall(lbl)))
       }
 
       def unapply(body: u.If): Option[(u.MethodSymbol, u.Tree, u.Tree)] = body match {
-        case u.If(Term(cond), u.Block(stat :: Nil,
-          TermApp(Id(LabelSym(lbl)), Seq(), Seq())), Lit(()))
-          => Some(lbl, cond, stat)
+        case u.If(Term(cond), u.Block(stat :: Nil, LoopCall(lbl)), Lit(())) =>
+          Some(lbl, cond, stat)
         case _ => None
       }
     }
@@ -157,13 +156,27 @@ trait Loops { this: AST =>
       def apply(lbl: u.MethodSymbol, cond: u.Tree, stat: u.Tree): u.Block = {
         assert(is.defined(lbl), s"$this label is not defined")
         assert(is.label(lbl),   s"$this label $lbl is not a label")
-        Block(stat)(Branch(cond, TermApp(Id(lbl), Seq.empty)))
+        Block(Seq(stat), Branch(cond, LoopCall(lbl)))
       }
 
       def unapply(body: u.Block): Option[(u.MethodSymbol, u.Tree, u.Tree)] = body match {
-        case u.Block(stat :: Nil, u.If(Term(cond),
-          TermApp(Id(LabelSym(lbl)), Seq(), Seq()), Lit(())))
-          => Some(lbl, cond, stat)
+        case u.Block(stat :: Nil, u.If(Term(cond), LoopCall(lbl), Lit(()))) =>
+          Some(lbl, cond, stat)
+        case _ => None
+      }
+    }
+
+    /** Helper object for loop bodies. */
+    private[ast] object LoopCall extends Node {
+
+      def apply(lbl: u.MethodSymbol): u.Tree = {
+        assert(is.defined(lbl), s"$this label is not defined")
+        assert(is.label(lbl),   s"$this label $lbl is not a label")
+        TermApp(Id(lbl), argss = Seq(Seq.empty))
+      }
+
+      def unapply(call: u.Apply): Option[u.MethodSymbol] = call match {
+        case TermApp(Id(LabelSym(lbl)), _, _) => Some(lbl)
         case _ => None
       }
     }
