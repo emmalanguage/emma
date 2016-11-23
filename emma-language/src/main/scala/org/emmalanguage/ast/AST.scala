@@ -18,8 +18,6 @@ package ast
 
 import shapeless._
 
-import scala.annotation.tailrec
-
 /** Common super-trait for macro- and runtime-compilation. */
 trait AST extends CommonAST
   with Bindings
@@ -63,94 +61,78 @@ trait AST extends CommonAST
    * Populates the missing types of lambda symbols in a tree.
    * WARN: Mutates the symbol table in place.
    */
-  lazy val fixSymbolTypes: u.Tree => u.Tree =
-    api.TopDown.traverse {
-      case lambda: u.Function =>
-        setInfo(lambda.symbol, lambda.tpe)
-      case defn @ u.DefDef(_, _, tparams, paramss, tpt, _) =>
-        val tps = tparams.map(_.symbol.asType)
-        val pss = paramss.map(_.map(_.symbol.asTerm))
-        val res = tpt.tpe.finalResultType
-        setInfo(defn.symbol, api.Type.method(tps: _*)(pss: _*)(res))
-    }.andThen(_.tree)
+  lazy val fixSymbolTypes = api.TopDown.traverse {
+    case lambda @ api.Lambda(fun, _, _) =>
+      setInfo(fun, lambda.tpe)
+    case api.DefDef(method, _, tparams, paramss, _) =>
+      val pss = paramss.map(_.map(_.symbol.asTerm))
+      val res = method.info.finalResultType
+      setInfo(method, api.Type.method(tparams: _*)(pss: _*)(res))
+  }.andThen(_.tree)
 
   /**
    * Replaces [[u.TypeTree]]s that have their `original` field set with stubs that only have their
    * `tpe` field set to the corresponding type. Type-trees of `val/var`s are left empty for the
    * compiler to infer.
    */
-  lazy val stubTypeTrees: u.Tree => u.Tree =
-    api.TopDown.break.withParent.transformWith {
+  lazy val stubTypeTrees = api.TopDown.break
+    .withParent.transformWith {
       // Leave `val/var` types to be inferred by the compiler.
-      case Attr.inh(u.TypeTree(), Some(api.BindingDef(lhs, rhs, _)) :: _)
-        if !lhs.isParameter && rhs.nonEmpty && lhs.info =:= rhs.tpe.dealias.widen
-        => u.TypeTree()
-      case Attr.none(api.Tree.With.tpe(u.TypeTree(), tpe))
-        => api.TypeQuote(tpe)
+      case Attr.inh(api.TypeQuote(tpe), Some(api.BindingDef(lhs, rhs, _)) :: _)
+        if !lhs.isParameter && rhs.nonEmpty && tpe =:= rhs.tpe.dealias.widen =>
+        api.TypeQuote.empty
+      case Attr.none(api.TypeQuote(tpe)) =>
+        api.TypeQuote(tpe)
     }.andThen(_.tree)
 
   /** Restores [[u.TypeTree]]s with their `original` field set. */
-  lazy val restoreTypeTrees: u.Tree => u.Tree =
-    api.TopDown.break.transform {
-      case api.Tree.With.tpe(u.TypeTree(), tpe) => api.Type.tree(tpe)
-    }.andThen(_.tree)
+  lazy val restoreTypeTrees = api.TopDown.break.transform {
+    case api.TypeQuote(tpe) => api.Type.tree(tpe)
+  }.andThen(_.tree)
 
   /** Normalizes all statements in term position by wrapping them in a block. */
-  lazy val normalizeStatements: u.Tree => u.Tree =
-    api.BottomUp.withParent.transformWith {
-      case Attr.inh(mol @ (api.VarMut(_, _) | api.Loop(_, _)), Some(_: u.Block) :: _) =>
-        mol
-      case Attr.none(mol @ (api.VarMut(_, _) | api.Loop(_, _))) =>
-        api.Block(mol)()
-      case Attr.none(u.Block(stats, mol @ (api.VarMut(_, _) | api.Loop(_, _)))) =>
-        api.Block(stats :+ mol: _*)()
-      case Attr.none(norm @ api.WhileBody(_, _, api.Block(_, api.Lit(())))) =>
-        norm
-      case Attr.none(norm @ api.DoWhileBody(_, _, api.Block(_, api.Lit(())))) =>
-        norm
-      case Attr.none(api.WhileBody(label, cond, api.Block(stats, stat))) =>
-        api.WhileBody(label, cond, api.Block(stats :+ stat: _*)())
-      case Attr.none(api.DoWhileBody(label, cond, api.Block(stats, stat))) =>
-        api.DoWhileBody(label, cond, api.Block(stats :+ stat: _*)())
-      case Attr.none(api.WhileBody(label, cond, stat)) =>
-        api.WhileBody(label, cond, api.Block(stat)())
-      case Attr.none(api.DoWhileBody(label, cond, stat)) =>
-        api.DoWhileBody(label, cond, api.Block(stat)())
-    }.andThen(_.tree)
-
-  /** Removes the qualifiers from references to static symbols. */
-  lazy val unQualifyStatics: u.Tree => u.Tree =
-    api.TopDown.break.transform {
-      case api.Sel(_, sym) if sym.isStatic && (sym.isClass || sym.isModule) =>
-        api.Id(sym)
-    }.andThen(_.tree)
-
-  /** Fully qualifies references to static symbols. */
-  lazy val qualifyStatics: u.Tree => u.Tree =
-    api.TopDown.break.transform {
-      case api.Ref(sym) if sym.isStatic && (sym.isClass || sym.isModule) =>
-        api.Tree.resolveStatic(sym)
-    }.andThen(_.tree)
-
-  /** Ensures that all definitions within `tree` have unique names. */
-  lazy val resolveNameClashes: u.Tree => u.Tree = (tree: u.Tree) => {
-    val defs = api.Tree.defs(tree)   // definitions in the given `tree`
-    val notUnique = defs.map(_.name) // names already used in the given `tree`
-    val clashes = nameClashes(defs)  // name clashes in the given `tree`
-
-    // Helper method: gets the first fresh name that does not collide
-    // with another def in the given tree.
-    @tailrec def fresh(nme: u.TermName): u.TermName = {
-      val fsh = api.TermName.fresh(nme)
-      if (notUnique(fsh)) fresh(nme) else fsh
+  lazy val normalizeStatements = {
+    def isStat(tree: u.Tree) = tree match {
+      case api.VarMut(_, _) => true
+      case api.Loop(_, _)   => true
+      case _ => false
     }
 
-    // Custom build aliases using the helper `fresh` method.
-    val aliases = for (sym <- clashes) yield
-      sym -> api.Sym.With(sym)(nme = fresh(sym.name)).asTerm
-
-    api.Tree.rename(aliases: _*)(tree)
+    api.BottomUp.withParent.transformWith {
+      case Attr.inh(tree, Some(_: u.Block) :: _)
+        if isStat(tree) => tree
+      case Attr.none(tree)
+        if isStat(tree) => api.Block(tree)()
+      case Attr.none(u.Block(stats, expr))
+        if isStat(expr) => api.Block(stats :+ expr: _*)()
+      case Attr.none(body @ api.WhileBody(_, _, api.Block(_, api.Lit(())))) => body
+      case Attr.none(body @ api.DoWhileBody(_, _, api.Block(_, api.Lit(())))) => body
+      case Attr.none(api.WhileBody(lbl, cond, api.Block(stats, stat))) =>
+        api.WhileBody(lbl, cond, api.Block(stats :+ stat: _*)())
+      case Attr.none(api.DoWhileBody(lbl, cond, api.Block(stats, stat))) =>
+        api.DoWhileBody(lbl, cond, api.Block(stats :+ stat: _*)())
+      case Attr.none(api.WhileBody(lbl, cond, stat)) =>
+        api.WhileBody(lbl, cond, api.Block(stat)())
+      case Attr.none(api.DoWhileBody(lbl, cond, stat)) =>
+        api.DoWhileBody(lbl, cond, api.Block(stat)())
+    }.andThen(_.tree)
   }
+
+  /** Removes the qualifiers from references to static symbols. */
+  lazy val unQualifyStatics = api.TopDown.break.transform {
+    case api.Sel(_, member) if member.isStatic && (member.isClass || member.isModule) =>
+      api.Id(member)
+  }.andThen(_.tree)
+
+  /** Fully qualifies references to static symbols. */
+  lazy val qualifyStatics = api.TopDown.break.transform {
+    case api.Ref(target) if target.isStatic && (target.isClass || target.isModule) =>
+      api.Tree.resolveStatic(target)
+  }.andThen(_.tree)
+
+  /** Ensures that all definitions within `tree` have unique names. */
+  lazy val resolveNameClashes: u.Tree => u.Tree =
+    tree => api.Tree.refresh(nameClashes(tree): _*)(tree)
 
   /**
    * Prints `tree` for debugging.
@@ -185,12 +167,8 @@ trait AST extends CommonAST
   }
 
   /** Returns a sequence of symbols in `tree` that have clashing names. */
-  def nameClashes(tree: u.Tree): Seq[u.TermSymbol] =
-    nameClashes(api.Tree.defs(tree))
-
-  /** Returns a sequence of symbols in `defs` that have clashing names. */
-  private def nameClashes(defs: Set[u.TermSymbol]): Seq[u.TermSymbol] = for {
-    (_, defs) <- defs.groupBy(_.name).toSeq
+  def nameClashes(tree: u.Tree): Seq[u.TermSymbol] = for {
+    (_, defs) <- api.Tree.defs(tree).groupBy(_.name).toSeq
     if defs.size > 1
     dfn <- defs.tail
   } yield dfn

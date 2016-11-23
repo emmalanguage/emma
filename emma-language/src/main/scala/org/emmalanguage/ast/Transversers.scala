@@ -16,9 +16,9 @@
 package org.emmalanguage
 package ast
 
+import util._
 import util.Functions._
 import util.Monoids._
-import util._
 
 import cats.Monoid
 import cats.std.all._
@@ -264,9 +264,12 @@ trait Transversers { this: AST =>
     def withAncestors = inherit(Attr.collect[Vector, Tree](partial(identity)))
 
     /** Inherits the owner of the current node. */
-    def withOwner = inherit {
-      case api.Owner(sym) => sym
-    } (Monoids.right(enclosingOwner))
+    def withOwner: Strategy[A, Symbol :: I, S] =
+      withOwner(api.Owner.encl)
+
+    /** Inherits the owner of the current node. */
+    def withOwner(default: Symbol): Strategy[A, Symbol :: I, S] =
+      inherit { case api.Owner(sym) => sym } (Monoids.right(default))
 
     /** Inherits the owner chain of the current node. */
     def withOwnerChain = inherit(Attr.collect[Vector, Symbol] {
@@ -393,7 +396,9 @@ trait Transversers { this: AST =>
     protected final def fixTraverse(tree: Tree): Unit =
       while (true) {
         accumulate(tree)
+        //scalastyle:off
         traversal.applyOrElse(tree, return)
+        //scalastyle:on
       }
   }
 

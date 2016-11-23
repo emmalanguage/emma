@@ -42,7 +42,6 @@ trait Bindings { this: AST =>
     import universe._
     import internal._
     import reificationSupport._
-    import u.Flag._
 
     /** Binding symbols (values, variables and parameters). */
     object BindingSym extends Node {
@@ -58,8 +57,8 @@ trait Bindings { this: AST =>
        */
       def apply(owner: u.Symbol, name: u.TermName, tpe: u.Type,
         flags: u.FlagSet = u.NoFlags,
-        pos: u.Position = u.NoPosition): u.TermSymbol
-        = TermSym(owner, name, tpe, flags, pos)
+        pos: u.Position = u.NoPosition
+      ): u.TermSymbol = TermSym(owner, name, tpe, flags, pos)
 
       def unapply(sym: u.TermSymbol): Option[u.TermSymbol] =
         Option(sym).filter(is.binding)
@@ -74,8 +73,8 @@ trait Bindings { this: AST =>
        * @return `target`.
        */
       def apply(target: u.TermSymbol): u.Ident = {
-        assert(is.defined(target), s"$this target `$target` is not defined")
-        assert(is.binding(target), s"$this target `$target` is not a binding")
+        assert(is.defined(target), s"$this target is not defined")
+        assert(is.binding(target), s"$this target $target is not a binding")
         TermRef(target)
       }
 
@@ -97,15 +96,13 @@ trait Bindings { this: AST =>
        */
       def apply(lhs: u.TermSymbol,
         rhs: u.Tree = Empty(),
-        flg: u.FlagSet = u.NoFlags): u.ValDef = {
-
-        assert(is.defined(lhs), s"$this LHS `$lhs` is not defined")
-        assert(is.binding(lhs), s"$this LHS `$lhs` is not a binding")
-        assert(has.nme(lhs), s"$this LHS `$lhs` has no name")
-        assert(has.tpe(lhs), s"$this LHS `$lhs` has no type")
-        assert(is.encoded(lhs), s"$this LHS `$lhs` is not encoded")
-        val mods = u.Modifiers(flags(lhs) | flg)
-        assert(!mods.hasFlag(LAZY), s"$this LHS `$lhs` cannot be lazy")
+        flg: u.FlagSet = u.NoFlags
+      ): u.ValDef = {
+        assert(is.defined(lhs), s"$this LHS is not defined")
+        assert(is.binding(lhs), s"$this LHS $lhs is not a binding")
+        assert(has.nme(lhs),    s"$this LHS $lhs has no name")
+        assert(has.tpe(lhs),    s"$this LHS $lhs has no type")
+        assert(is.encoded(lhs), s"$this LHS $lhs is not encoded")
         val (body, tpt) = if (is.defined(rhs)) {
           assert(is.term(rhs), s"$this RHS is not a term:\n${Tree.show(rhs)}")
           assert(has.tpe(rhs), s"$this RHS has no type:\n${Tree.showTypes(rhs)}")
@@ -114,14 +111,14 @@ trait Bindings { this: AST =>
             |(lhs: `$lhs`, rhs:\n`${u.showCode(rhs)}`\n)
             |""".stripMargin.trim)
           (Owner.at(lhs)(rhs),
-            if (lhs.info =:= rhs.tpe.dealias.widen) u.TypeTree()
+            if (lhs.info =:= rhs.tpe.dealias.widen) TypeQuote.empty
             else TypeQuote(lhs.info))
         } else {
           assert(lhs.isParameter, s"$this RHS cannot be empty")
           (Empty(), TypeQuote(lhs.info))
         }
 
-        val dfn = u.ValDef(mods, lhs.name, tpt, body)
+        val dfn = u.ValDef(Sym.mods(lhs), lhs.name, tpt, body)
         setSymbol(dfn, lhs)
       }
 

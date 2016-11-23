@@ -57,7 +57,7 @@ class LanguageSpec extends BaseCompilerSpec {
     }
 
   override def alphaEqTo[T <: u.Tree](tree: T) =
-    super.alphaEqTo(api.Owner.at(enclosingOwner)(tree))
+    super.alphaEqTo(api.Owner.atEncl(tree))
 
   // ---------------------------------------------------------------------------
   // Atomics

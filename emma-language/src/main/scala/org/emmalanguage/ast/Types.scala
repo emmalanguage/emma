@@ -23,6 +23,7 @@ trait Types { this: AST =>
   trait TypeAPI { this: API =>
 
     import universe._
+    import definitions._
     import internal._
     import reificationSupport._
 
@@ -30,9 +31,9 @@ trait Types { this: AST =>
     object TypeName extends Node {
 
       // Predefined type names
-      val empty    = u.typeNames.EMPTY
-      val wildcard = u.typeNames.WILDCARD
-      val wildStar = u.typeNames.WILDCARD_STAR
+      lazy val empty    = u.typeNames.EMPTY
+      lazy val wildcard = u.typeNames.WILDCARD
+      lazy val wildStar = u.typeNames.WILDCARD_STAR
 
       /** Creates a new type name (must be non-empty). */
       def apply(name: String): u.TypeName = {
@@ -42,14 +43,14 @@ trait Types { this: AST =>
 
       /** Encodes `name` and converts it to a type name. */
       def apply(name: u.Name): u.TypeName = {
-        assert(is.defined(name), s"Undefined name `$name`")
+        assert(is.defined(name), "Undefined name")
         name.encodedName.toTypeName
       }
 
       /** Extracts the type name of `sym`, if any. */
       def apply(sym: u.Symbol): u.TypeName = {
-        assert(is.defined(sym), s"Undefined symbol `$sym`")
-        assert(has.nme(sym), s"Symbol `$sym` has no name")
+        assert(is.defined(sym), "Undefined symbol")
+        assert(has.nme(sym),   s"Symbol $sym has no name")
         apply(sym.name)
       }
 
@@ -61,14 +62,14 @@ trait Types { this: AST =>
 
       /** Creates a fresh type name with the given `prefix`. */
       def fresh(prefix: u.Name): u.TypeName = {
-        assert(is.defined(prefix), s"Undefined prefix `$prefix`")
+        assert(is.defined(prefix), "Undefined prefix")
         fresh(prefix.toString)
       }
 
       /** Creates a fresh type name with the given symbol's name as `prefix`. */
       def fresh(prefix: u.Symbol): u.TypeName = {
-        assert(is.defined(prefix), s"Undefined prefix `$prefix`")
-        assert(has.nme(prefix), s"Prefix `$prefix` has no name")
+        assert(is.defined(prefix), "Undefined prefix")
+        assert(has.nme(prefix),   s"Prefix $prefix has no name")
         fresh(prefix.name)
       }
 
@@ -89,15 +90,15 @@ trait Types { this: AST =>
        */
       def apply(owner: u.Symbol, name: u.TypeName,
         flags: u.FlagSet = u.NoFlags,
-        pos: u.Position = u.NoPosition): u.TypeSymbol = {
-
-        assert(is.defined(name), s"$this name `$name` is not defined")
+        pos: u.Position = u.NoPosition
+      ): u.TypeSymbol = {
+        assert(is.defined(name), s"$this name is not defined")
         newTypeSymbol(owner, TypeName(name), pos, flags)
       }
 
       /** Creates a free type symbol (without an owner). */
       def free(name: u.TypeName, flags: u.FlagSet = u.NoFlags): u.FreeTypeSymbol = {
-        assert(is.defined(name), s"$this name `$name` is not defined")
+        assert(is.defined(name), s"$this name is not defined")
         internal.newFreeType(TypeName(name).toString, flags, null)
       }
 
@@ -120,25 +121,25 @@ trait Types { this: AST =>
       // ------------------
 
       // Top and bottom
-      lazy val any     = u.definitions.AnyTpe
-      lazy val nothing = u.definitions.NothingTpe
+      lazy val any     = AnyTpe
+      lazy val nothing = NothingTpe
 
       // Primitives
-      lazy val anyVal = u.definitions.AnyValTpe
-      lazy val unit   = u.definitions.UnitTpe
-      lazy val bool   = u.definitions.BooleanTpe
-      lazy val char   = u.definitions.CharTpe
-      lazy val byte   = u.definitions.ByteTpe
-      lazy val short  = u.definitions.ShortTpe
-      lazy val int    = u.definitions.IntTpe
-      lazy val long   = u.definitions.LongTpe
-      lazy val float  = u.definitions.FloatTpe
-      lazy val double = u.definitions.DoubleTpe
+      lazy val anyVal = AnyValTpe
+      lazy val unit   = UnitTpe
+      lazy val bool   = BooleanTpe
+      lazy val char   = CharTpe
+      lazy val byte   = ByteTpe
+      lazy val short  = ShortTpe
+      lazy val int    = IntTpe
+      lazy val long   = LongTpe
+      lazy val float  = FloatTpe
+      lazy val double = DoubleTpe
 
       // Objects
-      lazy val anyRef = u.definitions.AnyRefTpe
-      lazy val obj    = u.definitions.ObjectTpe
-      lazy val null_  = u.definitions.NullTpe
+      lazy val anyRef = AnyRefTpe
+      lazy val obj    = ObjectTpe
+      lazy val null_  = NullTpe
       lazy val string = Type[String]
       lazy val bigInt = Type[BigInt]
       lazy val bigDec = Type[BigDecimal]
@@ -159,16 +160,17 @@ trait Types { this: AST =>
       }
 
       // Other
+      lazy val none = u.NoType
       lazy val loop = Type.method()(Seq.empty)(unit)
 
       /** Applies a type `constructor` to the supplied arguments. */
       def apply(constructor: u.Type, args: u.Type*): u.Type =
         if (args.isEmpty) constructor else {
-          assert(is.defined(constructor), s"Type constructor `$constructor` is not defined")
-          assert(constructor.takesTypeArgs, s"Type `$constructor` is not a type constructor")
-          assert(args.forall(is.defined), "Not all type arguments are defined")
-          lazy val params = constructor.typeParams
-          assert(params.size == args.size, s"Type params <-> args size mismatch for `$constructor`")
+          assert(is.defined(constructor),    "Type constructor is not defined")
+          assert(constructor.takesTypeArgs, s"Type $constructor takes no type arguments")
+          assert(args.forall(is.defined),    "Not all type arguments are defined")
+          assert(constructor.typeParams.size == args.size,
+            s"Type params <-> args size mismatch for $constructor")
           u.appliedType(constructor, args.map(_.dealias.widen): _*)
         }
 
@@ -208,12 +210,6 @@ trait Types { this: AST =>
         apply(Sym.fun(n).toTypeConstructor, params :+ result: _*)
       }
 
-      /** Creates a `this` type of an enclosing class or module. */
-      def thisOf(encl: u.Symbol): u.ThisType = {
-        assert(encl.isClass || encl.isModule, s"Cannot reference this of `$encl`")
-        thisType(encl).asInstanceOf[u.ThisType]
-      }
-
       /** Creates a new tuple type. */
       def tupleOf(first: u.Type, rest: u.Type*): u.Type = {
         val n = rest.size + 1
@@ -223,9 +219,9 @@ trait Types { this: AST =>
 
       /** Extracts the i-th (1-based) type argument of the applied type `tpe`. */
       def arg(i: Int, tpe: u.Type): u.Type = {
-        assert(is.defined(tpe), s"Undefined type `$tpe`")
+        assert(is.defined(tpe), "Undefined type")
         val args = tpe.dealias.widen.typeArgs
-        assert(args.size >= i, s"Type `$tpe` has no type argument #$i")
+        assert(args.size >= i, s"Type $tpe has no type argument #$i")
         args(i - 1)
       }
 
@@ -244,33 +240,24 @@ trait Types { this: AST =>
 
       /** Returns a new method type (possibly generic and with multiple arg lists). */
       def method(tparams: u.TypeSymbol*)(paramss: Seq[u.TermSymbol]*)(result: u.Type): u.Type = {
-        assert(tparams.forall(is.defined), "Not all method type params are defined")
+        assert(tparams.forall(is.defined),         "Not all method type params are defined")
         assert(paramss.flatten.forall(is.defined), "Not all method param types are defined")
-        assert(is.defined(result), s"Undefined method return type `$result`")
-
-        val returnT = result.dealias.widen
-        val methodT = if (paramss.isEmpty) {
-          nullaryMethodType(returnT)
-        } else paramss.foldRight(returnT) { (params, ret) =>
-          methodType(params.toList, ret)
+        assert(is.defined(result),                 "Undefined method return type")
+        val mono = if (paramss.isEmpty) {
+          nullaryMethodType(result.dealias.widen)
+        } else paramss.foldRight(result.dealias.widen) {
+          (params, ret) => methodType(params.toList, ret)
         }
 
-        if (tparams.isEmpty) methodT
-        else polyType(tparams.toList, methodT)
-      }
-
-      /** Extracts the result type of `tpe` if it's a lambda or a method type. */
-      def result(tpe: u.Type): u.Type = {
-        val wide = tpe.dealias.widen
-        if (Sym.funs(wide.typeSymbol)) wide.typeArgs.last
-        else wide.resultType
+        if (tparams.isEmpty) mono
+        else polyType(tparams.toList, mono)
       }
 
       /** Extracts the type signature of `sym` (with an optional target), if any. */
-      def signature(sym: u.Symbol, in: u.Type = u.NoType): u.Type = {
-        assert(is.defined(sym), s"Symbol $sym is not defined")
-        assert(has.tpe(sym),    s"Symbol $sym has no type signature")
-        val sign = if (is.defined(in)) sym.typeSignatureIn(in) else sym.typeSignature
+      def signature(sym: u.Symbol, in: u.Type = Type.none): u.Type = {
+        assert(is.defined(sym), "Symbol is not defined")
+        assert(has.tpe(sym),   s"Symbol $sym has no type signature")
+        val sign = if (is.defined(in)) sym.infoIn(in) else sym.info
         if (is.byName(sym)) sign.typeArgs.head else sign
       }
 
@@ -282,69 +269,73 @@ trait Types { this: AST =>
       def tree(tpe: u.Type): u.Tree = {
         def original(tpe: u.Type): u.Tree = setType(tpe match {
           // Degenerate type: `this[staticID]`.
-          case u.ThisType(sym) if sym.isStatic =>
-            api.Tree.resolveStatic(sym)
+          case u.ThisType(encl) if encl.isStatic =>
+            api.Tree.resolveStatic(encl)
           // This type: `this[T]`.
-          case u.ThisType(sym) =>
-            api.This(sym)
+          case u.ThisType(encl) =>
+            api.This(encl)
           // Super type: `this.super[T]`
-          case u.SuperType(ths, sup) =>
-            val sym = sup.typeSymbol.asType
-            setSymbol(u.Super(original(ths), sym.name), sym)
+          case u.SuperType(ths, parent) =>
+            val sym = parent.typeSymbol.asType
+            val sup = u.Super(original(ths), sym.name)
+            setSymbol(sup, sym)
           // Package or class ref: `package` or `Class`.
           case u.SingleType(u.NoPrefix, target)
-            if target.isPackage || target.isClass
-            => api.Id(target)
+            if target.isPackage || target.isClass => api.Id(target)
           // Singleton type: `stableID.tpe`.
           case u.SingleType(u.NoPrefix, stableID) =>
-            u.SingletonTypeTree(api.Id(stableID))
+            u.SingletonTypeTree(Id(stableID))
           // Qualified type: `pkg.T`.
           case u.SingleType(pkg, target) =>
-            api.Sel(original(pkg), target)
+            Sel(original(pkg), target)
           // Abstract type ref: `T`.
           case u.TypeRef(u.NoPrefix, target, Nil) =>
-            api.Id(target)
+            Id(target)
           // Path dependent type: `path.T`.
           case u.TypeRef(path, target, Nil) =>
-            api.Sel(original(path), target)
+            Sel(original(path), target)
           // Applied type: `T[A, B, ...]`.
           case u.TypeRef(u.NoPrefix, target, args) =>
             u.AppliedTypeTree(api.Id(target), args.map(Type.tree))
           // Applied path dependent type: `path.T[A, B, ...]`
           case u.TypeRef(path, target, args) =>
-            u.AppliedTypeTree(api.Sel(original(path), target), args.map(Type.tree))
+            u.AppliedTypeTree(Sel(original(path), target), args.map(Type.tree))
           // Type bounds: `T >: lo <: hi`.
           case u.TypeBounds(lo, hi) =>
             u.TypeBoundsTree(Type.tree(lo), Type.tree(hi))
           // Existential type: `F[A, B, ...] forSome { type A; type B; ... }`
           case u.ExistentialType(quantified, underlying) =>
-            u.ExistentialTypeTree(Type.tree(underlying), quantified.map(internal.typeDef))
+            u.ExistentialTypeTree(Type.tree(underlying), quantified.map(typeDef))
           // Annotated type: `A @ann1 @ann2 ...`
           case AnnotatedType(annotations, underlying) =>
-            annotations.foldLeft(original(underlying))((res, ann) =>
-              u.Annotated(ann.tree, res)
-            )
+            annotations.foldLeft(original(underlying)) {
+              (res, ann) => u.Annotated(ann.tree, res)
+            }
           // E.g. type refinement: `T { def size: Int }`
-          case _ =>
-            abort(s"Cannot convert type `$tpe` to a type-tree")
+          case _ => abort(s"Cannot convert type $tpe to a type-tree")
         }, tpe)
-        setOriginal(u.TypeTree(tpe), original(tpe))
+
+        val tpt = u.TypeTree(tpe)
+        setOriginal(tpt, original(tpe))
       }
     }
 
     /** Quoted type-trees. */
     object TypeQuote extends Node {
 
+      /** An empty type-tree. */
+      def empty: u.TypeTree = u.TypeTree()
+
       /** Reifies `tpe` as a tree. */
       def apply(tpe: u.Type): u.TypeTree = {
-        assert(is.defined(tpe), s"$this type `$tpe` is not defined")
+        assert(is.defined(tpe), s"$this type is not defined")
         u.TypeTree(tpe)
       }
 
       /** Reifies `sym`'s type as a tree. */
       def apply(sym: u.Symbol): u.TypeTree = {
-        assert(is.defined(sym), s"$this symbol `$sym` is not defined")
-        assert(has.tpe(sym), s"$this symbol `$sym` has no type")
+        assert(is.defined(sym), s"$this symbol is not defined")
+        assert(has.tpe(sym),    s"$this symbol $sym has no type")
         apply(sym.info)
       }
 
@@ -352,17 +343,15 @@ trait Types { this: AST =>
       def apply[T: u.TypeTag]: u.TypeTree =
         apply(Type[T])
 
-      def unapply(tree: u.Tree): Option[u.Type] = tree match {
-        case Tree.With.tpe(_, tpe) if tree.isType => Some(tpe)
-        case _ => None
-      }
+      def unapply(tpt: u.TypeTree): Option[u.Type] =
+        for (tpt <- Option(tpt) if has.tpe(tpt)) yield tpt.tpe
     }
 
     /** By-name types (`=> T`), legal only in parameter declarations. */
     // TODO: Define a constructor?
     object ByNameType {
 
-      val sym: u.ClassSymbol = u.definitions.ByNameParamClass
+      lazy val sym: u.ClassSymbol = ByNameParamClass
 
       def unapply(tpe: u.TypeRef): Option[u.Type] = tpe match {
         case u.TypeRef(_, `sym`, Seq(arg)) => Some(arg)
@@ -374,12 +363,12 @@ trait Types { this: AST =>
     // TODO: Define a constructor?
     object VarArgType {
 
-      val scalaSym: u.ClassSymbol = u.definitions.RepeatedParamClass
-      val javaSym: u.ClassSymbol = u.definitions.JavaRepeatedParamClass
+      lazy val scalaSym: u.ClassSymbol = RepeatedParamClass
+      lazy val javaSym:  u.ClassSymbol = JavaRepeatedParamClass
 
       def unapply(tpe: u.TypeRef): Option[u.Type] = tpe match {
         case u.TypeRef(_, `scalaSym`, Seq(arg)) => Some(arg)
-        case u.TypeRef(_, `javaSym`, Seq(arg)) => Some(arg)
+        case u.TypeRef(_, `javaSym`,  Seq(arg)) => Some(arg)
         case _ => None
       }
     }

@@ -16,11 +16,11 @@
 package org.emmalanguage
 package ast
 
-/** Methods (`def`s). */
+/** Methods (defs). */
 trait Methods { this: AST =>
 
   /**
-   * Methods (`def`s).
+   * Methods (defs).
    *
    * === Examples ===
    * {{{
@@ -58,9 +58,9 @@ trait Methods { this: AST =>
     import universe._
     import internal._
     import reificationSupport._
-    import u.Flag._
+    import Flag._
 
-    /** Method (`def`) symbols. */
+    /** Method (def) symbols. */
     object DefSym extends Node {
 
       /**
@@ -81,7 +81,7 @@ trait Methods { this: AST =>
         (paramss: Seq[u.TermSymbol]*)
         (result: u.Type): u.MethodSymbol = {
 
-        assert(are.not(CONTRAVARIANT)(flags), s"$this `$name` cannot be a label")
+        assert(are.not(CONTRAVARIANT)(flags), s"$this $name cannot be a label")
         val sym = newMethodSymbol(owner, TermName(name), pos, flags)
         val tps = tparams.map(Sym.With(_)(own = sym, flg = DEFERRED | PARAM).asType)
         val pss = paramss.map(_.map(Sym.With(_)(own = sym, flg = PARAM).asTerm))
@@ -92,7 +92,7 @@ trait Methods { this: AST =>
         Option(sym).filter(is.method)
     }
 
-    /** Method (`def`) calls. */
+    /** Method (def) calls. */
     object DefCall extends Node {
 
       /**
@@ -109,16 +109,16 @@ trait Methods { this: AST =>
 
         val fun = target match {
           case Some(tgt) =>
-            assert(is.defined(tgt), s"$this target is not defined: $tgt")
-            assert(is.term(tgt), s"$this target is not a term:\n${Tree.show(tgt)}")
-            assert(has.tpe(tgt), s"$this target has no type:\n${Tree.showTypes(tgt)}")
+            assert(is.defined(tgt), s"$this target is not defined")
+            assert(is.term(tgt),    s"$this target is not a term:\n${Tree.show(tgt)}")
+            assert(has.tpe(tgt),    s"$this target has no type:\n${Tree.showTypes(tgt)}")
             val resolved = Sym.resolveOverloaded(tgt.tpe)(method, targs: _*)(argss: _*)
-            assert(is.method(resolved), s"$this resolved variant `$resolved` is not a method")
+            assert(is.method(resolved), s"$this resolved variant $resolved is not a method")
             Sel(tgt, resolved)
 
           case None =>
             val resolved = Sym.resolveOverloaded()(method, targs: _*)(argss: _*)
-            assert(is.method(resolved), s"$this resolved variant `$resolved` is not a method")
+            assert(is.method(resolved), s"$this resolved variant $resolved is not a method")
             Id(resolved)
         }
 
@@ -141,7 +141,7 @@ trait Methods { this: AST =>
         }
     }
 
-    /** Method (`def`) definitions. */
+    /** Method (def) definitions. */
     object DefDef extends Node {
 
       /**
@@ -158,29 +158,22 @@ trait Methods { this: AST =>
         (paramss: Seq[u.TermSymbol]*)
         (body: u.Tree): u.DefDef = {
 
-        assert(is.defined(sym), s"$this symbol `$sym` is not defined")
-        assert(is.method(sym), s"$this symbol `$sym` is not a method")
-        assert(has.nme(sym), s"$this symbol `$sym` has no name")
-        assert(is.encoded(sym), s"$this symbol `$sym` is not encoded")
-        assert(has.tpe(sym), s"$this symbol `$sym` has no type")
-        assert(tparams.forall(is.defined), s"Not all $this type parameters are defined")
+        assert(is.defined(sym), s"$this symbol is not defined")
+        assert(is.method(sym),  s"$this symbol $sym is not a method")
+        assert(has.nme(sym),    s"$this symbol $sym has no name")
+        assert(is.encoded(sym), s"$this symbol $sym is not encoded")
+        assert(has.tpe(sym),    s"$this symbol $sym has no type")
+        assert(tparams.forall(is.defined),         s"Not all $this type parameters are defined")
         assert(paramss.flatten.forall(is.defined), s"Not all $this parameters are defined")
-        assert(have.nme(paramss.flatten), s"Not all $this parameters have names")
-        assert(paramss.flatten.forall(has.tpe), s"Not all $this parameters have types")
-        assert(is.defined(body), s"$this body is not defined: $body")
-        assert(is.term(body), s"$this body is not a term:\n${Tree.show(body)}")
-        assert(has.tpe(body), s"$this body has no type:\n${Tree.showTypes(body)}")
+        assert(have.nme(paramss.flatten),          s"Not all $this parameters have names")
+        assert(paramss.flatten.forall(has.tpe),    s"Not all $this parameters have types")
+        assert(is.defined(body), s"$this body is not defined")
+        assert(is.term(body),    s"$this body is not a term:\n${Tree.show(body)}")
+        assert(has.tpe(body),    s"$this body has no type:\n${Tree.showTypes(body)}")
         assert(tparams.size == sym.typeParams.size, s"Wrong number of $this type parameters")
         assert(paramss.size == sym.paramLists.size, s"Wrong number of $this parameter lists")
         assert(paramss.flatten.size == sym.paramLists.flatten.size,
           s"Shape of $this parameter lists doesn't match")
-        assert({
-          val tpMap = (tparams.map(_.toType) zip sym.typeParams.map(_.asType.toType))
-            .toMap.withDefault(identity[u.Type])
-          (paramss.flatten zip sym.paramLists.flatten)
-            .forall { case (p, q) => p.info.map(tpMap) =:= q.info }
-        }, s"Not all $this parameters have the correct type")
-        val mod = u.Modifiers(flags(sym) | flg)
         val tps = sym.typeParams.map(typeDef)
         val pss = sym.paramLists.map(_.map(p => ParDef(p.asTerm)))
         val src = tparams ++ paramss.flatten
@@ -188,8 +181,9 @@ trait Methods { this: AST =>
         val rhs = Sym.subst(sym, src zip dst: _*)(body)
         val res = sym.info.finalResultType
         assert(rhs.tpe <:< sym.info.finalResultType,
-          s"$this body type `${rhs.tpe}` is not a subtype of return type `$res`")
-        setSymbol(u.DefDef(mod, sym.name, tps, pss, TypeQuote(res), rhs), sym)
+          s"$this body type ${rhs.tpe} is not a subtype of return type $res")
+        val dfn = u.DefDef(Sym.mods(sym), sym.name, tps, pss, TypeQuote(res), rhs)
+        setSymbol(dfn, sym)
       }
 
       def unapply(defn: u.DefDef)

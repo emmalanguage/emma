@@ -26,6 +26,7 @@ trait Trees { this: AST =>
   trait TreeAPI { this: API =>
 
     import universe._
+    import definitions._
     import internal._
     import reificationSupport._
 
@@ -34,8 +35,8 @@ trait Trees { this: AST =>
 
       // Predefined trees
       lazy val Root  = Id(u.rootMirror.RootPackage)
-      lazy val Java  = Sel(Root, u.definitions.JavaLangPackage)
-      lazy val Scala = Sel(Root, u.definitions.ScalaPackage)
+      lazy val Java  = Sel(Root, JavaLangPackage)
+      lazy val Scala = Sel(Root, ScalaPackage)
 
       object With {
 
@@ -195,32 +196,28 @@ trait Trees { this: AST =>
         u.showCode(tree, printTypes = true)
 
       /** Returns a set of all term definitions in a `tree`. */
-      def defs(tree: u.Tree): Set[u.TermSymbol] = tree.collect {
-        case TermDef(lhs) => lhs
-      }.toSet
+      def defs(tree: u.Tree): Set[u.TermSymbol] =
+        tree.collect { case TermDef(lhs) => lhs }.toSet
 
       /** Returns a set of all term references in a `tree`. */
-      def refs(tree: u.Tree): Set[u.TermSymbol] = tree.collect {
-        case TermRef(target) => target
-      }.toSet
+      def refs(tree: u.Tree): Set[u.TermSymbol] =
+        tree.collect { case TermRef(target) => target }.toSet
 
       /** Returns the closure of `tree` as a set. */
       def closure(tree: u.Tree): Set[u.TermSymbol] =
         refs(tree) diff defs(tree) filterNot (_.isStatic)
 
       /** Returns a set of all binding definitions in `tree`. */
-      def bindings(tree: u.Tree): Set[u.TermSymbol] = tree.collect {
-        case BindingDef(lhs, _, _) => lhs
-      }.toSet
+      def bindings(tree: u.Tree): Set[u.TermSymbol] =
+        tree.collect { case BindingDef(lhs, _, _) => lhs }.toSet
 
       /** Returns a set of all lambdas in `tree`. */
-      def lambdas(tree: u.Tree): Set[u.TermSymbol] = tree.collect {
-        case Lambda(fun, _, _) => fun
-      }.toSet
+      def lambdas(tree: u.Tree): Set[u.TermSymbol] =
+        tree.collect { case Lambda(fun, _, _) => fun }.toSet
 
       /** Returns a set of all method (`def`) definitions in `tree`. */
       def methods(tree: u.Tree): Set[u.MethodSymbol] = tree.collect {
-        case defn: u.DefDef => defn.symbol.asMethod
+        case dfn: u.DefDef => dfn.symbol.asMethod
       }.toSet
 
       /** Returns a set of all variable (`var`) mutations in `tree`. */
@@ -233,25 +230,22 @@ trait Trees { this: AST =>
         closure(tree) & mutations(tree)
 
       /** Returns a set of all parameter definitions in `tree`. */
-      def parameters(tree: u.Tree): Set[u.TermSymbol] = tree.collect {
-        case ParDef(lhs, _, _) => lhs
-      }.toSet
+      def parameters(tree: u.Tree): Set[u.TermSymbol] =
+        tree.collect { case ParDef(lhs, _, _) => lhs }.toSet
 
       /** Returns a set of all value (`val`) definitions in `tree`. */
-      def values(tree: u.Tree): Set[u.TermSymbol] = tree.collect {
-        case ValDef(lhs, _, _) => lhs
-      }.toSet
+      def values(tree: u.Tree): Set[u.TermSymbol] =
+        tree.collect { case ValDef(lhs, _, _) => lhs }.toSet
 
       /** Returns a set of all variable (`var`) definitions in `tree`. */
-      def variables(tree: u.Tree): Set[u.TermSymbol] = tree.collect {
-        case VarDef(lhs, _, _) => lhs
-      }.toSet
+      def variables(tree: u.Tree): Set[u.TermSymbol] =
+        tree.collect { case VarDef(lhs, _, _) => lhs }.toSet
 
       /** Returns a fully-qualified reference to `target` (must be static). */
       def resolveStatic(target: u.Symbol): u.Tree = {
-        assert(is.defined(target), s"Cannot resolve undefined target `$target`")
-        assert(target.isStatic, s"Cannot resolve dynamic target `$target`")
-        Owner.chain(target).takeWhile(x => !is.root(x)).foldRight[u.Tree](Root) {
+        assert(is.defined(target), "Cannot resolve undefined target")
+        assert(target.isStatic,   s"Cannot resolve dynamic target $target")
+        Owner.chain(target).takeWhile(!is.root(_)).foldRight[u.Tree](Root) {
           (member, owner) => Sel(owner, member)
         }
       }
@@ -273,7 +267,7 @@ trait Trees { this: AST =>
           else TypeSym.fresh(sym.asType)
         }): _*)
 
-      /** Refreshes all `symbols` in a tree that are defined within (including the symbols of lambdas). */
+      /** Refreshes all `symbols` in a tree that are defined within (including lambdas). */
       def refreshAll(tree: u.Tree): u.Tree =
         refresh(tree.collect {
           case TermDef(sym) => sym
@@ -319,14 +313,14 @@ trait Trees { this: AST =>
 
       /** Creates a curried version of the supplied `lambda`. */
       def curry(lambda: u.Function): u.Function = lambda match {
-        case Lambda(sym, params, body) => params.foldRight(body) {
-          case (ParDef(lhs, _, _), rhs) => Lambda(lhs)(rhs)
-        }.asInstanceOf[u.Function]
+        case Lambda(_, params, body) =>
+          if (params.size <= 1) lambda else params.foldRight(body) {
+            case (ParDef(lhs, _, _), rhs) => Lambda(lhs)(rhs)
+          }.asInstanceOf[u.Function]
       }
 
       /** Removes all (possibly nested) type ascriptions from `tree`. */
-      @tailrec
-      def unAscribe(tree: u.Tree): u.Tree = tree match {
+      @tailrec def unAscribe(tree: u.Tree): u.Tree = tree match {
         case TypeAscr(expr, _) => unAscribe(expr)
         case _ => tree
       }
@@ -346,10 +340,10 @@ trait Trees { this: AST =>
     private[ast] object Id extends Node {
 
       def apply(target: u.Symbol): u.Ident = {
-        assert(is.defined(target), s"$this target `$target` is not defined")
-        assert(has.nme(target), s"$this target `$target` has no name")
-        assert(has.tpe(target), s"$this target `$target` has no type")
-        assert(is.encoded(target), s"$this target `$target` is not encoded")
+        assert(is.defined(target), s"$this target is not defined")
+        assert(has.nme(target),    s"$this target $target has no name")
+        assert(has.tpe(target),    s"$this target $target has no type")
+        assert(is.encoded(target), s"$this target $target is not encoded")
         setType(mkIdent(target), target.info match {
           case u.NullaryMethodType(res) => res
           case tpe if tpe <:< Type.anyRef && is.stable(target) =>
@@ -368,17 +362,17 @@ trait Trees { this: AST =>
     private[ast] object Sel extends Node {
 
       def apply(target: u.Tree, member: u.Symbol): u.Select = {
-        assert(is.defined(target), s"$this target is not defined: $target")
-        assert(has.tpe(target), s"$this target has no type:\n${Tree.showTypes(target)}")
-        assert(is.defined(member), s"$this member `$member` is not defined")
-        assert(has.tpe(member), s"$this member `$member` has no type")
+        assert(is.defined(target), s"$this target is not defined")
+        assert(has.tpe(target),    s"$this target has no type:\n${Tree.showTypes(target)}")
+        assert(is.defined(member), s"$this member $member is not defined")
+        assert(has.tpe(member),    s"$this member $member has no type")
         val mod = member.isPackageClass || member.isModuleClass
         val sym = if (mod) member.asClass.module else member
         val sel = mkSelect(target, sym)
         setType(sel, sym.infoIn(target.tpe) match {
           case u.NullaryMethodType(res) => res
-          case tpe if tpe <:< Type.anyRef && is.stable(sym) && is.stable(target.tpe) =>
-            singleType(target.tpe, sym)
+          case tpe if tpe <:< Type.anyRef && is.stable(sym) &&
+            is.stable(target.tpe) => singleType(target.tpe, sym)
           case tpe => tpe
         })
       }
@@ -398,9 +392,9 @@ trait Trees { this: AST =>
        * @return `target`.
        */
       def apply(target: u.Symbol): u.Ident = {
-        assert(is.defined(target), s"$this target `$target` is not defined")
-        assert(!target.isPackage, s"$this target `$target` cannot be a package")
-        assert(!target.isMethod, s"$this target `$target` cannot be a method")
+        assert(is.defined(target), s"$this target is not defined")
+        assert(!target.isPackage,  s"$this target $target cannot be a package")
+        assert(!target.isMethod,   s"$this target $target cannot be a method")
         Id(target)
       }
 
@@ -420,17 +414,17 @@ trait Trees { this: AST =>
        * @return `target.member`.
        */
       def apply(target: u.Tree, member: u.Symbol): u.Select = {
-        assert(is.defined(target), s"$this target is not defined: $target")
-        assert(is.term(target), s"$this target is not a term:\n${Tree.show(target)}")
-        assert(is.defined(member), s"$this member `$member` is not defined")
-        assert(!member.isStatic, s"$this member `$member` cannot be static")
-        assert(!is.method(member), s"$this member `$member` cannot be a method")
+        assert(is.defined(target), s"$this target is not defined")
+        assert(is.term(target),    s"$this target is not a term:\n${Tree.show(target)}")
+        assert(is.defined(member), s"$this member is not defined")
+        assert(!member.isStatic,   s"$this member $member cannot be static")
+        assert(!is.method(member), s"$this member $member cannot be a method")
         Sel(target, member)
       }
 
       def unapply(acc: u.Select): Option[(u.Tree, u.Symbol)] = acc match {
-        case Sel(Term(target), member) if !member.isStatic && !is.method(member) =>
-          Some(target, member)
+        case Sel(Term(target), member) if !member.isStatic &&
+          !is.method(member) => Some(target, member)
         case _ => None
       }
     }
@@ -438,8 +432,7 @@ trait Trees { this: AST =>
     /** Definitions. */
     object Def extends Node {
       def unapply(tree: u.Tree): Option[u.Symbol] = for {
-        tree <- Option(tree)
-        if tree.isDef && has.sym(tree)
+        tree <- Option(tree) if tree.isDef && has.sym(tree)
       } yield tree.symbol
     }
   }
