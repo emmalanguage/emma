@@ -25,7 +25,7 @@ import test.schema.Marketing._
 import scala.collection.mutable
 
 /** A spec defining the subset of Scala modeling the LNF language used by the Emma compiler. */
-class LanguageSpec extends BaseCompilerSpec {
+class CoreLangSpec extends BaseCompilerSpec {
 
   import compiler._
   import Core.valid
@@ -123,7 +123,7 @@ class LanguageSpec extends BaseCompilerSpec {
     val examples = extractFrom(u.reify {
       class Unqualified { println(this) }
       class Qualified { println(Qualified.this) }
-      class Outer { println(LanguageSpec.this) }
+      class Outer { println(CoreLangSpec.this) }
       object Module { println(this) }
       Module: AnyRef
     }).map(_.collect {

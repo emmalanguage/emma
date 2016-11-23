@@ -56,8 +56,9 @@ private[source] trait SourceValidate extends Common {
         case src.Lit(_) => pass
       }
 
-      lazy val Ref: Validator =
-        oneOf(BindingRef, ModuleRef)
+      lazy val Ref: Validator = {
+        case src.Ref(_) => pass
+      }
 
       lazy val This: Validator = {
         case src.This(_) => pass
@@ -118,19 +119,6 @@ private[source] trait SourceValidate extends Common {
 
       lazy val BindingDef: Validator =
         oneOf(ValDef, VarDef, ParDef)
-
-      // ---------------------------------------------------------------------------
-      // Modules
-      // ---------------------------------------------------------------------------
-
-      lazy val ModuleRef: Validator = {
-        case src.ModuleRef(_) => pass
-      }
-
-      lazy val ModuleAcc: Validator = {
-        case src.ModuleAcc(target, _) =>
-          target is Term otherwise s"Invalid ${src.ModuleAcc} target"
-      }
 
       // ---------------------------------------------------------------------------
       // Methods
@@ -238,6 +226,11 @@ private[source] trait SourceValidate extends Common {
       // Terms
       // ---------------------------------------------------------------------------
 
+      lazy val TermAcc: Validator = {
+        case src.TermAcc(target, _) =>
+          target is Term otherwise s"Invalid ${src.TermAcc} target"
+      }
+
       lazy val Block: Validator = {
         case src.Block(stats, expr) => {
           all (stats) are Stat otherwise s"Invalid ${src.Block} statement"
@@ -273,7 +266,7 @@ private[source] trait SourceValidate extends Common {
       }
 
       lazy val Term: Validator =
-        oneOf(Atomic, ModuleAcc, Inst, DefCall, Block, Branch, Lambda, TypeAscr, PatMat)
+        oneOf(Atomic, TermAcc, Inst, DefCall, Block, Branch, Lambda, TypeAscr, PatMat)
 
       // ---------------------------------------------------------------------------
       // Statements
