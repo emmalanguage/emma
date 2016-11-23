@@ -121,6 +121,12 @@
             <groupId>org.scalatest</groupId>
             <artifactId>scalatest_${scala.tools.version}</artifactId>
         </dependency>
+
+        <!-- JSON-Rendering -->
+        <dependency>
+            <groupId>io.spray</groupId>
+            <artifactId>spray-json_${scala.tools.version}</artifactId>
+        </dependency>
     </dependencies>
 
     <build>

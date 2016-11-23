@@ -232,6 +232,7 @@ This project includes:
   Spark Project Unsafe under Apache 2.0 License
   spire under BSD-style
   spire-macros under BSD-style
+  spray-json under Apache 2
   StAX API under The Apache Software License, Version 2.0
   stream-lib under Apache License, Version 2.0
   test-interface under BSD

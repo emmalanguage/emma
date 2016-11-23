@@ -26,6 +26,7 @@ import org.eclipse.jetty.webapp.WebAppContext
 
 import java.io.{File, PrintStream}
 import java.net.{URL, URLClassLoader}
+import java.nio.file.Path
 import java.nio.file.Paths
 
 object HttpServer {
@@ -40,8 +41,16 @@ object HttpServer {
   private[server] var LOGGER: Logger = Logger.getRootLogger
   private var server: Server = null
 
+  private[this] var graphPath: Option[Path] = None
+
   @throws(classOf[Exception])
   def main(args: Array[String]): Unit = {
+    if(args.size != 1) {
+      // FIXME make better error message
+      println("Missing 1st argument (graph path)")
+      System.exit(1)
+    }
+    graphPath = Some(Paths.get(args(0)))
     System.setOut(createLoggingProxy(System.out))
     System.setErr(createLoggingProxy(System.err))
     HttpServer.start()
@@ -82,6 +91,8 @@ object HttpServer {
     context.addServlet(new ServletHolder(new CodeServlet), "/code/*")
     context.addServlet(new ServletHolder(new PlanServlet), "/plan/*")
     context.addServlet(new ServletHolder(new LogEventServlet), "/log/*")
+    context.addServlet(new ServletHolder(new GraphServlet(graphPath.get)), "/graph/*")
+
     this.server.setHandler(context)
 
     try {

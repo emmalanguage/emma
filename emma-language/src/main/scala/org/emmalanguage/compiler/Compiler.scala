@@ -22,6 +22,7 @@ import lang.cf.ControlFlow
 import lang.core.Core
 import lang.libsupport.LibSupport
 import lang.source.Source
+import tools.GraphTools
 
 import scala.reflect.api.Universe
 
@@ -36,7 +37,8 @@ trait Compiler extends AlphaEq
   with Source
   with Core
   with Backend
-  with ControlFlow {
+  with ControlFlow
+  with GraphTools {
 
   /** The underlying universe object. */
   override val universe: Universe
