@@ -41,11 +41,11 @@ class MonoidSpec extends FreeSpec with Checkers with Equivalences with Arbitrari
     "forgetful" - {
 
       "with left bias" in {
-        check(GroupLaws[Int].monoid(left(0)).all)
+        check(GroupLaws[Int].monoid(first(0)).all)
       }
 
       "with right bias" in {
-        check(GroupLaws[String].monoid(right("")).all)
+        check(GroupLaws[String].monoid(last("")).all)
       }
     }
     

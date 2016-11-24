@@ -53,13 +53,13 @@ object Monoids {
     }
 
   /** Trivial monoid with bias to the left. */
-  def left[A](zero: A): Monoid[A] = new Monoid[A] {
+  def first[A](zero: A): Monoid[A] = new Monoid[A] {
     def empty = zero
     def combine(x: A, y: A) = if (x == zero) y else x
   }
 
   /** Trivial monoid with bias to the right. */
-  def right[A](zero: A): Monoid[A] = new Monoid[A] {
+  def last[A](zero: A): Monoid[A] = new Monoid[A] {
     def empty = zero
     def combine(x: A, y: A) = if (y == zero) x else y
   }

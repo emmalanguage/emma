@@ -298,7 +298,7 @@ trait LibSupport extends Common {
                 // inherit enclosing caller lambda or library function
                 case ValDef(sym, Lambda(_, _, _)) =>
                   lambdas.getOrElse(sym, v)
-              })(Monoids.right(v))
+              })(Monoids.last(v))
               .inherit({
                 // inherit function type parameters of enclosing Lambda and DefDef nodes
                 case Lambda(_, params, _) => (for {
