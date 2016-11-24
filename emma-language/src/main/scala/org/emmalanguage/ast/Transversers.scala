@@ -276,10 +276,10 @@ trait Transversers { this: AST =>
       transformWith(forgetful(template))
 
     /** Inherits the root of the tree ([[None]] if the current node is the root). */
-    def withRoot = inherit(partial(Option.apply))(left(None))
+    def withRoot = inherit(partial(Option.apply))(first(None))
 
     /** Inherits the parent of the current node ([[None]] if the current node is the root). */
-    def withParent = inherit(partial(Option.apply))(right(None))
+    def withParent = inherit(partial(Option.apply))(last(None))
 
     /** Inherits all ancestors of the current node in a vector. */
     def withAncestors = inherit(Attr.collect[Vector, Tree](partial(identity)))
@@ -290,7 +290,7 @@ trait Transversers { this: AST =>
 
     /** Inherits the owner of the current node. */
     def withOwner(default: Symbol): Strategy[A, Symbol :: I, S] =
-      inherit { case api.Owner(sym) => sym } (right(default))
+      inherit { case api.Owner(sym) => sym } (last(default))
 
     /** Inherits the owner chain of the current node. */
     def withOwnerChain = inherit(Attr.collect[Vector, Symbol] {
