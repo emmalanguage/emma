@@ -21,7 +21,7 @@ import api.Group
 import compiler.integration.BaseCompilerITCase
 import compiler.ir.ComprehensionSyntax._
 import examples.text.WordCount
-import io.csv.CSV
+import io.csv._
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -39,6 +39,7 @@ class WordCountITCase extends BaseCompilerITCase {
   val input: String = null
   val output: String = null
   val csv = CSV()
+  implicit val countCSVConverter = CSVConverter[(String, Long)]
 
   // ---------------------------------------------------------------------------
   // Program representations

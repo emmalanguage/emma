@@ -16,18 +16,20 @@
 package org.emmalanguage
 package cli
 
-import api.Meta.Projections._
 import api._
+import api.Meta.Projections._
 import examples.graphs._
 import examples.graphs.model._
 import examples.ml.classification._
 import examples.ml.clustering._
 import examples.ml.model._
 import examples.text._
-import io.csv.CSV
+import io.csv._
 
 import breeze.linalg.Vector
 import org.apache.spark.sql.SparkSession
+
+import scala.reflect.ClassTag
 
 // TODO: migrate this to `emma-spark` once the dependency to `emma-examples` is inverted
 object SparkExamples {
@@ -163,6 +165,9 @@ object SparkExamples {
   // ---------------------------------------------------------------------------
   // Parallelized algorithms
   // ---------------------------------------------------------------------------
+
+  implicit def breezeVectorCSVField[V](implicit V: CSVColumn[V], ctag: ClassTag[V])
+    : CSVConverter[Vector[V]] = CSVConverter.iso[Array[V], Vector[V]](Vector.apply, _.toArray)
 
   // Graphs
 

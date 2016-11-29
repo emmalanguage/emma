@@ -17,7 +17,7 @@ package org.emmalanguage
 package compiler
 
 import api._
-import io.csv.CSV
+import io.csv._
 import test.schema.Graphs._
 import test.schema.Movies._
 import test.schema.Math._
@@ -27,6 +27,7 @@ import org.junit.runner.RunWith
 import org.scalatest._
 import org.scalatest.junit.JUnitRunner
 
+import scala.collection.IterableLike
 import scala.collection.generic.CanBuildFrom
 import scala.util.Random
 
@@ -43,15 +44,17 @@ abstract class BaseCodegenSpec
 
   val inputDir = tempPath("test/input")
   val outputDir = tempPath("test/output")
+  implicit val imdbMovieCSVConverter = CSVConverter[ImdbMovie]
 
   def backendPipeline: u.Tree => u.Tree
 
-  val codegenPipeline: u.Expr[Any] => u.Tree = compiler.pipeline(true)(
-    checkValid,
-    Core.lift,
-    Comprehension.combine,
-    backendPipeline
-  ).compose(_.tree)
+  val codegenPipeline: u.Expr[Any] => u.Tree =
+    compiler.pipeline(typeCheck = true)(
+      checkValid,
+      Core.lift,
+      Comprehension.combine,
+      backendPipeline
+    ).compose(_.tree)
 
   def verify(e: u.Expr[Any]): Unit = {
     val expected = eval[Any](idPipeline(e))
@@ -66,7 +69,7 @@ abstract class BaseCodegenSpec
   lazy val checkValid = (tree: u.Tree) => if (!Source.validate(tree)) fail else tree
 
   def show(x: Any): String = x match {
-    case bag: DataBag[_] => x.asInstanceOf[DataBag[_]].fetch().toString
+    case _: DataBag[_] => x.asInstanceOf[DataBag[_]].fetch().toString
     case _ => x.toString
   }
 
@@ -602,8 +605,9 @@ object BaseCodegenSpec {
     .partition { _.length % 2 == 0 }
 
   // Workaround for https://issues.scala-lang.org/browse/SI-9933
-  def zipWithIndex[A, Repr, That](coll: scala.collection.IterableLike[A, Repr])
-                                 (implicit bf: CanBuildFrom[Repr, (A, Int), That]): That = {
+  def zipWithIndex[A, Repr, That](coll: IterableLike[A, Repr])(
+    implicit bf: CanBuildFrom[Repr, (A, Int), That]
+  ): That = {
     val b = bf(coll.repr)
     var i = 0
     for (x <- coll) {
