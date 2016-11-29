@@ -26,7 +26,7 @@ object GraphPreprocessing {
 
   type Proj[L] = DataBag[Collaboration] => L
 
-  def apply[L: Meta](input: String, csv: CSV)(proj: Proj[L]): DataBag[LEdge[Person, L]] = {
+  def apply[L: Meta.Tag](input: String, csv: CSV)(proj: Proj[L]): DataBag[LEdge[Person, L]] = {
 
     // FIXME: CSVMacro does not work with Option[T] types
     val people : DataBag[Person] = ??? // DataBag.readCSV[Person](s"$input/people.csv", csv)

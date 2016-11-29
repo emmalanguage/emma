@@ -16,7 +16,7 @@
 package org.emmalanguage
 
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe._
+import scala.reflect.runtime.universe.TypeTag
 
 /** Package object for the Emma API. Contains default methods and definitions. */
 package object api {
@@ -32,22 +32,16 @@ package object api {
   }
 
   object Meta {
-    implicit def apply[T : ClassTag : TypeTag]: Meta[T] = new Meta[T] {
-      override def ctag = implicitly[ClassTag[T]]
-      override def ttag = implicitly[TypeTag[T]]
-    }
+    type Tag[T] = TypeTag[T]
 
-    implicit def bag[T : ClassTag : TypeTag]: Meta[DataBag[T]] = new Meta[DataBag[T]] {
-      override def ctag = implicitly[ClassTag[DataBag[T]]]
-      override def ttag = implicitly[TypeTag[DataBag[T]]]
+    implicit def apply[T: Tag]: Meta[T] = new Meta[T] {
+      lazy val ctag = ClassTag[T](ttag.mirror.runtimeClass(ttag.tpe))
+      def ttag = implicitly[TypeTag[T]]
     }
 
     object Projections {
-      implicit def ttagFor[T: Meta]: scala.reflect.runtime.universe.TypeTag[T] =
-        implicitly[Meta[T]].ttag
-
-      implicit def ctagFor[T: Meta]: ClassTag[T] =
-        implicitly[Meta[T]].ctag
+      implicit def ttagFor[T](implicit meta: Meta[T]): TypeTag[T]  = meta.ttag
+      implicit def ctagFor[T](implicit meta: Meta[T]): ClassTag[T] = meta.ctag
     }
   }
   //@formatter:on
