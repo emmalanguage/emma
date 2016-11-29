@@ -18,32 +18,50 @@ package io.csv
 
 import io.Format
 
-import java.nio.charset.{Charset, StandardCharsets}
+import java.nio.charset.Charset
+import java.nio.charset.StandardCharsets
 
 import CSV._
 
-/** CSV format. */
-case class CSV
-(
-  //@formatter:off
-  header    : Boolean      = DEFAULT_HEADER,     // Indicate the presence of a CSV header (to be ignored)
-  delimiter : Char         = DEFAULT_DELIMITER,  // Column delimiter character
-  charset   : Charset      = DEFAULT_CHARSET,    // Character set
-  quote     : Option[Char] = DEFAULT_QUOTE,      // Delimiters inside quotes are ignored
-  escape    : Option[Char] = DEFAULT_ESCAPE,     // Escaped quote characters are ignored
-  comment   : Option[Char] = DEFAULT_COMMENT,    // Disable comments by setting this to None
-  nullValue : String       = DEFAULT_NULLVALUE   // Fields matching this string will be set as nulls
-  //@formatter:on
-) extends Format
+/**
+ * CSV format configuration.
+ * @param header     Indicate the presence of a CSV header (to be ignored when reading).
+ * @param delimiter  Column delimiter character.
+ * @param delimitSeq Sequence delimiter character (used by CSV converters for collections).
+ * @param charset    Character set.
+ * @param quote      Delimiters inside quotes are ignored.
+ * @param escape     Escaped characters are always treated as data.
+ * @param comment    Lines starting with a comment character are ignored.
+ * @param nullValue  Fields matching this string will be set to null.
+ */
+case class CSV(
+    //@formatter:off
+    header     : Boolean      = defaultHeader,
+    delimiter  : Char         = defaultDelimiter,
+    delimitSeq : Char         = defaultDelimitSeq,
+    charset    : Charset      = defaultCharset,
+    quote      : Option[Char] = defaultQuote,
+    escape     : Option[Char] = defaultEscape,
+    comment    : Option[Char] = defaultComment,
+    nullValue  : String       = defaultNullValue
+    //@formatter:on
+) extends Format {
+  require({
+    val chars = Seq(Some(delimiter), Some(delimitSeq), quote, escape, comment).flatten
+    chars.distinct.size == chars.size
+  }, "Please choose unique punctuation characters")
+}
 
 object CSV {
   //@formatter:off
-  val DEFAULT_HEADER       = false
-  val DEFAULT_DELIMITER    = '\t'
-  val DEFAULT_CHARSET      = StandardCharsets.UTF_8
-  val DEFAULT_QUOTE        = Some('"')
-  val DEFAULT_ESCAPE       = Some('\\')
-  val DEFAULT_COMMENT      = None
-  val DEFAULT_NULLVALUE    = ""
+  val defaultHeader       = false
+  val defaultDelimiter    = '\t'
+  val defaultDelimitSeq   = ';'
+  val defaultCharset      = StandardCharsets.UTF_8
+  val defaultQuote        = Some('"')
+  val defaultEscape       = Some('\\')
+  val defaultComment      = None
+  val defaultNullValue    = ""
   //@formatter:on
+  val default = CSV()
 }

@@ -16,13 +16,13 @@
 package org.emmalanguage
 package compiler.integration.graphs
 
-import api.Meta.Projections._
 import api._
+import api.Meta.Projections._
 import compiler.integration.BaseCompilerITCase
 import compiler.ir.ComprehensionSyntax._
 import examples.graphs._
 import examples.graphs.model._
-import io.csv.CSV
+import io.csv._
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -40,6 +40,7 @@ class TransitiveClosureITCase extends BaseCompilerITCase {
   val input: String = null
   val output: String = null
   val csv = CSV()
+  implicit val edgeCSVConverter = CSVConverter[Edge[Int]]
 
   // ---------------------------------------------------------------------------
   // Program representations
@@ -82,7 +83,7 @@ class TransitiveClosureITCase extends BaseCompilerITCase {
       def suffix$1(): Unit = {
         val closure = paths$2
         val output = this.output
-        val csv$2 = this.csv;
+        val csv$2 = this.csv
         closure.writeCSV(output, csv$2)
       }
 

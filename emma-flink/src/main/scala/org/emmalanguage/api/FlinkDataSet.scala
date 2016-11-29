@@ -29,7 +29,6 @@ import scala.util.hashing.MurmurHash3
 class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A]) extends DataBag[A] {
 
   import Meta.Projections._
-
   import FlinkDataSet.{typeInfoForType, wrap}
 
   @transient override val m = implicitly[Meta[A]]
@@ -87,13 +86,13 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
   // -----------------------------------------------------
 
   override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit = {
-    require(format.charset == CSV.DEFAULT_CHARSET,
+    require(format.charset == CSV.defaultCharset,
       s"""Unsupported `charset` value: `${format.charset}`""")
-    require(format.escape == CSV.DEFAULT_ESCAPE,
-      s"""Unsupported `escape` character: '${format.escape.map(_.toString).getOrElse("")}'""")
-    require(format.comment == CSV.DEFAULT_COMMENT,
-      s"""Unsupported `comment` character: '${format.comment.map(_.toString).getOrElse("")}'""")
-    require(format.nullValue == CSV.DEFAULT_NULLVALUE,
+    require(format.escape == CSV.defaultEscape,
+      s"""Unsupported `escape` character: '${format.escape.fold("")(_.toString)}'""")
+    require(format.comment == CSV.defaultComment,
+      s"""Unsupported `comment` character: '${format.comment.fold("")(_.toString)}'""")
+    require(format.nullValue == CSV.defaultNullValue,
       s"""Unsupported `nullValue` string: "${format.nullValue}"""")
 
     rep.writeAsCsv(
@@ -178,11 +177,11 @@ object FlinkDataSet {
     flink.fromCollection(values)
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit flink: FlinkEnv): FlinkDataSet[A] = {
-    require(format.charset == CSV.DEFAULT_CHARSET,
+    require(format.charset == CSV.defaultCharset,
       s"""Unsupported `charset` value: `${format.charset}`""")
-    require(format.escape == CSV.DEFAULT_ESCAPE,
-      s"""Unsupported `escape` character: '${format.escape.map(_.toString).getOrElse("")}'""")
-    require(format.nullValue == CSV.DEFAULT_NULLVALUE,
+    require(format.escape == CSV.defaultEscape,
+      s"""Unsupported `escape` character: '${format.escape.fold("")(_.toString)}'""")
+    require(format.nullValue == CSV.defaultNullValue,
       s"""Unsupported `nullValue` string: "${format.nullValue}"""")
 
     flink.readCsvFile[A](

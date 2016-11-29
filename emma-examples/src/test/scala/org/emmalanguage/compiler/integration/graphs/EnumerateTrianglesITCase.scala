@@ -16,13 +16,13 @@
 package org.emmalanguage
 package compiler.integration.graphs
 
-import api.Meta.Projections._
 import api._
+import api.Meta.Projections._
 import compiler.integration.BaseCompilerITCase
 import compiler.ir.ComprehensionSyntax._
 import examples.graphs._
 import examples.graphs.model._
-import io.csv.CSV
+import io.csv._
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -42,6 +42,7 @@ class EnumerateTrianglesITCase extends BaseCompilerITCase {
   // input parameters
   val input: String = null
   val csv = CSV()
+  implicit val edgeCSVConverter = CSVConverter[Edge[Long]]
 
   // ---------------------------------------------------------------------------
   // Program representations
@@ -71,7 +72,7 @@ class EnumerateTrianglesITCase extends BaseCompilerITCase {
     }
     val edges$r1 = (incoming union outgoing).distinct
     // compute all triangles
-    val edges$r2 = edges$r1;
+    val edges$r2 = edges$r1
     val o: Ordering[Long] = scala.math.Ordering.Long
     val triangles = comprehension[Triangle[Long], DataBag] {
       val e1 = generator[Edge[Long], DataBag](edges$r2)

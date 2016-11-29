@@ -43,7 +43,7 @@ class CSVScalaSupport[A: CSVConverter](override val format: CSV) extends ScalaSu
         } {
           var r = csv.readNext()
           while (r != null) {
-            f(conv.from(r))
+            f(conv.from(r)(format))
             r = csv.readNext()
           }
         }
@@ -60,7 +60,7 @@ class CSVScalaSupport[A: CSVConverter](override val format: CSV) extends ScalaSu
       val conv = implicitly[CSVConverter[A]]
 
       for (x <- xs) {
-        val r = conv.to(x)
+        val r = conv.to(x)(format)
         csv.writeNext(r)
       }
     }

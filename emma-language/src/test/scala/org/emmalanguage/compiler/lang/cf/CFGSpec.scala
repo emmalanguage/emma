@@ -20,7 +20,7 @@ import api._
 import api.model._
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
-import io.csv.CSV
+import io.csv._
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -42,6 +42,7 @@ class CFGSpec extends BaseCompilerSpec {
       // input parameters
       val input = "file://path/to/input"
       val output = "file://path/to/output"
+      implicit val edgeCSVConverter = CSVConverter[Edge[Long]]
 
       val tree = idPipeline(u.reify {
         // read in a directed graph
