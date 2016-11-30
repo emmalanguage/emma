@@ -27,43 +27,37 @@ import java.io._
 import java.net.URI
 
 /** A [[ScalaSupport]] implementation for the [[CSV]] [[Format]]. */
-class CSVScalaSupport[A: CSVConverter](override val format: CSV) extends ScalaSupport[A, CSV] {
+class CSVScalaSupport[A](val format: CSV)(implicit conv: CSVConverter[A])
+  extends ScalaSupport[A, CSV] {
 
-  override private[emmalanguage] def read(path: String): TraversableOnce[A] =
+  private[emmalanguage] def read(path: String): TraversableOnce[A] =
     new Traversable[A] {
-
-      val conv = implicitly[CSVConverter[A]]
-
-      override def foreach[U](f: (A) => U): Unit =
-        for {
-          inp <- managed(inpStream(new URI(path)))
-          bis <- managed(new BufferedInputStream(inp))
-          isr <- managed(new InputStreamReader(bis, format.charset))
-          csv <- managed(new CSVReader(isr, format.delimiter, quoteChar(format), escapeChar(format)))
-        } {
-          var r = csv.readNext()
-          while (r != null) {
-            f(conv.from(r)(format))
-            r = csv.readNext()
-          }
+      def foreach[U](f: A => U) = for {
+        inp <- managed(inpStream(new URI(path)))
+        bis <- managed(new BufferedInputStream(inp))
+        isr <- managed(new InputStreamReader(bis, format.charset))
+        csv <- managed(new CSVReader(isr, format.delimiter, quoteChar(format), escapeChar(format)))
+      } {
+        var record = csv.readNext()
+        while (record != null) {
+          f(conv.read(record, 0)(format))
+          record = csv.readNext()
         }
+      }
     }
 
-  override private[emmalanguage] def write(path: String)(xs: Traversable[A]): Unit =
+  private[emmalanguage] def write(path: String)(xs: Traversable[A]): Unit = {
+    val record = Array.ofDim[String](conv.size)
     for {
       out <- managed(outStream(new URI(path)))
       bos <- managed(new BufferedOutputStream(out))
       osw <- managed(new OutputStreamWriter(bos, format.charset))
       csv <- managed(new CSVWriter(osw, format.delimiter, quoteChar(format), escapeChar(format)))
-    } {
-
-      val conv = implicitly[CSVConverter[A]]
-
-      for (x <- xs) {
-        val r = conv.to(x)(format)
-        csv.writeNext(r)
-      }
+    } for (x <- xs) {
+      conv.write(x, record, 0)(format)
+      csv.writeNext(record)
     }
+  }
 
   // ---------------------------------------------------------------------------
   // Helper functions for reading
