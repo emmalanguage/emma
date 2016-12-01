@@ -18,10 +18,10 @@ package examples.ml
 
 import api._
 
-import breeze.linalg.Vector
+import breeze.linalg.{Vector => Vec}
 
 /** Machine learning model objects. */
 object model {
-  case class Point[ID](@emma.pk id: ID, vector: Vector[Double])
-  case class LVector[L](label: L, vector: Vector[Double])
+  case class Point[ID](@emma.pk id: ID, vector: Vec[Double])
+  case class LVector[L](label: L, vector: Vec[Double])
 }

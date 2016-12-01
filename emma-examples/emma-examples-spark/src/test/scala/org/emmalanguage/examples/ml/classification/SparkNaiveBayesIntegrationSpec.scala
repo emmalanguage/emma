@@ -16,12 +16,12 @@
 package org.emmalanguage
 package examples.ml.classification
 
-import api.Meta.Projections._
 import api._
+import api.Meta.Projections._
 import examples.ml.model._
 import io.csv.CSV
 
-import breeze.linalg.Vector
+import breeze.linalg.{Vector => Vec}
 import org.apache.spark.sql.SparkSession
 
 class SparkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec {
@@ -31,7 +31,7 @@ class SparkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec {
       // read the input
       val data = for (line <- DataBag.readCSV[String](input, CSV())) yield {
         val record = line.split(",").map(_.toDouble)
-        LVector(record.head, Vector(record.slice(1, record.length)))
+        LVector(record.head, Vec(record.slice(1, record.length)))
       }
       // classification
       val result = NaiveBayes(lambda, modelType)(data)

@@ -20,7 +20,7 @@ import api._
 import api.Meta.Projections._
 import examples.ml.model._
 
-import breeze.linalg._
+import breeze.linalg.{Vector => Vec, _}
 
 @emma.lib
 object KMeans {
@@ -37,7 +37,7 @@ object KMeans {
 
     var bestSolution = DataBag.empty[Solution[PID]]
     var minSqrDist = 0.0
-    val zeroVec = Vector.zeros[Double](N)
+    val zeroVec = Vec.zeros[Double](N)
 
     for (i <- 1 to iterations) {
       // initialize forgy cluster means

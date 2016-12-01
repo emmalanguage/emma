@@ -17,12 +17,12 @@ package org.emmalanguage
 package examples.ml.clustering
 
 import KMeans.Solution
-import api.Meta.Projections._
 import api._
+import api.Meta.Projections._
 import examples.ml.model._
 import io.csv.CSV
 
-import breeze.linalg.Vector
+import breeze.linalg.{Vector => Vec}
 import org.apache.spark.sql.SparkSession
 
 class SparkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec {
@@ -32,7 +32,7 @@ class SparkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec {
       // read the input
       val points = for (line <- DataBag.readCSV[String](input, CSV())) yield {
         val record = line.split("\t")
-        Point(record.head.toLong, Vector(record.tail.map(_.toDouble)))
+        Point(record.head.toLong, Vec(record.tail.map(_.toDouble)))
       }
       // do the clustering
       val result = KMeans(k, epsilon, iterations)(points)
