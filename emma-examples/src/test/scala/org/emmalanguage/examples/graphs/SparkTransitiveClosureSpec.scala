@@ -17,9 +17,9 @@ package org.emmalanguage
 package examples.graphs
 
 import api._
+import examples.ExampleTest
 import examples.graphs.model.Edge
 import io.csv.CSV
-import eu.stratosphere.emma.testutil.ExampleTest
 
 import org.apache.spark.sql.SparkSession
 import org.junit.experimental.categories.Category

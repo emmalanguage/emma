@@ -18,9 +18,9 @@ package examples.ml.classification
 
 import api.Meta.Projections._
 import api._
+import examples.ExampleTest
 import examples.ml.model._
 import io.csv.CSV
-import eu.stratosphere.emma.testutil.ExampleTest
 
 import breeze.linalg.Vector
 import org.apache.spark.sql.SparkSession
