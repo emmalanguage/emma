@@ -26,14 +26,14 @@ public class LogQueue {
         logQueue = new ConcurrentLinkedQueue<>();
     }
 
-    public static LogQueue getInstance() {
+    static LogQueue getInstance() {
         if (instance == null)
             instance = new LogQueue();
 
         return instance;
     }
 
-    public void addMessage(String message) {
+    void addMessage(String message) {
         logQueue.add(message);
     }
 
