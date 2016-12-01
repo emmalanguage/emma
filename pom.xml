@@ -140,7 +140,7 @@
         <scala-arm.version>1.4</scala-arm.version>
 
         <!-- Test configuration -->
-        <excludedSurefireGroups>eu.stratosphere.emma.testutil.ExampleTest</excludedSurefireGroups>
+        <excludedSurefireGroups>org.emmalanguage.examples.ExampleTest</excludedSurefireGroups>
         <compile-spec-pipelines>false</compile-spec-pipelines>
         <spark.scope>provided</spark.scope>
         <flink.scope>provided</flink.scope>

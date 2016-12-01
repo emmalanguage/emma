@@ -17,8 +17,8 @@ package org.emmalanguage
 package examples.text
 
 import api._
+import examples.ExampleTest
 import io.csv.CSV
-import eu.stratosphere.emma.testutil.ExampleTest
 
 import org.apache.spark.sql.SparkSession
 import org.junit.experimental.categories.Category
