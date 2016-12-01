@@ -16,16 +16,17 @@
 package org.emmalanguage
 package server
 
-import org.emmalanguage.config.ConfigReader
-import org.emmalanguage.servlets.{CodeServlet, LogEventServlet}
+import config.ConfigReader
 
 import org.apache.log4j.Logger
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.servlet.ServletHolder
 import org.eclipse.jetty.webapp.WebAppContext
 
-import java.io.{File, PrintStream}
-import java.net.{URL, URLClassLoader}
+import java.io.File
+import java.io.PrintStream
+import java.net.URL
+import java.net.URLClassLoader
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -45,7 +46,7 @@ object HttpServer {
 
   @throws(classOf[Exception])
   def main(args: Array[String]): Unit = {
-    if(args.size != 1) {
+    if (args.size != 1) {
       // FIXME make better error message
       println("Missing 1st argument (graph path)")
       System.exit(1)
@@ -73,8 +74,8 @@ object HttpServer {
 
     codegenDir.mkdirs()
 
-    require(exampleDir.isDirectory, s"Example folder `$exampleDir` does not exist")
-    require(codegenDir.isDirectory, s"Codegen folder `$codegenDir` does not exist")
+    // require(exampleDir.isDirectory, s"Example folder `$exampleDir` does not exist")
+    // require(codegenDir.isDirectory, s"Codegen folder `$codegenDir` does not exist")
 
     HttpServer.addFile(codegenDir)
     HttpServer.addFile(exampleDir)
@@ -88,9 +89,6 @@ object HttpServer {
     context.setContextPath("/")
     context.setResourceBase("public")
     context.setWelcomeFiles(Array[String]("index.html"))
-    context.addServlet(new ServletHolder(new CodeServlet), "/code/*")
-    context.addServlet(new ServletHolder(new PlanServlet), "/plan/*")
-    context.addServlet(new ServletHolder(new LogEventServlet), "/log/*")
     context.addServlet(new ServletHolder(new GraphServlet(graphPath.get)), "/graph/*")
 
     this.server.setHandler(context)
@@ -121,7 +119,6 @@ object HttpServer {
       case t: Throwable =>
         throw new java.io.IOException("Error, could not add URL to system classloader", t)
     }
-
   }
 
 }

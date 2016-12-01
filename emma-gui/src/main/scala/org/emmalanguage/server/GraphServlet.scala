@@ -16,32 +16,31 @@
 package org.emmalanguage
 package server
 
-import java.io.File
-import java.nio.file.{Files, Paths}
-import javax.servlet.http._
 import org.apache.commons.io.FilenameUtils
 
+import java.io.File
 import java.nio.file.Path
+import java.nio.file.Files
+import java.nio.file.Paths
+import javax.servlet.http._
 
 class GraphServlet(path: Path) extends HttpServlet {
   protected override def doGet(req: HttpServletRequest, resp: HttpServletResponse): Unit = {
     import HttpServletResponse.SC_OK
     req.getRequestURI.split('/').last match {
-      case "graph-json" => {
+      case "graph-json" =>
         val directory = new File(path.toFile.toString)
         val contents = directory
           .listFiles()
           .filter(file => file.isFile && FilenameUtils.getExtension(file.getName) == "json")
-            .map(f => Files.readAllBytes(Paths.get(f.getAbsolutePath)))
-            .map(bytes => new String(bytes)).mkString(",")
+          .map(f => Files.readAllBytes(Paths.get(f.getAbsolutePath)))
+          .map(bytes => new String(bytes)).mkString(",")
         resp.setStatus(SC_OK)
         resp.setHeader("Content-Type", "application/json")
         resp.getWriter.println(s"[$contents]")
-      }
-      case _ => {
+      case _ =>
         resp.setStatus(SC_OK)
         req.getRequestDispatcher("/cytoscape-template.html").forward(req, resp)
-      }
     }
   }
 }
