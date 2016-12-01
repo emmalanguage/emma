@@ -16,7 +16,7 @@
 package org.emmalanguage
 package test.schema
 
-import eu.stratosphere.emma.api.model.Identity
+import api.model.Identity
 
 object State {
   // schema
