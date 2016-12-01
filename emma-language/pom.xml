@@ -43,10 +43,6 @@
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-compiler</artifactId>
         </dependency>
-        <dependency>
-            <groupId>com.assembla.scala-incubator</groupId>
-            <artifactId>graph-core_${scala.tools.version}</artifactId>
-        </dependency>
 
         <!-- Type-level -->
         <dependency>
