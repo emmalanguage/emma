@@ -81,13 +81,15 @@ This project includes:
   EL under The Apache Software License, Version 2.0
   emma under The Apache License, Version 2.0
   emma-examples under The Apache License, Version 2.0
+  emma-examples-flink under The Apache License, Version 2.0
+  emma-examples-library under The Apache License, Version 2.0
+  emma-examples-spark under The Apache License, Version 2.0
   emma-flink under The Apache License, Version 2.0
   emma-gui under The Apache License, Version 2.0
   emma-language under The Apache License, Version 2.0
   emma-quickstart under The Apache License, Version 2.0
   emma-spark under The Apache License, Version 2.0
   empty under The Apache License, Version 2.0
-  FindBugs-Annotations under GNU Lesser Public License
   FindBugs-jsr305 under The Apache Software License, Version 2.0
   flink-clients under The Apache Software License, Version 2.0
   flink-core under The Apache Software License, Version 2.0
