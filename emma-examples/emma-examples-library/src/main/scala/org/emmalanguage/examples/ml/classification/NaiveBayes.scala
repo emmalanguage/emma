@@ -16,17 +16,17 @@
 package org.emmalanguage
 package examples.ml.classification
 
-import api.Meta.Projections._
 import api._
+import api.Meta.Projections._
 import examples.ml.model._
 
-import breeze.linalg._
+import breeze.linalg.{Vector => Vec, _}
 
 @emma.lib
 object NaiveBayes {
 
   type ModelType = ModelType.Value
-  type Model[L] = (L, Double, Vector[Double])
+  type Model[L] = (L, Double, Vec[Double])
 
   def apply[L: Meta](
     lambda: Double, modelType: ModelType // hyper-parameters
@@ -39,7 +39,7 @@ object NaiveBayes {
 
     val aggregated = for (Group(label, values) <- data.groupBy(_.label)) yield {
       val lCnt = values.size
-      val lSum = values.fold(Vector.zeros[Double](N))(_.vector, _ + _)
+      val lSum = values.fold(Vec.zeros[Double](N))(_.vector, _ + _)
       (label, lCnt, lSum)
     }
 

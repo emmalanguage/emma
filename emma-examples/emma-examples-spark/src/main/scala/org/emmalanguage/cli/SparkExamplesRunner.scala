@@ -26,7 +26,7 @@ import examples.ml.model._
 import examples.text._
 import io.csv._
 
-import breeze.linalg.Vector
+import breeze.linalg.{Vector => Vec}
 import org.apache.spark.sql.SparkSession
 
 import scala.reflect.ClassTag
@@ -165,8 +165,8 @@ object SparkExamplesRunner {
   // Parallelized algorithms
   // ---------------------------------------------------------------------------
 
-  implicit def breezeVectorCSVField[V](implicit V: CSVColumn[V], ctag: ClassTag[V])
-    : CSVConverter[Vector[V]] = CSVConverter.iso[Array[V], Vector[V]](Vector.apply, _.toArray)
+  implicit def breezeVectorCSVConverter[V: CSVColumn: ClassTag]: CSVConverter[Vec[V]] =
+    CSVConverter.iso[Array[V], Vec[V]](Vec.apply, _.toArray)
 
   // Graphs
 
@@ -201,7 +201,7 @@ object SparkExamplesRunner {
       // read the training data
       val data = for (line <- DataBag.readCSV[String](c.input, c.csv)) yield {
         val record = line.split(",").map(_.toDouble)
-        LVector(record.head, Vector(record.slice(1, record.length)))
+        LVector(record.head, Vec(record.slice(1, record.length)))
       }
       // run classification algorithm
       val model = NaiveBayes(c.lambda, c.nbModelType)(data)
@@ -214,7 +214,7 @@ object SparkExamplesRunner {
       // read the input
       val points = for (line <- DataBag.readCSV[String](c.input, c.csv)) yield {
         val record = line.split("\t")
-        Point(record.head.toLong, Vector(record.tail.map(_.toDouble)))
+        Point(record.head.toLong, Vec(record.tail.map(_.toDouble)))
       }
       // do the clustering
       val solution = KMeans(c.k, c.epsilon, c.iterations)(points)

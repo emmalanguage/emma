@@ -18,7 +18,7 @@ package examples.ml.classification
 
 import test.util._
 
-import breeze.linalg.Vector
+import breeze.linalg.{Vector => Vec}
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
@@ -54,7 +54,7 @@ trait BaseNaiveBayesIntegrationSpec extends FlatSpec with Matchers with BeforeAn
       line <- Source.fromFile(s"$path/model.txt").getLines().toSet[String]
     } yield {
       val values = line.split(",").map(_.toDouble)
-      (values(0), values(1), Vector(values.slice(2, values.length)))
+      (values(0), values(1), Vec(values.slice(2, values.length)))
     }
 
     val solution = naiveBayes(s"$path/vote.csv", 1.0, NaiveBayes.ModelType.Bernoulli)
