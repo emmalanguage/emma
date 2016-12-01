@@ -133,10 +133,6 @@
 
         <!-- Arguments parsing -->
         <dependency>
-            <groupId>net.sourceforge.argparse4j</groupId>
-            <artifactId>argparse4j</artifactId>
-        </dependency>
-        <dependency>
             <groupId>com.github.scopt</groupId>
             <artifactId>scopt_${scala.tools.version}</artifactId>
         </dependency>

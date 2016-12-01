@@ -69,6 +69,12 @@
             <organizationUrl>https://www.tu-berlin.de</organizationUrl>
         </developer>
         <developer>
+            <name>Bernd Louis</name>
+            <email>bernd.c.louis@campus.tu-berlin.de</email>
+            <organization>TU Berlin</organization>
+            <organizationUrl>https://www.tu-berlin.de</organizationUrl>
+        </developer>
+        <developer>
             <name>Felix Schüler</name>
             <email>felix.schueler@campus.tu-berlin.de</email>
             <organization>TU Berlin</organization>
@@ -104,7 +110,7 @@
         <nexus-staging-maven-plugin.version>1.6.7</nexus-staging-maven-plugin.version>
 
         <!-- Java -->
-        <java.version>1.7</java.version>
+        <java.version>1.8</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
@@ -133,10 +139,8 @@
         <scalatest.version>2.2.6</scalatest.version>
 
         <!-- Other dependencies -->
-        <argparse4j.version>0.4.4</argparse4j.version><!-- TODO: remove -->
         <scopt.version>3.5.0</scopt.version>
         <reflections.version>0.9.9</reflections.version><!-- TODO: remove -->
-        <scala.graph-core.version>1.9.0</scala.graph-core.version><!-- TODO: remove -->
         <scala-arm.version>1.4</scala-arm.version>
 
         <!-- Test configuration -->
@@ -280,12 +284,6 @@
                 <version>${spark.version}</version>
                 <scope>${spark.scope}</scope>
             </dependency>
-            <dependency>
-                <groupId>org.apache.spark</groupId>
-                <artifactId>spark-sql_${scala.tools.version}</artifactId>
-                <version>${spark.version}</version>
-                <scope>${spark.scope}</scope>
-            </dependency>
 
             <!-- CSV -->
             <dependency>
@@ -320,7 +318,7 @@
             <dependency>
                 <groupId>org.scalactic</groupId>
                 <artifactId>scalactic_${scala.tools.version}</artifactId>
-                <version>${scalatest.version}</version><!-- use scaslatest version -->
+                <version>${scalatest.version}</version><!-- use scalatest version -->
             </dependency>
 
             <!-- Test -->
@@ -339,11 +337,6 @@
 
             <!-- Arguments parsing -->
             <dependency>
-                <groupId>net.sourceforge.argparse4j</groupId>
-                <artifactId>argparse4j</artifactId>
-                <version>${argparse4j.version}</version>
-            </dependency>
-            <dependency>
                 <groupId>com.github.scopt</groupId>
                 <artifactId>scopt_${scala.tools.version}</artifactId>
                 <version>${scopt.version}</version>
@@ -355,13 +348,6 @@
                 <groupId>org.reflections</groupId>
                 <artifactId>reflections</artifactId>
                 <version>${reflections.version}</version>
-            </dependency>
-
-            <!-- Graphs -->
-            <dependency>
-                <groupId>com.assembla.scala-incubator</groupId>
-                <artifactId>graph-core_${scala.tools.version}</artifactId>
-                <version>${scala.graph-core.version}</version>
             </dependency>
 
             <!-- Auto-Resource Management -->
@@ -506,9 +492,9 @@
                         <id>generate-sources</id>
                         <phase>generate-sources</phase>
                         <configuration>
-                            <tasks>
+                            <target>
                                 <mkdir dir="${java.io.tmpdir}/emma/codegen"/>
-                            </tasks>
+                            </target>
                         </configuration>
                         <goals>
                             <goal>run</goal>
@@ -657,7 +643,7 @@
                     <artifactId>nexus-staging-maven-plugin</artifactId>
                     <version>${nexus-staging-maven-plugin.version}</version>
                     <extensions>true</extensions>
-                    <configuration> 
+                    <configuration>
                         <serverId>ossrh</serverId>
                         <nexusUrl>https://oss.sonatype.org/</nexusUrl>
                         <autoReleaseAfterClose>false</autoReleaseAfterClose>
