@@ -107,6 +107,7 @@
         <maven-surefire-plugin.version>2.18.1</maven-surefire-plugin.version>
         <maven-source-plugin.version>2.4</maven-source-plugin.version>
         <scala-maven-plugin.version>3.2.2</scala-maven-plugin.version>
+        <scalatest-maven-plugin.version>1.0</scalatest-maven-plugin.version>
         <nexus-staging-maven-plugin.version>1.6.7</nexus-staging-maven-plugin.version>
 
         <!-- Java -->
@@ -366,6 +367,13 @@
         </dependencies>
     </dependencyManagement>
 
+    <dependencies>
+        <dependency>
+            <groupId>org.scalatest</groupId>
+            <artifactId>scalatest_${scala.tools.version}</artifactId>
+        </dependency>
+    </dependencies>
+
     <build>
         <plugins>
             <!-- Scala compiler -->
@@ -503,28 +511,52 @@
                 </executions>
             </plugin>
 
-            <!-- Adding code generation folder to JUnit tests -->
+            <!-- Disable surefire -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
-                    <additionalClasspathElements>
-                        <additionalClasspathElement>${java.io.tmpdir}/emma/codegen</additionalClasspathElement>
-                    </additionalClasspathElements>
-                    <systemPropertyVariables>
-                        <emma.test.macro.toolboxcp>${project.basedir}/target/classes</emma.test.macro.toolboxcp>
-                    </systemPropertyVariables>
-                    <includes>
-                        <include>**/Test*.java</include>
-                        <include>**/*Test.java</include>
-                        <include>**/*TestCase.java</include>
-                        <include>**/*Spec.java</include>
-                        <include>**/*Suite.java</include>
-                    </includes>
+                    <skipTests>true</skipTests>
+                </configuration>
+            </plugin>
+
+            <!-- Enable scalatest -->
+            <plugin>
+                <groupId>org.scalatest</groupId>
+                <artifactId>scalatest-maven-plugin</artifactId>
+                <version>${scalatest-maven-plugin.version}</version>
+                <configuration>
+                    <!-- Adding code generation folder to the classpath -->
+                    <runpath>${java.io.tmpdir}/emma/codegen/</runpath>
                     <!-- Memory for the Travis build -->
                     <argLine>-Xms1024m -Xmx2048m</argLine>
+                    <!-- Reporters configuration -->
+                    <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+                    <junitxml>.</junitxml>
+                    <filereports>WDF TestSuite.txt</filereports>
                 </configuration>
+                <executions>
+                    <execution>
+                        <id>test</id>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <suffixes>(?&lt;!Integration)(Test|Spec)</suffixes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>integration-test</id>
+                        <phase>integration-test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <suffixes>(?&lt;=Integration)(Test|Spec)</suffixes>
+                        </configuration>
+                    </execution>
+                </executions>
             </plugin>
 
             <!-- Check for proper LICENSE header -->
@@ -701,10 +733,9 @@
     <profiles>
         <!-- Profile that activates integration tests and compile-spec-pipelines -->
         <profile>
-            <id>IT</id>
+            <id>compile-spec-pipelines</id>
             <properties>
                 <!-- Test configuration -->
-                <excludedSurefireGroups>java.io.Serializable</excludedSurefireGroups> <!-- never used -->
                 <compile-spec-pipelines>true</compile-spec-pipelines>
             </properties>
         </profile>

@@ -85,16 +85,6 @@
             <artifactId>slf4j-log4j12</artifactId>
         </dependency>
 
-        <!-- Test -->
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.scalatest</groupId>
-            <artifactId>scalatest_${scala.tools.version}</artifactId>
-        </dependency>
-
         <!-- Arguments parsing -->
         <dependency>
             <groupId>com.github.scopt</groupId>
@@ -111,19 +101,7 @@
 
     <build>
         <plugins>
-            <!-- Surefire -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>${maven-surefire-plugin.version}</version>
-                <configuration>
-                    <includes>
-                        <include>**/*.class</include>
-                    </includes>
-                    <excludedGroups>${excludedSurefireGroups}</excludedGroups>
-                </configuration>
-            </plugin>
-
+            <!-- Build a test-jar -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-jar-plugin</artifactId>
