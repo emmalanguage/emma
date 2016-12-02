@@ -20,11 +20,10 @@ env:
   matrix:
     # Unit tests
     - TEST_ARGS=""
-    # Integration tests (the first one also runs the spec pipelines in emma-language with IT)
-    - TEST_ARGS="-PIT -pl emma-examples -pl emma-language"
-    - TEST_ARGS="-PIT -Pflink -pl emma-examples"
-    - TEST_ARGS="-PIT -Pspark -pl emma-examples"
-
+    # Integration tests (also runs the spec pipelines in emma-language with compilation)
+    - TEST_ARGS="-PIT -pl emma-language"
+    - TEST_ARGS="-PIT -pl emma-examples/emma-examples-spark"
+    - TEST_ARGS="-PIT -pl emma-examples/emma-examples-flink"
 cache:
   directories:
     $HOME/.m2
