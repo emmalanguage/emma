@@ -18,11 +18,7 @@ package compiler.lang.source
 
 import compiler.BaseCompilerSpec
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
 /** A spec for the `Core.foreach2loop` transformation. */
-@RunWith(classOf[JUnitRunner])
 class Foreach2LoopSpec extends BaseCompilerSpec {
 
   import compiler._

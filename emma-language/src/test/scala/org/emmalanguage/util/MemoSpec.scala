@@ -16,13 +16,10 @@
 package org.emmalanguage
 package util
 
-import org.junit.runner.RunWith
 import org.scalatest._
-import org.scalatest.junit.JUnitRunner
 
 import scala.collection.mutable
 
-@RunWith(classOf[JUnitRunner])
 class MemoSpec extends FreeSpec with Matchers {
 
   "Momoization" - {

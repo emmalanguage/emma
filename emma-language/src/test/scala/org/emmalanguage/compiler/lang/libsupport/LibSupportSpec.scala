@@ -16,12 +16,9 @@
 package org.emmalanguage
 package compiler.lang.libsupport
 
-import org.junit.runner.RunWith
 import org.scalactic.Equality
-import org.scalatest.junit.JUnitRunner
 
 /** A spec for the `FunSupport.callGraph` function. */
-@RunWith(classOf[JUnitRunner])
 class LibSupportSpec extends LibSupportExamples {
 
   import compiler.LibSupport.CG

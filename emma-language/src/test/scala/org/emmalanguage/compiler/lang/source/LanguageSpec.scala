@@ -21,17 +21,15 @@ package source
 import api._
 import test.schema.Marketing._
 
-import org.example.foo.{Bar, Baz}
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
+import org.example.foo.Bar
+import org.example.foo.Baz
 
 /** A spec defining the core fragment of Scala supported by Emma. */
-@RunWith(classOf[JUnitRunner])
 class LanguageSpec extends BaseCompilerSpec {
 
   import compiler._
-  import Source.{Lang => src}
   import Source.valid
+  import Source.{Lang => src}
   import Validation._
 
   // ---------------------------------------------------------------------------

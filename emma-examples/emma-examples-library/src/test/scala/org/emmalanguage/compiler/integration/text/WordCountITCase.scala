@@ -23,10 +23,6 @@ import compiler.ir.ComprehensionSyntax._
 import examples.text.WordCount
 import io.csv._
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
-@RunWith(classOf[JUnitRunner])
 class WordCountITCase extends BaseCompilerITCase {
 
   import compiler._

@@ -17,17 +17,11 @@ package org.emmalanguage
 package examples.graphs
 
 import api._
-import examples.ExampleTest
 import examples.graphs.model.Edge
 import io.csv.CSV
 
 import org.apache.flink.api.scala.ExecutionEnvironment
-import org.junit.experimental.categories.Category
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
-@Category(Array(classOf[ExampleTest]))
-@RunWith(classOf[JUnitRunner])
 class FlinkTransitiveClosureSpec extends BaseTransitiveClosureSpec {
 
   override def transitiveClosure(input: String, csv: CSV): Set[Edge[Long]] =

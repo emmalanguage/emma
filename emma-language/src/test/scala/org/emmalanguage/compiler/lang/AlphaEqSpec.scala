@@ -18,11 +18,7 @@ package compiler.lang
 
 import compiler.BaseCompilerSpec
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
 /** A spec for alpha equivalence of Scala ASTs. */
-@RunWith(classOf[JUnitRunner])
 class AlphaEqSpec extends BaseCompilerSpec {
 
   import compiler._
