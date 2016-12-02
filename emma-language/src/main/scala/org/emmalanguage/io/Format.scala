@@ -18,3 +18,6 @@ package io
 
 /** An abstract trait implemented by all supported formats. */
 trait Format extends Product
+
+/** An canonical empty format object. */
+case object EmptyFormat extends Format

@@ -47,9 +47,11 @@ trait Common extends AST {
     val empty                 = bagSymbol.companion.info.member(TermName("empty")).asMethod
     val apply                 = bagSymbol.companion.info.member(TermName("apply")).asMethod
     val readCSV               = bagSymbol.companion.info.member(TermName("readCSV")).asMethod
+    val readText              = bagSymbol.companion.info.member(TermName("readText")).asMethod
     // Sinks
     val fetch                 = bagSymbol.info.decl(TermName("fetch"))
     val writeCSV              = bagSymbol.info.decl(TermName("writeCSV"))
+    val writeText             = bagSymbol.info.decl(TermName("writeText"))
     // Monad ops
     val map                   = bagSymbol.info.decl(TermName("map"))
     val flatMap               = bagSymbol.info.decl(TermName("flatMap"))
@@ -78,8 +80,8 @@ trait Common extends AST {
     val top                   = bagSymbol.info.decl(TermName("top"))
     val sample                = bagSymbol.info.decl(TermName("sample"))
 
-    val sourceOps             = Set(empty, apply, readCSV); assertOneOverload(sourceOps)
-    val sinkOps               = Set(fetch, writeCSV)
+    val sourceOps             = Set(empty, apply, readCSV, readText); assertOneOverload(sourceOps)
+    val sinkOps               = Set(fetch, writeCSV, writeText)
     val monadOps              = Set(map, flatMap, withFilter)
     val nestOps               = Set(groupBy)
     val setOps                = Set(union, distinct)

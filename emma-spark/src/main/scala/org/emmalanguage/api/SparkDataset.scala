@@ -92,6 +92,9 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
       .mode("overwrite")
       .csv(path)
 
+  override def writeText(path: String): Unit =
+    rep.write.text(path)
+
   def fetch(): Seq[A] = collect
 
   private lazy val collect: Seq[A] =
@@ -170,6 +173,9 @@ object SparkDataset {
       .schema(encoderForType[A].schema)
       .csv(path)
       .as[A]
+
+  def readText(path: String)(implicit spark: SparkSession): SparkDataset[String] =
+    spark.read.textFile(path)
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion

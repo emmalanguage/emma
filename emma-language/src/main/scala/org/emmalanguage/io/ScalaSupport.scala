@@ -42,7 +42,7 @@ abstract class ScalaSupport[A, F <: Format] {
       val path = new HadoopPath(uri)
       hdfs.open(path)
     case _ =>
-      val path = Paths.get(uri)
+      val path = Paths.get(ensureFileScheme(uri))
       new FileInputStream(path.toFile)
   }
 
@@ -51,7 +51,7 @@ abstract class ScalaSupport[A, F <: Format] {
       val path = new HadoopPath(uri)
       hdfs.create(path, true)
     case _ =>
-      val path = Paths.get(uri)
+      val path = Paths.get(ensureFileScheme(uri))
       deleteRecursive(path.toFile)
       new FileOutputStream(path.toFile)
   }
@@ -64,6 +64,12 @@ abstract class ScalaSupport[A, F <: Format] {
     }
     ret && path.delete()
   }
+
+  private def ensureFileScheme(uri: URI): URI =
+    if (uri.getScheme == "file") uri
+    else fileRoot.resolve(uri)
+
+  private val fileRoot = new URI("file:///")
 }
 
 private object ScalaSupport {
