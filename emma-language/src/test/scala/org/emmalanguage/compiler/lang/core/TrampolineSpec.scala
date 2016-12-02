@@ -18,13 +18,9 @@ package compiler.lang.core
 
 import compiler.BaseCompilerSpec
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
 import scala.util.control.TailCalls._
 
 /** A spec for the `Core.trampoline` transformation. */
-@RunWith(classOf[JUnitRunner])
 class TrampolineSpec extends BaseCompilerSpec {
 
   import compiler._

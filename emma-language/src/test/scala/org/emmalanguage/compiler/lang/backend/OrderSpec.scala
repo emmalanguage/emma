@@ -19,11 +19,7 @@ package compiler.lang.backend
 import api.DataBag
 import compiler.BaseCompilerSpec
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
 /** A spec for order disambiguation. */
-@RunWith(classOf[JUnitRunner])
 class OrderSpec extends BaseCompilerSpec {
 
   import compiler._

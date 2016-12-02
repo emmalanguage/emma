@@ -19,13 +19,11 @@ package compiler
 import api._
 import io.csv._
 import test.schema.Graphs._
-import test.schema.Movies._
 import test.schema.Math._
+import test.schema.Movies._
 import test.util._
 
-import org.junit.runner.RunWith
 import org.scalatest._
-import org.scalatest.junit.JUnitRunner
 
 import scala.collection.IterableLike
 import scala.collection.generic.CanBuildFrom
@@ -34,7 +32,6 @@ import scala.util.Random
 import java.io.File
 import java.nio.file.Paths
 
-@RunWith(classOf[JUnitRunner])
 abstract class BaseCodegenSpec
   extends BaseCompilerSpec with BeforeAndAfter {
 

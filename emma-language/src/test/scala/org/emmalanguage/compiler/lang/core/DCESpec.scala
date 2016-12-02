@@ -18,11 +18,7 @@ package compiler.lang.core
 
 import compiler.BaseCompilerSpec
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
 /** A spec for the `LNF.dce` transformation. */
-@RunWith(classOf[JUnitRunner])
 class DCESpec extends BaseCompilerSpec {
 
   import compiler._

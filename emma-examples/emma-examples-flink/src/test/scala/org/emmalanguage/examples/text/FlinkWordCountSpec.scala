@@ -17,16 +17,10 @@ package org.emmalanguage
 package examples.text
 
 import api._
-import examples.ExampleTest
 import io.csv.CSV
 
 import org.apache.flink.api.scala.ExecutionEnvironment
-import org.junit.experimental.categories.Category
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
-@Category(Array(classOf[ExampleTest]))
-@RunWith(classOf[JUnitRunner])
 class FlinkWordCountSpec extends BaseWordCountSpec {
 
   override def wordCount(input: String, output: String, csv: CSV): Unit =

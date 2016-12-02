@@ -17,17 +17,13 @@ package org.emmalanguage
 package compiler.lang.core
 
 import api._
-import compiler.ir.ComprehensionSyntax._
 import compiler.BaseCompilerSpec
+import compiler.ir.ComprehensionSyntax._
 import test.schema.Marketing._
-
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
 import java.time.Instant
 
 /** A spec for the `LNF.cse` transformation. */
-@RunWith(classOf[JUnitRunner])
 class PrettyPrintSpec extends BaseCompilerSpec {
 
   import compiler._

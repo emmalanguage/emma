@@ -16,11 +16,7 @@
 package org.emmalanguage
 package compiler.lang.libsupport
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
 /** A collection of program examples to be used in the `Function*Spec` classes. */
-@RunWith(classOf[JUnitRunner])
 class LibSupportExamplesSpec extends LibSupportExamples {
 
   // ---------------------------------------------------------------------------

@@ -22,11 +22,7 @@ import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import io.csv._
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
 /** A spec for comprehension normalization. */
-@RunWith(classOf[JUnitRunner])
 class CFGSpec extends BaseCompilerSpec {
 
   import compiler._

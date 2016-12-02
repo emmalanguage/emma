@@ -22,11 +22,7 @@ import compiler.ir.ComprehensionSyntax._
 import test.schema.Marketing._
 import test.schema.Math._
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
 /** A spec for the `ANF.transform` transformation. */
-@RunWith(classOf[JUnitRunner])
 class ANFSpec extends BaseCompilerSpec {
 
   import compiler._

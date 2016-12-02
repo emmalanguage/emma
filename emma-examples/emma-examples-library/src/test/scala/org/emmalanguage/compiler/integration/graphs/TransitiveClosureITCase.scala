@@ -16,18 +16,14 @@
 package org.emmalanguage
 package compiler.integration.graphs
 
-import api._
 import api.Meta.Projections._
+import api._
 import compiler.integration.BaseCompilerITCase
 import compiler.ir.ComprehensionSyntax._
 import examples.graphs._
 import examples.graphs.model._
 import io.csv._
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
-@RunWith(classOf[JUnitRunner])
 class TransitiveClosureITCase extends BaseCompilerITCase {
 
   import compiler._

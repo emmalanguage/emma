@@ -21,13 +21,9 @@ import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import test.schema.Marketing._
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
 import java.time.Instant
 
 /** A spec for comprehension normalization. */
-@RunWith(classOf[JUnitRunner])
 class NormalizeSpec extends BaseCompilerSpec {
 
   import compiler._

@@ -19,18 +19,12 @@ package examples.ml.clustering
 import KMeans.Solution
 import api.Meta.Projections._
 import api._
-import examples.ExampleTest
 import examples.ml.model._
 import io.csv.CSV
 
 import breeze.linalg.Vector
 import org.apache.spark.sql.SparkSession
-import org.junit.experimental.categories.Category
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
-@Category(Array(classOf[ExampleTest]))
-@RunWith(classOf[JUnitRunner])
 class SparkKMeansSpec extends BaseKMeansSpec {
 
   override def kMeans(k: Int, epsilon: Double, iterations: Int, input: String): Set[Solution[Long]] =

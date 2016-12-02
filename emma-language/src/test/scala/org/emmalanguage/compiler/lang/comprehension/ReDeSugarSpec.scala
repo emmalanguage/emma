@@ -21,11 +21,7 @@ import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import test.schema.Marketing._
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
 /** A spec for the `Comprehension.{re|de}sugar` transformations. */
-@RunWith(classOf[JUnitRunner])
 class ReDeSugarSpec extends BaseCompilerSpec {
 
   import compiler._

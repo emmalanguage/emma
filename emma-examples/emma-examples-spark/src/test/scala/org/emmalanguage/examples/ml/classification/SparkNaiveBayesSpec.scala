@@ -18,18 +18,12 @@ package examples.ml.classification
 
 import api.Meta.Projections._
 import api._
-import examples.ExampleTest
 import examples.ml.model._
 import io.csv.CSV
 
 import breeze.linalg.Vector
 import org.apache.spark.sql.SparkSession
-import org.junit.experimental.categories.Category
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
-@Category(Array(classOf[ExampleTest]))
-@RunWith(classOf[JUnitRunner])
 class SparkNaiveBayesSpec extends BaseNaiveBayesSpec {
 
   def naiveBayes(input: String, lambda: Double, modelType: MType): Set[Model] =

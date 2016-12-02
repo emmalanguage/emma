@@ -16,10 +16,6 @@
 package org.emmalanguage
 package compiler
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
-@RunWith(classOf[JUnitRunner])
 class ASTSpec extends BaseCompilerSpec {
 
   import compiler._

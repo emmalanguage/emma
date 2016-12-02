@@ -17,20 +17,19 @@ package org.emmalanguage
 package compiler.lang.core
 
 import compiler.BaseCompilerSpec
-import io.csv.{CSV, CSVConverter, CSVScalaSupport}
+import io.csv.CSV
+import io.csv.CSVConverter
+import io.csv.CSVScalaSupport
 import test.schema.Marketing._
-
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
 
 import scala.collection.mutable
 
 /** A spec defining the subset of Scala modeling the LNF language used by the Emma compiler. */
-@RunWith(classOf[JUnitRunner])
 class LanguageSpec extends BaseCompilerSpec {
 
   import compiler._
-  import Core.{valid, Lang => core}
+  import Core.valid
+  import Core.{Lang => core}
   import Validation._
 
   // ---------------------------------------------------------------------------

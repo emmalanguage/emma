@@ -18,21 +18,17 @@ package compiler.lang.comprehension
 
 import api._
 import compiler.BaseCompilerSpec
-import compiler.ir.ComprehensionSyntax._
 import compiler.ir.ComprehensionCombinators._
+import compiler.ir.ComprehensionSyntax._
 import test.schema.Marketing._
 
 import shapeless._
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
 /** A spec for comprehension combination. */
-@RunWith(classOf[JUnitRunner])
 class CombinationSpec extends BaseCompilerSpec {
 
-  import compiler._
   import compiler.Combination._
+  import compiler._
 
   // ---------------------------------------------------------------------------
   // Transformation pipelines

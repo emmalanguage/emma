@@ -21,11 +21,7 @@ import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import test.schema.Literature._
 
-import org.junit.runner.RunWith
-import org.scalatest.junit.JUnitRunner
-
 /** A spec for the `LNF.cse` transformation. */
-@RunWith(classOf[JUnitRunner])
 class CSESpec extends BaseCompilerSpec {
 
   import compiler._

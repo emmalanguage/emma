@@ -18,17 +18,14 @@ package util
 
 import cats.implicits._
 import cats.kernel.laws.GroupLaws
-import shapeless._
-
-import org.junit.runner.RunWith
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Arbitrary
+import org.scalacheck.Gen
 import org.scalatest._
-import org.scalatest.junit.JUnitRunner
 import org.scalatest.prop.Checkers
+import shapeless._
 
 import scala.collection.SortedSet
 
-@RunWith(classOf[JUnitRunner])
 class MonoidSpec extends FreeSpec with Checkers with Equivalences with Arbitraries {
 
   import Monoids._
