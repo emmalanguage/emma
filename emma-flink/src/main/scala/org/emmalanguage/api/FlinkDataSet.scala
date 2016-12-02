@@ -104,7 +104,13 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
     rep.getExecutionEnvironment.execute()
   }
 
-  def fetch(): Seq[A] = collect
+  override def writeText(path: String): Unit =
+    rep.writeAsText(
+      filePath = path,
+      writeMode = FileSystem.WriteMode.OVERWRITE
+    )
+
+  override def fetch(): Seq[A] = collect
 
   private lazy val collect: Seq[A] =
     rep.collect()
@@ -191,6 +197,9 @@ object FlinkDataSet {
       quoteCharacter = format.quote.getOrElse[Char]('"')
     )
   }
+
+  def readText(path: String)(implicit flink: FlinkEnv): FlinkDataSet[String] =
+    flink.readTextFile(path)
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion

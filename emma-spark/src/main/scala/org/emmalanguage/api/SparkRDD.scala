@@ -92,6 +92,11 @@ class SparkRDD[A: Meta] private[api](@transient private[api] val rep: RDD[A])(im
       .csv(path)
   }
 
+  override def writeText(path: String): Unit =
+    spark
+      .createDataset(rep).write
+      .text(path)
+
   def fetch(): Seq[A] = collect
 
   private lazy val collect: Seq[A] =
@@ -164,6 +169,9 @@ object SparkRDD {
       .csv(path)
       .as[A]
       .rdd
+
+  def readText(path: String)(implicit spark: SparkSession): SparkRDD[String] =
+    spark.sparkContext.textFile(path)
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion

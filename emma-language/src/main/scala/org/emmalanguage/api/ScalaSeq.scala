@@ -16,12 +16,13 @@
 package org.emmalanguage
 package api
 
-import io.csv.{CSV, CSVConverter, CSVScalaSupport}
+import io.csv._
+import io.text._
 
+import scala.language.higherKinds
+import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-
-import scala.language.{higherKinds, implicitConversions}
 
 /** A `DataBag` implementation backed by a Scala `Seq`. */
 class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] {
@@ -81,6 +82,9 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
   override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
     CSVScalaSupport(format).write(path)(rep)
 
+  def writeText(path: String): Unit =
+    TextSupport.write(path)(rep map (_.toString))
+
   override def fetch(): Seq[A] =
     rep
 
@@ -100,6 +104,9 @@ object ScalaSeq {
 
   def readCSV[A: CSVConverter](path: String, format: CSV): ScalaSeq[A] =
     new ScalaSeq(CSVScalaSupport(format).read(path).toStream)
+
+  def readText(path: String): ScalaSeq[String] =
+    new ScalaSeq(TextSupport.read(path).toStream)
 
   // This is used in the code generation in TranslateToDataflows when inserting fetches
   def byFetch[A](bag: DataBag[A]): ScalaSeq[A] =

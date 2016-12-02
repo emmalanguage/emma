@@ -142,6 +142,15 @@ trait DataBag[A] extends Serializable {
   def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit
 
   /**
+   * Writes a DataBag into the specified `path` as plain text.
+   *
+   * The serialization logic is backend-specific.
+   *
+   * @param path The location where the data will be written.
+   */
+  def writeText(path: String): Unit
+
+  /**
    * Converts the DataBag back into a scala Seq.
    * Warning: Do not call this on DataBags that are too large to fit on one machine!
    *
@@ -361,13 +370,20 @@ object DataBag {
   def apply[A: Meta](values: Seq[A]): DataBag[A] = ScalaSeq(values)
 
   /**
-   * Reads a DataBag into the specified `path` using in a CSV format.
+   * Reads a DataBag from the specified `path` using in a CSV format.
    *
    * @param path   The location where the data will be read from.
    * @param format The CSV format configuration.
    * @tparam A the type of elements to read.
    */
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV): DataBag[A] = ScalaSeq.readCSV[A](path, format)
+
+  /**
+   * Reads a `DataBag[String]` elements from the specified `path`.
+   *
+   * @param path   The location where the data will be read from.
+   */
+  def readText(path: String): DataBag[String] = ScalaSeq.readText(path)
 
   // -----------------------------------------------------
   // Helper methods
