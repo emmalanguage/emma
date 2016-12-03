@@ -32,16 +32,20 @@ trait BaseNaiveBayesSpec extends FlatSpec with Matchers with BeforeAndAfter {
   type MType = NaiveBayes.ModelType
   type Model = NaiveBayes.Model[Double]
 
+  val codegenDir = tempPath("codegen")
   val dir = "/classification/naivebayes"
   val path = tempPath(dir)
 
   before {
+    new File(codegenDir).mkdirs()
     new File(path).mkdirs()
+    addToClasspath(new File(codegenDir))
     materializeResource(s"$dir/vote.csv")
     materializeResource(s"$dir/model.txt")
   }
 
   after {
+    deleteRecursive(new File(codegenDir))
     deleteRecursive(new File(path))
   }
 

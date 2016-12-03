@@ -30,15 +30,19 @@ import java.io.File
 
 trait BaseTransitiveClosureSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
+  val codegenDir = tempPath("codegen")
   val dir = "/graphs/trans-closure"
   val path = tempPath(dir)
 
   before {
+    new File(codegenDir).mkdirs()
     new File(path).mkdirs()
+    addToClasspath(new File(codegenDir))
     materializeResource(s"$dir/edges.tsv")
   }
 
   after {
+    deleteRecursive(new File(codegenDir))
     deleteRecursive(new File(path))
   }
 

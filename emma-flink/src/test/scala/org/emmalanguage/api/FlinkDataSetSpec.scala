@@ -16,11 +16,18 @@
 package org.emmalanguage
 package api
 
-import org.emmalanguage.io.csv.{CSV, CSVConverter}
+import io.csv.CSV
+import io.csv.CSVConverter
+import test.util.addToClasspath
+import test.util.deleteRecursive
+import test.util.tempPath
 
 import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
+import org.scalatest.BeforeAndAfter
 
-class FlinkDataSetSpec extends DataBagSpec {
+import java.io.File
+
+class FlinkDataSetSpec extends DataBagSpec with BeforeAndAfter {
 
   override type Bag[A] = FlinkDataSet[A]
   override type BackendContext = FlinkEnv
@@ -38,4 +45,16 @@ class FlinkDataSetSpec extends DataBagSpec {
 
   override def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit flink: FlinkEnv): DataBag[A] =
     FlinkDataSet.readCSV(path, format)
+
+  val codegenDir = new File(tempPath("codegen"))
+
+  before {
+    // make sure that the base paths exist
+    codegenDir.mkdirs()
+    addToClasspath(codegenDir)
+  }
+
+  after {
+    deleteRecursive(codegenDir)
+  }
 }
