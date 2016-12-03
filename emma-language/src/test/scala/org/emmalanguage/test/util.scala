@@ -19,7 +19,14 @@ package test
 import org.apache.commons.io.FilenameUtils
 import resource._
 
-import java.nio.file.{Files, Paths, StandardCopyOption}
+import scala.util.control.NonFatal
+
+import java.io.File
+import java.net.URL
+import java.net.URLClassLoader
+import java.nio.file.Files
+import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
 
 object util {
 
@@ -87,5 +94,22 @@ object util {
       true
     }
     ret && path.delete()
+  }
+
+  /** Adds a [[File]] to the classpath. */
+  def addToClasspath(f: File): Unit =
+    addToClasspath(f.toURI.toURL)
+
+  /** Adds a [[URL]] to the classpath. */
+  def addToClasspath(u: URL): Unit = {
+    try {
+      val clsldr = ClassLoader.getSystemClassLoader.asInstanceOf[URLClassLoader]
+      val method = classOf[URLClassLoader].getDeclaredMethod("addURL", classOf[URL])
+      method.setAccessible(true)
+      method.invoke(clsldr, u)
+    } catch {
+      case NonFatal(t) =>
+        throw new java.io.IOException("Error, could not add URL to system classloader", t)
+    }
   }
 }

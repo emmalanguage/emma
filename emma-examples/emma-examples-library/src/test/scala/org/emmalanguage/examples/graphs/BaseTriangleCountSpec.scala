@@ -16,7 +16,6 @@
 package org.emmalanguage
 package examples.graphs
 
-import api._
 import io.csv.CSV
 import test.util._
 
@@ -25,21 +24,22 @@ import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
 import java.io.File
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.Paths
 
 trait BaseTriangleCountSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
+  val codegenDir = tempPath("codegen")
   val dir = "/graphs/triangle-cnt"
   val path = tempPath(dir)
 
   before {
+    new File(codegenDir).mkdirs()
     new File(path).mkdirs()
+    addToClasspath(new File(codegenDir))
     materializeResource(s"$dir/edges.tsv")
   }
 
   after {
+    deleteRecursive(new File(codegenDir))
     deleteRecursive(new File(path))
   }
 

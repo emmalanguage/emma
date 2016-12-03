@@ -31,17 +31,21 @@ import java.nio.file.Paths
 
 trait BaseWordCountSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
+  val codegenDir = tempPath("codegen")
   val dir = "/text/"
   val path = tempPath(dir)
   val text = "To be or not to Be"
 
   before {
+    new File(codegenDir).mkdirs()
     new File(path).mkdirs()
+    addToClasspath(new File(codegenDir))
     Files.write(Paths.get(s"$path/hamlet.txt"), text.getBytes(StandardCharsets.UTF_8))
   }
 
   after {
-    deleteRecursive(Paths.get(path).toFile)
+    deleteRecursive(new File(codegenDir))
+    deleteRecursive(new File(path))
   }
 
   "WordCount" should "count words" in {

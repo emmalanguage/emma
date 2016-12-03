@@ -39,8 +39,9 @@ abstract class BaseCodegenSpec
 
   import compiler._
 
-  val inputDir = tempPath("test/input")
-  val outputDir = tempPath("test/output")
+  val inputDir = new File(tempPath("test/input"))
+  val outputDir = new File(tempPath("test/output"))
+  val codegenDir = new File(tempPath("codegen"))
   implicit val imdbMovieCSVConverter = CSVConverter[ImdbMovie]
 
   def backendPipeline: u.Tree => u.Tree
@@ -72,13 +73,16 @@ abstract class BaseCodegenSpec
 
   before {
     // make sure that the base paths exist
-    new File(inputDir).mkdirs()
-    new File(outputDir).mkdirs()
+    inputDir.mkdirs()
+    outputDir.mkdirs()
+    codegenDir.mkdirs()
+    addToClasspath(codegenDir)
   }
 
   after {
-    deleteRecursive { new File(outputDir) }
-    deleteRecursive { new File(inputDir) }
+    deleteRecursive(outputDir)
+    deleteRecursive(inputDir)
+    deleteRecursive(codegenDir)
   }
 
   // --------------------------------------------------------------------------

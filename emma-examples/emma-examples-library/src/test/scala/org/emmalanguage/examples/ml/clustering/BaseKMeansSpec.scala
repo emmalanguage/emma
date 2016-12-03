@@ -29,6 +29,7 @@ import java.io.File
 
 trait BaseKMeansSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
+  val codegenDir = tempPath("codegen")
   val dir = "/clustering/kmeans"
   val path = tempPath(dir)
   val epsilon = 1e-3
@@ -37,12 +38,15 @@ trait BaseKMeansSpec extends FlatSpec with Matchers with BeforeAndAfter {
   val overlap = .75
 
   before {
+    new File(codegenDir).mkdirs()
     new File(path).mkdirs()
+    addToClasspath(new File(codegenDir))
     materializeResource(s"$dir/points.tsv")
     materializeResource(s"$dir/clusters.tsv")
   }
 
   after {
+    deleteRecursive(new File(codegenDir))
     deleteRecursive(new File(path))
   }
 
