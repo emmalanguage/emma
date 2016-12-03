@@ -23,7 +23,7 @@ import examples.ml.model._
 import breeze.linalg.Vector
 import org.apache.flink.api.scala.ExecutionEnvironment
 
-class FlinkNaiveBayesSpec extends BaseNaiveBayesSpec {
+class FlinkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec {
 
   def naiveBayes(input: String, lambda: Double, modelType: MType): Set[Model] =
     emma.onFlink {

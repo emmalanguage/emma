@@ -14,17 +14,16 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.integration.graphs
+package compiler.integration.text
 
-import api.Meta.Projections._
-import api._
-import compiler.integration.BaseCompilerITCase
+import api.DataBag
+import api.Group
+import compiler.integration.BaseCompilerIntegrationSpec
 import compiler.ir.ComprehensionSyntax._
-import examples.graphs._
-import examples.graphs.model._
+import examples.text.WordCount
 import io.csv._
 
-class TransitiveClosureITCase extends BaseCompilerITCase {
+class WordCountIntegrationSpec extends BaseCompilerIntegrationSpec {
 
   import compiler._
 
@@ -36,58 +35,61 @@ class TransitiveClosureITCase extends BaseCompilerITCase {
   val input: String = null
   val output: String = null
   val csv = CSV()
-  implicit val edgeCSVConverter = CSVConverter[Edge[Int]]
+  implicit val countCSVConverter = CSVConverter[(String, Long)]
 
   // ---------------------------------------------------------------------------
   // Program representations
   // ---------------------------------------------------------------------------
 
   val sourceExpr = liftPipeline(u.reify {
-    // read an initial collection of edges
-    val edges = DataBag.readCSV[Edge[Int]](input, csv)
-    // compute the transitive closure of the edges
-    val closure = TransitiveClosure(edges)
+    // read the input files and split them into lowercased words
+    val docs = DataBag.readCSV[String](input, csv)
+    // parse and count the words
+    val counts = WordCount(docs)
     // write the results into a CSV file
-    closure.writeCSV(output, csv)
+    counts.writeCSV(output, csv)
   })
 
   val coreExpr = anfPipeline(u.reify {
-    // read in a directed graph
     val input = this.input
-    val csv$1 = this.csv
-    val readCSV = DataBag.readCSV[Edge[Int]](input, csv$1)
-    val paths$1 = readCSV.distinct
-    val count$1 = paths$1.size
-    val added$1 = 0L
+    val csv$r1 = this.csv
+    val docs = DataBag.readCSV[String](input, csv$r1)
 
-    def doWhile$1(added$3: Long, count$3: Long, paths$3: DataBag[Edge[Int]]): Unit = {
-
-      val closure = comprehension[Edge[Int], DataBag] {
-        val e1 = generator[Edge[Int], DataBag](paths$3)
-        val e2 = generator[Edge[Int], DataBag](paths$3)
-        guard(e1.dst == e2.src)
-        head {
-          Edge(e1.src, e2.dst)
-        }
+    // read the input files and split them into lowercased words
+    val words = comprehension[String, DataBag] {
+      val line = generator[String, DataBag] {
+        docs
       }
-
-      val paths$2 = (paths$3 union closure).distinct
-      val added$2 = paths$2.size - count$3
-      val count$2 = paths$2.size
-      val isReady = added$2 > 0
-
-      def suffix$1(): Unit = {
-        val closure = paths$2
-        val output = this.output
-        val csv$2 = this.csv
-        closure.writeCSV(output, csv$2)
+      val word = generator[String, DataBag] {
+        DataBag[String](line.toLowerCase.split("\\W+"))
       }
-
-      if (isReady) doWhile$1(added$2, count$2, paths$2)
-      else suffix$1()
+      head {
+        word
+      }
     }
 
-    doWhile$1(added$1, count$1, paths$1)
+    val anonfun$r3 = (x: String) => {
+      val x$r3 = Predef identity x
+      x$r3
+    }
+
+    val groupBy$r1 = words groupBy anonfun$r3
+
+    // group the words by their identity and count the occurrence of each word
+    val counts = comprehension[(String, Long), DataBag] {
+      val group = generator[Group[String, DataBag[String]], DataBag] {
+        groupBy$r1
+      }
+      head {
+        (group.key, group.values.size)
+      }
+    }
+
+    // write the results into a CSV file
+    val output$r1 = this.output
+    val csv$r2 = this.csv
+    val x$r1 = counts.writeCSV(output$r1, csv$r2)
+    x$r1
   })
 
   // ---------------------------------------------------------------------------

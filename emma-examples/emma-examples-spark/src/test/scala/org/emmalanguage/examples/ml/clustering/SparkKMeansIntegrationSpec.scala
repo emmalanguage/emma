@@ -14,8 +14,9 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package examples.ml.classification
+package examples.ml.clustering
 
+import KMeans.Solution
 import api.Meta.Projections._
 import api._
 import examples.ml.model._
@@ -24,19 +25,19 @@ import io.csv.CSV
 import breeze.linalg.Vector
 import org.apache.spark.sql.SparkSession
 
-class SparkNaiveBayesSpec extends BaseNaiveBayesSpec {
+class SparkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec {
 
-  def naiveBayes(input: String, lambda: Double, modelType: MType): Set[Model] =
+  override def kMeans(k: Int, epsilon: Double, iterations: Int, input: String): Set[Solution[Long]] =
     emma.onSpark {
       // read the input
-      val data = for (line <- DataBag.readCSV[String](input, CSV())) yield {
-        val record = line.split(",").map(_.toDouble)
-        LVector(record.head, Vector(record.slice(1, record.length)))
+      val points = for (line <- DataBag.readCSV[String](input, CSV())) yield {
+        val record = line.split("\t")
+        Point(record.head.toLong, Vector(record.tail.map(_.toDouble)))
       }
-      // classification
-      val result = NaiveBayes(lambda, modelType)(data)
-      // fetch the result locally
-      result.fetch().toSet[Model]
+      // do the clustering
+      val result = KMeans(k, epsilon, iterations)(points)
+      // return the solution as a local set
+      result.fetch().toSet[Solution[Long]]
     }
 
   implicit lazy val sparkSession = SparkSession.builder()

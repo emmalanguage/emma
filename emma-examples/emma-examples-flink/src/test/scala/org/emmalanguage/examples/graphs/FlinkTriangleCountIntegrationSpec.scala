@@ -20,22 +20,22 @@ import api._
 import examples.graphs.model.Edge
 import io.csv.CSV
 
-import org.apache.spark.sql.SparkSession
+import org.apache.flink.api.scala.ExecutionEnvironment
 
-class SparkTransitiveClosureSpec extends BaseTransitiveClosureSpec {
+class FlinkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec {
 
-  override def transitiveClosure(input: String, csv: CSV): Set[Edge[Long]] =
-    emma.onSpark {
-      // read in set of edges
-      val edges = DataBag.readCSV[Edge[Long]](input, csv)
-      // build the transitive closure
-      val paths = TransitiveClosure(edges)
-      // return the closure as local set
-      paths.fetch().toSet
+  override def triangleCount(input: String, csv: CSV): Long =
+    emma.onFlink {
+      // read a bag of directed edges
+      // and convert it into an undirected bag without duplicates
+      val incoming = DataBag.readCSV[Edge[Long]](input, csv)
+      val outgoing = incoming.map(e => Edge(e.dst, e.src))
+      val edges = (incoming union outgoing).distinct
+      // compute all triangles
+      val triangles = EnumerateTriangles(edges)
+      // count and return the number of enumerated triangles
+      triangles.size
     }
 
-  implicit lazy val sparkSession = SparkSession.builder()
-    .master("local[*]")
-    .appName(this.getClass.getSimpleName)
-    .getOrCreate()
+  implicit lazy val flinkEnv = ExecutionEnvironment.getExecutionEnvironment
 }

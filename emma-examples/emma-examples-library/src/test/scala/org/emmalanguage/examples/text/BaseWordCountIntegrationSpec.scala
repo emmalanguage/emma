@@ -14,34 +14,33 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package examples.ml.classification
+package examples.text
 
+import api._
+import io.csv.CSV
 import test.util._
 
-import breeze.linalg.Vector
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
-import scala.io.Source
-
 import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.Files
+import java.nio.file.Paths
 
-trait BaseNaiveBayesSpec extends FlatSpec with Matchers with BeforeAndAfter {
-
-  type MType = NaiveBayes.ModelType
-  type Model = NaiveBayes.Model[Double]
+trait BaseWordCountIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
   val codegenDir = tempPath("codegen")
-  val dir = "/classification/naivebayes"
+  val dir = "/text/"
   val path = tempPath(dir)
+  val text = "To be or not to Be"
 
   before {
     new File(codegenDir).mkdirs()
     new File(path).mkdirs()
     addToClasspath(new File(codegenDir))
-    materializeResource(s"$dir/vote.csv")
-    materializeResource(s"$dir/model.txt")
+    Files.write(Paths.get(s"$path/hamlet.txt"), text.getBytes(StandardCharsets.UTF_8))
   }
 
   after {
@@ -49,18 +48,14 @@ trait BaseNaiveBayesSpec extends FlatSpec with Matchers with BeforeAndAfter {
     deleteRecursive(new File(path))
   }
 
-  "NaiveBayes" should "create the correct model on Bernoulli house-votes-84 data set" in {
-    val expectedModel = for {
-      line <- Source.fromFile(s"$path/model.txt").getLines().toSet[String]
-    } yield {
-      val values = line.split(",").map(_.toDouble)
-      (values(0), values(1), Vector(values.slice(2, values.length)))
-    }
+  "WordCount" should "count words" in {
+    wordCount(s"$path/hamlet.txt", s"$path/output.txt", CSV())
 
-    val solution = naiveBayes(s"$path/vote.csv", 1.0, NaiveBayes.ModelType.Bernoulli)
+    val act = DataBag(fromPath(s"$path/output.txt"))
+    val exp = DataBag(text.toLowerCase.split("\\W+").groupBy(x => x).toSeq.map(x => s"${x._1}\t${x._2.length}"))
 
-    solution should contain theSameElementsAs expectedModel
+    compareBags(act.fetch(), exp.fetch())
   }
 
-  def naiveBayes(input: String, lambda: Double, modelType: MType): Set[Model]
+  def wordCount(input: String, output: String, csv: CSV): Unit
 }

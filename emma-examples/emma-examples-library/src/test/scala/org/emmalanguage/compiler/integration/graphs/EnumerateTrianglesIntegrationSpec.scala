@@ -18,7 +18,7 @@ package compiler.integration.graphs
 
 import api.Meta.Projections._
 import api._
-import compiler.integration.BaseCompilerITCase
+import compiler.integration.BaseCompilerIntegrationSpec
 import compiler.ir.ComprehensionSyntax._
 import examples.graphs._
 import examples.graphs.model._
@@ -27,7 +27,7 @@ import io.csv._
 import scala.Ordering.Implicits._
 
 /** A spec for comprehension normalization. */
-class EnumerateTrianglesITCase extends BaseCompilerITCase {
+class EnumerateTrianglesIntegrationSpec extends BaseCompilerIntegrationSpec {
 
   import compiler._
 

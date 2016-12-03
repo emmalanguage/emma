@@ -28,7 +28,7 @@ import scala.io.Source
 
 import java.io.File
 
-trait BaseTransitiveClosureSpec extends FlatSpec with Matchers with BeforeAndAfter {
+trait BaseTransitiveClosureIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
   val codegenDir = tempPath("codegen")
   val dir = "/graphs/trans-closure"

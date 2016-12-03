@@ -16,9 +16,9 @@
 package org.emmalanguage
 package compiler.spark.rdd
 
-import compiler.BaseCodegenSpec
+import compiler.BaseCodegenIntegrationSpec
 
-class CodegenSpec extends BaseCodegenSpec {
+class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
 
   import compiler._
 

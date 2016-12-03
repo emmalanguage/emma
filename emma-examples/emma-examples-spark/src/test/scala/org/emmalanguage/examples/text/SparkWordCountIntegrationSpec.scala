@@ -19,19 +19,22 @@ package examples.text
 import api._
 import io.csv.CSV
 
-import org.apache.flink.api.scala.ExecutionEnvironment
+import org.apache.spark.sql.SparkSession
 
-class FlinkWordCountSpec extends BaseWordCountSpec {
+class SparkWordCountIntegrationSpec extends BaseWordCountIntegrationSpec {
 
   override def wordCount(input: String, output: String, csv: CSV): Unit =
-    emma.onFlink {
+    emma.onSpark {
       // read the input
-      val docs = DataBag.readText(input)
+      val docs = DataBag.readCSV[String](input, csv)
       // parse and count the words
       val counts = WordCount(docs)
       // write the results into a file
       counts.writeCSV(output, csv)
     }
 
-  implicit lazy val flinkEnv = ExecutionEnvironment.getExecutionEnvironment
+  implicit lazy val sparkSession = SparkSession.builder()
+    .master("local[*]")
+    .appName(this.getClass.getSimpleName)
+    .getOrCreate()
 }

@@ -32,10 +32,10 @@ import scala.util.Random
 import java.io.File
 import java.nio.file.Paths
 
-abstract class BaseCodegenSpec
+abstract class BaseCodegenIntegrationSpec
   extends BaseCompilerSpec with BeforeAndAfter {
 
-  import BaseCodegenSpec._
+  import BaseCodegenIntegrationSpec._
 
   import compiler._
 
@@ -590,7 +590,7 @@ abstract class BaseCodegenSpec
   }
 }
 
-object BaseCodegenSpec {
+object BaseCodegenIntegrationSpec {
   lazy val jabberwocky = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
 
   lazy val imdb = DataBag.readCSV[ImdbMovie]("file://" + materializeResource("/cinema/imdb.csv"), CSV()).fetch()

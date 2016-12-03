@@ -14,30 +14,33 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package examples.ml.clustering
+package examples.ml.classification
 
-import KMeans.Solution
 import api.Meta.Projections._
 import api._
 import examples.ml.model._
+import io.csv.CSV
 
 import breeze.linalg.Vector
-import org.apache.flink.api.scala.ExecutionEnvironment
+import org.apache.spark.sql.SparkSession
 
-class FlinkKMeansSpec extends BaseKMeansSpec {
+class SparkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec {
 
-  override def kMeans(k: Int, epsilon: Double, iterations: Int, input: String): Set[Solution[Long]] =
-    /*emma.onFlink*/ {
+  def naiveBayes(input: String, lambda: Double, modelType: MType): Set[Model] =
+    emma.onSpark {
       // read the input
-      val points = for (line <- DataBag.readText(input)) yield {
-        val record = line.split("\t")
-        Point(record.head.toLong, Vector(record.tail.map(_.toDouble)))
+      val data = for (line <- DataBag.readCSV[String](input, CSV())) yield {
+        val record = line.split(",").map(_.toDouble)
+        LVector(record.head, Vector(record.slice(1, record.length)))
       }
-      // do the clustering
-      val result = KMeans(k, epsilon, iterations)(points)
-      // return the solution as a local set
-      result.fetch().toSet[Solution[Long]]
+      // classification
+      val result = NaiveBayes(lambda, modelType)(data)
+      // fetch the result locally
+      result.fetch().toSet[Model]
     }
 
-  implicit lazy val flinkEnv = ExecutionEnvironment.getExecutionEnvironment
+  implicit lazy val sparkSession = SparkSession.builder()
+    .master("local[*]")
+    .appName(this.getClass.getSimpleName)
+    .getOrCreate()
 }
