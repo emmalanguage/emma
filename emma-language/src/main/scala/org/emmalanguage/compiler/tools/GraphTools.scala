@@ -16,9 +16,9 @@
 package org.emmalanguage
 package compiler.tools
 
-import org.emmalanguage.compiler.Common
-import org.emmalanguage.compiler.lang.cf.ControlFlow
-import org.emmalanguage.compiler.lang.core.Core
+import compiler.Common
+import compiler.lang.cf.ControlFlow
+import compiler.lang.core.Core
 
 import resource._
 
@@ -26,8 +26,8 @@ import java.io.FileWriter
 import java.nio.file.Path
 
 trait GraphTools extends Common
-  with ControlFlow
-  { this: Core =>
+  with ControlFlow {
+  this: Core =>
 
   import UniverseImplicits._
 
@@ -38,15 +38,20 @@ trait GraphTools extends Common
     case class EdgeData(id: String, source: String, target: String, label: String)
 
     sealed trait Element
-    case class NodeElement(data: NodeData,
-                           group: String = "nodes",
-                           style: Option[Map[String, String]] = None
-                          ) extends Element
 
-    case class EdgeElement(data: EdgeData,
-                           group: String = "edges",
-                           style: Option[Map[String, String]] = None
-                          ) extends Element
+    case class NodeElement
+    (
+      data: NodeData,
+      group: String = "nodes",
+      style: Option[Map[String, String]] = None
+    ) extends Element
+
+    case class EdgeElement
+    (
+      data: EdgeData,
+      group: String = "edges",
+      style: Option[Map[String, String]] = None
+    ) extends Element
 
     implicit val nodeDataFormat = jsonFormat3(NodeData)
     implicit val edgeDataFormat = jsonFormat4(EdgeData)
@@ -70,13 +75,17 @@ trait GraphTools extends Common
   }
 
   object GraphTools {
+
     import Core.{Lang => core}
     import CytoscapeGraphJsonProtocol._
     import spray.json._
+
     val cs = new Comprehension.Syntax(API.bagSymbol)
+
     def mkGraph(tree: u.Tree): Iterable[Element] = {
       val graph = ControlFlow.cfg(API.bagSymbol)(tree)
       val mkLabel = label(graph) _
+
       val nestFlipped = for {
         (parent, children) <- graph.nest
         child <- children
@@ -111,7 +120,9 @@ trait GraphTools extends Common
       nodes ++ edges
     }
 
-    private[emmalanguage] def mkJsonGraph(id: String, tree: u.Tree): JsValue = JsObject(id -> mkGraph(tree).toJson)
+    private[emmalanguage] def mkJsonGraph(id: String, tree: u.Tree): JsValue =
+      JsObject(id -> mkGraph(tree).toJson)
+
     private[emmalanguage] def writeJsonGraph(basePath: Path, id: String, tree: u.Tree): u.Tree = {
       basePath.toFile.mkdirs() // make parent
       val targetPath: Path = basePath.resolve(s"$id.json")
@@ -130,17 +141,17 @@ trait GraphTools extends Common
       * @param name the filename
       * @return a function returning the identity of the tree
       */
-    def renderGraph(basePath: Path)(name: String): u.Tree => u.Tree = writeJsonGraph(basePath, name, _)
+    def renderGraph(basePath: Path)(name: String): u.Tree => u.Tree =
+      writeJsonGraph(basePath, name, _)
 
-    private[emmalanguage] def label(graph: CFG.Graph[u.TermSymbol])(sym: u.TermSymbol): String = {
+    private[emmalanguage] def label(graph: CFG.Graph[u.TermSymbol])(sym: u.TermSymbol): String =
       graph.defs.get(sym).map(_.rhs) match {
         case Some(core.Atomic(x)) => u.showCode(x)
-        case Some(core.DefCall(_, sym, _, _)) => sym.name.decodedName.toString
+        case Some(core.DefCall(_, method, _, _)) => method.name.decodedName.toString
         case Some(core.Lambda(_, _, _)) => "Lambda"
         case Some(cs.Comprehension(_, _)) => "For-Comprehension"
         case Some(_) => s"[Unknown Symbol: ${sym.name.decodedName}]"
         case None => s"Closure (${sym.name.decodedName})"
       }
-    }
   }
 }
