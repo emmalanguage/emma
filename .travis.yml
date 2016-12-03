@@ -19,11 +19,7 @@ env:
 
   matrix:
     # Unit tests
-    - TEST_ARGS=""
-    # Integration tests (also runs the spec pipelines in emma-language with compilation)
-    - TEST_ARGS="-PIT -pl emma-language"
-    - TEST_ARGS="-PIT -pl emma-examples/emma-examples-spark"
-    - TEST_ARGS="-PIT -pl emma-examples/emma-examples-flink"
+    - TEST_ARGS="-Pcompile-spec-pipelines"
 cache:
   directories:
     $HOME/.m2
@@ -32,4 +28,4 @@ script:
   # Enable exit code propagation through pipes
   - set -o pipefail
   # Use pipe view (`pv`) to work around command line output timeout
-  - mvn test $TEST_ARGS | pv -t -b -l -i 10
+  - mvn verify $TEST_ARGS | pv -t -b -l -i 10
