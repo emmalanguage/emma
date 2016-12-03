@@ -27,7 +27,7 @@ import scala.io.Source
 
 import java.io.File
 
-trait BaseKMeansSpec extends FlatSpec with Matchers with BeforeAndAfter {
+trait BaseKMeansIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
   val codegenDir = tempPath("codegen")
   val dir = "/clustering/kmeans"

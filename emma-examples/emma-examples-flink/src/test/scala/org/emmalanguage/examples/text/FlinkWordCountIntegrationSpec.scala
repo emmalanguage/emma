@@ -14,24 +14,23 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package examples.graphs
+package examples.text
 
 import api._
-import examples.graphs.model.Edge
 import io.csv.CSV
 
 import org.apache.flink.api.scala.ExecutionEnvironment
 
-class FlinkTransitiveClosureSpec extends BaseTransitiveClosureSpec {
+class FlinkWordCountIntegrationSpec extends BaseWordCountIntegrationSpec {
 
-  override def transitiveClosure(input: String, csv: CSV): Set[Edge[Long]] =
+  override def wordCount(input: String, output: String, csv: CSV): Unit =
     emma.onFlink {
-      // read in set of edges
-      val edges = DataBag.readCSV[Edge[Long]](input, csv)
-      // build the transitive closure
-      val paths = TransitiveClosure(edges)
-      // return the closure as local set
-      paths.fetch().toSet
+      // read the input
+      val docs = DataBag.readText(input)
+      // parse and count the words
+      val counts = WordCount(docs)
+      // write the results into a file
+      counts.writeCSV(output, csv)
     }
 
   implicit lazy val flinkEnv = ExecutionEnvironment.getExecutionEnvironment

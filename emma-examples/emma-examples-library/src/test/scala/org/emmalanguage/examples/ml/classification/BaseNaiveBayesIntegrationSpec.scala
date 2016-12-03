@@ -14,33 +14,34 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package examples.text
+package examples.ml.classification
 
-import api._
-import io.csv.CSV
 import test.util._
 
+import breeze.linalg.Vector
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 
-import java.io.File
-import java.nio.charset.StandardCharsets
-import java.nio.file.Files
-import java.nio.file.Paths
+import scala.io.Source
 
-trait BaseWordCountSpec extends FlatSpec with Matchers with BeforeAndAfter {
+import java.io.File
+
+trait BaseNaiveBayesIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter {
+
+  type MType = NaiveBayes.ModelType
+  type Model = NaiveBayes.Model[Double]
 
   val codegenDir = tempPath("codegen")
-  val dir = "/text/"
+  val dir = "/classification/naivebayes"
   val path = tempPath(dir)
-  val text = "To be or not to Be"
 
   before {
     new File(codegenDir).mkdirs()
     new File(path).mkdirs()
     addToClasspath(new File(codegenDir))
-    Files.write(Paths.get(s"$path/hamlet.txt"), text.getBytes(StandardCharsets.UTF_8))
+    materializeResource(s"$dir/vote.csv")
+    materializeResource(s"$dir/model.txt")
   }
 
   after {
@@ -48,14 +49,18 @@ trait BaseWordCountSpec extends FlatSpec with Matchers with BeforeAndAfter {
     deleteRecursive(new File(path))
   }
 
-  "WordCount" should "count words" in {
-    wordCount(s"$path/hamlet.txt", s"$path/output.txt", CSV())
+  "NaiveBayes" should "create the correct model on Bernoulli house-votes-84 data set" in {
+    val expectedModel = for {
+      line <- Source.fromFile(s"$path/model.txt").getLines().toSet[String]
+    } yield {
+      val values = line.split(",").map(_.toDouble)
+      (values(0), values(1), Vector(values.slice(2, values.length)))
+    }
 
-    val act = DataBag(fromPath(s"$path/output.txt"))
-    val exp = DataBag(text.toLowerCase.split("\\W+").groupBy(x => x).toSeq.map(x => s"${x._1}\t${x._2.length}"))
+    val solution = naiveBayes(s"$path/vote.csv", 1.0, NaiveBayes.ModelType.Bernoulli)
 
-    compareBags(act.fetch(), exp.fetch())
+    solution should contain theSameElementsAs expectedModel
   }
 
-  def wordCount(input: String, output: String, csv: CSV): Unit
+  def naiveBayes(input: String, lambda: Double, modelType: MType): Set[Model]
 }

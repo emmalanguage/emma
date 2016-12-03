@@ -19,7 +19,7 @@ package compiler.integration
 import compiler.BaseCompilerSpec
 
 /** Base trait for full Emma examples. */
-trait BaseCompilerITCase extends BaseCompilerSpec {
+trait BaseCompilerIntegrationSpec extends BaseCompilerSpec {
 
   import compiler._
 

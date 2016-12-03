@@ -14,27 +14,25 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package examples.text
+package examples.graphs
 
 import api._
+import examples.graphs.model.Edge
 import io.csv.CSV
 
-import org.apache.spark.sql.SparkSession
+import org.apache.flink.api.scala.ExecutionEnvironment
 
-class SparkWordCountSpec extends BaseWordCountSpec {
+class FlinkTransitiveClosureIntegrationSpec extends BaseTransitiveClosureIntegrationSpec {
 
-  override def wordCount(input: String, output: String, csv: CSV): Unit =
-    emma.onSpark {
-      // read the input
-      val docs = DataBag.readCSV[String](input, csv)
-      // parse and count the words
-      val counts = WordCount(docs)
-      // write the results into a file
-      counts.writeCSV(output, csv)
+  override def transitiveClosure(input: String, csv: CSV): Set[Edge[Long]] =
+    emma.onFlink {
+      // read in set of edges
+      val edges = DataBag.readCSV[Edge[Long]](input, csv)
+      // build the transitive closure
+      val paths = TransitiveClosure(edges)
+      // return the closure as local set
+      paths.fetch().toSet
     }
 
-  implicit lazy val sparkSession = SparkSession.builder()
-    .master("local[*]")
-    .appName(this.getClass.getSimpleName)
-    .getOrCreate()
+  implicit lazy val flinkEnv = ExecutionEnvironment.getExecutionEnvironment
 }

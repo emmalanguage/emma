@@ -20,12 +20,12 @@ import api._
 import examples.graphs.model.Edge
 import io.csv.CSV
 
-import org.apache.flink.api.scala.ExecutionEnvironment
+import org.apache.spark.sql.SparkSession
 
-class FlinkTriangleCountSpec extends BaseTriangleCountSpec {
+class SparkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec {
 
   override def triangleCount(input: String, csv: CSV): Long =
-    emma.onFlink {
+    emma.onSpark {
       // read a bag of directed edges
       // and convert it into an undirected bag without duplicates
       val incoming = DataBag.readCSV[Edge[Long]](input, csv)
@@ -37,5 +37,8 @@ class FlinkTriangleCountSpec extends BaseTriangleCountSpec {
       triangles.size
     }
 
-  implicit lazy val flinkEnv = ExecutionEnvironment.getExecutionEnvironment
+  implicit lazy val sparkSession = SparkSession.builder()
+    .master("local[*]")
+    .appName(this.getClass.getSimpleName)
+    .getOrCreate()
 }

@@ -14,30 +14,24 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package examples.ml.clustering
+package examples.graphs
 
-import KMeans.Solution
-import api.Meta.Projections._
 import api._
-import examples.ml.model._
+import examples.graphs.model.Edge
 import io.csv.CSV
 
-import breeze.linalg.Vector
 import org.apache.spark.sql.SparkSession
 
-class SparkKMeansSpec extends BaseKMeansSpec {
+class SparkTransitiveClosureIntegrationSpec extends BaseTransitiveClosureIntegrationSpec {
 
-  override def kMeans(k: Int, epsilon: Double, iterations: Int, input: String): Set[Solution[Long]] =
+  override def transitiveClosure(input: String, csv: CSV): Set[Edge[Long]] =
     emma.onSpark {
-      // read the input
-      val points = for (line <- DataBag.readCSV[String](input, CSV())) yield {
-        val record = line.split("\t")
-        Point(record.head.toLong, Vector(record.tail.map(_.toDouble)))
-      }
-      // do the clustering
-      val result = KMeans(k, epsilon, iterations)(points)
-      // return the solution as a local set
-      result.fetch().toSet[Solution[Long]]
+      // read in set of edges
+      val edges = DataBag.readCSV[Edge[Long]](input, csv)
+      // build the transitive closure
+      val paths = TransitiveClosure(edges)
+      // return the closure as local set
+      paths.fetch().toSet
     }
 
   implicit lazy val sparkSession = SparkSession.builder()

@@ -16,9 +16,9 @@
 package org.emmalanguage
 package compiler.flink.dataset
 
-import compiler.BaseCodegenSpec
+import compiler.BaseCodegenIntegrationSpec
 
-class CodegenSpec extends BaseCodegenSpec {
+class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
 
   import compiler._
 

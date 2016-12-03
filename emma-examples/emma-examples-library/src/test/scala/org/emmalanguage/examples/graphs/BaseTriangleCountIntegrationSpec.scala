@@ -25,7 +25,7 @@ import org.scalatest.Matchers
 
 import java.io.File
 
-trait BaseTriangleCountSpec extends FlatSpec with Matchers with BeforeAndAfter {
+trait BaseTriangleCountIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
   val codegenDir = tempPath("codegen")
   val dir = "/graphs/triangle-cnt"
