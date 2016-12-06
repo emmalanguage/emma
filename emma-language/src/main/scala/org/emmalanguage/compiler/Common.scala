@@ -169,6 +169,40 @@ trait Common extends AST {
     //@formatter:on
   }
 
+  protected[emmalanguage] object DSCFAnnotations extends IRModule {
+    import ir.DSCFAnnotations._
+    //@formatter:off
+    val module        = api.Sym[ir.DSCFAnnotations.type].asModule
+
+    // Annotation symbols
+    val branch        = api.Sym[branch].asClass
+    val loop          = api.Sym[loop].asClass
+    val suffix        = api.Sym[suffix].asClass
+    val thenBranch    = api.Sym[thenBranch].asClass
+    val elseBranch    = api.Sym[elseBranch].asClass
+    val whileLoop     = api.Sym[whileLoop].asClass
+    val doWhileLoop   = api.Sym[doWhileLoop].asClass
+    val loopBody      = api.Sym[loopBody].asClass
+
+    private def ann(sym: u.ClassSymbol) =
+      u.Annotation(api.Inst(sym.info, argss = Seq(Seq.empty)))
+
+    // Annotation trees
+    val suffixAnn     = ann(suffix)
+    val thenAnn       = ann(thenBranch)
+    val elseAnn       = ann(elseBranch)
+    val whileAnn      = ann(whileLoop)
+    val doWhileAnn    = ann(doWhileLoop)
+    val loopBodyAnn   = ann(loopBody)
+
+    val ops           = Set.empty[u.MethodSymbol]
+    //@formatter:on
+  }
+
+  private def assertOneOverload(ops: Traversable[u.MethodSymbol]) =
+    for (op <- ops) assert(op.alternatives.size == 1,
+      s"`$op` should have exactly one overload. (see `changeStaticCalls` in translateToDataflows)")
+
   /** Common validation helpers. */
   object Validation {
 
