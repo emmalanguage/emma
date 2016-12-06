@@ -16,13 +16,11 @@
 package org.emmalanguage
 package io.csv
 
+import util._
+
 import java.{lang => jl}
-import java.{math => jm}
-import java.util.Date
 
 import scala.Function.const
-import scala.math.BigInt
-import scala.math.BigDecimal
 import scala.reflect.ClassTag
 
 /**
@@ -55,26 +53,16 @@ trait CSVColumn[T] {
 }
 
 /** Factory methods and implicit instances of CSV column codecs. */
-object CSVColumn {
+object CSVColumn extends IsoCSVColumns {
 
   /** Summons an implicit codec for type `T` available in scope. */
   def apply[T](implicit column: CSVColumn[T]): CSVColumn[T] = column
 
   /** Creates a new codec for type `T` from pure conversion functions. */
-  def make[T](fromF: String => T, toF: T => String = (_: T).toString): CSVColumn[T] =
-    new CSVColumn[T] {
+  def make[T](fromF: String => T, toF: T => String = (_: T).toString)
+    : CSVColumn[T] = new CSVColumn[T] {
       def from(column: String)(implicit csv: CSV) = fromF(column)
       def to(value: T)(implicit csv: CSV) = toF(value)
-    }
-
-  /**
-   * Derives a new codec for type `B` from an existing codec for type `A`,
-   * given an isomorphism between `A` and `B`.
-   */
-  def iso[A, B](fromF: A => B, toF: B => A)(implicit A: CSVColumn[A]): CSVColumn[B] =
-    new CSVColumn[B] {
-      def from(column: String)(implicit csv: CSV) = fromF(A from column)
-      def to(value: B)(implicit csv: CSV) = A to toF(value)
     }
 
   // Scala primitives
@@ -88,21 +76,6 @@ object CSVColumn {
   implicit val floatCSVColumn:      CSVColumn[Float]      = make(_.toFloat)
   implicit val doubleCSVColumn:     CSVColumn[Double]     = make(_.toDouble)
   implicit val unitCSVColumn:       CSVColumn[Unit]       = make(const(()), const(""))
-  implicit val bigIntCSVColumn:     CSVColumn[BigInt]     = make(BigInt.apply)
-  implicit val bigDecimalCSVColumn: CSVColumn[BigDecimal] = make(BigDecimal.apply)
-
-  // Java primitives
-  implicit val jCharacterCSVColumn:  CSVColumn[jl.Character]  = make(_.head)
-  implicit val jBooleanCSVColumn:    CSVColumn[jl.Boolean]    = make(_.toBoolean)
-  implicit val jByteCSVColumn:       CSVColumn[jl.Byte]       = make(_.toByte)
-  implicit val jShortCSVColumn:      CSVColumn[jl.Short]      = make(_.toShort)
-  implicit val jIntegerCSVColumn:    CSVColumn[jl.Integer]    = make(_.toInt)
-  implicit val jLongCSVColumn:       CSVColumn[jl.Long]       = make(_.toLong)
-  implicit val jFloatCSVColumn:      CSVColumn[jl.Float]      = make(_.toFloat)
-  implicit val jDoubleCSVColumn:     CSVColumn[jl.Double]     = make(_.toDouble)
-  implicit val jBigIntegerCSVColumn: CSVColumn[jm.BigInteger] = make(new jm.BigInteger(_))
-  implicit val jBigDecimalCSVColumn: CSVColumn[jm.BigDecimal] = make(new jm.BigDecimal(_))
-  implicit val jDateCSVColumn:       CSVColumn[Date] = iso[Long, Date](new Date(_), _.getTime)
 
   /**
    * Creates a Scala [[Enumeration]] codec.
@@ -111,22 +84,38 @@ object CSVColumn {
    * `implicit object MyEnum extends Enumeration`.
    */
   implicit def enumCSVColumn[E <: Enumeration](implicit enum: E): CSVColumn[enum.Value] =
-    make(col => enum withName col)
+    iso(Iso.stringIsoEnum[enum.type](enum), stringCSVColumn)
 
   /**
    * Creates a Java [[Enum]] codec.
    * A [[ClassTag]] is required to decode instances.
    */
-  implicit def jEnumCSVColumn[E <: jl.Enum[E]](implicit ctag: ClassTag[E]): CSVColumn[E] =
-    make(jl.Enum.valueOf(ctag.runtimeClass.asInstanceOf[Class[E]], _), _.name)
+  implicit def jEnumCSVColumn[E <: jl.Enum[E]](implicit E: ClassTag[E]): CSVColumn[E] =
+    iso(Iso.stringIsoJEnum, stringCSVColumn)
 
   /** Creates an optional codec from an existing codec. */
-  implicit def optionCSVColumn[T](implicit T: CSVColumn[T]): CSVColumn[Option[T]] =
-    new CSVColumn[Option[T]] {
+  implicit def optionCSVColumn[T](implicit T: CSVColumn[T])
+    : CSVColumn[Option[T]] = new CSVColumn[Option[T]] {
       def from(column: String)(implicit csv: CSV) =
         if (csv.nullValue == column) None else Option(T from column)
 
       def to(value: Option[T])(implicit csv: CSV) =
         value.fold(csv.nullValue)(T.to)
+    }
+}
+
+// Lowest priority
+trait IsoCSVColumns {
+
+  /**
+   * Derives a new codec for type `B` from an existing codec for type `A`,
+   * given an (implicit) isomorphism between `A` and `B`.
+   *
+   * Handles Java primitives.
+   */
+  implicit def iso[A, B](implicit iso: A <=> B, underlying: CSVColumn[A])
+    : CSVColumn[B] = new CSVColumn[B] {
+      def from(column: String)(implicit csv: CSV) = iso.from(underlying.from(column))
+      def to(value: B)(implicit csv: CSV) = underlying.to(iso.to(value))
     }
 }

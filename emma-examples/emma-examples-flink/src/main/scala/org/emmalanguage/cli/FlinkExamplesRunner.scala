@@ -25,6 +25,7 @@ import examples.ml.clustering._
 import examples.ml.model._
 import examples.text._
 import io.csv._
+import util.Iso
 
 import breeze.linalg.{Vector => Vec}
 import org.apache.flink.api.scala.ExecutionEnvironment
@@ -161,7 +162,7 @@ object FlinkExamplesRunner {
   // ---------------------------------------------------------------------------
 
   implicit def breezeVectorCSVConverter[V: CSVColumn: ClassTag]: CSVConverter[Vec[V]] =
-    CSVConverter.iso[Array[V], Vec[V]](Vec.apply, _.toArray)
+    CSVConverter.iso[Array[V], Vec[V]](Iso.make(Vec.apply, _.toArray), implicitly)
 
   // Graphs
 
