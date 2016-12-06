@@ -65,6 +65,12 @@ trait Symbols { this: AST =>
       // Utility methods
       // ------------------------------------------------------------------------------------------
 
+      /** Returns the symbol corresponding to a type. */
+      def apply[T: u.WeakTypeTag]: u.Symbol = {
+        val sym = symbolOf[T]
+        if (sym.isModuleClass) sym.asClass.module else sym
+      }
+
       /** Returns the flags associated with `sym`. */
       def flags(sym: u.Symbol): u.FlagSet =
         internal.flags(sym)
