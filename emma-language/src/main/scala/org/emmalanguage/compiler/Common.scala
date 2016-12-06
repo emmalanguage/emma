@@ -16,7 +16,10 @@
 package org.emmalanguage
 package compiler
 
+import api._
 import ast.AST
+import io.csv.CSVConverter
+import io.parquet.ParquetConverter
 
 import org.scalactic._
 import org.scalactic.Accumulation._
@@ -32,56 +35,71 @@ trait Common extends AST {
 
   val rootPkg = "org.emmalanguage"
 
+  trait IRModule {
+    def module: u.ModuleSymbol
+    def ops: Set[u.MethodSymbol]
+
+    protected def op(name: String): u.MethodSymbol =
+      methodIn(module, name)
+
+    protected def methodIn(target: u.Symbol, name: String): u.MethodSymbol =
+      target.info.member(api.TermName(name)).asMethod
+  }
+
   /** A set of API method symbols to be comprehended. */
-  protected[emmalanguage] object API {
+  protected[emmalanguage] object API extends IRModule {
     //@formatter:off
-    val apiModuleSymbol       = rootMirror.staticModule(s"$rootPkg.api.package")
-    val emmaModuleSymbol      = rootMirror.staticModule(s"$rootPkg.api.emma.package")
+    val apiModuleSymbol       = api.Sym[org.emmalanguage.api.`package`.type].asModule
+    val emmaModuleSymbol      = api.Sym[emma.`package`.type].asModule
     val csvPkgSymbol          = rootMirror.staticPackage(s"$rootPkg.io.csv")
-    val bagSymbol             = rootMirror.staticClass(s"$rootPkg.api.DataBag")
-    val groupSymbol           = rootMirror.staticClass(s"$rootPkg.api.Group")
-    val bagModuleSymbol       = rootMirror.staticModule(s"$rootPkg.api.DataBag")
-    val scalaSeqModuleSymbol  = rootMirror.staticModule(s"$rootPkg.api.ScalaSeq")
+    val bagSymbol             = api.Sym[DataBag[Any]].asClass
+    val groupSymbol           = api.Sym[Group[Any, Any]].asClass
+    val bagModuleSymbol       = bagSymbol.companion.asModule
+    val scalaSeqModuleSymbol  = api.Sym[ScalaSeq.type].asModule
+    def module                = apiModuleSymbol
+
+    private def bagOp(name: String) =
+      methodIn(bagSymbol, name)
 
     // Sources
-    val empty                 = bagSymbol.companion.info.member(TermName("empty")).asMethod
-    val apply                 = bagSymbol.companion.info.member(TermName("apply")).asMethod
-    val readCSV               = bagSymbol.companion.info.member(TermName("readCSV")).asMethod
-    val readParquet           = bagSymbol.companion.info.member(TermName("readParquet")).asMethod
-    val readText              = bagSymbol.companion.info.member(TermName("readText")).asMethod
+    val empty                 = methodIn(bagModuleSymbol, "empty")
+    val apply                 = methodIn(bagModuleSymbol, "apply")
+    val readCSV               = methodIn(bagModuleSymbol, "readCSV")
+    val readParquet           = methodIn(bagModuleSymbol, "readParquet")
+    val readText              = methodIn(bagModuleSymbol, "readText")
     // Sinks
-    val fetch                 = bagSymbol.info.decl(TermName("fetch"))
-    val as                    = bagSymbol.info.decl(TermName("as"))
-    val writeCSV              = bagSymbol.info.decl(TermName("writeCSV"))
-    val writeParquet          = bagSymbol.info.decl(TermName("writeParquet"))
-    val writeText             = bagSymbol.info.decl(TermName("writeText"))
+    val fetch                 = bagOp("fetch")
+    val as                    = bagOp("as")
+    val writeCSV              = bagOp("writeCSV")
+    val writeParquet          = bagOp("writeParquet")
+    val writeText             = bagOp("writeText")
     // Monad ops
-    val map                   = bagSymbol.info.decl(TermName("map"))
-    val flatMap               = bagSymbol.info.decl(TermName("flatMap"))
-    val withFilter            = bagSymbol.info.decl(TermName("withFilter"))
+    val map                   = bagOp("map")
+    val flatMap               = bagOp("flatMap")
+    val withFilter            = bagOp("withFilter")
     // Grouping
-    val groupBy               = bagSymbol.info.decl(TermName("groupBy"))
+    val groupBy               = bagOp("groupBy")
     // Set operations
-    val union                 = bagSymbol.info.decl(TermName("union"))
-    val distinct              = bagSymbol.info.decl(TermName("distinct"))
+    val union                 = bagOp("union")
+    val distinct              = bagOp("distinct")
     // Structural recursion & Folds
-    val fold                  = bagSymbol.info.decl(TermName("fold"))
-    val isEmpty               = bagSymbol.info.decl(TermName("isEmpty"))
-    val nonEmpty              = bagSymbol.info.decl(TermName("nonEmpty"))
-    val reduce                = bagSymbol.info.decl(TermName("reduce"))
-    val reduceOption          = bagSymbol.info.decl(TermName("reduceOption"))
-    val min                   = bagSymbol.info.decl(TermName("min"))
-    val max                   = bagSymbol.info.decl(TermName("max"))
-    val sum                   = bagSymbol.info.decl(TermName("sum"))
-    val product               = bagSymbol.info.decl(TermName("product"))
-    val size                  = bagSymbol.info.decl(TermName("size"))
-    val count                 = bagSymbol.info.decl(TermName("count"))
-    val exists                = bagSymbol.info.decl(TermName("exists"))
-    val forall                = bagSymbol.info.decl(TermName("forall"))
-    val find                  = bagSymbol.info.decl(TermName("find"))
-    val bottom                = bagSymbol.info.decl(TermName("bottom"))
-    val top                   = bagSymbol.info.decl(TermName("top"))
-    val sample                = bagSymbol.info.decl(TermName("sample"))
+    val fold                  = bagOp("fold")
+    val isEmpty               = bagOp("isEmpty")
+    val nonEmpty              = bagOp("nonEmpty")
+    val reduce                = bagOp("reduce")
+    val reduceOption          = bagOp("reduceOption")
+    val min                   = bagOp("min")
+    val max                   = bagOp("max")
+    val sum                   = bagOp("sum")
+    val product               = bagOp("product")
+    val size                  = bagOp("size")
+    val count                 = bagOp("count")
+    val exists                = bagOp("exists")
+    val forall                = bagOp("forall")
+    val find                  = bagOp("find")
+    val bottom                = bagOp("bottom")
+    val top                   = bagOp("top")
+    val sample                = bagOp("sample")
 
     val sourceOps             = Set(empty, apply, readCSV, readParquet, readText)
     val sinkOps               = Set(fetch, as, writeCSV, writeParquet, writeText)
@@ -99,57 +117,55 @@ trait Common extends AST {
       sample
     )
 
-    val ops                   =  for {
-      m <- sourceOps ++ sinkOps ++ monadOps ++ nestOps ++ setOps ++ foldOps
-    } yield m
+    val ops = sourceOps | sinkOps | monadOps | nestOps | setOps | foldOps
 
-    val implicitTypes         = Set(
-      typeOf[org.emmalanguage.api.Meta[Nothing]].typeConstructor,
-      typeOf[org.emmalanguage.io.csv.CSVConverter[Nothing]].typeConstructor,
-      typeOf[org.emmalanguage.io.parquet.ParquetConverter[Nothing]].typeConstructor
+    val implicitTypes = Set(
+      api.Type[Meta[Any]].typeConstructor,
+      api.Type[CSVConverter[Any]].typeConstructor,
+      api.Type[ParquetConverter[Any]].typeConstructor
     )
 
     // Type constructors
-    val DataBag               = typeOf[org.emmalanguage.api.DataBag[Nothing]].typeConstructor
-    val Group                 = typeOf[org.emmalanguage.api.Group[Nothing, Nothing]].typeConstructor
+    val DataBag               = api.Type[DataBag[Any]].typeConstructor
+    val Group                 = api.Type[Group[Any, Any]].typeConstructor
 
     // Backend-only operations
-    val byFetch               = scalaSeqModuleSymbol.info.member(api.TermName("byFetch")).asMethod
+    val byFetch               = methodIn(scalaSeqModuleSymbol, "byFetch")
     //@formatter:on
   }
 
-  protected[emmalanguage] object ComprehensionSyntax {
+  protected[emmalanguage] object ComprehensionSyntax extends IRModule {
     //@formatter:off
-    val module                = rootMirror.staticModule(s"$rootPkg.compiler.ir.ComprehensionSyntax").asModule
+    val module                = api.Sym[ir.ComprehensionSyntax.type].asModule
 
-    val flatten               = module.info.decl(TermName("flatten")).asMethod
-    val generator             = module.info.decl(TermName("generator")).asMethod
-    val comprehension         = module.info.decl(TermName("comprehension")).asMethod
-    val guard                 = module.info.decl(TermName("guard")).asMethod
-    val head                  = module.info.decl(TermName("head")).asMethod
+    val flatten               = op("flatten")
+    val generator             = op("generator")
+    val comprehension         = op("comprehension")
+    val guard                 = op("guard")
+    val head                  = op("head")
 
     val ops                   = Set(flatten, generator, comprehension, guard, head)
     //@formatter:on
   }
 
-  protected[emmalanguage] object ComprehensionCombinators {
+  protected[emmalanguage] object ComprehensionCombinators extends IRModule {
     //@formatter:off
-    val module                = rootMirror.staticModule(s"$rootPkg.compiler.ir.ComprehensionCombinators").asModule
+    val module                = api.Sym[ir.ComprehensionCombinators.type].asModule
 
-    val cross                 = module.info.decl(TermName("cross")).asMethod
-    val equiJoin              = module.info.decl(TermName("equiJoin")).asMethod
+    val cross                 = op("cross")
+    val equiJoin              = op("equiJoin")
 
     val ops                   = Set(cross, equiJoin)
     //@formatter:on
   }
 
-  protected[emmalanguage] object GraphRepresentation {
+  protected[emmalanguage] object GraphRepresentation extends IRModule {
     //@formatter:off
-    val module  = rootMirror.staticModule(s"$rootPkg.compiler.ir.GraphRepresentation").asModule
+    val module  = api.Sym[ir.GraphRepresentation.type].asModule
 
-    val phi     = module.info.member(api.TermName("phi")).asMethod
+    val phi     = op("phi")
 
-    val methods = Set(phi)
+    val ops     = Set(phi)
     //@formatter:on
   }
 
@@ -164,12 +180,11 @@ trait Common extends AST {
     type Verdict = Valid Or Invalid
     type Validator = Tree =?> Verdict
 
-    def validateAs(expected: Validator, tree: Tree, violation: => String = "Unexpected tree"): Verdict = {
-
-      expected.applyOrElse(tree, (unexpected: Tree) => {
-        Bad(One(Error(unexpected, violation)))
-      })
-    }
+    def validateAs(expected: Validator, tree: Tree,
+      violation: => String = "Unexpected tree"
+    ): Verdict = expected.applyOrElse(tree, (unexpected: Tree) => {
+      Bad(One(Error(unexpected, violation)))
+    })
 
     def oneOf(allowed: Validator*): Validator =
       allowed.reduceLeft(_ orElse _)
@@ -179,7 +194,6 @@ trait Common extends AST {
     }
 
     case class all(trees: Seq[Tree]) {
-
       case class are(expected: Validator) {
         def otherwise(violation: => String): Verdict =
           if (trees.isEmpty) pass
@@ -187,7 +201,6 @@ trait Common extends AST {
             case unexpected => Bad(One(Error(unexpected, violation)))
           } map (_.head)
       }
-
     }
 
     object all {
@@ -343,5 +356,4 @@ trait Common extends AST {
     implicit val RuntimeClassTag: ClassTag[RuntimeClass] = u.RuntimeClassTag
     implicit val MirrorTag: ClassTag[Mirror] = u.MirrorTag
   }
-
 }
