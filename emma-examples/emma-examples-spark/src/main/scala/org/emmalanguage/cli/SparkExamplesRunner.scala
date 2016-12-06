@@ -25,6 +25,7 @@ import examples.ml.clustering._
 import examples.ml.model._
 import examples.text._
 import io.csv._
+import util.Iso
 
 import breeze.linalg.{Vector => Vec}
 import org.apache.spark.sql.SparkSession
@@ -165,8 +166,9 @@ object SparkExamplesRunner {
   // Parallelized algorithms
   // ---------------------------------------------------------------------------
 
-  implicit def breezeVectorCSVConverter[V: CSVColumn: ClassTag]: CSVConverter[Vec[V]] =
-    CSVConverter.iso[Array[V], Vec[V]](Vec.apply, _.toArray)
+  implicit def breezeVectorCSVConverter[V](implicit V: CSVColumn[V], ctag: ClassTag[V])
+    : CSVConverter[Vec[V]] = CSVConverter.iso[Array[V], Vec[V]](
+      Iso.make(Vec.apply, _.toArray), implicitly)
 
   // Graphs
 

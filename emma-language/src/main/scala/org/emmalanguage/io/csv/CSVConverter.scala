@@ -17,6 +17,7 @@ package org.emmalanguage
 package io.csv
 
 import api._
+import util._
 
 import shapeless._
 
@@ -60,15 +61,15 @@ object CSVConverter {
 
   /**
    * Derives a new codec for type `B` from an existing codec for type `A`,
-   * given an isomorphism between `A` and `B`.
+   * given an (implicit) isomorphism between `A` and `B`.
    */
-  def iso[A, B](from: A => B, to: B => A)(implicit A: CSVConverter[A]): CSVConverter[B] =
-    new CSVConverter[B] {
-      def size = A.size
+  def iso[A, B](implicit iso: A <=> B, underlying: CSVConverter[A])
+    : CSVConverter[B] = new CSVConverter[B] {
+      def size = underlying.size
       def read(record: Array[String], i: Int)(implicit csv: CSV) =
-        from(A.read(record, i))
+        iso.from(underlying.read(record, i))
       def write(value: B, record: Array[String], i: Int)(implicit csv: CSV) =
-        A.write(to(value), record, i)
+        underlying.write(iso.to(value), record, i)
     }
 
   /** Creates a codec with a single column. */
@@ -150,5 +151,5 @@ object CSVConverter {
    * Note: data must be fetched before encoding.
    */
   implicit def dataBagCSVConverter[A: CSVColumn: Meta]: CSVConverter[DataBag[A]] =
-    iso[Seq[A], DataBag[A]](DataBag(_), _.fetch())
+    iso[Seq[A], DataBag[A]]
 }
