@@ -47,10 +47,12 @@ trait Common extends AST {
     val empty                 = bagSymbol.companion.info.member(TermName("empty")).asMethod
     val apply                 = bagSymbol.companion.info.member(TermName("apply")).asMethod
     val readCSV               = bagSymbol.companion.info.member(TermName("readCSV")).asMethod
+    val readParquet           = bagSymbol.companion.info.member(TermName("readParquet")).asMethod
     val readText              = bagSymbol.companion.info.member(TermName("readText")).asMethod
     // Sinks
     val fetch                 = bagSymbol.info.decl(TermName("fetch"))
     val writeCSV              = bagSymbol.info.decl(TermName("writeCSV"))
+    val writeParquet          = bagSymbol.info.decl(TermName("writeParquet"))
     val writeText             = bagSymbol.info.decl(TermName("writeText"))
     // Monad ops
     val map                   = bagSymbol.info.decl(TermName("map"))
@@ -80,8 +82,8 @@ trait Common extends AST {
     val top                   = bagSymbol.info.decl(TermName("top"))
     val sample                = bagSymbol.info.decl(TermName("sample"))
 
-    val sourceOps             = Set(empty, apply, readCSV, readText); assertOneOverload(sourceOps)
-    val sinkOps               = Set(fetch, writeCSV, writeText)
+    val sourceOps             = Set(empty, apply, readCSV, readParquet, readText); assertOneOverload(sourceOps)
+    val sinkOps               = Set(fetch, writeCSV, writeParquet, writeText)
     val monadOps              = Set(map, flatMap, withFilter)
     val nestOps               = Set(groupBy)
     val setOps                = Set(union, distinct)
@@ -103,7 +105,8 @@ trait Common extends AST {
 
     val implicitTypes         = Set(
       typeOf[org.emmalanguage.api.Meta[Nothing]].typeConstructor,
-      typeOf[org.emmalanguage.io.csv.CSVConverter[Nothing]].typeConstructor
+      typeOf[org.emmalanguage.io.csv.CSVConverter[Nothing]].typeConstructor,
+      typeOf[org.emmalanguage.io.parquet.ParquetConverter[Nothing]].typeConstructor
     )
 
     // Type constructors
