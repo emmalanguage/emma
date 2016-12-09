@@ -16,20 +16,24 @@
 package org.emmalanguage
 package api
 
-import io.csv.{CSV, CSVConverter}
 import compiler.RuntimeCompiler
+import io.csv._
+import io.parquet._
 
-import org.apache.flink.api.scala.{DataSet, ExecutionEnvironment => FlinkEnv}
+import org.apache.flink.api.scala.DataSet
+import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
 import org.apache.flink.core.fs.FileSystem
 
-import scala.language.{higherKinds, implicitConversions}
+import scala.language.higherKinds
+import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
 
 /** A `DataBag` implementation backed by a Flink `DataSet`. */
 class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A]) extends DataBag[A] {
 
+  import FlinkDataSet.typeInfoForType
+  import FlinkDataSet.wrap
   import Meta.Projections._
-  import FlinkDataSet.{typeInfoForType, wrap}
 
   @transient override val m = implicitly[Meta[A]]
   private implicit def env = this.rep.getExecutionEnvironment
@@ -110,6 +114,9 @@ class FlinkDataSet[A: Meta] private[api](@transient private val rep: DataSet[A])
       writeMode = FileSystem.WriteMode.OVERWRITE
     )
 
+  def writeParquet(path: String, format: Parquet)(implicit converter: ParquetConverter[A]): Unit =
+    ???
+
   override def fetch(): Seq[A] = collect
 
   private lazy val collect: Seq[A] =
@@ -182,7 +189,7 @@ object FlinkDataSet {
   def apply[A: Meta](values: Seq[A])(implicit flink: FlinkEnv): FlinkDataSet[A] =
     flink.fromCollection(values)
 
-  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit flink: FlinkEnv): FlinkDataSet[A] = {
+  def readCSV[A: Meta](path: String, format: CSV)(implicit flink: FlinkEnv): FlinkDataSet[A] = {
     require(format.charset == CSV.defaultCharset,
       s"""Unsupported `charset` value: `${format.charset}`""")
     require(format.escape == CSV.defaultEscape,
@@ -200,6 +207,8 @@ object FlinkDataSet {
 
   def readText(path: String)(implicit flink: FlinkEnv): FlinkDataSet[String] =
     flink.readTextFile(path)
+
+  def readParquet[A: Meta](path: String, format: Parquet): DataBag[A] = ???
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
