@@ -16,20 +16,64 @@
 package org.emmalanguage
 package io.parquet
 
+import Parquet._
 import io.Format
 
-import java.nio.charset.{Charset, StandardCharsets}
+import org.apache.hadoop.conf.Configuration
 
-/** CSV format. */
-case class Parquet
-(
+/**
+ * Parquet format.
+ * @param binaryAsString   Interpret binary data as a string.
+ * @param int96AsTimestamp Interpret INT96 data as a timestamp.
+ * @param cacheMetadata    Turns on caching of Parquet schema metadata.
+ * @param validation       Should validation be enabled?
+ * @param dictEncoding     Should dictionary encoding be enabled?
+ * @param codec            Compression codec use when writing Parquet files.
+ */
+case class Parquet(
+    //@formatter:off
+    binaryAsString   : Boolean       = defaultBinaryAsString,
+    int96AsTimestamp : Boolean       = defaultInt96AsTimestamp,
+    cacheMetadata    : Boolean       = defaultCacheMetadata,
+    validation       : Boolean       = defaultValidation,
+    dictEncoding     : Boolean       = defaultDictEncoding,
+    codec            : Codec.Value   = Codec.Snappy,
+    blockSize        : Option[Int]   = None,
+    pageSize         : Option[Int]   = None,
+    dictPageSize     : Option[Int]   = None,
+    memPoolRatio     : Option[Float] = None,
+    minMemAlloc      : Option[Long]  = None,
+    maxPadding       : Option[Int]   = None
+    //@formatter:on
+  ) extends Format {
+
+  val config = new Configuration()
+  config.setBoolean("parquet.enable.summary-metadata", cacheMetadata)
+  config.setBoolean("parquet.validation", validation)
+  config.setBoolean("parquet.enable.dictionary", dictEncoding)
+  config.set("parquet.compression", codec.toString.toUpperCase)
+  for (block <- blockSize)    config.setInt("parquet.block.size", block)
+  for (page  <- pageSize)     config.setInt("parquet.page.size", page)
+  for (dict  <- dictPageSize) config.setInt("parquet.dictionary.page.size", dict)
+  for (ratio <- memPoolRatio) config.setFloat("parquet.memory.pool.ratio", ratio)
+  for (alloc <- minMemAlloc)  config.setLong("parquet.memory.min.chunk.size", alloc)
+  for (pad   <- maxPadding)   config.setInt("parquet.writer.max-padding", pad)
+}
+
+object Parquet {
   //@formatter:off
-  header    : Boolean      = false,                  // Indicate the presence of a CSV header (to be ignored)
-  delimiter : Char         = '\t',                   // Column delimiter character
-  charset   : Charset      = StandardCharsets.UTF_8, // Character set
-  quote     : Option[Char] = Some('"'),              // Delimiters inside quotes are ignored
-  escape    : Option[Char] = Some('\\'),             // Escaped quote characters are ignored
-  comment   : Option[Char] = Some('#'),              // Disable comments by setting this to None
-  nullValue : String       = ""                      // Fields matching this string will be set as nulls
+  val defaultBinaryAsString    = false
+  val defaultInt96AsTimestamp  = true
+  val defaultCacheMetadata     = true
+  val defaultValidation        = true
+  val defaultDictEncoding      = true
   //@formatter:on
-) extends Format
+  val default = Parquet()
+
+  object Codec extends Enumeration {
+    val Uncompressed = Value("uncompressed")
+    val Snappy = Value("snappy")
+    val GZip = Value("gzip")
+    val LZO = Value("lzo")
+  }
+}

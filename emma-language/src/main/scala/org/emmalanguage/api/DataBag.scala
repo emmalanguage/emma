@@ -16,7 +16,8 @@
 package org.emmalanguage
 package api
 
-import io.csv.{CSV, CSVConverter}
+import io.csv._
+import io.parquet._
 
 /** An abstraction for homogeneous distributed collections. */
 trait DataBag[A] extends Serializable {
@@ -149,6 +150,15 @@ trait DataBag[A] extends Serializable {
    * @param path The location where the data will be written.
    */
   def writeText(path: String): Unit
+
+  /**
+   * Writes a DataBag into the specified `path` in a CSV format.
+   *
+   * @param path      The location where the data will be written.
+   * @param format    The CSV format configuration
+   * @param converter A converter to use for element serialization.
+   */
+  def writeParquet(path: String, format: Parquet)(implicit converter: ParquetConverter[A]): Unit
 
   /**
    * Converts the DataBag back into a scala Seq.
@@ -376,14 +386,26 @@ object DataBag {
    * @param format The CSV format configuration.
    * @tparam A the type of elements to read.
    */
-  def readCSV[A: Meta : CSVConverter](path: String, format: CSV): DataBag[A] = ScalaSeq.readCSV[A](path, format)
+  def readCSV[A: CSVConverter](path: String, format: CSV): DataBag[A] =
+    ScalaSeq.readCSV[A](path, format)
 
   /**
    * Reads a `DataBag[String]` elements from the specified `path`.
    *
    * @param path   The location where the data will be read from.
    */
-  def readText(path: String): DataBag[String] = ScalaSeq.readText(path)
+  def readText(path: String): DataBag[String] =
+    ScalaSeq.readText(path)
+
+  /**
+   * Reads a DataBag into the specified `path` using a Parquet format.
+   *
+   * @param path   The location where the data will be read from.
+   * @param format The Parquet format configuration.
+   * @tparam A the type of elements to read.
+   */
+  def readParquet[A: ParquetConverter](path: String, format: Parquet): DataBag[A] =
+    ScalaSeq.readParquet(path, format)
 
   // -----------------------------------------------------
   // Helper methods

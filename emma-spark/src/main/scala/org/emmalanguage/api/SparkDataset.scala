@@ -16,17 +16,22 @@
 package org.emmalanguage
 package api
 
-import io.csv.{CSV, CSVConverter}
+import io.csv._
+import io.parquet._
 
-import org.apache.spark.sql.{Dataset, SparkSession}
+import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.SparkSession
 
-import scala.language.{higherKinds, implicitConversions}
+import scala.language.higherKinds
+import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
 
 /** A `DataBag` implementation backed by a Spark `Dataset`. */
 class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Dataset[A]) extends DataBag[A] {
 
-  import SparkDataset.{encoderForType, wrap}
+  import SparkDataset.encoderForType
+  import SparkDataset.wrap
+
   import rep.sparkSession.sqlContext.implicits._
 
   @transient override val m = implicitly[Meta[A]]
@@ -81,19 +86,26 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
   // Sinks
   // -----------------------------------------------------
 
-  override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
-    rep.write
+  override def writeCSV(path: String, format: CSV)
+    (implicit converter: CSVConverter[A]): Unit = rep.write
       .option("header", format.header)
       .option("delimiter", format.delimiter.toString)
       .option("charset", format.charset.toString)
       .option("quote", format.quote.getOrElse('"').toString)
       .option("escape", format.escape.getOrElse('\\').toString)
       .option("nullValue", format.nullValue)
-      .mode("overwrite")
-      .csv(path)
+      .mode("overwrite").csv(path)
 
   override def writeText(path: String): Unit =
     rep.write.text(path)
+
+  def writeParquet(path: String, format: Parquet)
+    (implicit converter: ParquetConverter[A]): Unit = rep.write
+      .option("binaryAsString", format.binaryAsString)
+      .option("int96AsTimestamp", format.int96AsTimestamp)
+      .option("cacheMetadata", format.cacheMetadata)
+      .option("codec", format.codec.toString)
+      .mode("overwrite").parquet(path)
 
   def fetch(): Seq[A] = collect
 
@@ -104,7 +116,7 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
   // equals and hashCode
   // -----------------------------------------------------
 
-  override def equals(o: Any) =
+  override def equals(o: Any): Boolean =
     super.equals(o)
 
   override def hashCode(): Int = {
@@ -161,21 +173,29 @@ object SparkDataset {
   def apply[A: Meta](values: Seq[A])(implicit spark: SparkSession): SparkDataset[A] =
     spark.createDataset(values)
 
-  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): SparkDataset[A] =
-    spark.read
+  def readCSV[A: Meta](path: String, format: CSV)
+    (implicit spark: SparkSession): SparkDataset[A] = spark.read
       .option("header", format.header)
       .option("delimiter", format.delimiter.toString)
       .option("charset", format.charset.toString)
       .option("quote", format.quote.getOrElse('"').toString)
       .option("escape", format.escape.getOrElse('\\').toString)
-      .option("comment", format.escape.map(_.toString).getOrElse(null.asInstanceOf[String]))
+      .option("comment", format.escape.map(_.toString).orNull)
       .option("nullValue", format.nullValue)
       .schema(encoderForType[A].schema)
-      .csv(path)
-      .as[A]
+      .csv(path).as[A]
 
   def readText(path: String)(implicit spark: SparkSession): SparkDataset[String] =
     spark.read.textFile(path)
+
+  def readParquet[A: Meta](path: String, format: Parquet)
+    (implicit spark: SparkSession): SparkDataset[A] = spark.read
+      .option("binaryAsString", format.binaryAsString)
+      .option("int96AsTimestamp", format.int96AsTimestamp)
+      .option("cacheMetadata", format.cacheMetadata)
+      .option("codec", format.codec.toString)
+      .schema(encoderForType[A].schema)
+      .parquet(path).as[A]
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion

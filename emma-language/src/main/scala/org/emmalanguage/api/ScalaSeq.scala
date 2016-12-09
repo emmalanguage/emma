@@ -18,11 +18,14 @@ package api
 
 import io.csv._
 import io.text._
+import io.parquet._
 
 import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
+
+import scala.language.{higherKinds, implicitConversions}
 
 /** A `DataBag` implementation backed by a Scala `Seq`. */
 class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] {
@@ -79,15 +82,17 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
   // Sinks
   // -----------------------------------------------------
 
-  override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
+  def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
     CSVScalaSupport(format).write(path)(rep)
 
   def writeText(path: String): Unit =
     TextSupport.write(path)(rep map (_.toString))
 
+  def writeParquet(path: String, format: Parquet)(implicit converter: ParquetConverter[A]): Unit =
+    ParquetScalaSupport(format).write(path)(rep)
+
   override def fetch(): Seq[A] =
     rep
-
 }
 
 object ScalaSeq {
@@ -107,6 +112,9 @@ object ScalaSeq {
 
   def readText(path: String): ScalaSeq[String] =
     new ScalaSeq(TextSupport.read(path).toStream)
+
+  def readParquet[A: ParquetConverter](path: String, format: Parquet): DataBag[A] =
+    new ScalaSeq(ParquetScalaSupport(format).read(path).toStream)
 
   // This is used in the code generation in TranslateToDataflows when inserting fetches
   def byFetch[A](bag: DataBag[A]): ScalaSeq[A] =
