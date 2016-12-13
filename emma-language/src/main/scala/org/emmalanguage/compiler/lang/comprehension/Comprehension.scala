@@ -228,8 +228,9 @@ trait Comprehension extends Common
         val symbol = ComprehensionCombinators.equiJoin
 
         def apply(kx: u.Tree, ky: u.Tree)(xs: u.Tree, ys: u.Tree): u.Tree = {
-          val keyTpe = api.Type.arg(2, kx.tpe)
-          assert(keyTpe =:= api.Type.arg(2, ky.tpe))
+          val keyTpe = api.Type.lub(Seq(
+            api.Type.arg(2, kx.tpe),
+            api.Type.arg(2, ky.tpe)))
 
           core.DefCall(module, symbol,
             Seq(Core.bagElemTpe(xs), Core.bagElemTpe(ys), keyTpe),

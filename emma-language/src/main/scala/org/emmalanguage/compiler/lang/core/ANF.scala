@@ -255,15 +255,15 @@ private[core] trait ANF extends Common {
           }
 
           // Flatten nested let expressions in expr position without control flow.
-          val (exprVals, flatExpr) = expr match {
-            case core.Let(nestedVals, Seq(), nestedExpr) =>
-              (nestedVals, nestedExpr)
+          val (exprVals, flatDefs, flatExpr) = expr match {
+            case core.Let(nestedVals, nestedDefs, nestedExpr) =>
+              (nestedVals, nestedDefs, nestedExpr)
             case _ =>
-              (Seq.empty, expr)
+              (Seq.empty, defs, expr)
           }
 
           val (trimmedVals, trimmedExpr) = trimVals(flatVals ++ exprVals, flatExpr)
-          core.Let(trimmedVals, defs, trimmedExpr)
+          core.Let(trimmedVals, flatDefs, trimmedExpr)
       }.andThen(_.tree)
 
     // ---------------
@@ -289,7 +289,7 @@ private[core] trait ANF extends Common {
         case _ => false
       }
       def inExpr = let.expr match {
-        case core.Let(_, Seq(), _) => true
+        case core.Let(_, _, _) => true
         case _ => false
       }
       inStats || inExpr
