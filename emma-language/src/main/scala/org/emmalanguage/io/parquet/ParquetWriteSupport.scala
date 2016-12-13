@@ -18,6 +18,7 @@ package io.parquet
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
+import org.apache.parquet.hadoop.ParquetFileWriter
 import org.apache.parquet.hadoop.ParquetWriter
 import org.apache.parquet.hadoop.api.WriteSupport
 import org.apache.parquet.io.api._
@@ -57,9 +58,36 @@ private[parquet] object ParquetWriteSupport {
   def builder[A: ParquetConverter](file: Path): WriterBuilder[A] =
     new WriterBuilder[A](new ParquetWriteSupport, file)
 
-  class WriterBuilder[A](support: WriteSupport[A], file: Path)
-    extends ParquetWriter.Builder[A, WriterBuilder[A]](file) {
+  class WriterBuilder[A](support: WriteSupport[A], file: Path) {
+
+    var conf = new Configuration()
+    var mode = ParquetFileWriter.Mode.CREATE
+
     def getWriteSupport(conf: Configuration) = support
     def self() = this
+
+    def withConf(conf: Configuration): WriterBuilder[A] = {
+      this.conf = conf
+      this
+    }
+
+    def withWriteMode(mode: ParquetFileWriter.Mode): WriterBuilder[A] = {
+      this.mode = mode
+      this
+    }
+
+    def build(): ParquetWriter[A] = new ParquetWriter[A](
+      file,
+      mode,
+      support,
+      ParquetWriter.DEFAULT_COMPRESSION_CODEC_NAME,
+      ParquetWriter.DEFAULT_BLOCK_SIZE,
+      ParquetWriter.DEFAULT_PAGE_SIZE,
+      ParquetWriter.DEFAULT_PAGE_SIZE,
+      ParquetWriter.DEFAULT_IS_DICTIONARY_ENABLED,
+      ParquetWriter.DEFAULT_IS_VALIDATING_ENABLED,
+      ParquetWriter.DEFAULT_WRITER_VERSION,
+      conf
+    )
   }
 }
