@@ -101,13 +101,6 @@
             <artifactId>parquet-hadoop</artifactId>
         </dependency>
 
-        <!-- Serialization -->
-        <dependency>
-            <groupId>com.twitter</groupId>
-            <artifactId>chill_${scala.tools.version}</artifactId>
-            <version>0.5.2</version>
-        </dependency>
-
         <!-- Logging -->
         <dependency>
             <groupId>log4j</groupId>
