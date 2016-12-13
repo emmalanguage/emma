@@ -54,18 +54,18 @@ object ParquetConverter extends IsoParquetConverters {
 trait IsoParquetConverters extends GenericParquetConverters {
 
   private implicit val binaryIsoArrayByte: Binary <=> Array[Byte] =
-    Iso.make(_.getBytes, Binary.fromReusedByteArray)
+    Iso.make(_.getBytes, Binary.fromByteArray)
 
   private implicit val binaryIsoByte: Binary <=> Byte =
-    Iso.make(_.getBytesUnsafe.head, b => Binary.fromConstantByteArray(Array(b)))
+    Iso.make(_.getBytes.head, b => Binary.fromByteArray(Array(b)))
 
   private implicit val binaryIsoShort: Binary <=> Short =
     Iso.make(bin => {
-      val bytes = bin.getBytesUnsafe
+      val bytes = bin.getBytes
       (bytes(0) + (bytes(1) << 8)).toShort
     }, short => {
       val bytes = Array(short.toByte, (short >> 8).toByte)
-      Binary.fromConstantByteArray(bytes)
+      Binary.fromByteArray(bytes)
     })
 
   private implicit val binaryIsoString: Binary <=> String =
