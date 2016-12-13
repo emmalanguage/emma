@@ -143,7 +143,6 @@
 
         <!-- Other dependencies -->
         <scopt.version>3.5.0</scopt.version>
-        <reflections.version>0.9.9</reflections.version><!-- TODO: remove -->
         <scala-arm.version>1.4</scala-arm.version>
 
         <!-- Test configuration -->
@@ -366,13 +365,6 @@
                 <artifactId>scopt_${scala.tools.version}</artifactId>
                 <version>${scopt.version}</version>
                 <scope>compile</scope>
-            </dependency>
-
-            <!-- Dynamic loading -->
-            <dependency>
-                <groupId>org.reflections</groupId>
-                <artifactId>reflections</artifactId>
-                <version>${reflections.version}</version>
             </dependency>
 
             <!-- Auto-Resource Management -->
