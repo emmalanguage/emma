@@ -170,7 +170,7 @@ trait Transversers { this: AST =>
       if (acc != HNil) state = acc |+| accumulation(tree)
 
     /** Resets the state so that another tree can be traversed. */
-    protected final def reset(): Unit = {
+    protected def reset(): Unit = {
       state = grammar.initAcc
       stack = grammar.initInh :: Nil
       cache.clear()
@@ -606,7 +606,13 @@ trait Transversers { this: AST =>
         (grammar: AttrGrammar[A, I, S])(template: Attr[A, I, S] =?> Tree)
         : Transform[A, I, S] = new Transform[A, I, S](grammar, template) {
           val matches: mutable.Set[Tree] = mutable.Set.empty
-          override final def transform(tree: Tree): Tree = {
+
+          override def reset() = {
+            super.reset()
+            matches.clear()
+          }
+
+          override final def transform(tree: Tree) = {
             val recur = super.transform(tree)
             val children = tree.children
             if (children.exists(matches)) {
@@ -690,7 +696,13 @@ trait Transversers { this: AST =>
         (grammar: AttrGrammar[A, I, S])(callback: Attr[A, I, S] =?> Unit)
         : Traversal[A, I, S] = new Traversal[A, I, S](grammar, callback) {
           val matches: mutable.Set[Tree] = mutable.Set.empty
-          override final def traverse(tree: Tree): Unit = {
+
+          override def reset() = {
+            super.reset()
+            matches.clear()
+          }
+
+          override final def traverse(tree: Tree) = {
             super.traverse(tree)
             val children = tree.children
             if (children.exists(matches)) {
