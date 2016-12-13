@@ -81,7 +81,7 @@ trait Symbols { this: AST =>
 
       /** Returns any annotation of type `A` associated with `sym`. */
       def findAnn[A: TypeTag](sym: u.Symbol): Option[u.Annotation] =
-        sym.annotations.find(_.tree.tpe =:= Type[A])
+        sym.annotations.find(_.tree.tpe <:< Type[A])
 
       /** Copy / extractor for symbol attributes. */
       object With {

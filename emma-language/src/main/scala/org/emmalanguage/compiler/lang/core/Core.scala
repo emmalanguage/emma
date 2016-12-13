@@ -301,6 +301,13 @@ trait Core extends Common
     /** Delegates to [[ANF.uninlineLetExprs]]. */
     lazy val uninlineLetExprs = ANF.uninlineLetExprs
 
+    /** Delegates to [[DSCF.stripAnnotations]]. */
+    lazy val stripAnnotations = DSCF.stripAnnotations
+
+    /** Delegates to [[DSCF.mapSuffix]]. */
+    def mapSuffix(let: u.Block, res: Option[u.Type] = None)
+      (f: (Seq[u.ValDef], u.Tree) => u.Block): u.Block = DSCF.mapSuffix(let, res)(f)
+
     // -------------------------------------------------------------------------
     // DCE API
     // -------------------------------------------------------------------------

@@ -185,7 +185,7 @@ trait Common extends AST {
     val loopBody      = api.Sym[loopBody].asClass
 
     private def ann(sym: u.ClassSymbol) =
-      u.Annotation(api.Inst(sym.info, argss = Seq(Seq.empty)))
+      u.Annotation(api.Inst(sym.toType, argss = Seq(Seq.empty)))
 
     // Annotation trees
     val suffixAnn     = ann(suffix)
