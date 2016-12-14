@@ -27,8 +27,9 @@ import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
 
 /** A `DataBag` implementation backed by a Spark `RDD`. */
-class SparkRDD[A: Meta] private[api](@transient private[api] val rep: RDD[A])(implicit spark: SparkSession)
-  extends DataBag[A] {
+class SparkRDD[A: Meta] private[api]
+  (@transient private[api] val rep: RDD[A])
+  (@transient private[api] implicit val spark: SparkSession) extends DataBag[A] {
 
   import Meta.Projections._
   import SparkRDD.encoderForType
