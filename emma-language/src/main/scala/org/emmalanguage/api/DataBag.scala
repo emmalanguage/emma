@@ -16,8 +16,11 @@
 package org.emmalanguage
 package api
 
+import converter.CollConverter
 import io.csv._
 import io.parquet._
+
+import scala.language.higherKinds
 
 /** An abstraction for homogeneous distributed collections. */
 trait DataBag[A] extends Serializable {
@@ -167,6 +170,12 @@ trait DataBag[A] extends Serializable {
    * @return The contents of the DataBag as a scala Seq.
    */
   def fetch(): Seq[A]
+
+  /**
+   * Converts this bag into a distributed collection of type `DColl[A]`.
+   */
+  def as[DColl[_]](implicit converter: CollConverter[DColl]): DColl[A] =
+    converter(this)
 
   // -----------------------------------------------------
   // Pre-defined folds
@@ -392,7 +401,7 @@ object DataBag {
   /**
    * Reads a `DataBag[String]` elements from the specified `path`.
    *
-   * @param path   The location where the data will be read from.
+   * @param path The location where the data will be read from.
    */
   def readText(path: String): DataBag[String] =
     ScalaSeq.readText(path)
