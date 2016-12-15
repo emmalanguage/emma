@@ -16,21 +16,27 @@
 package org.emmalanguage
 package compiler.lang.backend
 
-import cats.std.all._
 import compiler.Common
 import compiler.lang.core.Core
-import util.Monoids
+import util.Monoids._
 
+import cats.std.all._
 import shapeless._
+
+import scala.collection.breakOut
 
 /** Translating to dataflows. */
 private[backend] trait TranslateToDataflows extends Common {
   self: Backend with Core =>
-
-  import UniverseImplicits._
-  import Core.{Lang => core}
   
   private[backend] object TranslateToDataflows {
+
+    import UniverseImplicits._
+    import Core.{Lang => core}
+
+    private val modules  = Set[u.TermSymbol](API.bagModuleSymbol, ComprehensionCombinators.module)
+    private val methods  = API.sourceOps | ComprehensionCombinators.ops
+    private val scalaSeq = Some(api.ModuleRef(API.scalaSeqModuleSymbol))
 
     /**
      * Translates into a dataflow on the given backend.
@@ -43,63 +49,69 @@ private[backend] trait TranslateToDataflows extends Common {
      *
      * - A tree where DataBag operations have been translated to dataflow operations.
      *
-     * @param backendSymbol The symbol of the target backend.
+     * @param backend The symbol of the target backend.
      */
-    def translateToDataflows(backendSymbol: u.ModuleSymbol): u.Tree => u.Tree = tree => {
+    def translateToDataflows(backend: u.ModuleSymbol): u.Tree => u.Tree = {
+      val backendRef = Some(core.Ref(backend))
+      Order.disambiguate.andThen { case (disambiguated, highOrd) =>
+        val fetched = api.TopDown.break.withBindDefs.withBindUses
+          .accumulateWith[Set[u.TermSymbol]] {
+            // Build the closure of outermost lambdas wrt to bags used in higher-order context.
+            // Descending further is redundant since referenced bags have already been fetched.
+            case Attr.syn(core.ValDef(lhs, _), uses :: defs :: _)
+              if highOrd(lhs) => for {
+                bag <- uses.keySet diff defs.keySet
+                if api.Type.constructor(bag.info) =:= API.DataBag
+              } yield bag
+          }.traverse {
+            // Break condition same as above.
+            case core.ValDef(lhs, _) if highOrd(lhs) =>
+          }.andThen[Map[u.TermSymbol, u.ValDef]] {
+            case Attr(_, highRef :: _, _, _ :: defs :: _) => highRef.map { lhs =>
+              val alias = api.ValSym(lhs.owner, api.TermName.fresh(lhs), lhs.info)
+              defs.get(lhs) match {
+                // DataBag(Seq(..elements)).fetch() == ScalaSeq(Seq(..elements))
+                // Instead of fetching build directly from the underlying Seq.
+                case Some(core.ValDef(_, call @ core.DefCall(_, API.empty | API.apply, _, _))) =>
+                  lhs -> core.ValDef(alias, call)
+                case _ =>
+                  val targs = Seq(api.Type.arg(1, lhs.info))
+                  val argss = Seq(Seq(core.Ref(lhs)))
+                  val fetch = core.DefCall(scalaSeq, API.byFetch, targs, argss)
+                  lhs -> core.ValDef(alias, fetch)
+              }
+            } (breakOut)
+          } (disambiguated)
 
-      // Figure out the order stuff
-      val (disambiguatedTree, highFuns): (u.Tree, Set[u.TermSymbol]) = Order.disambiguate(tree)
+        api.BottomUp.inherit {
+          // Are we nested in a higher-order function?
+          case core.ValDef(lhs, _) => highOrd(lhs)
+        } (disj).transformWith {
+          // Change static method calls to their corresponding backend calls.
+          case Attr.inh(core.DefCall(Some(core.Ref(target)), method, targs, argss), false :: _)
+            if modules(target) && methods(method) =>
+            val translated = backend.info.member(method.name).asTerm
+            core.DefCall(backendRef, translated, targs, argss)
 
-      val withHighContext = api.TopDown.inherit {
-        case core.ValDef(sym, _) if highFuns contains sym => true
-      }(Monoids.disj)
+          // Insert fetch calls for method parameters (former variables).
+          case Attr.none(core.DefDef(method, tps, pss, core.Let(vals, defs, expr)))
+            if pss.exists(_.exists(p => fetched.contains(p.symbol.asTerm))) =>
+            val paramss = pss.map(_.map(_.symbol.asTerm))
+            val body = core.Let(paramss.flatten.collect(fetched) ++ vals, defs, expr)
+            core.DefDef(method, tps, paramss, body)
 
-      // Change static method calls to their corresponding backend calls.
-      // The backend methods should be defined in the module `backendSymbol`,
-      // and they should not have any overloads (this is because we look up the corresponding method
-      // just by name; adding overload resolution would be possible but complicated because of the additional
-      // implicit parameters for the backend contexts).
-      val moduleSymbols = Set(API.bagModuleSymbol, ComprehensionCombinators.module)
-      val methods = API.sourceOps ++ ComprehensionCombinators.ops
-      val staticCallsChanged = withHighContext.transformWith {
-        case Attr.inh(core.DefCall(Some(api.ModuleRef(moduleSymbol)), method, targs, argss), false :: _)
-          if moduleSymbols(moduleSymbol) && methods(method) =>
-          val targetMethodDecl = backendSymbol.info.decl(method.name)
-          assert(targetMethodDecl.alternatives.size == 1,
-            s"Target method `${method.name}` (found as `$targetMethodDecl`) should have exactly one overload.")
-          val targetMethod = targetMethodDecl.asMethod
-          core.DefCall(Some(api.ModuleRef(backendSymbol)), targetMethod, targs, argss)
-      }(disambiguatedTree).tree
+          // Insert fetch calls for values.
+          case Attr.none(core.Let(vals, defs, expr))
+            if vals.exists(v => fetched.contains(v.symbol.asTerm)) =>
+            core.Let(vals.flatMap { case value @ core.ValDef (lhs, _) =>
+              fetched.get(lhs).fold(Seq(value))(Seq(value, _))
+            }, defs, expr)
 
-      // Gather DataBag vals that are referenced from higher-order context
-      val Attr.acc(_, valsRefdFromHigh :: _) =
-        withHighContext.accumulateWith[Set[u.TermSymbol]] {
-          case Attr.inh(core.ValRef(sym), true :: _)
-          if api.Type.constructor(sym.info) =:= API.DataBag =>
-            Set(sym)
-        }.traverseAny(staticCallsChanged)
-
-      // Insert fetch calls for the vals in valsRefdFromHigh (but only if they are defined at first-order)
-      val collectsInserted0 =
-        withHighContext.transformWith {
-          case Attr.inh(api.ValDef(lhs, rhs), false :: _)
-          if valsRefdFromHigh(lhs) =>
-            // will be the original bag
-            val origSym = api.TermSym(lhs, api.TermName.fresh("orig"), lhs.info)
-            val fetchCall = core.DefCall(Some(api.ModuleRef(API.scalaSeqModuleSymbol)),
-              API.byFetch,
-              Seq(Core.bagElemTpe(core.ValRef(lhs))),
-              Seq(Seq(core.ValRef(origSym))))
-            val fetchedSym = api.TermSym(lhs, api.TermName.fresh("fetched"), fetchCall.tpe)
-            val fetchedVal = core.ValDef(fetchedSym, fetchCall)
-            core.ValDef(
-              lhs,
-              core.Let(Seq(api.ValDef(origSym, rhs), fetchedVal), Seq.empty, core.ValRef(fetchedSym)))
-          // Note: the flags are present also here, and on fetchedVal.
-        }(staticCallsChanged).tree
-
-      Core.flatten(collectsInserted0) // This is because we put a Let on the rhs of a ValDef when inserting collects
+          // Replace references in higher-order functions with fetched values.
+          case Attr.inh(core.Ref(target), true :: _) if fetched.contains(target) =>
+            core.Ref(fetched(target).symbol.asTerm)
+        }._tree(disambiguated)
+      }
     }
-
   }
 }
