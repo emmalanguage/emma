@@ -26,7 +26,7 @@ trait ControlFlow extends Common
 
   object ControlFlow {
 
-    /** Delegates to [[CFG.graph()]]. */
-    def cfg(monad: u.ClassSymbol = API.bagSymbol) = CFG.graph(monad)
+    /** Delegates to [[CFG.graph]]. */
+    lazy val cfg: u.Tree => CFG.FlowGraph[u.TermSymbol] = CFG.graph
   }
 }

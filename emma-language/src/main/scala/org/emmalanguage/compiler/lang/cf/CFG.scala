@@ -18,10 +18,14 @@ package compiler.lang.cf
 
 import compiler.Common
 import compiler.lang.core.Core
-import util.Monoids
+import compiler.ir.DSCFAnnotations.continuation
+import util.Monoids._
 
 import cats.std.all._
+import quiver._
 import shapeless._
+
+import scala.collection.breakOut
 
 /** Control-flow graph analysis (CFG). */
 private[compiler] trait CFG extends Common {
@@ -36,58 +40,11 @@ private[compiler] trait CFG extends Common {
 
     private val module = Some(core.Ref(GraphRepresentation.module))
 
-    /**
-     * A control-flow graph.
-     *
-     * @tparam V The type of vertices in the graph.
-     * @param uses A store for number of references per vertex.
-     * @param defs A store for all value definitions (parameters are defined as `phi` nodes).
-     * @param flow A directed graph from LHS to free references on the RHS of values.
-     * @param nest A directed graph from LHS to nested definitions on the RHS of values.
-     */
-    case class Graph[V](
+    case class FlowGraph[V](
         uses: Map[V, Int],
-        defs: Map[V, u.ValDef],
-        flow: Map[V, Set[V]],
-        nest: Map[V, Set[V]]) {
-
-      /** Reverses the direction of `flow` and `nest` from RHS to LHS. */
-      def reverse: Graph[V] = Graph(uses, defs, reverse(flow), reverse(nest))
-
-      /** Builds the transitive closure of `flow` and `nest`. */
-      def transitive: Graph[V] = Graph(uses, defs, transitive(flow), transitive(nest))
-
-      /** Returns the sub-graph of this graph with vertices satisfying `p`. */
-      def filter(p: V => Boolean): Graph[V] = Graph(
-        uses.filterKeys(p), defs.filterKeys(p),
-        flow.filterKeys(p).mapValues(_.filter(p)),
-        nest.filterKeys(p).mapValues(_.filter(p)))
-
-      /** Applies `f` to every vertex in the graph. */
-      def map[A](f: V => A): Graph[A] = Graph(
-        uses.map { case (k, v) => f(k) -> v },
-        defs.map { case (k, v) => f(k) -> v },
-        flow.map { case (k, vs) => f(k) -> vs.map(f) },
-        nest.map { case (k, vs) => f(k) -> vs.map(f) })
-
-      /** Reverses a map of edges. */
-      private def reverse(edges: Map[V, Set[V]]): Map[V, Set[V]] =
-        (for ((k, vs) <- edges.toSeq; v <- vs) yield (v, k))
-          .groupBy(_._1).mapValues(_.map(_._2).toSet)
-
-      /** Builds the transitive closure of a map of edges. */
-      private def transitive(edges: Map[V, Set[V]]): Map[V, Set[V]] = {
-        var trans = edges
-        var prevSz, currSz = 0
-        do {
-          trans = for ((k, vs) <- trans)
-            yield k -> vs.flatMap(trans.get).fold(vs)(_ union _)
-          prevSz = currSz
-          currSz = trans.values.map(_.size).sum
-        } while (prevSz < currSz)
-        trans
-      }
-    }
+        nest: Graph[V, Unit, Unit],
+        ctrl: Graph[V, u.DefDef, Unit],
+        data: Graph[V, u.ValDef, Unit])
 
     /**
      * Control-flow graph analysis (CFA) of a tree.
@@ -96,43 +53,64 @@ private[compiler] trait CFG extends Common {
      * - The input `tree` is in DSCF (see [[DSCF.transform]]).
      *
      * == Postconditions ==
-     * - All dataflow dependencies from LHS to RHS are contained in the graph.
-     * - All containment relations from LHS to RHS are contained in the graph.
      * - The RHS of method parameters is represented by `phi` nodes.
+     * - The graph contains:
+     *   - The number of references for each val / parameter;
+     *   - All nest(ing) relations from outer to inner;
+     *   - All control (flow) dependencies from caller to callee;
+     *   - All data (flow) dependencies from RHS to LHS.
      */
-    def graph(monad: u.ClassSymbol = API.bagSymbol): u.Tree => Graph[u.TermSymbol] = {
-      val cs = new Comprehension.Syntax(monad)
-      api.TopDown.withBindUses.withBindDefs
-        .inherit { // Enclosing comprehension / lambda, if any
-          case core.ValDef(lhs, cs.Comprehension(_, _)) => Option(lhs)
-          case core.ValDef(lhs, core.Lambda(_, _, _)) => Option(lhs)
-        } (Monoids.last(None)).inherit { // Accessible methods
-          case core.Let(_, defs, _) => defs.map(_.symbol.asTerm).toSet
-        }.accumulateWith[Map[u.TermSymbol, Set[u.TermSymbol]]] { // Dataflow edges
-          case Attr.syn(core.ValDef(lhs, _), defs :: uses :: _) =>
-            Map(lhs -> uses.keySet.diff(defs.keySet).filterNot(_.isStatic))
-        }.accumulateWith[Map[u.TermSymbol, Set[u.TermSymbol]]] { // Contains edges
-          case Attr.inh(core.ValDef(lhs, _), _ :: Some(encl) :: _) =>
-            Map(encl -> Set(lhs))
-        } (Monoids.merge).accumulateWith[Map[u.TermSymbol, Vector[u.Tree]]] { // Phi choices
-          case Attr.inh(core.DefCall(None, method, _, argss), local :: _) if local(method) => {
-            for ((param, arg) <- method.paramLists.flatten zip argss.flatten)
-              yield param.asTerm -> Vector(arg)
-          }.toMap
-        } (Monoids.merge).traverseAny.andThen {
-          case Attr(tree, choices :: nest :: flow :: _, _, defs :: uses :: _) =>
-            val dataFlow = flow ++ choices.mapValues(_.iterator.collect {
-              case core.Ref(target) if !target.isStatic => target
-            }.toSet)
+    lazy val graph: u.Tree => FlowGraph[u.TermSymbol] = {
+      api.TopDown.withDefDefs.withBindUses.withBindDefs
+        .inherit { case core.TermDef(encl) => Option(encl) } (last(None))
+        .accumulateWith[Vector[UEdge[u.TermSymbol]]] { // Nesting
+          case Attr.inh(core.ValDef(lhs, _), Some(encl) :: _) =>
+            Vector(LEdge(encl, lhs, ()))
+          case Attr.inh(core.DefDef(method, _, _, _), Some(encl) :: _) =>
+            Vector(LEdge(encl, method, ()))
+        }.accumulate { // Control flow
+          case core.DefDef(f, _, _, core.Let(_, _, expr)) =>
+            expr.collect { case core.DefCall(None, g, _, _)
+              if api.Sym.findAnn[continuation](g).isDefined =>
+              LEdge(f.asTerm, g.asTerm, ())
+            }.toVector
+        }.accumulateWith[Vector[UEdge[u.TermSymbol]]] { // Data flow
+          case Attr.syn(core.BindingDef(lhs, _), vals :: uses :: _) =>
+            uses.keySet.diff(vals.keySet).filterNot(_.isStatic).map(LEdge(_, lhs, ()))(breakOut)
+        }.accumulate { // Phi choices
+          case core.DefCall(None, method, _, argss)
+            if api.Sym.findAnn[continuation](method).isDefined => {
+              for ((param, arg) <- method.paramLists.flatten zip argss.flatten)
+                yield param.asTerm -> Vector(arg)
+            }.toMap
+        } (merge).traverseAny.andThen {
+          case Attr(_, choices :: data :: ctrl :: nest :: _, _, vals :: uses :: defs :: _) =>
+            val nestTree = quiver.empty[u.TermSymbol, Unit, Unit]
+              .addNodes(vals.keys.map(x => LNode(x, ()))(breakOut))
+              .addNodes(defs.keys.map(m => LNode(m.asTerm, ()))(breakOut))
+              .safeAddEdges(nest)
 
-            val values = defs.collect {
-              case value @ (api.ValSym(_), _) => value
-              case (_, core.ParDef(lhs, _)) if choices.contains(lhs) =>
-                val rhs = core.DefCall(module, phi, Seq(lhs.info), Seq(choices(lhs)))
-                lhs -> core.ParDef(lhs, rhs)
-            }
+            val ctrlFlow = quiver.empty[u.TermSymbol, u.DefDef, Unit]
+              .addNodes(defs.map { case (k, v) => LNode(k.asTerm, v) } (breakOut))
+              .safeAddEdges(ctrl)
 
-            Graph(uses, values, dataFlow, nest)
+            val phiNodes = for {
+              api.ParSym(lhs) <- vals.keys.toStream if choices.contains(lhs)
+              rhs = core.DefCall(module, phi, Seq(lhs.info), Seq(choices(lhs)))
+            } yield LNode(lhs, core.ParDef(lhs, rhs))
+
+            val phiEdges = for {
+              (lhs, args) <- choices.toStream
+              core.Ref(target) <- args if !target.isStatic
+            } yield LEdge(target, lhs, ())
+
+            val dataFlow = quiver.empty[u.TermSymbol, u.ValDef, Unit]
+              .addNodes(vals.map { case (k, v) => LNode(k, v) } (breakOut))
+              .addNodes(phiNodes)
+              .safeAddEdges(data)
+              .safeAddEdges(phiEdges)
+
+            FlowGraph(uses, nestTree, ctrlFlow, dataFlow)
         }
     }
   }

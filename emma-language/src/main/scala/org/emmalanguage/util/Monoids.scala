@@ -17,6 +17,7 @@ package org.emmalanguage
 package util
 
 import cats.Monoid
+import quiver.Graph
 import shapeless._
 
 import scala.collection.SortedSet
@@ -97,5 +98,11 @@ object Monoids {
   def reverse[A](implicit A: Monoid[A]): Monoid[A] = new Monoid[A] {
     def empty = A.empty
     def combine(x: A, y: A) = A.combine(y, x)
+  }
+
+  /** Graph union forms a monoid. */
+  implicit def graphUnion[V, A, B]: Monoid[Graph[V, A, B]] = new Monoid[Graph[V, A, B]] {
+    def empty = quiver.empty[V, A, B]
+    def combine(x: Graph[V, A, B], y: Graph[V, A, B]) = x union y
   }
 }
