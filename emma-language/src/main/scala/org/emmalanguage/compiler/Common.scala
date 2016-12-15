@@ -83,7 +83,7 @@ trait Common extends AST {
     val top                   = bagSymbol.info.decl(TermName("top"))
     val sample                = bagSymbol.info.decl(TermName("sample"))
 
-    val sourceOps             = Set(empty, apply, readCSV, readParquet, readText); assertOneOverload(sourceOps)
+    val sourceOps             = Set(empty, apply, readCSV, readParquet, readText)
     val sinkOps               = Set(fetch, as, writeCSV, writeParquet, writeText)
     val monadOps              = Set(map, flatMap, withFilter)
     val nestOps               = Set(groupBy)
@@ -101,7 +101,6 @@ trait Common extends AST {
 
     val ops                   =  for {
       m <- sourceOps ++ sinkOps ++ monadOps ++ nestOps ++ setOps ++ foldOps
-      a <- m.alternatives
     } yield m
 
     val implicitTypes         = Set(
@@ -140,7 +139,7 @@ trait Common extends AST {
     val cross                 = module.info.decl(TermName("cross")).asMethod
     val equiJoin              = module.info.decl(TermName("equiJoin")).asMethod
 
-    val ops                   = Set(cross, equiJoin); assertOneOverload(ops)
+    val ops                   = Set(cross, equiJoin)
     //@formatter:on
   }
 
@@ -153,12 +152,6 @@ trait Common extends AST {
     val methods = Set(phi)
     //@formatter:on
   }
-
-  private def assertOneOverload(ops: Traversable[u.MethodSymbol]) =
-    ops.foreach {
-      op => assert(op.alternatives.size == 1,
-        s"`$op` should have exactly one overload. (see `changeStaticCalls` in translateToDataflows)")
-    }
 
   /** Common validation helpers. */
   object Validation {
@@ -204,7 +197,7 @@ trait Common extends AST {
 
     implicit class And(verdict: Verdict) {
       def and(other: Verdict): Verdict =
-        withGood(verdict, other) { case _ => ok }
+        withGood(verdict, other)((_, _) => ok)
     }
 
   }
