@@ -83,13 +83,13 @@ trait GraphTools extends Common
     val cs = new Comprehension.Syntax(API.bagSymbol)
 
     def mkGraph(tree: u.Tree): Iterable[Element] = {
-      val graph = ControlFlow.cfg(API.bagSymbol)(tree)
+      val graph = ControlFlow.cfg(tree)
       val mkLabel = label(graph) _
 
-      val nestFlipped = for {
-        (parent, children) <- graph.nest
-        child <- children
-      } yield child -> parent
+      val nestFlipped = (for {
+        parent <- graph.nest.nodes
+        child <- graph.nest.successors(parent)
+      } yield child -> parent).toMap
 
       val nodes = for {
         n <- graph.uses.keys
@@ -102,15 +102,15 @@ trait GraphTools extends Common
       )
 
       val edges = for {
-        (from, tos) <- graph.flow
-        to <- tos
+        from <- graph.data.nodes
+        to <- graph.data.predecessors(from)
       } yield {
         val source = from.name.toString
         val target = to.name.toString
         val label = to.name.toString
         EdgeElement(
           data = EdgeData(
-            id = s"${source}_to_${target}",
+            id = s"${source}_to_$target",
             source = source,
             target = target,
             label = label
@@ -133,19 +133,19 @@ trait GraphTools extends Common
     }
 
     /**
-      * Renders a tree in Cytoscape graph json format.
-      *
-      * The method returns the identical tree while writing the graph as an effect.
-      *
-      * @param basePath the base path of the file
-      * @param name the filename
-      * @return a function returning the identity of the tree
-      */
+     * Renders a tree in Cytoscape graph json format.
+     *
+     * The method returns the identical tree while writing the graph as an effect.
+     *
+     * @param basePath the base path of the file
+     * @param name the filename
+     * @return a function returning the identity of the tree
+     */
     def renderGraph(basePath: Path)(name: String): u.Tree => u.Tree =
       writeJsonGraph(basePath, name, _)
 
-    private[emmalanguage] def label(graph: CFG.Graph[u.TermSymbol])(sym: u.TermSymbol): String =
-      graph.defs.get(sym).map(_.rhs) match {
+    private[emmalanguage] def label(graph: CFG.FlowGraph[u.TermSymbol])(sym: u.TermSymbol): String =
+      graph.data.label(sym).map(_.rhs) match {
         case Some(core.Atomic(x)) => u.showCode(x)
         case Some(core.DefCall(_, method, _, _)) => method.name.decodedName.toString
         case Some(core.Lambda(_, _, _)) => "Lambda"

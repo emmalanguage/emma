@@ -124,6 +124,12 @@
             <groupId>io.spray</groupId>
             <artifactId>spray-json_${scala.tools.version}</artifactId>
         </dependency>
+
+        <!-- Functional graphs -->
+        <dependency>
+            <groupId>io.verizon.quiver</groupId>
+            <artifactId>core_${scala.tools.version}</artifactId>
+        </dependency>
     </dependencies>
 
     <profiles>

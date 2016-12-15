@@ -43,7 +43,7 @@ This project includes:
   Apache Parquet Hadoop under The Apache Software License, Version 2.0
   Apache Parquet Jackson under The Apache Software License, Version 2.0
   Apache XBean :: ASM 5 shaded (repackaged) under null or null
-  ASM Core under BSD
+  ASM Core under Apache License, Version 2.0
   Bean Validation API under The Apache Software License, Version 2.0
   bijection-avro under Apache 2
   bijection-core under Apache 2
@@ -176,6 +176,7 @@ This project includes:
   kernelLaws under MIT
   Kryo under New BSD License
   kryo serializers under The Apache Software License, Version 2.0
+  Kryo Shaded under New BSD License
   laws under MIT
   leveldbjni-all under The BSD 3-Clause License
   LZ4 and xxHash under The Apache Software License, Version 2.0
@@ -194,7 +195,6 @@ This project includes:
   Protocol Buffer Java API under New BSD license
   Py4J under The New BSD License
   pyrolite under MIT License
-  ReflectASM under New BSD License
   RoaringBitmap under Apache 2
   Scala Compiler under BSD 3-Clause
   Scala Library under BSD 3-Clause
@@ -208,6 +208,7 @@ This project includes:
   scalactic under the Apache License, ASL Version 2.0
   Scalap under BSD 3-Clause
   scalatest under the Apache License, ASL Version 2.0
+  scalaz-core under BSD-style
   scopt under MIT License
   ServiceLocator Default Implementation under CDDL + GPLv2 with classpath exception
   Servlet API under Apache Software License - Version 2.0 or Eclipse Public License - Version 1.0
