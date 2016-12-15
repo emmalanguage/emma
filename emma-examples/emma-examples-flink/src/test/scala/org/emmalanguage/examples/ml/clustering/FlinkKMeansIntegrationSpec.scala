@@ -27,7 +27,7 @@ import org.apache.flink.api.scala.ExecutionEnvironment
 class FlinkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec {
 
   override def kMeans(k: Int, epsilon: Double, iterations: Int, input: String): Set[Solution[Long]] =
-    /*emma.onFlink*/ {
+    emma.onFlink {
       // read the input
       val points = for (line <- DataBag.readText(input)) yield {
         val record = line.split("\t")
