@@ -24,13 +24,23 @@ import test.schema.Math._
 
 /** A spec for the `ANF.transform` transformation. */
 class ANFSpec extends BaseCompilerSpec {
-
   import compiler._
-  
+
   val anfPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       tree => time(ANF.transform(tree), "anf")
     ).compose(_.tree)
+
+  val A = new A
+  class A {
+    val B = new B
+    class B {
+      val C = new C
+      class C {
+        val x = "42"
+      }
+    }
+  }
 
   "field selections" - {
 
@@ -130,6 +140,7 @@ class ANFSpec extends BaseCompilerSpec {
         val b = y.indexOf('a')
         b + 15
       }
+      a * c
     })
 
     val exp = idPipeline(u.reify {
@@ -139,6 +150,8 @@ class ANFSpec extends BaseCompilerSpec {
       val y$2 = y
       val b$2 = y$2.indexOf('a')
       val c = b$2 + 15
+      val prod$1 = a * c
+      prod$1
     })
 
     act shouldBe alphaEqTo(exp)
@@ -254,23 +267,26 @@ class ANFSpec extends BaseCompilerSpec {
     "of nested product types" in {
       val act = anfPipeline(u.reify {
         (Point(1, 2), (3, 4)) match {
-          case (a@Point(i, j), b@(k, _)) =>
-            i + j + k
+          case (a@Point(i, j), (m, n)) =>
+            a.copy(x = i * m, y = j * n)
         }
       })
 
       val exp = idPipeline(u.reify {
-        val p$1 = Point(1, 2)
-        val x$2 = (3, 4)
-        val x$3 = (p$1, x$2)
-        val a = x$3._1
+        val point$1 = Point(1, 2)
+        val pair$1 = (3, 4)
+        val pair$2 = (point$1, pair$1)
+        val a = pair$2._1
         val i = a.x
         val j = a.y
-        val b = x$3._2
-        val k = b._1
-        val x$4 = i + j
-        val x$5 = x$4 + k
-        x$5
+        val pair$3 = pair$2._2
+        val m = pair$3._1
+        val pair$4 = pair$2._2
+        val n = pair$4._2
+        val prod$1 = i * m
+        val prod$2 = j * n
+        val point$2 = a.copy(x = prod$1, y = prod$2)
+        point$2
       })
 
       act shouldBe alphaEqTo(exp)
@@ -359,6 +375,22 @@ class ANFSpec extends BaseCompilerSpec {
       val Seq$1 = Seq(1, 2, sum$1)
       val Seq$2 = Seq(Seq$1: _*)
       Seq$2
+    })
+
+    act shouldBe alphaEqTo(exp)
+  }
+
+  "path-dependent types" in {
+    val act = anfPipeline(u.reify {
+      A.B.C.x
+    })
+
+    val exp = idPipeline(u.reify {
+      val A$1 = this.A
+      val B$1 = A$1.B
+      val C$1 = B$1.C
+      val x$1 = C$1.x
+      x$1
     })
 
     act shouldBe alphaEqTo(exp)
