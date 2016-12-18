@@ -116,8 +116,10 @@ trait Bindings { this: AST =>
           (Empty(), TypeQuote(lhs.info))
         }
 
-        val dfn = u.ValDef(Sym.mods(lhs), lhs.name, tpt, body)
+        val mod = Sym.mods(lhs)
+        val dfn = u.ValDef(mod, lhs.name, tpt, body)
         setSymbol(dfn, lhs)
+        setType(dfn, u.NoType)
       }
 
       def unapply(bind: u.ValDef): Option[(u.TermSymbol, u.Tree)] =

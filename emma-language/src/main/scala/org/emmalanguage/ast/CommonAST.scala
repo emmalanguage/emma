@@ -16,7 +16,6 @@
 package org.emmalanguage
 package ast
 
-import scala.annotation.tailrec
 import scala.reflect.api.Universe
 
 /**
@@ -191,10 +190,11 @@ trait CommonAST {
     def method(tpe: Type): Boolean =
       !(tpe =:= tpe.finalResultType)
 
-    /** Is `sym` a stable path? */
-    @tailrec def stable(tpe: Type): Boolean = tpe match {
-      case u.SingleType(u.NoPrefix, _) => true
-      case u.SingleType(prefix, _)     => is.stable(prefix)
+    /** Is `tpe` a stable path? */
+    def stable(tpe: Type): Boolean = tpe match {
+      case u.ThisType(_)      => true
+      case u.SuperType(_, _)  => true
+      case u.SingleType(_, _) => true
       case _ => false
     }
 

@@ -343,7 +343,7 @@ trait Trees { this: AST =>
         assert(is.defined(target), s"$this target is not defined")
         assert(has.nme(target),    s"$this target $target has no name")
         assert(has.tpe(target),    s"$this target $target has no type")
-        assert(is.encoded(target), s"$this target $target is not encoded")
+        assert(target.isType || is.encoded(target), s"$this target $target is not encoded")
         setType(mkIdent(target), target.info match {
           case u.NullaryMethodType(res) => res
           case tpe if tpe <:< Type.anyRef && is.stable(target) =>
@@ -370,9 +370,10 @@ trait Trees { this: AST =>
         val sym = if (mod) member.asClass.module else member
         val sel = mkSelect(target, sym)
         setType(sel, sym.infoIn(target.tpe) match {
-          case u.NullaryMethodType(res) => res
-          case tpe if tpe <:< Type.anyRef && is.stable(sym) &&
-            is.stable(target.tpe) => singleType(target.tpe, sym)
+          case u.NullaryMethodType(res) =>
+            if (res <:< Type.anyRef && is.stable(sym) && is.stable(target.tpe)) {
+              singleType(target.tpe, sym)
+            } else res
           case tpe => tpe
         })
       }

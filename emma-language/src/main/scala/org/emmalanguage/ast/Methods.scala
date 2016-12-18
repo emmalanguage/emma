@@ -176,16 +176,18 @@ trait Methods { this: AST =>
         assert(paramss.size == method.paramLists.size, s"Wrong number of $this parameter lists")
         assert(paramss.flatten.size == method.paramLists.flatten.size,
           s"Shape of $this parameter lists doesn't match")
+        val mod = Sym.mods(method)
         val tps = method.typeParams.map(typeDef)
         val pss = method.paramLists.map(_.map(p => ParDef(p.asTerm)))
         val src = tparams ++ paramss.flatten
         val dst = method.typeParams ++ method.paramLists.flatten
         val rhs = Sym.subst(method, src zip dst)(body)
         val res = method.info.finalResultType
-        assert(rhs.tpe <:< method.info.finalResultType,
-          s"$this body type ${rhs.tpe} is not a subtype of return type $res")
-        val dfn = u.DefDef(Sym.mods(method), method.name, tps, pss, TypeQuote(res), rhs)
+        assert(rhs.tpe <:< res, s"$this body type ${rhs.tpe} is not a subtype of return type $res")
+        val tpt = TypeQuote(res)
+        val dfn = u.DefDef(mod, method.name, tps, pss, tpt, rhs)
         setSymbol(dfn, method)
+        setType(dfn, u.NoType)
       }
 
       def unapply(defn: u.DefDef)
