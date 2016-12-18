@@ -278,39 +278,59 @@ trait Types { this: AST =>
 
       /** Returns the original type-tree corresponding to `tpe`. */
       def tree(tpe: u.Type): u.Tree = {
-        def original(tpe: u.Type): u.Tree = setType(tpe match {
-          // Degenerate type: `this[staticID]`.
+        /** Converts stable path-dependent types to a selection chain. */
+        def stable(tpe: u.Type): u.Tree = tpe match {
+          // Degenerate static type: `this[T]`.
           case u.ThisType(encl) if encl.isStatic =>
             api.Tree.resolveStatic(encl)
-          // This type: `this[T]`.
+          // Qualified this type: `T.this`.
           case u.ThisType(encl) =>
             api.This(encl)
           // Super type: `this.super[T]`
           case u.SuperType(ths, parent) =>
             val sym = parent.typeSymbol.asType
             val sup = u.Super(original(ths), sym.name)
-            setSymbol(sup, sym)
-          // Package or class ref: `package` or `Class`.
-          case u.SingleType(u.NoPrefix, target)
-            if target.isPackage || target.isClass => api.Id(target)
-          // Singleton type: `stableID.tpe`.
-          case u.SingleType(u.NoPrefix, stableID) =>
-            u.SingletonTypeTree(Id(stableID))
-          // Qualified type: `pkg.T`.
-          case u.SingleType(pkg, target) =>
-            Sel(original(pkg), target)
-          // Abstract type ref: `T`.
+            setType(setSymbol(sup, sym), tpe)
+          // Singleton type: `target.type`.
+          case u.SingleType(u.NoPrefix, target) =>
+            Id(target)
+          // Path-dependent singleton type: `prefix.target.type`.
+          case u.SingleType(prefix, target) =>
+            Sel(stable(prefix), target)
+          // Singleton type: `target.type`.
           case u.TypeRef(u.NoPrefix, target, Nil) =>
             Id(target)
-          // Path dependent type: `path.T`.
-          case u.TypeRef(path, target, Nil) =>
-            Sel(original(path), target)
-          // Applied type: `T[A, B, ...]`.
-          case u.TypeRef(u.NoPrefix, target, args) =>
-            u.AppliedTypeTree(api.Id(target), args.map(Type.tree))
-          // Applied path dependent type: `path.T[A, B, ...]`
-          case u.TypeRef(path, target, args) =>
-            u.AppliedTypeTree(Sel(original(path), target), args.map(Type.tree))
+          // Path-dependent singleton type: `prefix.target.type`.
+          case u.TypeRef(prefix, target, Nil) if is.stable(prefix) =>
+            Sel(stable(prefix), target)
+          case _ =>
+            abort(s"Unstable path-dependent $tpe")
+        }
+
+        /** Creates the original field of the type-tree. */
+        def original(tpe: u.Type): u.Tree = setType(tpe match {
+          // This / super type
+          case ThisType(_) | SuperType(_, _) =>
+            stable(tpe)
+          // Singleton type: `target.type`.
+          case u.SingleType(_, _) =>
+            u.SingletonTypeTree(stable(tpe))
+          // Abstract type: `T`.
+          case u.TypeRef(u.NoPrefix, target, Nil) =>
+            Id(target)
+          // Path dependent type: `prefix.T`.
+          // Type projection: `Prefix#T`
+          case u.TypeRef(prefix, target, Nil) => original(prefix) match {
+            case u.SingletonTypeTree(sng) => Sel(sng, target)
+            case pre if is.stable(prefix) => Sel(pre, target)
+            case pre => setSymbol(u.SelectFromTypeTree(pre, target.name.toTypeName), target)
+          }
+          // Applied abstract type: `T[A, B, ...]`.
+          // Applied path dependent type: `prefix.T[A, B, ...]`
+          // Applied type projection: `Prefix#T[A, B, ...]`
+          case u.TypeRef(prefix, target, args) =>
+            val sel = original(typeRef(prefix, target, Nil))
+            u.AppliedTypeTree(sel, args.map(Type.tree))
           // Type bounds: `T >: lo <: hi`.
           case u.TypeBounds(lo, hi) =>
             u.TypeBoundsTree(Type.tree(lo), Type.tree(hi))
@@ -318,12 +338,12 @@ trait Types { this: AST =>
           case u.ExistentialType(quantified, underlying) =>
             u.ExistentialTypeTree(Type.tree(underlying), quantified.map(typeDef))
           // Annotated type: `A @ann1 @ann2 ...`
-          case AnnotatedType(annotations, underlying) =>
+          case u.AnnotatedType(annotations, underlying) =>
             annotations.foldLeft(original(underlying)) {
               (res, ann) => u.Annotated(ann.tree, res)
             }
           // E.g. type refinement: `T { def size: Int }`
-          case _ => abort(s"Cannot convert type $tpe to a type-tree")
+          case _ => mkTypeTree(tpe).original
         }, tpe)
 
         val tpt = u.TypeTree(tpe)

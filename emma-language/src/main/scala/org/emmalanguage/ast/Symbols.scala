@@ -39,9 +39,10 @@ trait Symbols { this: AST =>
       // Predefined symbols
       // ------------------------------------------------------------------------------------------
 
-      lazy val none    = u.NoSymbol
-      lazy val foreach = Type[TraversableOnce[Nothing]]
-        .member(TermName.foreach).asMethod
+      lazy val implicitly = predef.info.member(TermName("implicitly")).asMethod
+      lazy val foreach    = Type[TraversableOnce[Any]].member(TermName.foreach).asMethod
+      lazy val none       = u.NoSymbol
+      lazy val predef     = PredefModule
 
       /** A map of all tuple symbols by number of elements. */
       lazy val tuple: Map[Int, u.ClassSymbol] =
@@ -292,10 +293,8 @@ trait Symbols { this: AST =>
       def encl: u.Symbol = enclosingOwner
 
       /** Extracts the owner of `tree`, if any. */
-      def of(tree: u.Tree): u.Symbol = tree
-        .find(is.owner)
-        .map(_.symbol.owner)
-        .getOrElse(Sym.none)
+      def of(tree: u.Tree): u.Symbol =
+        tree.find(is.owner).fold(Sym.none)(_.symbol.owner)
 
       /** Returns a chain of the owners of `sym` starting at `sym` and ending at `_root_`. */
       def chain(sym: u.Symbol): Stream[u.Symbol] =
