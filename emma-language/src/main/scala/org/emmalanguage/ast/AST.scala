@@ -90,6 +90,31 @@ trait AST extends CommonAST
     case api.TypeQuote(tpe) => api.Type.tree(tpe)
   }.andThen(_.tree)
 
+  /**
+   * Rewrites `A.this.x` as `x` if `A` is shadowed another symbol in the owner chain.
+   *
+   * Can be used before `showCode` to avoid printing invalid trees such as
+   *
+   * {{{
+   * class A {
+   *   val x = 42;
+   *   class A {
+   *     scala.Predef.println(A.this.x)
+   *   }
+   * }
+   * }}}
+   */
+  lazy val removeShadowedThis =
+    if (shadowedOwners.isEmpty) identity[u.Tree] _
+    else api.TopDown.transform {
+      case api.Sel(api.This(encl), member)
+        if shadowedOwners(encl) => api.Id(member)
+    }.andThen(_.tree)
+
+  /** Computes a set of owners whose name is shadowed in the current scope. */
+  lazy val shadowedOwners = api.Owner.chain(api.Owner.encl)
+    .filter(_.isClass).groupBy(_.name).values.flatMap(_.tail).toSet
+
   /** Normalizes all statements in term position by wrapping them in a block. */
   lazy val normalizeStatements = {
     def isStat(tree: u.Tree) = tree match {
