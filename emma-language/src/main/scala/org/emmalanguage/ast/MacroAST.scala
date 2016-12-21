@@ -18,6 +18,7 @@ package ast
 
 import scala.reflect.macros.blackbox
 import scala.tools.nsc.Global
+import scala.util.control.NonFatal
 
 /**
  * Implements various utility functions that mitigate and/or workaround deficiencies in Scala's
@@ -53,10 +54,24 @@ trait MacroAST extends AST {
     c.abort(pos, msg)
 
   def parse(code: String) =
-    c.parse(code)
+    try c.parse(code)
+    catch { case NonFatal(err) => throw new Exception(s"""
+      |Parsing error: ${err.getMessage}
+      |================
+      |$code
+      |================
+      |""".stripMargin.trim, err)
+    }
 
   def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
-    if (typeMode) c.typecheck(tree, c.TYPEmode) else c.typecheck(tree)
+    try if (typeMode) c.typecheck(tree, c.TYPEmode) else c.typecheck(tree)
+    catch { case NonFatal(err) => throw new Exception(s"""
+      |Type-checking error: ${err.getMessage}
+      |================
+      |${showCode(tree)}
+      |================
+      |""".stripMargin.trim, err)
+    }
 
   def eval[T](code: Tree): T =
     c.eval[T](c.Expr[T](unTypeCheck(code)))
@@ -67,10 +82,16 @@ trait MacroAST extends AST {
       val gt = tree.asInstanceOf[global.Tree]
       import global.treeBrowsers._
       val frame = new BrowserFrame("macro-expand")
-      val lock = new concurrent.Lock
+      val lock = Lock()
       frame.setTreeModel(new ASTTreeModel(gt))
       frame.createFrame(lock)
       lock.acquire()
     case _ =>
+  }
+
+  // Workaround to suppress deprecated warning.
+  private object Lock extends Lock
+  @deprecated("", "") private trait Lock {
+    def apply() = new concurrent.Lock
   }
 }

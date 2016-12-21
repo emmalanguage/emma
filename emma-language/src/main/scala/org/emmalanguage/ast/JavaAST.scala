@@ -55,16 +55,20 @@ trait JavaAST extends AST {
     value <- Option(tb.inferImplicitValue(tpe)) if value.nonEmpty
   } yield value.setType(value.tpe.finalResultType)
 
-  def warning(msg: String, pos: Position = NoPosition): Unit =
-    logger.warn(s"Warning at $pos\n$msg")
+  def warning(msg: String, pos: Position = NoPosition): Unit = {
+    val at = if (is.defined(pos)) s"($pos)" else ""
+    logger.warn(s"Warning:$at $msg")
+  }
 
-  def abort(msg: String, pos: Position = NoPosition): Nothing =
-    throw ToolBoxError(s"Error at $pos:\n$msg")
+  def abort(msg: String, pos: Position = NoPosition): Nothing = {
+    val at = if (is.defined(pos)) s"($pos)" else ""
+    throw ToolBoxError(s"Error:$at $msg")
+  }
 
   def parse(code: String): Tree =
     try tb.parse(code)
     catch { case err: ToolBoxError => throw ToolBoxError(s"""
-      |Parsing failed for tree:
+      |Parsing error: ${err.getMessage}
       |================
       |$code
       |================
@@ -74,7 +78,7 @@ trait JavaAST extends AST {
   def typeCheck(tree: Tree, typeMode: Boolean = false): Tree =
     try if (typeMode) tb.typecheck(tree, tb.TYPEmode) else tb.typecheck(tree)
     catch { case err: ToolBoxError => throw ToolBoxError(s"""
-      |Type-check failed for tree:
+      |Type-checking error: ${err.getMessage}
       |================
       |${showCode(tree)}
       |================
@@ -87,7 +91,7 @@ trait JavaAST extends AST {
     typeCheck(reify(()).tree)
     binary
   } catch { case err: ToolBoxError => throw ToolBoxError(s"""
-    |Compilation failed for tree:
+    |Compilation error: ${err.getMessage}
     |================
     |${showCode(tree)}
     |================
