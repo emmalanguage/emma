@@ -22,22 +22,20 @@ import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
 class QuoteMacro(val c: blackbox.Context) extends MacroCompiler {
-
-  import api._
   import UniverseImplicits._
 
   def quoteImpl[T](e: c.Expr[T]): c.Expr[String] = {
-    val res = u.showCode(quotePipeline(e))
-    // c.warning(e.tree.pos, res)
-    c.Expr[String](api.Lit(res))
+    val code = u.showCode(quotePipeline(e))
+    // Maximum String literal length in bytes on the JVM.
+    if (code.getBytes.length > 0xffff) abort(s"Method too large to quote:\n$code", e.tree.pos)
+    c.Expr[String](api.Lit(code))
   }
 
   lazy val quotePipeline: c.Expr[Any] => u.Tree =
-    pipeline(typeCheck = false)(qualifyThis).compose(_.tree)
+    pipeline()(qualifyThis).compose(_.tree)
 
-  lazy val qualifyThis: u.Tree => u.Tree =
-    api.BottomUp.transform({
-      case This(sym) if sym.isClass && sym.isStatic =>
-        Ref(sym.asClass.module)
-    })(_).tree
+  lazy val qualifyThis = api.BottomUp.transform {
+    case api.This(sym) if sym.isClass && sym.isStatic =>
+      api.Ref(sym.asClass.module)
+  }._tree
 }
