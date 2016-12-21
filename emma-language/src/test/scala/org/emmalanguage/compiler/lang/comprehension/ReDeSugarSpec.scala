@@ -360,6 +360,42 @@ class ReDeSugarSpec extends BaseCompilerSpec {
     (des, res)
   }
 
+  // degenerate flatMap
+  val (des9, res9, nor9) = {
+
+    val des = u.reify {
+      val users$1 = users
+      val clicks$1 = clicks
+      val clicks$2 = users$1
+        .flatMap(_ => clicks$1)
+      clicks$2
+    }
+
+    val res = u.reify {
+      val users$1 = users
+      val clicks$1 = clicks
+      val clicks$2 = flatten[Click, DataBag] {
+        comprehension[DataBag[Click], DataBag] {
+          val u = generator(users$1)
+          head(clicks$1)
+        }
+      }
+      clicks$2
+    }
+
+    val nor = u.reify {
+      val users$1 = users
+      val clicks$1 = clicks
+      val clicks$2 = comprehension[Click, DataBag] {
+        val u = generator(users$1)
+        val c = generator(clicks$1)
+        head(c)
+      }
+      clicks$2
+    }
+
+    (des, res, nor)
+  }
   // ---------------------------------------------------------------------------
   // Spec tests
   // ---------------------------------------------------------------------------
@@ -371,6 +407,9 @@ class ReDeSugarSpec extends BaseCompilerSpec {
     }
     "flatMap" in {
       resugarPipeline(des2) shouldBe alphaEqTo(anfPipeline(res2))
+    }
+    "degenerate flatMap" in {
+      resugarPipeline(des9) shouldBe alphaEqTo(anfPipeline(res9))
     }
     "withFilter" in {
       resugarPipeline(des3) shouldBe alphaEqTo(anfPipeline(res3))
@@ -402,6 +441,9 @@ class ReDeSugarSpec extends BaseCompilerSpec {
     "flatMap" in {
       desugarPipeline(res2) shouldBe alphaEqTo(anfPipeline(des2))
     }
+    "degenerate flatMap" in {
+      desugarPipeline(res9) shouldBe alphaEqTo(anfPipeline(des9))
+    }
     "withFilter" in {
       desugarPipeline(res3) shouldBe alphaEqTo(anfPipeline(des3))
     }
@@ -425,6 +467,9 @@ class ReDeSugarSpec extends BaseCompilerSpec {
   }
 
   "desugar normalized" - {
+    "degenerate flatMap" in {
+      desugarPipeline(nor9) shouldBe alphaEqTo(anfPipeline(des9))
+    }
     "with two generators" in {
       desugarPipeline(nor4) shouldBe alphaEqTo(anfPipeline(des4))
     }
