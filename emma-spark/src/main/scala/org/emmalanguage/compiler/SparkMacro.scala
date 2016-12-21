@@ -24,7 +24,7 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler {
   def parallelizeImpl[T](e: c.Expr[T]): c.Expr[T] = {
     val res = parallelizePipeline(e)
     //c.warning(e.tree.pos, Core.prettyPrint(res))
-    c.Expr[T](unTypeCheck(res))
+    c.Expr[T]((removeShadowedThis andThen unTypeCheck)(res))
   }
 
   private lazy val parallelizePipeline: c.Expr[Any] => u.Tree =
