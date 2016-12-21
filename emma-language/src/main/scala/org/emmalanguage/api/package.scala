@@ -45,11 +45,4 @@ package object api {
     }
   }
   //@formatter:on
-
-  // -----------------------------------------------------
-  // Converters
-  // -----------------------------------------------------
-
-  def comparing[A](lt: (A, A) => Boolean): Ordering[A] =
-    Ordering.fromLessThan(lt)
 }

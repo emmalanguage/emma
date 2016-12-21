@@ -21,6 +21,7 @@ import api.Meta.Projections._
 import examples.ml.model._
 
 import breeze.linalg.{Vector => Vec, _}
+import breeze.numerics.pow
 
 @emma.lib
 object KMeans {
@@ -32,7 +33,8 @@ object KMeans {
   ): DataBag[Solution[PID]] = {
 
     val dimensions = points.map(_.vector.length).distinct.fetch()
-    assert(dimensions.size == 1, "Multiple dimensions in input data. All vectors should have the same length.")
+    assert(dimensions.size == 1,
+      "Multiple dimensions in input data. All vectors should have the same length.")
     val N = dimensions.head
 
     var bestSolution = DataBag.empty[Solution[PID]]
@@ -46,7 +48,7 @@ object KMeans {
 
       // initialize solution
       var solution = for (p <- points) yield {
-        val closest = centroids.min(comparing { (m1, m2) =>
+        val closest = centroids.min(Ordering.fromLessThan { (m1, m2) =>
           val diff1 = p.vector - m1.vector
           val diff2 = p.vector - m2.vector
           (diff1 dot diff1) < (diff2 dot diff2)
@@ -71,11 +73,11 @@ object KMeans {
           mean <- centroids
           newMean <- newMeans
           if mean.id == newMean.id
-        } yield sum((mean.vector - newMean.vector) :* (mean.vector - newMean.vector))).sum
+        } yield sum(pow(mean.vector - newMean.vector, 2))).sum
 
         // update solution: re-assign clusters
         solution = for (s <- solution) yield {
-          val closest = centroids.min(comparing { (m1, m2) =>
+          val closest = centroids.min(Ordering.fromLessThan { (m1, m2) =>
             val diff1 = s.point.vector - m1.vector
             val diff2 = s.point.vector - m2.vector
             (diff1.t * diff1) < (diff2.t * diff2)
