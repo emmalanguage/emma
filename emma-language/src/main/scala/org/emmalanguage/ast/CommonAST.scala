@@ -16,7 +16,9 @@
 package org.emmalanguage
 package ast
 
+import scala.reflect.ClassTag
 import scala.reflect.api.Universe
+import scala.reflect.macros.Attachments
 
 /**
  * Implements various utility functions that mitigate and/or workaround deficiencies in Scala's
@@ -44,10 +46,26 @@ trait CommonAST {
   // Abstract methods
   // ----------------------------------------------------------------------------------------------
 
+  /** Meta information (attachments). */
+  trait Meta {
+    def all: Attachments
+    def apply[T: ClassTag]: T = get[T].get
+    def contains[T: ClassTag]: Boolean = all.contains[T]
+    def get[T: ClassTag]: Option[T] = all.get[T]
+    def remove[T: ClassTag](): Unit
+    def update[T: ClassTag](att: T): Unit
+  }
+
   private[ast] def freshNameSuffix: Char
 
   /** Returns `tpt` with its original field set. */
   private[ast] def setOriginal(tpt: TypeTree, original: Tree): TypeTree
+
+  /** Returns the meta information associated with `sym`. */
+  def meta(sym: Symbol): Meta
+
+  /** Returns the meta information associated with `tree`. */
+  def meta(tree: Tree): Meta
 
   /** Returns the enclosing named entity (class, method, value, etc). */
   def enclosingOwner: Symbol

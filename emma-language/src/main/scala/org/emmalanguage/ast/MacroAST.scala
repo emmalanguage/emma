@@ -16,6 +16,7 @@
 package org.emmalanguage
 package ast
 
+import scala.reflect.ClassTag
 import scala.reflect.macros.blackbox
 import scala.tools.nsc.Global
 import scala.util.control.NonFatal
@@ -30,11 +31,24 @@ trait MacroAST extends AST {
   val c: blackbox.Context
   val universe: c.universe.type = c.universe
   import universe._
+  import internal._
 
   private[ast] def freshNameSuffix: Char = 'm'
 
   private[ast] def setOriginal(tpt: TypeTree, original: Tree): TypeTree =
     internal.setOriginal(tpt, original)
+
+  def meta(sym: Symbol): Meta = new Meta {
+    def all = attachments(sym)
+    def remove[T: ClassTag]() = removeAttachment[T](sym)
+    def update[T: ClassTag](att: T) = updateAttachment(sym, att)
+  }
+
+  def meta(tree: Tree): Meta = new Meta {
+    def all = attachments(tree)
+    def remove[T: ClassTag]() = removeAttachment[T](tree)
+    def update[T: ClassTag](att: T) = updateAttachment(tree, att)
+  }
 
   def enclosingOwner: Symbol =
     c.internal.enclosingOwner

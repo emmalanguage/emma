@@ -19,6 +19,7 @@ package ast
 import com.typesafe.scalalogging.slf4j.Logger
 import org.slf4j.LoggerFactory
 
+import scala.reflect.ClassTag
 import scala.reflect.runtime
 import scala.reflect.runtime.JavaUniverse
 import scala.tools.reflect.ToolBox
@@ -47,6 +48,18 @@ trait JavaAST extends AST {
 
   private[ast] def setOriginal(tpt: TypeTree, original: Tree): TypeTree =
     tpt.setOriginal(original)
+
+  def meta(sym: Symbol) = new Meta {
+    def all = sym.attachments
+    def remove[T: ClassTag]() = sym.removeAttachment[T]
+    def update[T: ClassTag](att: T) = sym.updateAttachment(att)
+  }
+
+  def meta(tree: Tree) = new Meta {
+    def all = tree.attachments
+    def remove[T: ClassTag]() = tree.removeAttachment[T]
+    def update[T: ClassTag](att: T) = tree.updateAttachment(att)
+  }
 
   lazy val enclosingOwner =
     typeCheck(q"val x = ()").symbol.owner
