@@ -26,6 +26,7 @@ import scala.collection.mutable
 trait AlphaEq extends Common {
 
   import universe._
+  import internal._
 
   // ---------------------------------------------------------------------------
   // Types
@@ -63,8 +64,17 @@ trait AlphaEq extends Common {
   /** Are `lhs` and `rhs` alpha equivalent (i.e. equal upto renaming)? */
   def alphaEq(lhs: Tree, rhs: Tree): Eq Or Neq = {
 
-    // An accumulator dictionary for alpha equivalence
-    val dict = mutable.Map.empty[Symbol, Symbol]
+    // An accumulator dictionary for alpha equivalence.
+    var keys = freeTerms(lhs) ::: freeTypes(lhs)
+    var vals = freeTerms(rhs) ::: freeTypes(rhs)
+    val dict = mutable.Map(keys zip vals: _*)
+
+    /** Updates the dictionary with a alias. */
+    def alias(original: Symbol, alias: Symbol): Unit = {
+      dict += original -> alias
+      keys ::= original
+      vals ::= alias
+    }
 
     // ------------------------------------------------------------------------
     // Helper functions
@@ -80,24 +90,6 @@ trait AlphaEq extends Common {
       def symbols(lhSym: Symbol, rhSym: Symbol): Eq Or Neq = (lhSym, rhSym) match {
         case _ if lhSym == rhSym =>
           pass
-
-        case ( // Free terms
-          lhSym: FreeTermSymbol,
-          rhSym: FreeTermSymbol
-          ) => for {
-            eq <- if (lhSym.name == rhSym.name) pass
-              else failHere because s"Names of free symbols $lhSym and $rhSym differ"
-            eq <- if (lhSym.value == rhSym.value) pass
-              else failHere because s"Values of free symbols $lhSym and $rhSym differ"
-          } yield eq
-
-        case ( // Free types
-          lhSym: FreeTypeSymbol,
-          rhSym: FreeTypeSymbol
-          ) => for {
-            eq <- if (lhSym.name == rhSym.name) pass
-              else failHere because s"Names of free symbols $lhSym and $rhSym differ"
-          } yield eq
 
         case ( // Synthetic ToolBox owner
           api.Sym.With.nme(_, api.TermName.exprOwner),
@@ -125,7 +117,7 @@ trait AlphaEq extends Common {
 
       // Alpha equivalence of types
       def types(lhT: Type, rhT: Type): Eq Or Neq =
-        if (lhT =:= rhT) pass
+        if (lhT.substituteSymbols(keys, vals) =:= rhT) pass
         else failHere because s"Types $lhT and $rhT differ"
 
       // Alpha equivalence of constants
@@ -183,11 +175,10 @@ trait AlphaEq extends Common {
             eq <- names(name$l, name$r)
           } yield eq
 
-        // Type-trees
-        case (_: TypeTree, _: TypeTree)
-          | (_: AppliedTypeTree, _: AppliedTypeTree)
-          | (_: SingletonTypeTree, _: SingletonTypeTree)
-          => for {
+        case ( // Type-trees
+          TypeTree(),
+          TypeTree()
+          ) => for {
             eq <- types(lhs.tpe, rhs.tpe)
           } yield eq
 
@@ -227,8 +218,8 @@ trait AlphaEq extends Common {
           Block(stats$r, expr$r)
           ) => for {
             eq <- size(stats$l, stats$r, "block statements")
-            _ = dict ++= (for ((l: DefDef, r: DefDef) <- stats$l zip stats$r)
-              yield l.symbol -> r.symbol)
+            _ = for ((l: DefDef, r: DefDef) <- stats$l zip stats$r)
+              alias(l.symbol, r.symbol)
             eq <- all(stats$l, stats$r)
             eq <- trees(expr$l, expr$r)
           } yield eq
@@ -239,7 +230,7 @@ trait AlphaEq extends Common {
           ) => for {
             eq <- modifiers(mods$l, mods$r)
             eq <- types(lhs.symbol.info, rhs.symbol.info)
-            _ = dict += lhs.symbol -> rhs.symbol
+            _ = alias(lhs.symbol, rhs.symbol)
             eq <- trees(rhs$l, rhs$r)
           } yield eq
 
@@ -256,7 +247,7 @@ trait AlphaEq extends Common {
           Function(params$r, body$r)
           ) => for {
             eq <- size(params$l, params$r, "function parameters")
-            _ = dict += lhs.symbol -> rhs.symbol
+            _ = alias(lhs.symbol, rhs.symbol)
             eq <- all(params$l, params$r)
             eq <- trees(body$l, body$r)
           } yield eq
@@ -323,7 +314,7 @@ trait AlphaEq extends Common {
             eq <- shape(paramss$l, paramss$r, "method parameters")
             eq <- all(paramss$l.flatten, paramss$r.flatten)
             eq <- types(tpt$l.tpe, tpt$r.tpe)
-            _ = dict += lhs.symbol -> rhs.symbol
+            _ = alias(lhs.symbol, rhs.symbol)
             eq <- trees(rhs$l, rhs$r)
           } yield eq
 
@@ -350,7 +341,7 @@ trait AlphaEq extends Common {
           Bind(_, pat$r)
           ) => for {
             eq <- trees(pat$l, pat$r)
-            _ = dict += lhs.symbol -> rhs.symbol
+            _ = alias(lhs.symbol, rhs.symbol)
           } yield eq
 
         case _ =>
@@ -358,6 +349,15 @@ trait AlphaEq extends Common {
       }
     }
 
-    trees(lhs, rhs)
+    for {
+      eq <- if (keys.size == vals.size) pass
+        else fail at (lhs, rhs) because "Number of free symbols does not match"
+      eq <- (keys zip vals).foldLeft(pass) { case (result, (l, r)) =>
+        if (result.isBad) result
+        else if (l.name == r.name && l.info =:= r.info) pass
+        else fail at (lhs, rhs) because s"Free symbols $l and $r don't match"
+      }
+      eq <- trees(lhs, rhs)
+    } yield eq
   }
 }
