@@ -120,7 +120,7 @@ trait Common extends AST {
     val ops = sourceOps | sinkOps | monadOps | nestOps | setOps | foldOps
 
     val implicitTypes = Set(
-      api.Type[Meta[Any]].typeConstructor,
+      api.Type[org.emmalanguage.api.Meta[Any]].typeConstructor,
       api.Type[CSVConverter[Any]].typeConstructor,
       api.Type[ParquetConverter[Any]].typeConstructor
     )
