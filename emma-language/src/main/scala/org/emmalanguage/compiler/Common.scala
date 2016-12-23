@@ -49,14 +49,13 @@ trait Common extends AST {
   /** A set of API method symbols to be comprehended. */
   protected[emmalanguage] object API extends IRModule {
     //@formatter:off
-    val apiModuleSymbol       = api.Sym[org.emmalanguage.api.`package`.type].asModule
     val emmaModuleSymbol      = api.Sym[emma.`package`.type].asModule
     val csvPkgSymbol          = rootMirror.staticPackage(s"$rootPkg.io.csv")
     val bagSymbol             = api.Sym[DataBag[Any]].asClass
     val groupSymbol           = api.Sym[Group[Any, Any]].asClass
     val bagModuleSymbol       = bagSymbol.companion.asModule
     val scalaSeqModuleSymbol  = api.Sym[ScalaSeq.type].asModule
-    def module                = apiModuleSymbol
+    def module                = emmaModuleSymbol
 
     private def bagOp(name: String) =
       methodIn(bagSymbol, name)
@@ -198,10 +197,6 @@ trait Common extends AST {
     val ops           = Set.empty[u.MethodSymbol]
     //@formatter:on
   }
-
-  private def assertOneOverload(ops: Traversable[u.MethodSymbol]) =
-    for (op <- ops) assert(op.alternatives.size == 1,
-      s"`$op` should have exactly one overload. (see `changeStaticCalls` in translateToDataflows)")
 
   /** Common validation helpers. */
   object Validation {

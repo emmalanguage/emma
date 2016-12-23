@@ -13,25 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.emmalanguage.api
+package org.example.foo
 
-import scala.annotation.StaticAnnotation
+class Bar[T](x: Int) {
+  val y: T = null.asInstanceOf[T]
+}
 
-package object model {
+object Bar {
 
-  import scala.language.experimental.macros
+  class Baz(val x: Int)
 
-  // -----------------------------------------------------
-  // traits
-  // -----------------------------------------------------
-
-  trait Identity[K] {
-    def identity: K
+  object Baz {
+    def apply(x: Int): Baz = new Baz(x)
   }
 
-  // -----------------------------------------------------
-  // annotations
-  // -----------------------------------------------------
-
-  final class id extends StaticAnnotation {}
+  def apply(x: Int): Baz = new Baz(x)
 }
