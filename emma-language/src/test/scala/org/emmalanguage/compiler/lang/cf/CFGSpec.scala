@@ -17,17 +17,15 @@ package org.emmalanguage
 package compiler.lang.cf
 
 import api._
-import api.model._
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import compiler.ir.DSCFAnnotations._
 import io.csv._
+import test.schema.Graphs._
 
 /** A spec for comprehension normalization. */
 class CFGSpec extends BaseCompilerSpec {
-
   import compiler._
-  import CFGSpec._
 
   val anfPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
@@ -199,11 +197,5 @@ class CFGSpec extends BaseCompilerSpec {
       ctrlT.successors("suffix$1") should contain allOf (
         "while$1", "while$2", (for (i <- 2 to 5) yield s"suffix$$$i"): _*)
     }
-  }
-}
-
-object CFGSpec {
-  case class Edge[VT](@id src: VT, @id dst: VT) extends Identity[Edge[VT]] {
-    def identity = Edge(src, dst)
   }
 }

@@ -16,10 +16,8 @@
 package org.emmalanguage
 package test.schema
 
-import api.model.Identity
-
 object State {
   // schema
-  case class State(identity: Long, var value: Int) extends Identity[Long]
-  case class Update(identity: Long, inc: Int) extends Identity[Long]
+  case class State(identity: Long, var value: Int)
+  case class Update(identity: Long, inc: Int)
 }
