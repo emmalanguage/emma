@@ -43,9 +43,12 @@ trait Compiler extends AlphaEq
   /** The underlying universe object. */
   override val universe: Universe
 
+  /** Implicit types to be removed */
+  lazy val implicitTypes: Set[u.Type] = API.implicitTypes
+
   /** Standard pipeline prefix. Brings a tree into a form convenient for transformation. */
   lazy val preProcess: Seq[u.Tree => u.Tree] = Seq(
-    Source.removeImplicits(API.implicitTypes),
+    Source.removeImplicits(implicitTypes),
     fixSymbolTypes,
     stubTypeTrees,
     unQualifyStatics,
