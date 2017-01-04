@@ -19,6 +19,8 @@ package compiler.lang.core
 import compiler.Common
 import compiler.lang.source.Source
 
+import scala.Function.const
+
 /** Core language pickling. */
 private[core] trait Pickling extends Common {
   this: Source with Core =>
@@ -95,10 +97,11 @@ private[core] trait Pickling extends Common {
       val alg = new Core.Algebra[D] {
 
         // Empty
-        def empty: D = offset => ""
+        val empty: D = const("")
 
         // Atomics
-        def lit(value: Any): D = offset => value match {
+
+        def lit(value: Any) = const(value match {
           //@formatter:off
           case value: Int    => value.toString
           case value: Long   => s"${value}L"
@@ -108,80 +111,84 @@ private[core] trait Pickling extends Common {
           case null          => "null"
           case _             => value.toString
           //@formatter:on
-        }
+        })
 
-        def this_(sym: u.Symbol): D = offset =>
-          s"${printSym(sym)}.this"
+        def this_(sym: u.Symbol) =
+          const(s"${printSym(sym)}.this")
 
-        def bindingRef(sym: u.TermSymbol): D = offset =>
-          printSym(sym)
-
-        def moduleRef(target: u.ModuleSymbol): D = offset =>
-          printSym(target)
+        def ref(target: u.TermSymbol) =
+          const(printSym(target))
 
         // Definitions
-        def valDef(lhs: u.TermSymbol, rhs: D): D = offset =>
+
+        def bindingDef(lhs: u.TermSymbol, rhs: D) = ???
+
+        override def valDef(lhs: u.TermSymbol, rhs: D) = offset =>
           s"val ${printSym(lhs)} = ${rhs(offset)}"
 
-        def parDef(lhs: u.TermSymbol, rhs: D): D = offset =>
-          s"${printSym(lhs)}: ${printTpe(lhs.info)}"
+        override def parDef(lhs: u.TermSymbol, rhs: D) =
+          const(s"${printSym(lhs)}: ${printTpe(lhs.info)}")
 
-        def defDef(sym: u.MethodSymbol, tparams: S[u.TypeSymbol], paramss: SS[D], body: D): D =
-          offset => {
-            val tparamsStr = tparams match {
-              case Nil => (tparams map printSym).mkString(", ")
-              case _ => ""
-            }
-            val paramssStr = printParamss(paramss, offset)
-            val bodyStr = body(offset)
-            s"def ${printSym(sym)}$tparamsStr$paramssStr: ${printTpe(sym.returnType)} = $bodyStr"
+        def defDef(sym: u.MethodSymbol,
+          tparams: Seq[u.TypeSymbol], paramss: Seq[Seq[D]], body: D
+        ) = offset => {
+          val tparamsStr = tparams match {
+            case Nil => (tparams map printSym).mkString(", ")
+            case _ => ""
           }
-
-        // Other
-        def typeAscr(target: D, tpe: u.Type): D = offset =>
-          s"${target(offset)}: ${printTpe(tpe)}"
-
-        def defCall(target: Option[D], method: u.MethodSymbol, targs: S[u.Type], argss: SS[D]): D = offset => {
-          val s = target
-          (target, argss) match {
-            case (Some(tgt), ((arg :: Nil) :: Nil)) if isApply(method) =>
-              s"${tgt(offset)}(${arg(offset)})"
-            case (Some(tgt), ((arg :: Nil) :: Nil)) =>
-              s"${tgt(offset)}${printMethod(" ", method, " ")}${arg(offset)}"
-            case (Some(tgt), Nil | (Nil :: Nil)) if targs.nonEmpty =>
-              s"${tgt(offset)}${printMethod(".", method, "")}[${(targs map printTpe).mkString}]"
-            case (Some(tgt), Nil) if isUnary(method) =>
-              s"${printSym(method)}${tgt(offset)}"
-            case (Some(tgt), _) if isApply(method) && api.Sym.tuples.contains(method.owner.companion) =>
-              s"${printArgss(argss, offset)}"
-            case (Some(tgt), _) =>
-              s"${tgt(offset)}${printMethod(".", method, "")}${printArgss(argss, offset)}"
-            case (None, Nil | (Nil :: Nil)) if targs.nonEmpty =>
-              s"${printSym(method)}[${(targs map printTpe).mkString}]"
-            case (None, _) =>
-              s"${printSym(method)}${printArgss(argss, offset)}"
-          }
+          val paramssStr = printParamss(paramss, offset)
+          val bodyStr = body(offset)
+          s"def ${printSym(sym)}$tparamsStr$paramssStr: ${printTpe(sym.returnType)} = $bodyStr"
         }
 
-        def inst(target: u.Type, targs: Seq[u.Type], argss: SS[D]): D = offset => argss match {
+        // Other
+
+        def typeAscr(target: D, tpe: u.Type) = offset =>
+          s"${target(offset)}: ${printTpe(tpe)}"
+
+        def moduleAcc(target: D, member: u.ModuleSymbol) = offset =>
+          s"${target(offset)}.${printSym(member)}"
+
+        def defCall(target: Option[D], method: u.MethodSymbol,
+          targs: Seq[u.Type], argss: Seq[Seq[D]]
+        ) = offset => (target, argss) match {
+          case (Some(tgt), ((arg :: Nil) :: Nil)) if isApply(method) =>
+            s"${tgt(offset)}(${arg(offset)})"
+          case (Some(tgt), ((arg :: Nil) :: Nil)) =>
+            s"${tgt(offset)}${printMethod(" ", method, " ")}${arg(offset)}"
+          case (Some(tgt), Nil | (Nil :: Nil)) if targs.nonEmpty =>
+            s"${tgt(offset)}${printMethod(".", method, "")}[${(targs map printTpe).mkString}]"
+          case (Some(tgt), Nil) if isUnary(method) =>
+            s"${printSym(method)}${tgt(offset)}"
+          case (Some(tgt), _) if isApply(method) && api.Sym.tuples.contains(method.owner.companion) =>
+            s"${printArgss(argss, offset)}"
+          case (Some(tgt), _) =>
+            s"${tgt(offset)}${printMethod(".", method, "")}${printArgss(argss, offset)}"
+          case (None, Nil | (Nil :: Nil)) if targs.nonEmpty =>
+            s"${printSym(method)}[${(targs map printTpe).mkString}]"
+          case (None, _) =>
+            s"${printSym(method)}${printArgss(argss, offset)}"
+        }
+
+        def inst(target: u.Type, targs: Seq[u.Type], argss: Seq[Seq[D]]) = offset => argss match {
           case Nil | (Nil :: Nil) if targs.nonEmpty =>
             s"new ${printSym(target.typeSymbol)}[${(targs map printTpe).mkString(", ")}]${printArgss(argss, offset)}"
           case _ =>
             s"new ${printSym(target.typeSymbol)}${printArgss(argss, offset)}"
         }
 
-        def lambda(sym: u.TermSymbol, params: S[D], body: D): D = offset =>
+        def lambda(sym: u.TermSymbol, params: Seq[D], body: D) = offset =>
           s"${printParams(params, offset + indent)} => ${body(offset)}"
 
-        def branch(cond: D, thn: D, els: D): D = offset =>
+        def branch(cond: D, thn: D, els: D) = offset =>
           s"if (${cond(offset + indent)}) ${thn(offset + indent)} else ${els(offset + indent)}"
 
-        def let(vals: S[D], defs: S[D], expr: D): D = offset => {
+        def let(vals: Seq[D], defs: Seq[D], expr: D) = offset => {
           s"""{
-              |${(vals map (val_ => (" " * (offset + indent)) + val_(offset + indent))).mkString("\n")}
-              |${" " * (offset + indent)}${expr(offset + indent)}
-              |${" " * offset}}
-           """.stripMargin.trim
+            |${(vals map (val_ => (" " * (offset + indent)) + val_(offset + indent))).mkString("\n")}
+            |${" " * (offset + indent)}${expr(offset + indent)}
+            |${" " * offset}}
+            |""".stripMargin.trim
 
           val valsStr = (vals map (val_ => (" " * (offset + indent)) + val_(offset + indent))).mkString("\n")
           val defsStr = (defs map (def_ => (" " * (offset + indent)) + def_(offset + indent))).mkString("\n")
@@ -194,22 +201,22 @@ private[core] trait Pickling extends Common {
         }
 
         // Comprehensions
-        def comprehend(qs: S[D], hd: D): D = offset =>
+        def comprehend(qs: Seq[D], hd: D) = offset =>
           s"""for {
-             |${(qs map (q => (" " * (offset + indent)) + q(offset + indent))).mkString("\n")}
-             |${" " * offset}} yield ${hd(offset)}
-           """.stripMargin.trim
+            |${(qs map (q => (" " * (offset + indent)) + q(offset + indent))).mkString("\n")}
+            |${" " * offset}} yield ${hd(offset)}
+            |""".stripMargin.trim
 
-        def generator(lhs: u.TermSymbol, rhs: D): D = offset =>
+        def generator(lhs: u.TermSymbol, rhs: D) = offset =>
           s"${printSym(lhs)} <- ${rhs(offset)}"
 
-        def guard(expr: D): D = offset =>
+        def guard(expr: D) = offset =>
           s"if ${expr(offset)}"
 
-        def head(expr: D): D = offset =>
+        def head(expr: D) = offset =>
           expr(offset)
 
-        def flatten(expr: D): D = offset =>
+        def flatten(expr: D) = offset =>
           s"(${expr(offset)}).flatten"
       }
 
