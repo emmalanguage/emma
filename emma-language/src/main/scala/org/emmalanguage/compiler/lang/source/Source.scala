@@ -32,6 +32,8 @@ trait Source extends Common
   /** Source language. */
   object Source {
 
+    import UniverseImplicits._
+
     /**
      * The grammar associated with the [[Lang]] objects and accepted by the [[Source.valid]] method
      * is as follows.
@@ -155,6 +157,101 @@ trait Source extends Common
       val TypeAscr = api.TypeAscr
 
       //@formatter:on
+    }
+
+    trait Algebra[A] {
+
+      // Empty tree
+      def empty: A
+
+      // Atomics
+      def lit(value: Any): A
+      def this_(encl: u.Symbol): A
+      def ref(target: u.TermSymbol): A
+
+      // References (with defaults)
+      def moduleRef(target: u.ModuleSymbol): A = ref(target)
+      def bindingRef(target: u.TermSymbol): A = ref(target)
+      def valRef(target: u.TermSymbol): A = bindingRef(target)
+      def varRef(target: u.TermSymbol): A = bindingRef(target)
+      def parRef(target: u.TermSymbol): A = bindingRef(target)
+
+      // Definitions
+      def bindingDef(lhs: u.TermSymbol, rhs: A): A
+      def valDef(lhs: u.TermSymbol, rhs: A): A = bindingDef(lhs, rhs)
+      def varDef(lhs: u.TermSymbol, rhs: A): A = bindingDef(lhs, rhs)
+      def parDef(lhs: u.TermSymbol, rhs: A): A = bindingDef(lhs, rhs)
+
+      // Loops
+      def loop(cond: A, body: A): A
+      def while_(cond: A, body: A): A = loop(cond, body)
+      def doWhile(cond: A, body: A): A = loop(cond, body)
+
+      // Other
+      def varMut(lhs: u.TermSymbol, rhs: A): A
+      def typeAscr(target: A, tpe: u.Type): A
+      def moduleAcc(target: A, member: u.ModuleSymbol): A
+      def defCall(target: Option[A], method: u.MethodSymbol, targs: Seq[u.Type], argss: Seq[Seq[A]]): A
+      def inst(target: u.Type, targs: Seq[u.Type], argss: Seq[Seq[A]]): A
+      def lambda(sym: u.TermSymbol, params: Seq[A], body: A): A
+      def branch(cond: A, thn: A, els: A): A
+      def block(stats: Seq[A], expr: A): A
+    }
+
+    def fold[A](a: Algebra[A])(tree: u.Tree): A = {
+      def fold(tree: u.Tree): A = tree match {
+        // Empty
+        case Lang.Empty(_) =>
+          a.empty
+
+        // Atomics
+        case Lang.Lit(value) =>
+          a.lit(value)
+        case Lang.This(encl) =>
+          a.this_(encl)
+        case Lang.ModuleRef(target) =>
+          a.moduleRef(target)
+        case Lang.ValRef(target) =>
+          a.valRef(target)
+        case Lang.VarRef(target) =>
+          a.varRef(target)
+        case Lang.ParRef(target) =>
+          a.parRef(target)
+
+        // Definitions
+        case Lang.ValDef(lhs, rhs) =>
+          a.valDef(lhs, fold(rhs))
+        case Lang.VarDef(lhs, rhs) =>
+          a.varDef(lhs, fold(rhs))
+        case Lang.ParDef(lhs, rhs) =>
+          a.parDef(lhs, fold(rhs))
+
+        // Loops
+        case Lang.While(cond, body) =>
+          a.while_(fold(cond), fold(body))
+        case Lang.DoWhile(cond, body) =>
+          a.doWhile(fold(cond), fold(body))
+
+        // Other
+        case Lang.VarMut(lhs, rhs) =>
+          a.varMut(lhs, fold(rhs))
+        case Lang.TypeAscr(target, tpe) =>
+          a.typeAscr(fold(target), tpe)
+        case Lang.ModuleAcc(target, member) =>
+          a.moduleAcc(fold(target), member)
+        case Lang.DefCall(target, method, targs, argss) =>
+          a.defCall(target.map(fold), method, targs, argss.map(_.map(fold)))
+        case Lang.Inst(target, targs, argss) =>
+          a.inst(target, targs, argss.map(_.map(fold)))
+        case Lang.Lambda(sym, params, body) =>
+          a.lambda(sym, params.map(fold), fold(body))
+        case Lang.Branch(cond, thn, els) =>
+          a.branch(fold(cond), fold(thn), fold(els))
+        case Lang.Block(stats, expr) =>
+          a.block(stats.map(fold), fold(expr))
+      }
+
+      fold(tree)
     }
 
     // -------------------------------------------------------------------------
