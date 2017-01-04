@@ -116,8 +116,7 @@ private[core] trait CSE extends Common {
     /** The hash algebra carrier, parametrized by a hash table of symbols. */
     private case class Hash(sym: u.Symbol = u.NoSymbol)(h: Map[u.Symbol, Int] => Int)
       extends (Map[u.Symbol, Int] => Int) {
-
-      override def apply(tab: Map[u.Symbol, Int]): Int = h(tab)
+      def apply(tab: Map[u.Symbol, Int]) = h(tab)
     }
 
     /** The hash algebra, respecting alpha equivalence. */
@@ -139,158 +138,158 @@ private[core] trait CSE extends Common {
         val bindingRef = rand.nextInt()
         val moduleRef  = rand.nextInt()
         // Definitions
-        val valDef = rand.nextInt()
-        val parDef = rand.nextInt()
-        val defDef = rand.nextInt()
+        val bindingDef = rand.nextInt()
+        val defDef     = rand.nextInt()
         // Other
-        val typeAscr = rand.nextInt()
-        val defCall  = rand.nextInt()
-        val inst     = rand.nextInt()
-        val lambda   = rand.nextInt()
-        val branch   = rand.nextInt()
-        val let      = rand.nextInt()
+        val typeAscr  = rand.nextInt()
+        val moduleAcc = rand.nextInt()
+        val defCall   = rand.nextInt()
+        val inst      = rand.nextInt()
+        val lambda    = rand.nextInt()
+        val branch    = rand.nextInt()
+        val let       = rand.nextInt()
         // Comprehensions
-        val comprehend = ComprehensionSyntax.comprehension.hashCode
-        val generator  = ComprehensionSyntax.generator.hashCode
-        val guard      = ComprehensionSyntax.guard.hashCode
-        val head       = ComprehensionSyntax.head.hashCode
-        val flatten    = ComprehensionSyntax.flatten.hashCode
+        val comprehend = ComprehensionSyntax.comprehension.##
+        val generator  = ComprehensionSyntax.generator.##
+        val guard      = ComprehensionSyntax.guard.##
+        val head       = ComprehensionSyntax.head.##
+        val flatten    = ComprehensionSyntax.flatten.##
         //@formatter:on
       }
 
       // Empty tree
-      override def empty: Hash = Hash() {
+      val empty = Hash() {
         const(seed.empty)
       }
 
       // Atomics
 
-      override def lit(value: Any): Hash = Hash() {
-        const(mix(seed.lit, value.hashCode))
+      def lit(value: Any) = Hash() {
+        const(mix(seed.lit, value.##))
       }
 
-      override def this_(sym: u.Symbol): Hash = Hash(sym) {
-        const(mix(seed.this_, sym.hashCode))
+      def this_(sym: u.Symbol) = Hash(sym) {
+        const(mix(seed.this_, sym.##))
       }
 
-      override def bindingRef(sym: u.TermSymbol): Hash = Hash(sym) {
-        _.getOrElse(sym, mix(seed.bindingRef, sym.hashCode))
+      def ref(target: u.TermSymbol) = ???
+
+      override def bindingRef(target: u.TermSymbol) = Hash(target) {
+        _.getOrElse(target, mix(seed.bindingRef, target.hashCode))
       }
 
-      override def moduleRef(target: u.ModuleSymbol): Hash = Hash(target) {
+      override def moduleRef(target: u.ModuleSymbol) = Hash(target) {
         const(mix(seed.moduleRef, target.hashCode))
       }
 
       // Definitions
 
-      override def valDef(lhs: u.TermSymbol, rhs: Hash): Hash = Hash(lhs) {
-        tab => combine(seed.valDef)(tab(lhs), hashType(lhs.info), rhs(tab))
+      def bindingDef(lhs: u.TermSymbol, rhs: Hash) = Hash(lhs) {
+        tab => combine(seed.bindingDef)(tab(lhs), hashType(lhs.info), rhs(tab))
       }
 
-      override def parDef(lhs: u.TermSymbol, rhs: Hash): Hash = Hash(lhs) {
-        tab => combine(seed.parDef)(tab(lhs), hashType(lhs.info), rhs(tab))
+      def defDef(sym: u.MethodSymbol,
+        tparams: Seq[u.TypeSymbol], paramss: Seq[Seq[Hash]], body: Hash
+      ) = Hash(sym) { tab =>
+        val hSym = tab(sym)
+        // TODO: How to handle type parameters?
+        val hTparams = tparams.size.##
+        val alphaTab = tab ++ genTab(paramss.flatten, hSym)
+        val hParamss = hashSS(alphaTab, paramss)
+        combine(seed.defDef)(hSym, hTparams, hParamss, body(alphaTab))
       }
-
-      override def defDef(sym: u.MethodSymbol,
-        tparams: S[u.TypeSymbol], paramss: SS[Hash], body: Hash)
-        : Hash = Hash(sym) { tab =>
-          val hSym = tab(sym)
-          // TODO: How to handle type parameters?
-          val hTparams = tparams.size.hashCode
-          val alphaTab = tab ++ genTab(paramss.flatten, hSym)
-          val hParamss = hashSS(alphaTab, paramss)
-          combine(seed.defDef)(hSym, hTparams, hParamss, body(alphaTab))
-        }
 
       // Other
 
-      override def typeAscr(target: Hash, tpe: u.Type): Hash = Hash(target.sym) {
+      def typeAscr(target: Hash, tpe: u.Type) = Hash(target.sym) {
         const(mix(seed.typeAscr, hashType(tpe)))
       }
 
-      override def defCall(target: Option[Hash], method: u.MethodSymbol,
-        targs: S[u.Type], argss: SS[Hash])
-        : Hash = Hash(method) { tab =>
-          val hTarget = hashS(tab, target.toSeq)
-          val hMethod = tab.getOrElse(method, method.hashCode)
-          val hTargs = hashTypes(targs)
-          val hArgss = hashSS(tab, argss)
-          combine(seed.defCall)(hTarget, hMethod, hTargs, hArgss)
-        }
+      def moduleAcc(target: Hash, member: u.ModuleSymbol) = Hash(member) {
+        tab => combine(seed.moduleAcc)(target(tab), member.##)
+      }
 
-      override def inst(target: u.Type, targs: Seq[u.Type], argss: SS[Hash])
-        : Hash = Hash(target.typeSymbol) { memo =>
+      def defCall(target: Option[Hash], method: u.MethodSymbol,
+        targs: Seq[u.Type], argss: Seq[Seq[Hash]]
+      ) = Hash(method) { tab =>
+        val hTarget = hashS(tab, target.toSeq)
+        val hMethod = tab.getOrElse(method, method.##)
+        val hTargs = hashTypes(targs)
+        val hArgss = hashSS(tab, argss)
+        combine(seed.defCall)(hTarget, hMethod, hTargs, hArgss)
+      }
+
+      def inst(target: u.Type, targs: Seq[u.Type], argss: Seq[Seq[Hash]]) =
+        Hash(target.typeSymbol) { tab =>
           val hTarget = hashType(target)
           val hTargs = hashTypes(targs)
-          val hArgss = hashSS(memo, argss)
+          val hArgss = hashSS(tab, argss)
           combine(seed.inst)(hTarget, hTargs, hArgss)
         }
 
-      override def lambda(sym: u.TermSymbol, params: S[Hash], body: Hash)
-        : Hash = Hash(sym) { tab =>
-          val alphaTab = tab ++ genTab(params)
-          val hParams = hashS(alphaTab, params)
-          combine(seed.lambda)(hParams, body(alphaTab))
-        }
+      def lambda(sym: u.TermSymbol, params: Seq[Hash], body: Hash) = Hash(sym) { tab =>
+        val alphaTab = tab ++ genTab(params)
+        val hParams = hashS(alphaTab, params)
+        combine(seed.lambda)(hParams, body(alphaTab))
+      }
 
-      override def branch(cond: Hash, thn: Hash, els: Hash): Hash = Hash() {
+      def branch(cond: Hash, thn: Hash, els: Hash) = Hash() {
         tab => combine(seed.branch)(cond(tab), thn(tab), els(tab))
       }
 
-      override def let(vals: S[Hash], defs: S[Hash], expr: Hash)
-        : Hash = Hash() { tab =>
-          val alphaTab = tab ++ genTab(vals ++ defs)
-          val hVals = hashS(alphaTab, vals)
-          val hDefs = hashS(alphaTab, defs)
-          combine(seed.let)(hVals, hDefs, expr(alphaTab))
-        }
+      def let(vals: Seq[Hash], defs: Seq[Hash], expr: Hash) = Hash() { tab =>
+        val alphaTab = tab ++ genTab(vals ++ defs)
+        val hVals = hashS(alphaTab, vals)
+        val hDefs = hashS(alphaTab, defs)
+        combine(seed.let)(hVals, hDefs, expr(alphaTab))
+      }
 
       // Comprehensions
 
-      override def comprehend(qs: S[Hash], hd: Hash): Hash = Hash() { tab =>
+      def comprehend(qs: Seq[Hash], hd: Hash) = Hash() { tab =>
         val alphaTab = tab ++ genTab(qs)
         val hQs = hashS(alphaTab, qs)
         combine(seed.comprehend)(hQs, hd(alphaTab))
       }
 
-      override def generator(lhs: u.TermSymbol, rhs: Hash): Hash = Hash(lhs) {
+      def generator(lhs: u.TermSymbol, rhs: Hash) = Hash(lhs) {
         tab => combine(seed.generator)(tab(lhs), rhs(tab))
       }
 
-      override def guard(expr: Hash): Hash = Hash() {
+      def guard(expr: Hash) = Hash() {
         tab => mix(seed.guard, expr(tab))
       }
 
-      override def head(expr: Hash): Hash = Hash() {
+      def head(expr: Hash) = Hash() {
         tab => mix(seed.head, expr(tab))
       }
 
-      override def flatten(expr: Hash): Hash = Hash() {
+      def flatten(expr: Hash) = Hash() {
         tab => mix(seed.flatten, expr(tab))
       }
 
       /** Deterministically combines a sequence of hash values. */
-      private def combine(seed: Int)(data: Int*): Int =
+      private def combine(seed: Int)(data: Int*) =
         orderedHash(data, seed)
 
       /** Applies a sequence of hashes to a given symbol table. */
-      private def hashS(tab: Map[u.Symbol, Int], hs: S[Hash]): Int =
+      private def hashS(tab: Map[u.Symbol, Int], hs: Seq[Hash]) =
         orderedHash(for (h <- hs) yield h(tab))
 
       /** Applies a nested sequence of hashes to a given symbol table. */
-      private def hashSS(tab: Map[u.Symbol, Int], hss: SS[Hash]): Int =
+      private def hashSS(tab: Map[u.Symbol, Int], hss: Seq[Seq[Hash]]) =
         orderedHash(for (hs <- hss) yield hashS(tab, hs))
 
       /** Hashes a type. */
       private def hashType(tpe: u.Type): Int =
-        orderedHash(tpe.typeArgs.map(hashType), tpe.typeSymbol.hashCode)
+        orderedHash(tpe.typeArgs.map(hashType), tpe.typeSymbol.##)
 
       /** Hashes a sequence of types. */
-      private def hashTypes(types: Seq[u.Type]): Int =
+      private def hashTypes(types: Seq[u.Type]) =
         orderedHash(types.map(hashType))
 
       /** Generates an update for the hash symbol table from a seed. */
-      private def genTab(hs: S[Hash], seed: Int = seqSeed): Seq[(u.Symbol, Int)] = {
+      private def genTab(hs: Seq[Hash], seed: Int = seqSeed) = {
         val rand = new Random(seed)
         hs.map(_.sym) zip Stream.continually(rand.nextInt())
       }

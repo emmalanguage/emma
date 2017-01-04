@@ -21,6 +21,8 @@ import compiler.lang.AlphaEq
 import compiler.lang.comprehension.Comprehension
 import compiler.lang.source.Source
 
+import cats.Monoid
+
 /** Core language. */
 trait Core extends Common
   with ANF
@@ -163,99 +165,102 @@ trait Core extends Common
       //@formatter:on
     }
 
-    abstract class Algebra[A] {
-
-      type S[X] = Seq[X]
-      type SS[X] = Seq[Seq[X]]
-
-      //@formatter:off
+    trait Algebra[A] {
 
       // Empty tree
       def empty: A
 
       // Atomics
       def lit(value: Any): A
-      def this_(sym: u.Symbol): A
-      def bindingRef(sym: u.TermSymbol): A
-      def moduleRef(target: u.ModuleSymbol): A
+      def this_(encl: u.Symbol): A
+      def ref(target: u.TermSymbol): A
+
+      // References (with defaults)
+      def moduleRef(target: u.ModuleSymbol): A = ref(target)
+      def bindingRef(target: u.TermSymbol): A = ref(target)
+      def valRef(target: u.TermSymbol): A = bindingRef(target)
+      def parRef(target: u.TermSymbol): A = bindingRef(target)
 
       // Definitions
-      def valDef(lhs: u.TermSymbol, rhs: A): A
-      def parDef(lhs: u.TermSymbol, rhs: A): A
-      def defDef(sym: u.MethodSymbol, tparams: S[u.TypeSymbol], paramss: SS[A], body: A): A
+      def bindingDef(lhs: u.TermSymbol, rhs: A): A
+      def defDef(sym: u.MethodSymbol, tparams: Seq[u.TypeSymbol], paramss: Seq[Seq[A]], body: A): A
+
+      // Definitions (with defaults)
+      def valDef(lhs: u.TermSymbol, rhs: A): A = bindingDef(lhs, rhs)
+      def parDef(lhs: u.TermSymbol, rhs: A): A = bindingDef(lhs, rhs)
 
       // Other
       def typeAscr(target: A, tpe: u.Type): A
-      def defCall(target: Option[A], method: u.MethodSymbol, targs: S[u.Type], argss: SS[A]): A
-      def inst(target: u.Type, targs: Seq[u.Type], argss: SS[A]): A
-      def lambda(sym: u.TermSymbol, params: S[A], body: A): A
+      def moduleAcc(target: A, member: u.ModuleSymbol): A
+      def defCall(target: Option[A], method: u.MethodSymbol, targs: Seq[u.Type], argss: Seq[Seq[A]]): A
+      def inst(target: u.Type, targs: Seq[u.Type], argss: Seq[Seq[A]]): A
+      def lambda(sym: u.TermSymbol, params: Seq[A], body: A): A
       def branch(cond: A, thn: A, els: A): A
-      def let(vals: S[A], defs: S[A], expr: A): A
+      def let(vals: Seq[A], defs: Seq[A], expr: A): A
 
       // Comprehensions
-      def comprehend(qs: S[A], hd: A): A
+      def comprehend(qs: Seq[A], hd: A): A
       def generator(lhs: u.TermSymbol, rhs: A): A
       def guard(expr: A): A
       def head(expr: A): A
       def flatten(expr: A): A
-
-      //@formatter:on
     }
 
-    def fold[B](a: Algebra[B])(tree: u.Tree): B = {
+    def fold[A](a: Algebra[A])(tree: u.Tree): A = {
       // construct comprehension syntax helper for the given monad
       val cs = new Comprehension.Syntax(API.bagSymbol)
+      def fold(tree: u.Tree): A = tree match {
+        // Comprehensions
+        case cs.Comprehension(qs, hd) =>
+          a.comprehend(qs.map(fold), fold(hd))
+        case cs.Generator(lhs, rhs) =>
+          a.generator(lhs, fold(rhs))
+        case cs.Guard(expr) =>
+          a.guard(fold(expr))
+        case cs.Head(expr) =>
+          a.head(fold(expr))
+        case cs.Flatten(expr) =>
+          a.flatten(fold(expr))
 
-      def fold(tree: u.Tree): B = {
-        tree match {
+        // Empty
+        case Lang.Empty(_) =>
+          a.empty
 
-          // Comprehensions
-          case cs.Comprehension(qs, hd) =>
-            a.comprehend(qs map fold, fold(hd))
-          case cs.Generator(lhs, rhs) =>
-            a.generator(lhs, fold(rhs))
-          case cs.Guard(expr) =>
-            a.guard(fold(expr))
-          case cs.Head(expr) =>
-            a.head(fold(expr))
-          case cs.Flatten(expr) =>
-            a.flatten(fold(expr))
+        // Atomics
+        case Lang.Lit(value) =>
+          a.lit(value)
+        case Lang.This(encl) =>
+          a.this_(encl)
+        case Lang.ModuleRef(target) =>
+          a.moduleRef(target)
+        case Lang.ValRef(target) =>
+          a.valRef(target)
+        case Lang.ParRef(target) =>
+          a.parRef(target)
 
-          // Empty
-          case Lang.Empty(_) =>
-            a.empty
-          // Atomics
-          case Lang.Lit(value) =>
-            a.lit(value)
-          case Lang.This(sym) =>
-            a.this_(sym)
-          case Lang.ModuleRef(target) =>
-            a.moduleRef(target)
-          case Lang.BindingRef(sym) =>
-            a.bindingRef(sym)
+        // Definitions
+        case Lang.ValDef(lhs, rhs) =>
+          a.valDef(lhs, fold(rhs))
+        case Lang.ParDef(lhs, rhs) =>
+          a.parDef(lhs, fold(rhs))
+        case Lang.DefDef(sym, tparams, paramss, body) =>
+          a.defDef(sym, tparams, paramss.map(_.map(fold)), fold(body))
 
-          // Definitions
-          case Lang.ValDef(lhs, rhs) =>
-            a.valDef(lhs, fold(rhs))
-          case Lang.ParDef(lhs, rhs) =>
-            a.parDef(lhs, fold(rhs))
-          case Lang.DefDef(sym, tparams, paramss, body) =>
-            a.defDef(sym, tparams, paramss map (_ map fold), fold(body))
-
-          // Other
-          case Lang.TypeAscr(target, tpe) =>
-            a.typeAscr(fold(target), tpe)
-          case Lang.DefCall(target, method, targs, argss) =>
-            a.defCall(target map fold, method, targs, argss map (_ map fold))
-          case Lang.Inst(target, targs, argss) =>
-            a.inst(target, targs, argss map (_ map fold))
-          case Lang.Lambda(sym, params, body) =>
-            a.lambda(sym, params map fold, fold(body))
-          case Lang.Branch(cond, thn, els) =>
-            a.branch(fold(cond), fold(thn), fold(els))
-          case Lang.Let(vals, defs, expr) =>
-            a.let(vals map fold, defs map fold, fold(expr))
-        }
+        // Other
+        case Lang.TypeAscr(target, tpe) =>
+          a.typeAscr(fold(target), tpe)
+        case Lang.ModuleAcc(target, member) =>
+          a.moduleAcc(fold(target), member)
+        case Lang.DefCall(target, method, targs, argss) =>
+          a.defCall(target.map(fold), method, targs, argss.map(_.map(fold)))
+        case Lang.Inst(target, targs, argss) =>
+          a.inst(target, targs, argss.map(_.map(fold)))
+        case Lang.Lambda(sym, params, body) =>
+          a.lambda(sym, params.map(fold), fold(body))
+        case Lang.Branch(cond, thn, els) =>
+          a.branch(fold(cond), fold(thn), fold(els))
+        case Lang.Let(vals, defs, expr) =>
+          a.let(vals.map(fold), defs.map(fold), fold(expr))
       }
 
       fold(tree)
