@@ -158,6 +158,16 @@ trait Common extends AST {
     //@formatter:on
   }
 
+  protected[emmalanguage] object Runtime extends IRModule {
+    //@formatter:off
+    val module                = api.Sym[ir.Runtime.type].asModule
+
+    val cache                 = op("cache")
+
+    val ops                   = Set(cache)
+    //@formatter:on
+  }
+
   protected[emmalanguage] object GraphRepresentation extends IRModule {
     //@formatter:off
     val module  = api.Sym[ir.GraphRepresentation.type].asModule

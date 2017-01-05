@@ -28,9 +28,10 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler {
   }
 
   private lazy val parallelizePipeline: c.Expr[Any] => u.Tree =
-    pipeline(typeCheck = false)(
+    pipeline()(
       LibSupport.expand,
       Core.lift,
+      Backend.addCacheCalls,
       Comprehension.combine,
       Backend.translateToDataflows(SparkAPI.rddModuleSymbol),
       Core.inlineLetExprs,
