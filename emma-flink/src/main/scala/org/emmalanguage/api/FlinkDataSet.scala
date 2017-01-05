@@ -20,6 +20,8 @@ import compiler.RuntimeCompiler
 import io.csv._
 import io.parquet._
 
+import org.apache.flink.api.java.io.TypeSerializerInputFormat
+import org.apache.flink.api.java.io.TypeSerializerOutputFormat
 import org.apache.flink.api.scala.DataSet
 import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
 import org.apache.flink.core.fs.FileSystem
@@ -27,6 +29,8 @@ import org.apache.flink.core.fs.FileSystem
 import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
+
+import java.net.URI
 
 /** A `DataBag` implementation backed by a Flink `DataSet`. */
 class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSet[A]) extends DataBag[A] {
@@ -36,6 +40,7 @@ class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSe
   import Meta.Projections._
 
   @transient override val m = implicitly[Meta[A]]
+
   private implicit def env = this.rep.getExecutionEnvironment
 
   // -----------------------------------------------------
@@ -245,4 +250,31 @@ object FlinkDataSet {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // RuntimeOps
+  // ---------------------------------------------------------------------------
+
+  def cache[A: Meta](xs: DataBag[A])(implicit flink: FlinkEnv): DataBag[A] =
+    xs match {
+      case xs: FlinkDataSet[A] =>
+        val typeInfo = typeInfoForType[A]
+        val filePath = tempNames.next().toString
+        val outFmt = new TypeSerializerOutputFormat[A]
+        outFmt.setInputType(typeInfo, flink.getConfig)
+        outFmt.setSerializer(typeInfo.createSerializer(flink.getConfig))
+        xs.rep.write(outFmt, filePath, FileSystem.WriteMode.OVERWRITE)
+        xs.env.execute(s"emma-temp-$filePath")
+        val inFmt = new TypeSerializerInputFormat[A](typeInfo)
+        inFmt.setFilePath(filePath)
+        flink.readFile(inFmt, filePath)
+      case _ => xs
+    }
+
+  private val tempBase =
+    new URI(System.getProperty("emma.flink.temp-base", "file:///tmp/emma/flink-temp/"))
+
+  private val tempNames = Stream.iterate(0)(i => i + 1)
+    .map(i => f"dataflow$i%03d")
+    .map(s => tempBase.resolve(s).toURL)
+    .toIterator
 }

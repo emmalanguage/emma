@@ -14,26 +14,14 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.lang.backend
+package compiler.ir
 
-import compiler.Common
-import compiler.lang.core.Core
+import api._
 
-/** Backend-related (but backend-agnostic) transformations. */
-trait Backend extends Common
-  with Caching
-  with Order
-  with TranslateToDataflows {
-  this: Core =>
+/** Dummy IR nodes that model runtime operators (i.e. purely physical operators) in the Emma IR. */
+object Runtime {
 
-  import UniverseImplicits._
+  /** Implement the underlying logical semantics only (identity function). */
+  def cache[A: Meta](xs: DataBag[A]): DataBag[A] = xs
 
-  object Backend {
-
-    /** Delegates to [[TranslateToDataflows.translateToDataflows]]. */
-    def translateToDataflows(to: u.ModuleSymbol) = TranslateToDataflows.translateToDataflows(to)
-
-    /** Delegates to [[Caching.addCacheCalls]]. */
-    lazy val addCacheCalls = Caching.addCacheCalls
-  }
 }

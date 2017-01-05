@@ -230,4 +230,14 @@ object SparkRDD {
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // RuntimeOps
+  // ---------------------------------------------------------------------------
+
+  def cache[A: Meta](xs: DataBag[A])(implicit spark: SparkSession): DataBag[A] =
+    xs match {
+      case xs: SparkRDD[A] => xs.rep.cache()
+      case xs: SparkDataset[A] => xs.rep.rdd.cache()
+      case _ => xs
+    }
 }

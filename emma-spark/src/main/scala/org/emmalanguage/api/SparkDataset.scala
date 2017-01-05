@@ -203,4 +203,15 @@ object SparkDataset {
 
   implicit def wrap[A: Meta](rep: Dataset[A]): SparkDataset[A] =
     new SparkDataset(rep)
+
+  // ---------------------------------------------------------------------------
+  // RuntimeOps
+  // ---------------------------------------------------------------------------
+
+  def cache[A: Meta](xs: DataBag[A])(implicit spark: SparkSession): DataBag[A] =
+    xs match {
+      case xs: SparkRDD[A] => spark.createDataset(xs.rep).cache()
+      case xs: SparkDataset[A] => xs.rep.cache()
+      case _ => xs
+    }
 }

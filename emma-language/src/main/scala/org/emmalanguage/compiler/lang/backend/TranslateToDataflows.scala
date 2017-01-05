@@ -34,8 +34,10 @@ private[backend] trait TranslateToDataflows extends Common {
     import UniverseImplicits._
     import Core.{Lang => core}
 
-    private val modules  = Set[u.TermSymbol](API.bagModuleSymbol, ComprehensionCombinators.module)
-    private val methods  = API.sourceOps | ComprehensionCombinators.ops
+    private val modules  = Set[u.TermSymbol](
+      API.bagModuleSymbol, ComprehensionCombinators.module, Runtime.module)
+
+    private val methods  = API.sourceOps | ComprehensionCombinators.ops | Runtime.ops
     private val scalaSeq = Some(api.ModuleRef(API.scalaSeqModuleSymbol))
 
     /**
