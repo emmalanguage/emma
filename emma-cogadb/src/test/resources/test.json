@@ -1,0 +1,39 @@
+{
+  "PREDICATE_TYPE": "AND_PREDICATE",
+  "PREDICATES": [
+    {
+      "PREDICATE": {
+        "PREDICATE_TYPE": "COLUMN_COLUMN_PREDICATE",
+        "LEFT_HAND_SIDE_ATTRIBUTE_REFERENCE": {
+          "TABLE_NAME": "lineitem",
+          "COLUMN_NAME": "order_id",
+          "VERSION": 1,
+          "RESULT_NAME": "l_order_id"
+        },
+        "PREDICATE_COMPARATOR": "EQUAL",
+        "RIGHT_HAND_SIDE_ATTRIBUTE_REFERENCE": {
+          "TABLE_NAME": "order",
+          "COLUMN_NAME": "id",
+          "VERSION": 1,
+          "RESULT_NAME": "o_order_id"
+        }
+      }
+    },
+    {
+      "PREDICATE": {
+        "PREDICATE_TYPE": "COLUMN_CONSTANT_PREDICATE",
+        "ATTRIBUTE_REFERENCE": {
+          "TABLE_NAME": "order",
+          "COLUMN_NAME": "amount",
+          "VERSION": 1,
+          "RESULT_NAME": "amount"
+        },
+        "PREDICATE_COMPARATOR": "UNEQUAL",
+        "CONSTANT": {
+          "CONSTANT_VALUE": 500,
+          "CONSTANT_TYPE": "INT"
+        }
+      }
+    }
+  ]
+}

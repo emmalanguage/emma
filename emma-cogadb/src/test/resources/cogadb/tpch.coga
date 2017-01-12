@@ -1,0 +1,16 @@
+set path_to_ssb_sf1_database=/home/harry/cogadb_reference_dbs/cogadb_reference_databases_v1/ssb_sf1
+set path_to_tpch_sf1_database=/home/harry/cogadb_reference_dbs/cogadb_reference_databases_v1/tpch_sf1
+
+set table_loader_mode=disk
+#loaddatabase
+
+set optimizer=no_join_order_optimizer
+set query_execution_policy=compiled
+set default_code_generator=multi_staged
+set code_gen.c_compiler_clang_jit=true
+set enable_parallel_pipelines=true
+set print_query_plan=true
+set default_hash_table=linear_probing
+set code_gen.exec_strategy=c
+
+listen 8000

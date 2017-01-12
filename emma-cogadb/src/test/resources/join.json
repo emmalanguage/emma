@@ -1,0 +1,40 @@
+{
+  "QUERY_PLAN":
+  {
+    "OPERATOR_NAME": "GENERIC_JOIN",
+    "JOIN_TYPE": "INNER_JOIN",
+    "PREDICATE": {
+      "PREDICATE_TYPE": "AND_PREDICATE",
+      "PREDICATES": [
+        {
+          "PREDICATE": {
+            "PREDICATE_TYPE": "COLUMN_COLUMN_PREDICATE",
+            "LEFT_HAND_SIDE_ATTRIBUTE_REFERENCE": {
+              "COLUMN_NAME": "S_SUPPKEY",
+              "TABLE_NAME": "SUPPLIER",
+              "VERSION": 1,
+              "RESULT_NAME": "S_SUPPKEY"
+            },
+            "PREDICATE_COMPARATOR": "EQUAL",
+            "RIGHT_HAND_SIDE_ATTRIBUTE_REFERENCE": {
+              "COLUMN_NAME": "PS_SUPPKEY",
+              "TABLE_NAME": "PARTSUPP",
+              "VERSION": 1,
+              "RESULT_NAME": "PS_SUPPKEY"
+            }
+          }
+        }
+      ]
+    },
+    "LEFT_CHILD": {
+      "OPERATOR_NAME": "TABLE_SCAN",
+      "TABLE_NAME": "SUPPLIER",
+      "VERSION": 1
+    },
+    "RIGHT_CHILD": {
+      "OPERATOR_NAME": "TABLE_SCAN",
+      "TABLE_NAME": "PARTSUPP",
+      "VERSION": 1
+    }
+  }
+}
