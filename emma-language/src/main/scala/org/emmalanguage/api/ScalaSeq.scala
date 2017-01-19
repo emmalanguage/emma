@@ -50,20 +50,20 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
   // Monad Ops
   // -----------------------------------------------------
 
-  override def map[B: Meta](f: (A) => B): ScalaSeq[B] =
+  override def map[B: Meta](f: (A) => B): DataBag[B] =
     rep.map(f)
 
-  override def flatMap[B: Meta](f: (A) => DataBag[B]): ScalaSeq[B] =
+  override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
     rep.flatMap(x => f(x).fetch())
 
-  def withFilter(p: (A) => Boolean): ScalaSeq[A] =
+  def withFilter(p: (A) => Boolean): DataBag[A] =
     rep.filter(p)
 
   // -----------------------------------------------------
   // Grouping
   // -----------------------------------------------------
 
-  override def groupBy[K: Meta](k: (A) => K): ScalaSeq[Group[K, DataBag[A]]] =
+  override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
     wrap(rep.groupBy(k).toSeq map { case (key, vals) => Group(key, wrap(vals)) })
 
   // -----------------------------------------------------
@@ -75,7 +75,7 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
     case _ => that union this
   }
 
-  override def distinct: ScalaSeq[A] =
+  override def distinct: DataBag[A] =
     rep.distinct
 
   // -----------------------------------------------------
@@ -101,30 +101,30 @@ object ScalaSeq {
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def empty[A]: ScalaSeq[A] =
-    Seq.empty[A]
+  def empty[A]: DataBag[A] =
+    new ScalaSeq(Seq.empty)
 
-  def apply[A](values: Seq[A]): ScalaSeq[A] =
-    values
+  def apply[A](values: Seq[A]): DataBag[A] =
+    new ScalaSeq(values)
 
-  def readCSV[A: CSVConverter](path: String, format: CSV): ScalaSeq[A] =
-    CSVScalaSupport(format).read(path).toStream
+  def readCSV[A: CSVConverter](path: String, format: CSV): DataBag[A] =
+    new ScalaSeq(CSVScalaSupport(format).read(path).toStream)
 
-  def readText(path: String): ScalaSeq[String] =
-    TextSupport.read(path).toStream
+  def readText(path: String): DataBag[String] =
+    new ScalaSeq(TextSupport.read(path).toStream)
 
   def readParquet[A: ParquetConverter](path: String, format: Parquet): DataBag[A] =
-    ParquetScalaSupport(format).read(path).toStream
+    new ScalaSeq(ParquetScalaSupport(format).read(path).toStream)
 
   // This is used in the code generation in TranslateToDataflows when inserting fetches
-  def byFetch[A](bag: DataBag[A]): ScalaSeq[A] =
-    bag.fetch()
+  def byFetch[A](bag: DataBag[A]): DataBag[A] =
+    new ScalaSeq(bag.fetch())
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  private implicit def wrap[A](rep: Seq[A]): ScalaSeq[A] =
+  private implicit def wrap[A](rep: Seq[A]): DataBag[A] =
     new ScalaSeq(rep)
 
   def foldGroup[A: Meta, B: Meta, K: Meta](

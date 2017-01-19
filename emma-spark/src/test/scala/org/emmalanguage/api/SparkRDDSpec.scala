@@ -30,10 +30,10 @@ class SparkRDDSpec extends DataBagSpec {
   override def withBackendContext[T](f: BackendContext => T): T =
     LocalSparkSession.withSparkSession(f)
 
-  override def Bag[A: Meta]()(implicit spark: BackendContext): Bag[A] =
+  override def Bag[A: Meta]()(implicit spark: BackendContext): DataBag[A] =
     SparkRDD.empty[A]
 
-  override def Bag[A: Meta](seq: Seq[A])(implicit spark: BackendContext): Bag[A] =
+  override def Bag[A: Meta](seq: Seq[A])(implicit spark: BackendContext): DataBag[A] =
     SparkRDD(seq)
 
   override def readCSV[A : Meta : CSVConverter](path: String, format: CSV)(implicit ctx: BackendContext): DataBag[A] =

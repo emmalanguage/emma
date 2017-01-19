@@ -28,10 +28,10 @@ class ScalaSeqSpec extends DataBagSpec {
 
   override val suffix = "scala"
 
-  override def Bag[A: Meta]()(implicit unit: BackendContext): Bag[A] =
+  override def Bag[A: Meta]()(implicit unit: BackendContext): DataBag[A] =
     ScalaSeq.empty[A]
 
-  override def Bag[A: Meta](seq: Seq[A])(implicit unit: BackendContext): Bag[A] =
+  override def Bag[A: Meta](seq: Seq[A])(implicit unit: BackendContext): DataBag[A] =
     ScalaSeq(seq)
 
   override def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit unit: BackendContext): DataBag[A] =

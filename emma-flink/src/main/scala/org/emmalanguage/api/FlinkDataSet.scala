@@ -58,20 +58,20 @@ class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSe
   // Monad Ops
   // -----------------------------------------------------
 
-  override def map[B: Meta](f: (A) => B): FlinkDataSet[B] =
+  override def map[B: Meta](f: (A) => B): DataBag[B] =
     rep.map(f)
 
-  override def flatMap[B: Meta](f: (A) => DataBag[B]): FlinkDataSet[B] =
+  override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
     rep.flatMap((x: A) => f(x).fetch())
 
-  def withFilter(p: (A) => Boolean): FlinkDataSet[A] =
+  def withFilter(p: (A) => Boolean): DataBag[A] =
     rep.filter(p)
 
   // -----------------------------------------------------
   // Grouping
   // -----------------------------------------------------
 
-  override def groupBy[K: Meta](k: (A) => K): FlinkDataSet[Group[K, DataBag[A]]] =
+  override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
     rep.groupBy(k).reduceGroup((it: Iterator[A]) => {
       val buffer = it.toBuffer // This is because the iterator might not be serializable
       Group(k(buffer.head), DataBag(buffer))
@@ -81,13 +81,13 @@ class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSe
   // Set operations
   // -----------------------------------------------------
 
-  override def union(that: DataBag[A]): FlinkDataSet[A] = that match {
-    case dbag: ScalaSeq[A] => this.rep union FlinkDataSet(dbag.rep).rep
+  override def union(that: DataBag[A]): DataBag[A] = that match {
+    case dbag: ScalaSeq[A] => this union FlinkDataSet(dbag.rep)
     case dbag: FlinkDataSet[A] => this.rep union dbag.rep
     case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
 
-  override def distinct: FlinkDataSet[A] =
+  override def distinct: DataBag[A] =
     rep.distinct
 
   // -----------------------------------------------------
@@ -188,13 +188,13 @@ object FlinkDataSet {
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def empty[A: Meta](implicit flink: FlinkEnv): FlinkDataSet[A] =
+  def empty[A: Meta](implicit flink: FlinkEnv): DataBag[A] =
     flink.fromElements[A]()
 
-  def apply[A: Meta](values: Seq[A])(implicit flink: FlinkEnv): FlinkDataSet[A] =
+  def apply[A: Meta](values: Seq[A])(implicit flink: FlinkEnv): DataBag[A] =
     flink.fromCollection(values)
 
-  def readCSV[A: Meta](path: String, format: CSV)(implicit flink: FlinkEnv): FlinkDataSet[A] = {
+  def readCSV[A: Meta](path: String, format: CSV)(implicit flink: FlinkEnv): DataBag[A] = {
     require(format.charset == CSV.defaultCharset,
       s"""Unsupported `charset` value: `${format.charset}`""")
     require(format.escape == CSV.defaultEscape,
@@ -210,7 +210,7 @@ object FlinkDataSet {
     )
   }
 
-  def readText(path: String)(implicit flink: FlinkEnv): FlinkDataSet[String] =
+  def readText(path: String)(implicit flink: FlinkEnv): DataBag[String] =
     flink.readTextFile(path)
 
   def readParquet[A: Meta](path: String, format: Parquet): DataBag[A] = ???
@@ -219,7 +219,7 @@ object FlinkDataSet {
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  implicit def wrap[A: Meta](rep: DataSet[A]): FlinkDataSet[A] =
+  implicit def wrap[A: Meta](rep: DataSet[A]): DataBag[A] =
     new FlinkDataSet(rep)
 
   // ---------------------------------------------------------------------------
@@ -229,13 +229,13 @@ object FlinkDataSet {
 
   def cross[A: Meta, B: Meta](
     xs: DataBag[A], ys: DataBag[B]
-  )(implicit flink: FlinkEnv): FlinkDataSet[(A, B)] = (xs, ys) match {
+  )(implicit flink: FlinkEnv): DataBag[(A, B)] = (xs, ys) match {
     case (xs: FlinkDataSet[A], ys: FlinkDataSet[B]) => xs.rep.cross(ys.rep)
   }
 
   def equiJoin[A: Meta, B: Meta, K: Meta](
     keyx: A => K, keyy: B => K)(xs: DataBag[A], ys: DataBag[B]
-  )(implicit flink: FlinkEnv): FlinkDataSet[(A, B)] = {
+  )(implicit flink: FlinkEnv): DataBag[(A, B)] = {
     val rddOf = new DataSetExtractor(flink)
     (xs, ys) match {
       case (rddOf(xsDS), rddOf(ysDS)) =>
