@@ -28,7 +28,7 @@
 
     <name>emma</name>
     <description>
-        Emma is a macro-based, deeply embedded Scala DSL for scalable data analysis.
+        Emma is a quotation-based, deeply embedded Scala DSL for scalable data analysis.
         Emma aims is to improve developer productivity by maximizing the reuse of native Scala features in the DSL and
         hiding parallelism aspects of supported backend engines (e.g. Flink, Spark) behind a high-level, declarative
         API.
@@ -146,6 +146,7 @@
         <scopt.version>3.5.0</scopt.version>
         <scala-arm.version>1.4</scala-arm.version>
         <quiver.version>5.4.12</quiver.version>
+        <univocity-parsers.version>2.2.1</univocity-parsers.version>
 
         <!-- Test configuration -->
         <excludedSurefireGroups>org.emmalanguage.examples.ExampleTest</excludedSurefireGroups>
@@ -320,9 +321,9 @@
 
             <!-- CSV -->
             <dependency>
-                <groupId>net.sf.opencsv</groupId>
-                <artifactId>opencsv</artifactId>
-                <version>2.3</version>
+                <groupId>com.univocity</groupId>
+                <artifactId>univocity-parsers</artifactId>
+                <version>${univocity-parsers.version}</version>
             </dependency>
 
             <!-- Logging -->
