@@ -16,9 +16,13 @@
 package org.emmalanguage
 package io.csv
 
-import io.{Format, ScalaSupport}
+import io.Format
+import io.ScalaSupport
 
-import au.com.bytecode.opencsv.{CSVReader, CSVWriter}
+import com.univocity.parsers.csv.CsvParser
+import com.univocity.parsers.csv.CsvParserSettings
+import com.univocity.parsers.csv.CsvWriter
+import com.univocity.parsers.csv.CsvWriterSettings
 import resource._
 
 import scala.language.experimental.macros
@@ -36,13 +40,15 @@ class CSVScalaSupport[A](val format: CSV)(implicit conv: CSVConverter[A])
         inp <- managed(inpStream(new URI(path)))
         bis <- managed(new BufferedInputStream(inp))
         isr <- managed(new InputStreamReader(bis, format.charset))
-        csv <- managed(new CSVReader(isr, format.delimiter, quoteChar(format), escapeChar(format)))
       } {
-        var record = csv.readNext()
+        val csv = new CsvParser(parserSettings(format))
+        csv.beginParsing(isr)
+        var record = csv.parseNext()
         while (record != null) {
           f(conv.read(record, 0)(format))
-          record = csv.readNext()
+          record = csv.parseNext()
         }
+        csv.stopParsing()
       }
     }
 
@@ -52,10 +58,10 @@ class CSVScalaSupport[A](val format: CSV)(implicit conv: CSVConverter[A])
       out <- managed(outStream(new URI(path)))
       bos <- managed(new BufferedOutputStream(out))
       osw <- managed(new OutputStreamWriter(bos, format.charset))
-      csv <- managed(new CSVWriter(osw, format.delimiter, quoteChar(format), escapeChar(format)))
+      csv <- managed(new CsvWriter(osw, writerSettings(format)))
     } for (x <- xs) {
       conv.write(x, record, 0)(format)
-      csv.writeNext(record)
+      csv.writeRow(record)
     }
   }
 
@@ -63,11 +69,38 @@ class CSVScalaSupport[A](val format: CSV)(implicit conv: CSVConverter[A])
   // Helper functions for reading
   // ---------------------------------------------------------------------------
 
-  private def quoteChar(format: CSV): Char =
-    format.quote.getOrElse(CSVWriter.NO_QUOTE_CHARACTER)
+  private def writerSettings(format: CSV): CsvWriterSettings = {
+    val settings = new CsvWriterSettings()
 
-  private def escapeChar(format: CSV): Char =
-    format.escape.getOrElse(CSVWriter.NO_ESCAPE_CHARACTER)
+    // derived from the CSV format
+    settings.getFormat.setDelimiter(format.delimiter)
+    format.quote.foreach(quote => settings.getFormat.setQuote(quote))
+    format.escape.foreach(escape => settings.getFormat.setQuoteEscape(escape))
+    format.comment.foreach(comment => settings.getFormat.setComment(comment))
+    settings.setNullValue(format.nullValue)
+    // hard-coded
+    settings.setIgnoreLeadingWhitespaces(true)
+    settings.setIgnoreTrailingWhitespaces(true)
+
+    settings
+  }
+
+  private def parserSettings(format: CSV): CsvParserSettings = {
+    val settings = new CsvParserSettings()
+
+    // derived from the CSV format
+    settings.setHeaderExtractionEnabled(format.header)
+    settings.getFormat.setDelimiter(format.delimiter)
+    format.quote.foreach(quote => settings.getFormat.setQuote(quote))
+    format.escape.foreach(escape => settings.getFormat.setQuoteEscape(escape))
+    format.comment.foreach(comment => settings.getFormat.setComment(comment))
+    settings.setNullValue(format.nullValue)
+    // hard-coded
+    settings.setIgnoreLeadingWhitespaces(true)
+    settings.setIgnoreTrailingWhitespaces(true)
+
+    settings
+  }
 }
 
 /** Companion object. */
