@@ -16,11 +16,16 @@
 package org.emmalanguage
 package compiler.flink.dataset
 
-import api.FlinkDataSet
-import api.FlinkMutableBag
+import api._
 import compiler.BaseCodegenIntegrationSpec
+import compiler.FlinkCompiler
+import compiler.RuntimeCompiler
+
+import org.apache.flink.api.scala.ExecutionEnvironment
 
 class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
+
+  override lazy val compiler = new RuntimeCompiler with FlinkCompiler
 
   import compiler._
 
@@ -30,10 +35,18 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
   override lazy val backendPipeline: u.Tree => u.Tree =
     Function.chain(Seq(
       Comprehension.desugar(API.bagSymbol),
-      Backend.translateToDataflows(flinkDataSet),
-      Core.refineModules(Map(MutableBagAPI.module -> flinkMutableBag)),
+      Backend.translateToDataflows(FlinkAPI.bagSymbol),
+      Core.refineModules(Map(MutableBagAPI.module -> FlinkAPI.mutableBagModuleSymbol)),
       addContext
     ))
+
+  override val idPipeline: u.Expr[Any] => u.Tree = {
+    (_: u.Expr[Any]).tree
+  } andThen {
+    compiler.pipeline(typeCheck = true)(addContext)
+  } andThen {
+    checkCompile
+  }
 
   private lazy val addContext: u.Tree => u.Tree = tree => {
     import u._
@@ -42,4 +55,6 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
         $tree
     """
   }
+
+  implicit val ctx = ExecutionEnvironment.getExecutionEnvironment
 }

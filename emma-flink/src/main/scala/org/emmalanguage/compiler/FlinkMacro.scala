@@ -19,7 +19,7 @@ package compiler
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
-class FlinkMacro(val c: blackbox.Context) extends MacroCompiler {
+class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompiler {
 
   def parallelizeImpl[T](e: c.Expr[T]): c.Expr[T] = {
     val res = parallelizePipeline(e)
@@ -38,10 +38,4 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler {
       Core.inlineLetExprs,
       Core.trampoline
     ).compose(_.tree)
-
-  private object FlinkAPI {
-    lazy val bagSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.FlinkDataSet")
-    lazy val mutableBagModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.FlinkMutableBag")
-  }
-
 }
