@@ -53,33 +53,33 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
   // Monad Ops
   // -----------------------------------------------------
 
-  override def map[B: Meta](f: (A) => B): SparkDataset[B] =
+  override def map[B: Meta](f: (A) => B): DataBag[B] =
     rep.map(f)
 
-  override def flatMap[B: Meta](f: (A) => DataBag[B]): SparkDataset[B] =
+  override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
     rep.flatMap((x: A) => f(x).fetch())
 
-  def withFilter(p: (A) => Boolean): SparkDataset[A] =
+  def withFilter(p: (A) => Boolean): DataBag[A] =
     rep.filter(p)
 
   // -----------------------------------------------------
   // Grouping
   // -----------------------------------------------------
 
-  override def groupBy[K: Meta](k: (A) => K): SparkRDD[Group[K, DataBag[A]]] =
+  override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
     rdd.groupBy(k)
 
   // -----------------------------------------------------
   // Set operations
   // -----------------------------------------------------
 
-  override def union(that: DataBag[A]): SparkDataset[A] = that match {
-    case dbag: ScalaSeq[A] => this.rep union SparkDataset(dbag.rep).rep
+  override def union(that: DataBag[A]): DataBag[A] = that match {
+    case dbag: ScalaSeq[A] => this union SparkDataset(dbag.rep)
     case dbag: SparkDataset[A] => this.rep union dbag.rep
     case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
 
-  override def distinct: SparkDataset[A] =
+  override def distinct: DataBag[A] =
     rep.distinct
 
   // -----------------------------------------------------
@@ -155,10 +155,10 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
 
 object SparkDataset {
 
+  import Meta.Projections._
+
   import org.apache.spark.sql.Encoder
   import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-
-  import Meta.Projections._
 
   implicit def encoderForType[T: Meta]: Encoder[T] =
     ExpressionEncoder[T]
@@ -167,14 +167,14 @@ object SparkDataset {
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def empty[A: Meta](implicit spark: SparkSession): SparkDataset[A] =
+  def empty[A: Meta](implicit spark: SparkSession): DataBag[A] =
     spark.emptyDataset[A]
 
-  def apply[A: Meta](values: Seq[A])(implicit spark: SparkSession): SparkDataset[A] =
+  def apply[A: Meta](values: Seq[A])(implicit spark: SparkSession): DataBag[A] =
     spark.createDataset(values)
 
   def readCSV[A: Meta](path: String, format: CSV)
-    (implicit spark: SparkSession): SparkDataset[A] = spark.read
+    (implicit spark: SparkSession): DataBag[A] = spark.read
       .option("header", format.header)
       .option("delimiter", format.delimiter.toString)
       .option("charset", format.charset.toString)
@@ -185,11 +185,11 @@ object SparkDataset {
       .schema(encoderForType[A].schema)
       .csv(path).as[A]
 
-  def readText(path: String)(implicit spark: SparkSession): SparkDataset[String] =
+  def readText(path: String)(implicit spark: SparkSession): DataBag[String] =
     spark.read.textFile(path)
 
   def readParquet[A: Meta](path: String, format: Parquet)
-    (implicit spark: SparkSession): SparkDataset[A] = spark.read
+    (implicit spark: SparkSession): DataBag[A] = spark.read
       .option("binaryAsString", format.binaryAsString)
       .option("int96AsTimestamp", format.int96AsTimestamp)
       .option("cacheMetadata", format.cacheMetadata)
@@ -201,7 +201,7 @@ object SparkDataset {
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  implicit def wrap[A: Meta](rep: Dataset[A]): SparkDataset[A] =
+  implicit def wrap[A: Meta](rep: Dataset[A]): DataBag[A] =
     new SparkDataset(rep)
 
   // ---------------------------------------------------------------------------

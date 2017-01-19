@@ -48,10 +48,10 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
   def withBackendContext[T](f: BackendContext => T): T
 
   /** An empty [[DataBag]] refinement type constructor. */
-  def Bag[A: Meta]()(implicit ctx: BackendContext): Bag[A]
+  def Bag[A: Meta]()(implicit ctx: BackendContext): DataBag[A]
 
   /** An [[DataBag]] refinement type constructor which takes a Scala Seq. */
-  def Bag[A: Meta](seq: Seq[A])(implicit ctx: BackendContext): Bag[A]
+  def Bag[A: Meta](seq: Seq[A])(implicit ctx: BackendContext): DataBag[A]
 
   /** Read a CSV file. */
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit ctx: BackendContext): DataBag[A]

@@ -50,33 +50,33 @@ class SparkRDD[A: Meta] private[api]
   // Monad Ops
   // -----------------------------------------------------
 
-  override def map[B: Meta](f: (A) => B): SparkRDD[B] =
+  override def map[B: Meta](f: (A) => B): DataBag[B] =
     rep.map(f)
 
-  override def flatMap[B: Meta](f: (A) => DataBag[B]): SparkRDD[B] =
+  override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
     rep.flatMap((x: A) => f(x).fetch())
 
-  def withFilter(p: (A) => Boolean): SparkRDD[A] =
+  def withFilter(p: (A) => Boolean): DataBag[A] =
     rep.filter(p)
 
   // -----------------------------------------------------
   // Grouping
   // -----------------------------------------------------
 
-  override def groupBy[K: Meta](k: (A) => K): SparkRDD[Group[K, DataBag[A]]] =
+  override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
     rep.groupBy(k).map { case (key, vals) => Group(key, DataBag(vals.toSeq)) }
 
   // -----------------------------------------------------
   // Set operations
   // -----------------------------------------------------
 
-  override def union(that: DataBag[A]): SparkRDD[A] = that match {
-    case dbag: ScalaSeq[A] => this.rep union SparkRDD(dbag.rep).rep
+  override def union(that: DataBag[A]): DataBag[A] = that match {
+    case dbag: ScalaSeq[A] => this union SparkRDD(dbag.rep)
     case dbag: SparkRDD[A] => this.rep union dbag.rep
     case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
 
-  override def distinct: SparkRDD[A] =
+  override def distinct: DataBag[A] =
     rep.distinct
 
   // -----------------------------------------------------
@@ -159,14 +159,14 @@ object SparkRDD {
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def empty[A: Meta](implicit spark: SparkSession): SparkRDD[A] =
+  def empty[A: Meta](implicit spark: SparkSession): DataBag[A] =
     spark.sparkContext.emptyRDD[A]
 
-  def apply[A: Meta](values: Seq[A])(implicit spark: SparkSession): SparkRDD[A] =
+  def apply[A: Meta](values: Seq[A])(implicit spark: SparkSession): DataBag[A] =
     spark.sparkContext.parallelize(values)
 
   def readCSV[A: Meta](path: String, format: CSV)
-    (implicit spark: SparkSession): SparkRDD[A] = spark.read
+    (implicit spark: SparkSession): DataBag[A] = spark.read
       .option("header", format.header)
       .option("delimiter", format.delimiter.toString)
       .option("charset", format.charset.toString)
@@ -177,11 +177,11 @@ object SparkRDD {
       .schema(encoderForType[A].schema)
       .csv(path).as[A].rdd
 
-  def readText(path: String)(implicit spark: SparkSession): SparkRDD[String] =
+  def readText(path: String)(implicit spark: SparkSession): DataBag[String] =
     spark.sparkContext.textFile(path)
 
   def readParquet[A: Meta](path: String, format: Parquet)
-    (implicit spark: SparkSession): SparkRDD[A] = spark.read
+    (implicit spark: SparkSession): DataBag[A] = spark.read
       .option("binaryAsString", format.binaryAsString)
       .option("int96AsTimestamp", format.int96AsTimestamp)
       .option("cacheMetadata", format.cacheMetadata)
@@ -193,7 +193,7 @@ object SparkRDD {
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  implicit def wrap[A: Meta](rep: RDD[A])(implicit spark: SparkSession): SparkRDD[A] =
+  implicit def wrap[A: Meta](rep: RDD[A])(implicit spark: SparkSession): DataBag[A] =
     new SparkRDD(rep)
 
   // ---------------------------------------------------------------------------
@@ -203,7 +203,7 @@ object SparkRDD {
 
   def cross[A: Meta, B: Meta](
     xs: DataBag[A], ys: DataBag[B]
-  )(implicit spark: SparkSession): SparkRDD[(A, B)] = {
+  )(implicit spark: SparkSession): DataBag[(A, B)] = {
     val rddOf = new RDDExtractor(spark)
     (xs, ys) match {
       case (rddOf(xsRdd), rddOf(ysRdd)) => xsRdd cartesian ysRdd
@@ -212,7 +212,7 @@ object SparkRDD {
 
   def equiJoin[A: Meta, B: Meta, K: Meta](
     keyx: A => K, keyy: B => K)(xs: DataBag[A], ys: DataBag[B]
-  )(implicit spark: SparkSession): SparkRDD[(A, B)] = {
+  )(implicit spark: SparkSession): DataBag[(A, B)] = {
     val rddOf = new RDDExtractor(spark)
     (xs, ys) match {
       case (rddOf(xsRDD), rddOf(ysRDD)) =>
