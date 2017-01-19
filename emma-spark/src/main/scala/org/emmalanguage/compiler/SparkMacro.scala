@@ -19,17 +19,13 @@ package compiler
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
-class SparkMacro(val c: blackbox.Context) extends MacroCompiler {
+class SparkMacro(val c: blackbox.Context) extends MacroCompiler with SparkCompiler {
 
   def parallelizeImpl[T](e: c.Expr[T]): c.Expr[T] = {
     val res = parallelizePipeline(e)
     //c.warning(e.tree.pos, Core.prettyPrint(res))
     c.Expr[T]((removeShadowedThis andThen unTypeCheck) (res))
   }
-
-  override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ Set(
-    api.Type[org.apache.spark.sql.Encoder[Any]].typeConstructor
-  )
 
   private lazy val parallelizePipeline: c.Expr[Any] => u.Tree =
     pipeline()(
@@ -42,12 +38,4 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler {
       Core.inlineLetExprs,
       Core.trampoline
     ).compose(_.tree)
-
-  private object SparkAPI {
-    lazy val rddModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.SparkRDD")
-    lazy val mutableBagModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.SparkMutableBag")
-    lazy val sessionSymbol = universe.rootMirror.staticClass(s"org.apache.spark.sql.SparkSession")
-    lazy val sessionType = sessionSymbol.info
-  }
-
 }

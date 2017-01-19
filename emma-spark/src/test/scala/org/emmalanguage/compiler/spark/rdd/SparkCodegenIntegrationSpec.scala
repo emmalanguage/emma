@@ -16,24 +16,34 @@
 package org.emmalanguage
 package compiler.spark.rdd
 
-import api.SparkMutableBag
-import api.SparkRDD
+import api._
 import compiler.BaseCodegenIntegrationSpec
+import compiler.RuntimeCompiler
+import compiler.SparkCompiler
 
 class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
 
+  override lazy val compiler = new RuntimeCompiler with SparkCompiler
+
   import compiler._
 
-  lazy val sparkRDD = api.Sym[SparkRDD.type].asModule
   lazy val sparkMutableBag = api.Sym[SparkMutableBag.type].asModule
 
-  override lazy val backendPipeline: u.Tree => compiler.u.Tree =
+  override lazy val backendPipeline: u.Tree => u.Tree =
     Function.chain(Seq(
       Comprehension.desugar(API.bagSymbol),
-      Backend.translateToDataflows(sparkRDD),
-      Core.refineModules(Map(MutableBagAPI.module -> sparkMutableBag)),
+      Backend.translateToDataflows(SparkAPI.rddModuleSymbol),
+      Core.refineModules(Map(MutableBagAPI.module -> SparkAPI.mutableBagModuleSymbol)),
       addContext
     ))
+
+  override val idPipeline: u.Expr[Any] => u.Tree = {
+    (_: u.Expr[Any]).tree
+  } andThen {
+    compiler.pipeline(typeCheck = true)(addContext)
+  } andThen {
+    checkCompile
+  }
 
   private lazy val addContext: u.Tree => u.Tree = tree => {
     import u._
@@ -42,4 +52,6 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
         $tree
     """
   }
+
+  implicit val ctx = LocalSparkSession.getOrCreate()
 }
