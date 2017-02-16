@@ -16,6 +16,8 @@
 package org.emmalanguage
 package util
 
+import api._
+
 /** Utilities for [[scala.Function]]s. */
 object Functions {
 
@@ -36,4 +38,12 @@ object Functions {
   def compose[A, B, C](pf: B =?> C)(f: A => B): A =?> C = {
     case a if pf.isDefinedAt(f(a)) => pf(f(a))
   }
+
+  /** Returns a function that applies `f` when `p` matches, otherwise returns `default`. */
+  def conditional[A, B](f: A => B, p: A => Boolean, default: B): A => B =
+    a => if (p(a)) f(a) else default
+
+  /** Composes the unfolding function `f` with the fold specified by `emp`, `sng` and `uni`. */
+  def flatFold[A, B, C: Meta](f: A => DataBag[B], emp: C, sng: B => C, uni: (C, C) => C): A => C =
+    f.andThen(_.fold(emp)(sng, uni))
 }
