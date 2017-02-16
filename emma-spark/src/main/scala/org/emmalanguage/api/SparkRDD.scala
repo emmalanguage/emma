@@ -240,4 +240,11 @@ object SparkRDD {
       case xs: SparkDataset[A] => xs.rep.rdd.cache()
       case _ => xs
     }
+
+  def foldGroup[A: Meta, B: Meta, K: Meta](
+    xs: DataBag[A], key: A => K, sng: A => B, uni: (B, B) => B
+  )(implicit spark: SparkSession): DataBag[(K, B)] = xs match {
+    case xs: SparkRDD[A] => xs.rep.map(x => key(x) -> sng(x)).reduceByKey(uni)
+    case xs: SparkDataset[A] => SparkDataset.foldGroup(xs, key, sng, uni)
+  }
 }
