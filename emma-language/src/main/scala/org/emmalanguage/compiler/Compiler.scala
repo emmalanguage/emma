@@ -21,6 +21,7 @@ import lang.backend.Backend
 import lang.cf.ControlFlow
 import lang.core.Core
 import lang.libsupport.LibSupport
+import lang.opt.Optimizations
 import lang.source.Source
 import tools.GraphTools
 
@@ -38,7 +39,8 @@ trait Compiler extends AlphaEq
   with Core
   with Backend
   with ControlFlow
-  with GraphTools {
+  with GraphTools
+  with Optimizations {
 
   /** The underlying universe object. */
   override val universe: Universe
