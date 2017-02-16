@@ -281,7 +281,15 @@ object FlinkDataSet {
     flink.readFile(inFmt, filePath)
   }
 
-  private[api] val tempBase =
+  def foldGroup[A: Meta, B: Meta, K: Meta](
+    xs: DataBag[A], key: A => K, sng: A => B, uni: (B, B) => B
+  )(implicit flink: FlinkEnv): DataBag[(K, B)] = xs match {
+    case xs: FlinkDataSet[A] => xs.rep
+      .map(x => key(x) -> sng(x)).groupBy("_1")
+      .reduce((x, y) => x._1 -> uni(x._2, y._2))
+  }
+
+  private val tempBase =
     new URI(System.getProperty("emma.flink.temp-base", "file:///tmp/emma/flink-temp/"))
 
   private[api] val tempNames = Stream.iterate(0)(_ + 1)

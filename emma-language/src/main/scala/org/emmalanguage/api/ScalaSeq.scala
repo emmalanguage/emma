@@ -102,23 +102,23 @@ object ScalaSeq {
   // ---------------------------------------------------------------------------
 
   def empty[A]: ScalaSeq[A] =
-    new ScalaSeq(Seq.empty)
+    Seq.empty[A]
 
   def apply[A](values: Seq[A]): ScalaSeq[A] =
-    new ScalaSeq(values)
+    values
 
   def readCSV[A: CSVConverter](path: String, format: CSV): ScalaSeq[A] =
-    new ScalaSeq(CSVScalaSupport(format).read(path).toStream)
+    CSVScalaSupport(format).read(path).toStream
 
   def readText(path: String): ScalaSeq[String] =
-    new ScalaSeq(TextSupport.read(path).toStream)
+    TextSupport.read(path).toStream
 
   def readParquet[A: ParquetConverter](path: String, format: Parquet): DataBag[A] =
-    new ScalaSeq(ParquetScalaSupport(format).read(path).toStream)
+    ParquetScalaSupport(format).read(path).toStream
 
   // This is used in the code generation in TranslateToDataflows when inserting fetches
   def byFetch[A](bag: DataBag[A]): ScalaSeq[A] =
-    new ScalaSeq(bag.fetch())
+    bag.fetch()
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
@@ -126,4 +126,14 @@ object ScalaSeq {
 
   private implicit def wrap[A](rep: Seq[A]): ScalaSeq[A] =
     new ScalaSeq(rep)
+
+  def foldGroup[A: Meta, B: Meta, K: Meta](
+    xs: DataBag[A], key: A => K, sng: A => B, uni: (B, B) => B
+  ): DataBag[(K, B)] = xs.fetch()
+    .foldLeft(Map.empty[K, B]) { (acc, x) =>
+      val k = key(x)
+      val s = sng(x)
+      val u = acc.get(k).fold(s)(uni(_, s))
+      acc + (k -> u)
+    }.toSeq
 }
