@@ -257,24 +257,37 @@ object FlinkDataSet {
   def cache[A: Meta](xs: DataBag[A])(implicit flink: FlinkEnv): DataBag[A] =
     xs match {
       case xs: FlinkDataSet[A] =>
-        val typeInfo = typeInfoForType[A]
-        val filePath = tempNames.next().toString
-        val outFmt = new TypeSerializerOutputFormat[A]
-        outFmt.setInputType(typeInfo, flink.getConfig)
-        outFmt.setSerializer(typeInfo.createSerializer(flink.getConfig))
-        xs.rep.write(outFmt, filePath, FileSystem.WriteMode.OVERWRITE)
-        xs.env.execute(s"emma-temp-$filePath")
-        val inFmt = new TypeSerializerInputFormat[A](typeInfo)
-        inFmt.setFilePath(filePath)
-        flink.readFile(inFmt, filePath)
+        val sinkName = sink(xs.rep)
+        xs.env.execute(s"emma-cache-$sinkName")
+        source[A](sinkName)
       case _ => xs
     }
 
-  private val tempBase =
+  private[api] def sink[A: Meta](xs: DataSet[A])(implicit flink: FlinkEnv): String = {
+    val typeInfo = typeInfoForType[A]
+    val tempName = tempNames.next()
+    val outFmt = new TypeSerializerOutputFormat[A]
+    outFmt.setInputType(typeInfo, flink.getConfig)
+    outFmt.setSerializer(typeInfo.createSerializer(flink.getConfig))
+    xs.write(outFmt, tempPath(tempName), FileSystem.WriteMode.OVERWRITE)
+    tempName
+  }
+
+  private[api] def source[A: Meta](fileName: String)(implicit flink: FlinkEnv): DataSet[A] = {
+    val filePath = tempPath(fileName)
+    val typeInfo = typeInfoForType[A]
+    val inFmt = new TypeSerializerInputFormat[A](typeInfo)
+    inFmt.setFilePath(filePath)
+    flink.readFile(inFmt, filePath)
+  }
+
+  private[api] val tempBase =
     new URI(System.getProperty("emma.flink.temp-base", "file:///tmp/emma/flink-temp/"))
 
-  private val tempNames = Stream.iterate(0)(i => i + 1)
+  private[api] val tempNames = Stream.iterate(0)(_ + 1)
     .map(i => f"dataflow$i%03d")
-    .map(s => tempBase.resolve(s).toURL)
     .toIterator
+
+  private[api] def tempPath(tempName: String): String =
+    tempBase.resolve(tempName).toURL.toString
 }
