@@ -34,12 +34,14 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler {
       Backend.addCacheCalls,
       Comprehension.combine,
       Backend.translateToDataflows(FlinkAPI.bagSymbol),
+      Core.refineModules(Map(MutableBagAPI.module -> FlinkAPI.mutableBagModuleSymbol)),
       Core.inlineLetExprs,
       Core.trampoline
     ).compose(_.tree)
 
   private object FlinkAPI {
     lazy val bagSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.FlinkDataSet")
+    lazy val mutableBagModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.FlinkMutableBag")
   }
 
 }
