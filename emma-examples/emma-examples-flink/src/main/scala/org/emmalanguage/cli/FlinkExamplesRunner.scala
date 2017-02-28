@@ -67,6 +67,15 @@ object FlinkExamplesRunner {
       .text("Show this help message")
 
     section("Graph Analytics")
+    cmd("connected-components")
+      .text("Label undirected graph vertices with component IDs")
+      .children(
+        arg[String]("input")
+          .text("edges path")
+          .action((x, c) => c.copy(input = x)),
+        arg[String]("output")
+          .text("labeled vertices path")
+          .action((x, c) => c.copy(output = x)))
     cmd("transitive-closure")
       .text("Compute the transitive closure of a directed graph")
       .children(
@@ -140,6 +149,8 @@ object FlinkExamplesRunner {
       cmd <- cfg.command
       res <- cmd match {
         // Graphs
+        case "connected-components" =>
+          Some(connectedComponents(cfg)(flinkExecEnv(cfg)))
         case "transitive-closure" =>
           Some(transitiveClosure(cfg)(flinkExecEnv(cfg)))
         case "triangle-count" =>
@@ -161,10 +172,20 @@ object FlinkExamplesRunner {
   // Parallelized algorithms
   // ---------------------------------------------------------------------------
 
-  implicit def breezeVectorCSVConverter[V: CSVColumn: ClassTag]: CSVConverter[Vec[V]] =
+  implicit def breezeVectorCSVConverter[V: CSVColumn : ClassTag]: CSVConverter[Vec[V]] =
     CSVConverter.iso[Array[V], Vec[V]](Iso.make(Vec.apply, _.toArray), implicitly)
 
   // Graphs
+
+  def connectedComponents(c: Config)(implicit flink: ExecutionEnvironment): Unit =
+    emma.onFlink {
+      // read in set of edges to be used as input
+      val edges = DataBag.readCSV[Edge[Long]](c.input, c.csv)
+      // build the transitive closure
+      val paths = ConnectedComponents(edges)
+      // write the results into a file
+      paths.writeCSV(c.output, c.csv)
+    }
 
   def transitiveClosure(c: Config)(implicit flink: ExecutionEnvironment): Unit =
     emma.onFlink {

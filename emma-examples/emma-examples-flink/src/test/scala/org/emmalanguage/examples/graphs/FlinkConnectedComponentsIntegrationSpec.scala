@@ -16,13 +16,25 @@
 package org.emmalanguage
 package examples.graphs
 
-import api.emma
+import api._
+import examples.graphs.model._
 
-/** Graph model objects. */
-object model {
-  case class Edge[V](src: V, dst: V)
-  case class LEdge[V, L](@emma.pk src: V, @emma.pk dst: V, label: L)
-  case class LVertex[V, L](@emma.pk id: V, label: L)
-  case class Triangle[V](x: V, y: V, z: V)
-  case class Message[K, V](@emma.pk tgt: K, payload: V)
+import org.apache.flink.api.scala.ExecutionEnvironment
+
+class FlinkConnectedComponentsIntegrationSpec extends BaseConnectedComponentsIntegrationSpec {
+
+  def connectedComponents(edges: Seq[Edge[Int]]): Seq[LVertex[Int, Int]] =
+    FlinkConnectedComponentsIntegrationSpec(edges)
+}
+
+object FlinkConnectedComponentsIntegrationSpec {
+
+  def apply(edges: Seq[Edge[Int]]): Seq[LVertex[Int, Int]] =
+    emma.onFlink {
+      val es = DataBag(edges)
+      val rs = ConnectedComponents[Int](es)
+      rs.fetch()
+    }
+
+  implicit lazy val flinkEnv = ExecutionEnvironment.getExecutionEnvironment
 }
