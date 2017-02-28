@@ -129,6 +129,7 @@
         <flink.version>1.2.0</flink.version>
         <!-- Spark -->
         <spark.version>2.0.1</spark.version>
+        <spark.indexedrdd.version>0.4.0</spark.indexedrdd.version>
         <!-- Parquet -->
         <parquet.version>1.7.0</parquet.version>
 
@@ -168,6 +169,14 @@
             <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
         </repository>
     </distributionManagement>
+
+    <repositories>
+        <!-- Spark Packages Repo -->
+        <repository>
+            <id>spark</id>
+            <url>http://dl.bintray.com/spark-packages/maven</url>
+        </repository>
+    </repositories>
 
     <dependencyManagement>
         <dependencies>
@@ -280,6 +289,11 @@
                 <artifactId>spark-sql_${scala.tools.version}</artifactId>
                 <version>${spark.version}</version>
                 <scope>${spark.scope}</scope>
+            </dependency>
+            <dependency>
+                <groupId>amplab</groupId>
+                <artifactId>spark-indexedrdd</artifactId>
+                <version>${spark.indexedrdd.version}</version>
             </dependency>
 
             <!-- Parquet -->

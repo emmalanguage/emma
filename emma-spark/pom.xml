@@ -66,5 +66,9 @@
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_${scala.tools.version}</artifactId>
         </dependency>
+        <dependency>
+            <groupId>amplab</groupId>
+            <artifactId>spark-indexedrdd</artifactId>
+        </dependency>
     </dependencies>
 </project>
