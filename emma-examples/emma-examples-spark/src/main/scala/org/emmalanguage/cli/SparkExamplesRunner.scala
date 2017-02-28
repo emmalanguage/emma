@@ -72,6 +72,15 @@ object SparkExamplesRunner {
       .text("Spark master address")
 
     section("Graph Analytics")
+    cmd("connected-components")
+      .text("Label undirected graph vertices with component IDs")
+      .children(
+        arg[String]("input")
+          .text("edges path")
+          .action((x, c) => c.copy(input = x)),
+        arg[String]("output")
+          .text("labeled vertices path")
+          .action((x, c) => c.copy(output = x)))
     cmd("transitive-closure")
       .text("Compute the transitive closure of a directed graph")
       .children(
@@ -145,6 +154,8 @@ object SparkExamplesRunner {
       cmd <- cfg.command
       res <- cmd match {
         // Graphs
+        case "connected-components" =>
+          Some(connectedComponents(cfg)(sparkSession(cfg)))
         case "transitive-closure" =>
           Some(transitiveClosure(cfg)(sparkSession(cfg)))
         case "triangle-count" =>
@@ -171,6 +182,16 @@ object SparkExamplesRunner {
       Iso.make(Vec.apply, _.toArray), implicitly)
 
   // Graphs
+
+  def connectedComponents(c: Config)(implicit spark: SparkSession): Unit =
+    emma.onSpark {
+      // read in set of edges to be used as input
+      val edges = DataBag.readCSV[Edge[Long]](c.input, c.csv)
+      // build the transitive closure
+      val paths = ConnectedComponents(edges)
+      // write the results into a file
+      paths.writeCSV(c.output, c.csv)
+    }
 
   def transitiveClosure(c: Config)(implicit spark: SparkSession): Unit =
     emma.onSpark {
