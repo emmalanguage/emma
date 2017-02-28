@@ -48,6 +48,7 @@ This project includes:
   catsJVM under MIT
   chill under Apache 2
   chill-java under Apache 2
+  com.ankurdave:part_2.10 under Apache License, Version 2.0
   Commons BeanUtils Bean Collections under The Apache Software License, Version 2.0
   Commons BeanUtils Core under The Apache Software License, Version 2.0
   Commons CLI under The Apache Software License, Version 2.0
@@ -222,6 +223,7 @@ This project includes:
   Spark Project SQL under Apache 2.0 License
   Spark Project Tags under Apache 2.0 License
   Spark Project Unsafe under Apache 2.0 License
+  spark-indexedrdd under Apache-2.0
   spire under BSD-style
   spire-macros under BSD-style
   spray-json under Apache 2
