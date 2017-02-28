@@ -38,12 +38,14 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler {
       Backend.addCacheCalls,
       Comprehension.combine,
       Backend.translateToDataflows(SparkAPI.rddModuleSymbol),
+      Core.refineModules(Map(MutableBagAPI.module -> SparkAPI.mutableBagModuleSymbol)),
       Core.inlineLetExprs,
       Core.trampoline
     ).compose(_.tree)
 
   private object SparkAPI {
     lazy val rddModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.SparkRDD")
+    lazy val mutableBagModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.SparkMutableBag")
     lazy val sessionSymbol = universe.rootMirror.staticClass(s"org.apache.spark.sql.SparkSession")
     lazy val sessionType = sessionSymbol.info
   }
