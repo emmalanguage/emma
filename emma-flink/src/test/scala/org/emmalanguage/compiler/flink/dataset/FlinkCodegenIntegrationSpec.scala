@@ -16,21 +16,24 @@
 package org.emmalanguage
 package compiler.flink.dataset
 
+import api.FlinkDataSet
+import api.FlinkMutableBag
 import compiler.BaseCodegenIntegrationSpec
 
 class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
 
   import compiler._
 
-  lazy val flinkDataSetModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.FlinkDataSet")
+  lazy val flinkDataSet = api.Sym[FlinkDataSet.type].asModule
+  lazy val flinkMutableBag = api.Sym[FlinkMutableBag.type].asModule
 
-  override lazy val backendPipeline: (compiler.u.Tree) => compiler.u.Tree = {
-    Comprehension.desugar(API.bagSymbol)
-  } andThen {
-    Backend.translateToDataflows(flinkDataSetModuleSymbol)
-  } andThen {
-    addContext
-  }
+  override lazy val backendPipeline: u.Tree => u.Tree =
+    Function.chain(Seq(
+      Comprehension.desugar(API.bagSymbol),
+      Backend.translateToDataflows(flinkDataSet),
+      Core.refineModules(Map(MutableBagAPI.module -> flinkMutableBag)),
+      addContext
+    ))
 
   private lazy val addContext: u.Tree => u.Tree = tree => {
     import u._
