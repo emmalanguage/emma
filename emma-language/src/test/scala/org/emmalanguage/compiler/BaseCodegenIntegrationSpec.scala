@@ -367,54 +367,64 @@ abstract class BaseCodegenIntegrationSpec
     })
   }
 
-// TODO: This is commented out, because we don't yet have stateful support on newir.
-//  // --------------------------------------------------------------------------
-//  // Stateful DataBags
-//  // --------------------------------------------------------------------------
-//
-//  "Stateful" - {
-//    "create (fetch)" in withRuntime(runtimeUnderTest) { engine =>
-//      val input = State(6, 8) :: Nil
-//
-//      val algorithm = verify(u.reify {
-//        val withState = stateful[State, Long] { DataBag(input) }
-//        withState.bag().fetch()
-//      })
-//
-//      algorithm.run(engine) should equal (input)
-//    }
-//
-//    "update" in { // FIXME: doesn't work if we move `input` inside `parallelize`
-//      val input = State(6, 12) :: State(3, 4) :: Nil
-//      verify(u.reify {
-//        val withState = stateful[State, Long] { DataBag(input) }
-//
-//        withState.updateWithZero { s =>
-//          s.value += 1
-//          DataBag(): DataBag[Int]
-//        }
-//
-//        val updates1 = DataBag(Update(6, 5) :: Update(6, 7) :: Nil)
-//        withState.updateWithOne(updates1)(_.identity, (s, u) => {
-//          s.value += u.inc
-//          DataBag(42 :: Nil)
-//        })
-//
-//        val updates2 = DataBag(Update(3, 5) :: Update(3, 4) :: Nil)
-//        withState.updateWithMany(updates2)(_.identity, (s, us) => {
-//          for (u <- us) yield s.value += u.inc
-//        })
-//
-//        val updates3 = DataBag(Update(3, 1) :: Update(6, 2) :: Update(6, 3) :: Nil)
-//        withState.updateWithMany(updates3)(_.identity, (s, us) => {
-//          us.map { _.inc }.sum
-//          DataBag(42 :: Nil)
-//        })
-//
-//        withState.bag()
-//      })
-//    }
-//  }
+  // --------------------------------------------------------------------------
+  // MutableBag
+  // --------------------------------------------------------------------------
+
+  "MutableBag" - {
+    "create and fetch" in {
+      val act = eval[Seq[(Int, Long)]](codegenPipeline(u.reify(
+        MutableBag(DataBag((1 to 100).map(x => x -> x.toLong))).bag().fetch()
+      )))
+
+      val exp = (1 to 100).map(x => x -> x.toLong)
+
+      exp should contain theSameElementsAs act
+    }
+
+    "update and copy" in {
+      val exp1 = (1 to 10).map(x => x -> (if (x % 2 == 0) 2L * x else x))
+      val exp2 = (1 to 10).map(x => x -> (if (x % 2 == 0) 2L * x else x))
+      val exp3 = (1 to 10).map(x => x -> x.toLong)
+      val exp4 = (1 to 10).map(x => x -> (if (x % 2 == 0) 2L * x else x))
+      val exp5 = (1 to 10).map(x => x -> (if (x % 2 == 0) 2L * x else x))
+      val exp6 = (1 to 10).map(x => x -> (if (x % 2 != 0) 2L * x else x))
+
+      val act1 :: act2 :: act3 :: act4 :: act5 :: act6 :: Nil =
+        eval[List[Seq[(Int, Long)]]](codegenPipeline(u.reify {
+          val inputs = DataBag((1 to 10).map(x => x -> x.toLong))
+          val state1 = MutableBag(inputs)
+          val state2 = state1
+          val state3 = state1.copy()
+
+          state1.update(
+            inputs.withFilter(_._1 % 2 == 0).groupBy(_._1)
+          )((_, vOld, m) => vOld.map(_ + m.map(_._2).sum))
+
+          val act1 = state1.bag().fetch()
+          val act2 = state2.bag().fetch()
+          val act3 = state3.bag().fetch()
+
+          state3.update(
+            inputs.withFilter(_._1 % 2 != 0).groupBy(_._1)
+          )((_, vOld, m) => vOld.map(_ + m.map(_._2).sum))
+
+          val act4 = state1.bag().fetch()
+          val act5 = state2.bag().fetch()
+          val act6 = state3.bag().fetch()
+
+          act1 :: act2 :: act3 :: act4 :: act5 :: act6 :: Nil
+        }))
+
+      act1 should contain theSameElementsAs exp1
+      act2 should contain theSameElementsAs exp2
+      act3 should contain theSameElementsAs exp3
+
+      act4 should contain theSameElementsAs exp4
+      act5 should contain theSameElementsAs exp5
+      act6 should contain theSameElementsAs exp6
+    }
+  }
 
   // --------------------------------------------------------------------------
   // Expression normalization

@@ -133,6 +133,20 @@ trait Common extends AST {
     //@formatter:on
   }
 
+  protected[emmalanguage] object MutableBagAPI extends IRModule {
+    //@formatter:off
+    val module                = api.Sym[org.emmalanguage.api.MutableBag.type].asModule
+    val clzSym                = api.Sym[org.emmalanguage.api.MutableBag[Any, Any]].asClass
+
+    val apply                 = op("apply")
+    val update                = methodIn(clzSym, "update")
+    val bag                   = methodIn(clzSym, "bag")
+    val copy                  = methodIn(clzSym, "copy")
+
+    val ops                   = Set(apply, update, bag, copy)
+    //@formatter:on
+  }
+
   protected[emmalanguage] object ComprehensionSyntax extends IRModule {
     //@formatter:off
     val module                = api.Sym[ir.ComprehensionSyntax.type].asModule
