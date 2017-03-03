@@ -18,8 +18,8 @@ package api
 
 import FlinkDataSet.cache
 import FlinkMutableBag.State
-import api.Meta.Projections._
-import api.converter.flink._
+import Meta.Projections._
+import flink._
 
 import org.apache.flink.api.scala.DataSet
 import org.apache.flink.api.scala.ExecutionEnvironment
@@ -34,10 +34,10 @@ class FlinkMutableBag[K: Meta, V: Meta] private
 ) extends MutableBag[K, V] with Serializable {
 
   import FlinkDataSet.typeInfoForType
-  import FlinkDataSet.wrap
 
   def update[M: Meta](ms: DataBag[Group[K, M]])(f: UpdateFunction[M]): DataBag[(K, V)] = {
-    ss = cache((ss.as[DataSet] fullOuterJoin ms.as[DataSet]).where(0).equalTo(0)(
+    val conv = implicitly[DataSet[State[K, V]] => DataBag[State[K, V]]]
+    ss = cache(conv((ss.as[DataSet] fullOuterJoin ms.as[DataSet]).where(0).equalTo(0)(
       (s: State[K, V], m: Group[K, M], out: Collector[State[K, V]]) => {
         val rs = Option(m) match {
           case Some(m) =>
@@ -48,8 +48,7 @@ class FlinkMutableBag[K: Meta, V: Meta] private
             Option(s).map(_.copy(changed = false))
         }
         rs.foreach(out.collect)
-      }))
-
+      })))
     for (s <- ss if s.changed) yield s.k -> s.v
   }
 

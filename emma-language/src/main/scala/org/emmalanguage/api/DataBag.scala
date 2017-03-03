@@ -16,7 +16,6 @@
 package org.emmalanguage
 package api
 
-import converter.CollConverter
 import io.csv._
 import io.parquet._
 
@@ -174,8 +173,8 @@ trait DataBag[A] extends Serializable {
   /**
    * Converts this bag into a distributed collection of type `DColl[A]`.
    */
-  def as[DColl[_]](implicit converter: CollConverter[DColl]): DColl[A] =
-    converter(this)
+  def as[DColl[_]](implicit conv: DataBag[A] => DColl[A]): DColl[A] =
+    conv(this)
 
   // -----------------------------------------------------
   // Pre-defined folds
@@ -366,6 +365,16 @@ trait DataBag[A] extends Serializable {
 }
 
 trait DataBagCompanion[E] {
+
+  /**
+   * Distributed collection constructor.
+   *
+   * @param coll A distributed collection with input values.
+   * @param conv A distributed collection converter.
+   * @tparam A The element type for the DataBag.
+   */
+  def from[DColl[_], A](coll: DColl[A])(implicit conv: DColl[A] => DataBag[A]): DataBag[A] =
+    conv(coll)
 
   /**
    * Empty constructor.

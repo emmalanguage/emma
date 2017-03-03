@@ -31,6 +31,7 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
 
   import SparkDataset.encoderForType
   import SparkDataset.wrap
+  import api.spark.fromRDD
 
   import rep.sparkSession.sqlContext.implicits._
 
@@ -67,7 +68,7 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
   // -----------------------------------------------------
 
   override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
-    rdd.groupBy(k)
+    SparkRDD.from(rep.rdd).groupBy(k)
 
   // -----------------------------------------------------
   // Set operations
@@ -144,13 +145,6 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
     h = MurmurHash3.mixLast(h, c)
     MurmurHash3.finalizeHash(h, n)
   }
-
-  // -----------------------------------------------------
-  // Conversions
-  // -----------------------------------------------------
-
-  private def rdd: SparkRDD[A] =
-    new SparkRDD(rep.rdd)(implicitly[Meta[A]], rep.sparkSession)
 }
 
 object SparkDataset extends DataBagCompanion[SparkSession] {

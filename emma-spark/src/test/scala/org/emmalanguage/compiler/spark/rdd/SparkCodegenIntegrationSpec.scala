@@ -17,9 +17,12 @@ package org.emmalanguage
 package compiler.spark.rdd
 
 import api._
+import api.spark._
 import compiler.BaseCodegenIntegrationSpec
 import compiler.RuntimeCompiler
 import compiler.SparkCompiler
+
+import org.apache.spark.rdd.RDD
 
 class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
 
@@ -54,4 +57,15 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
   }
 
   implicit val ctx = LocalSparkSession.getOrCreate()
+
+  // --------------------------------------------------------------------------
+  // Distributed collection conversion
+  // --------------------------------------------------------------------------
+
+  "Convert from/to a Spark RDD" in verify(u.reify {
+    val xs = DataBag(1 to 1000).withFilter(_ > 800)
+    val ys = xs.as[RDD].filter(_ < 200)
+    val zs = DataBag.from(ys)
+    zs.size
+  })
 }
