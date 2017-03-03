@@ -153,7 +153,7 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
     new SparkRDD(rep.rdd)(implicitly[Meta[A]], rep.sparkSession)
 }
 
-object SparkDataset {
+object SparkDataset extends DataBagCompanion[SparkSession] {
 
   import Meta.Projections._
 
@@ -167,35 +167,40 @@ object SparkDataset {
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def empty[A: Meta](implicit spark: SparkSession): DataBag[A] =
-    spark.emptyDataset[A]
+  def empty[A: Meta](
+    implicit spark: SparkSession
+  ): DataBag[A] = spark.emptyDataset[A]
 
-  def apply[A: Meta](values: Seq[A])(implicit spark: SparkSession): DataBag[A] =
-    spark.createDataset(values)
+  def apply[A: Meta](values: Seq[A])(
+    implicit spark: SparkSession
+  ): DataBag[A] = spark.createDataset(values)
 
-  def readCSV[A: Meta](path: String, format: CSV)
-    (implicit spark: SparkSession): DataBag[A] = spark.read
-      .option("header", format.header)
-      .option("delimiter", format.delimiter.toString)
-      .option("charset", format.charset.toString)
-      .option("quote", format.quote.getOrElse('"').toString)
-      .option("escape", format.escape.getOrElse('\\').toString)
-      .option("comment", format.escape.map(_.toString).orNull)
-      .option("nullValue", format.nullValue)
-      .schema(encoderForType[A].schema)
-      .csv(path).as[A]
+  def readText(path: String)(
+    implicit spark: SparkSession
+  ): DataBag[String] = spark.read.textFile(path)
 
-  def readText(path: String)(implicit spark: SparkSession): DataBag[String] =
-    spark.read.textFile(path)
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(
+    implicit spark: SparkSession
+  ): DataBag[A] = spark.read
+    .option("header", format.header)
+    .option("delimiter", format.delimiter.toString)
+    .option("charset", format.charset.toString)
+    .option("quote", format.quote.getOrElse('"').toString)
+    .option("escape", format.escape.getOrElse('\\').toString)
+    .option("comment", format.escape.map(_.toString).orNull)
+    .option("nullValue", format.nullValue)
+    .schema(encoderForType[A].schema)
+    .csv(path).as[A]
 
-  def readParquet[A: Meta](path: String, format: Parquet)
-    (implicit spark: SparkSession): DataBag[A] = spark.read
-      .option("binaryAsString", format.binaryAsString)
-      .option("int96AsTimestamp", format.int96AsTimestamp)
-      .option("cacheMetadata", format.cacheMetadata)
-      .option("codec", format.codec.toString)
-      .schema(encoderForType[A].schema)
-      .parquet(path).as[A]
+  def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(
+    implicit spark: SparkSession
+  ): DataBag[A] = spark.read
+    .option("binaryAsString", format.binaryAsString)
+    .option("int96AsTimestamp", format.int96AsTimestamp)
+    .option("cacheMetadata", format.cacheMetadata)
+    .option("codec", format.codec.toString)
+    .schema(encoderForType[A].schema)
+    .parquet(path).as[A]
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion

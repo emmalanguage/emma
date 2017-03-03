@@ -161,7 +161,7 @@ class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSe
   }
 }
 
-object FlinkDataSet {
+object FlinkDataSet extends DataBagCompanion[FlinkEnv] {
 
   import org.apache.flink.api.common.typeinfo.TypeInformation
 
@@ -188,13 +188,21 @@ object FlinkDataSet {
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def empty[A: Meta](implicit flink: FlinkEnv): DataBag[A] =
-    flink.fromElements[A]()
+  def empty[A: Meta](
+    implicit flink: FlinkEnv
+  ): DataBag[A] = flink.fromElements[A]()
 
-  def apply[A: Meta](values: Seq[A])(implicit flink: FlinkEnv): DataBag[A] =
-    flink.fromCollection(values)
+  def apply[A: Meta](values: Seq[A])(
+    implicit flink: FlinkEnv
+  ): DataBag[A] = flink.fromCollection(values)
 
-  def readCSV[A: Meta](path: String, format: CSV)(implicit flink: FlinkEnv): DataBag[A] = {
+  def readText(path: String)(
+    implicit flink: FlinkEnv
+  ): DataBag[String] = flink.readTextFile(path)
+
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(
+    implicit flink: FlinkEnv
+  ): DataBag[A] = {
     require(format.charset == CSV.defaultCharset,
       s"""Unsupported `charset` value: `${format.charset}`""")
     require(format.escape == CSV.defaultEscape,
@@ -210,10 +218,9 @@ object FlinkDataSet {
     )
   }
 
-  def readText(path: String)(implicit flink: FlinkEnv): DataBag[String] =
-    flink.readTextFile(path)
-
-  def readParquet[A: Meta](path: String, format: Parquet): DataBag[A] = ???
+  def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(
+    implicit flink: FlinkEnv
+  ): DataBag[A] = ???
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
