@@ -14,23 +14,29 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package api.converter
-
-import api.DataBag
-import api.FlinkDataSet
+package api
 
 import org.apache.flink.api.scala.DataSet
+import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
 
-object flink {
+package object flink {
 
-  /** Converts a `DataBag[A]` into a Flink `DataSet[A]`. */
-  implicit val datasetConverter = new CollConverter[DataSet] {
-    override def apply[A](bag: DataBag[A]) = bag match {
-      case bag: FlinkDataSet[A] =>
-        bag.rep
-      case _ =>
-        throw new RuntimeException(s"Cannot convert a DataBag of type ${bag.getClass.getSimpleName} to Dataset")
-    }
+  import FlinkDataSet.typeInfoForType
+  import Meta.Projections.ctagFor
+
+  implicit def fromDataSet[A](
+    implicit flink: FlinkEnv, m: Meta[A]
+  ): DataSet[A] => DataBag[A] = new FlinkDataSet(_)
+
+  implicit def toDataSet[A](
+    implicit flink: FlinkEnv, m: Meta[A]
+  ): DataBag[A] => DataSet[A] = {
+    case bag: FlinkDataSet[A] =>
+      bag.rep
+    case bag: ScalaSeq[A] =>
+      flink.fromCollection(bag.rep)
+    case bag =>
+      throw new RuntimeException(s"Cannot convert a DataBag of type ${bag.getClass.getSimpleName} to a Flink DataSet")
   }
 
 }

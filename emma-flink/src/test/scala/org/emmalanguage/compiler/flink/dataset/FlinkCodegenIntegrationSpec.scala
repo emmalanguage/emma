@@ -17,10 +17,12 @@ package org.emmalanguage
 package compiler.flink.dataset
 
 import api._
+import api.flink._
 import compiler.BaseCodegenIntegrationSpec
 import compiler.FlinkCompiler
 import compiler.RuntimeCompiler
 
+import org.apache.flink.api.scala.DataSet
 import org.apache.flink.api.scala.ExecutionEnvironment
 
 class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
@@ -57,4 +59,15 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
   }
 
   implicit val ctx = ExecutionEnvironment.getExecutionEnvironment
+
+  // --------------------------------------------------------------------------
+  // Distributed collection conversion
+  // --------------------------------------------------------------------------
+
+  "Convert from/to a Flink DataSet" in verify(u.reify {
+    val xs = DataBag(1 to 1000).withFilter(_ > 800)
+    val ys = xs.as[DataSet].filter(_ < 200)
+    val zs = DataBag.from(ys)
+    zs.size
+  })
 }

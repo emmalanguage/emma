@@ -61,6 +61,7 @@ trait Common extends AST {
       methodIn(bagSymbol, name)
 
     // Sources
+    val from                  = methodIn(bagModuleSymbol, "from")
     val empty                 = methodIn(bagModuleSymbol, "empty")
     val apply                 = methodIn(bagModuleSymbol, "apply")
     val readCSV               = methodIn(bagModuleSymbol, "readCSV")
@@ -100,7 +101,7 @@ trait Common extends AST {
     val top                   = bagOp("top")
     val sample                = bagOp("sample")
 
-    val sourceOps             = Set(empty, apply, readCSV, readParquet, readText)
+    val sourceOps             = Set(from, empty, apply, readCSV, readParquet, readText)
     val sinkOps               = Set(fetch, as, writeCSV, writeParquet, writeText)
     val monadOps              = Set(map, flatMap, withFilter)
     val nestOps               = Set(groupBy)

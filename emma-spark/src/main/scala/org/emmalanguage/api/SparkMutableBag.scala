@@ -17,7 +17,7 @@ package org.emmalanguage
 package api
 
 import api.Meta.Projections._
-import api.converter.spark._
+import api.spark._
 
 import edu.berkeley.cs.amplab.spark.indexedrdd.IndexedRDD
 import edu.berkeley.cs.amplab.spark.indexedrdd.KeySerializer
