@@ -365,55 +365,73 @@ trait DataBag[A] extends Serializable {
 
 }
 
-object DataBag {
-
-  // -----------------------------------------------------
-  // Constructors & Sources
-  // -----------------------------------------------------
+trait DataBagCompanion[E] {
 
   /**
    * Empty constructor.
    *
+   * @param env An execution environment instance.
    * @tparam A The element type for the DataBag.
-   * @return An empty DataBag for elements of type A.
    */
-  def empty[A: Meta]: DataBag[A] = ScalaSeq.empty[A]
+  def empty[A: Meta](implicit env: E): DataBag[A]
 
   /**
    * Sequence constructor.
    *
    * @param values The values contained in the bag.
+   * @param env An execution environment instance.
    * @tparam A The element type for the DataBag.
-   * @return A DataBag containing the elements of the `values` sequence.
    */
-  def apply[A: Meta](values: Seq[A]): DataBag[A] = ScalaSeq(values)
+  def apply[A: Meta](values: Seq[A])(implicit env: E): DataBag[A]
+
+  /**
+   * Reads a `DataBag[String]` elements from the specified `path`.
+   *
+   * @param env  An execution environment instance.
+   * @param path The location where the data will be read from.
+   */
+  def readText(path: String)(implicit env: E): DataBag[String]
 
   /**
    * Reads a DataBag from the specified `path` using in a CSV format.
    *
    * @param path   The location where the data will be read from.
    * @param format The CSV format configuration.
+   * @param env    An execution environment instance.
    * @tparam A the type of elements to read.
    */
-  def readCSV[A: CSVConverter](path: String, format: CSV): DataBag[A] =
-    ScalaSeq.readCSV[A](path, format)
-
-  /**
-   * Reads a `DataBag[String]` elements from the specified `path`.
-   *
-   * @param path The location where the data will be read from.
-   */
-  def readText(path: String): DataBag[String] =
-    ScalaSeq.readText(path)
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit env: E): DataBag[A]
 
   /**
    * Reads a DataBag into the specified `path` using a Parquet format.
    *
    * @param path   The location where the data will be read from.
    * @param format The Parquet format configuration.
+   * @param env    An execution environment instance.
    * @tparam A the type of elements to read.
    */
-  def readParquet[A: ParquetConverter](path: String, format: Parquet): DataBag[A] =
+  def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(implicit env: E): DataBag[A]
+}
+
+object DataBag extends DataBagCompanion[ScalaEnv] {
+
+  // -----------------------------------------------------
+  // Constructors & Sources
+  // -----------------------------------------------------
+
+  def empty[A: Meta](implicit env: ScalaEnv): DataBag[A] =
+    ScalaSeq.empty[A]
+
+  def apply[A: Meta](values: Seq[A])(implicit env: ScalaEnv): DataBag[A] =
+    ScalaSeq(values)
+
+  def readText(path: String)(implicit env: ScalaEnv): DataBag[String] =
+    ScalaSeq.readText(path)
+
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit env: ScalaEnv): DataBag[A] =
+    ScalaSeq.readCSV[A](path, format)
+
+  def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(implicit env: ScalaEnv): DataBag[A] =
     ScalaSeq.readParquet(path, format)
 
   // -----------------------------------------------------
