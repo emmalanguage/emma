@@ -17,15 +17,13 @@ package org.emmalanguage
 package api
 
 import io.csv._
-import io.text._
 import io.parquet._
+import io.text._
 
 import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-
-import scala.language.{higherKinds, implicitConversions}
 
 /** A `DataBag` implementation backed by a Scala `Seq`. */
 class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] {
@@ -129,16 +127,6 @@ object ScalaSeq extends DataBagCompanion[LocalEnv] {
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  private implicit def wrap[A](rep: Seq[A]): DataBag[A] =
+  private[emmalanguage] implicit def wrap[A](rep: Seq[A]): DataBag[A] =
     new ScalaSeq(rep)
-
-  def foldGroup[A: Meta, B: Meta, K: Meta](
-    xs: DataBag[A], key: A => K, sng: A => B, uni: (B, B) => B
-  ): DataBag[(K, B)] = xs.fetch()
-    .foldLeft(Map.empty[K, B]) { (acc, x) =>
-      val k = key(x)
-      val s = sng(x)
-      val u = acc.get(k).fold(s)(uni(_, s))
-      acc + (k -> u)
-    }.toSeq
 }

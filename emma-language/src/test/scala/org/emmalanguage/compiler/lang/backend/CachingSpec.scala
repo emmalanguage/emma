@@ -16,9 +16,8 @@
 package org.emmalanguage
 package compiler.lang.backend
 
-import compiler.ir
-
 import api.DataBag
+import api.backend.Backend._
 import compiler.BaseCompilerSpec
 
 /** A spec for order disambiguation. */
@@ -51,7 +50,7 @@ class CachingSpec extends BaseCompilerSpec {
 
       val exp = u.reify {
         val i = 2
-        val xs = ir.Runtime.cache {
+        val xs = cache {
           DataBag(1 to 5).withFilter(_ % 2 == 0)
         }
 
@@ -77,7 +76,7 @@ class CachingSpec extends BaseCompilerSpec {
         val i = 2
         val N = 5
         var xs = DataBag(1 to 5)
-        for (_ <- 0 to N) xs = ir.Runtime.cache {
+        for (_ <- 0 to N) xs = cache {
           xs.map(_ + i)
         }
 
@@ -102,12 +101,12 @@ class CachingSpec extends BaseCompilerSpec {
         val i = 2
         val N = 5
         var xs = DataBag(1 to 5)
-        val ys = ir.Runtime.cache {
+        val ys = cache {
           DataBag(1 to 5).withFilter(_ % 2 == 0)
         }
 
         for (_ <- 0 to N)
-          xs = ir.Runtime.cache {
+          xs = cache {
             xs union ys
           }
 

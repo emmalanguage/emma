@@ -17,6 +17,7 @@ package org.emmalanguage
 package compiler
 
 import api._
+import api.backend.Backend
 import ast.AST
 import io.csv.CSVConverter
 import io.parquet.ParquetConverter
@@ -165,7 +166,7 @@ trait Common extends AST {
 
   protected[emmalanguage] object ComprehensionCombinators extends IRModule {
     //@formatter:off
-    val module                = api.Sym[ir.ComprehensionCombinators.type].asModule
+    val module                = api.Sym[Backend.type].asModule
 
     val cross                 = op("cross")
     val equiJoin              = op("equiJoin")
@@ -176,7 +177,7 @@ trait Common extends AST {
 
   protected[emmalanguage] object Runtime extends IRModule {
     //@formatter:off
-    val module                = api.Sym[ir.Runtime.type].asModule
+    val module                = api.Sym[Backend.type].asModule
 
     val cache                 = op("cache")
 

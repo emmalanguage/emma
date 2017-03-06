@@ -37,7 +37,7 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
   override lazy val backendPipeline: u.Tree => u.Tree =
     Function.chain(Seq(
       Comprehension.desugar(API.bagSymbol),
-      Backend.translateToDataflows(FlinkAPI.bagSymbol),
+      Backend.translateToDataflows(FlinkAPI.bagSymbol, FlinkAPI.backendModuleSymbol),
       Core.refineModules(Map(MutableBagAPI.module -> FlinkAPI.mutableBagModuleSymbol)),
       addContext
     ))

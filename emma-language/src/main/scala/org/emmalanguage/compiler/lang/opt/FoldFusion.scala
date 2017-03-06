@@ -16,8 +16,8 @@
 package org.emmalanguage
 package compiler.lang.opt
 
+import api.backend.Aggregations
 import compiler.Common
-import compiler.ir.Aggregations
 import compiler.lang.cf.ControlFlow
 import compiler.lang.core.Core
 import util.Functions

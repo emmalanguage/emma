@@ -20,8 +20,6 @@ import compiler.RuntimeCompiler
 import io.csv._
 import io.parquet._
 
-import org.apache.flink.api.java.io.TypeSerializerInputFormat
-import org.apache.flink.api.java.io.TypeSerializerOutputFormat
 import org.apache.flink.api.scala.DataSet
 import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
 import org.apache.flink.core.fs.FileSystem
@@ -30,10 +28,11 @@ import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
 
-import java.net.URI
-
 /** A `DataBag` implementation backed by a Flink `DataSet`. */
-class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSet[A]) extends DataBag[A] {
+class FlinkDataSet[A: Meta] private[api]
+(
+  @transient private[emmalanguage] val rep: DataSet[A]
+) extends DataBag[A] {
 
   import FlinkDataSet.typeInfoForType
   import FlinkDataSet.wrap
@@ -41,7 +40,7 @@ class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSe
 
   @transient override val m = implicitly[Meta[A]]
 
-  private implicit def env = this.rep.getExecutionEnvironment
+  private[emmalanguage] implicit def env = this.rep.getExecutionEnvironment
 
   // -----------------------------------------------------
   // Structural recursion
@@ -228,81 +227,4 @@ object FlinkDataSet extends DataBagCompanion[FlinkEnv] {
 
   implicit def wrap[A: Meta](rep: DataSet[A]): DataBag[A] =
     new FlinkDataSet(rep)
-
-  // ---------------------------------------------------------------------------
-  // ComprehensionCombinators
-  // (these should correspond to `compiler.ir.ComprehensionCombinators`)
-  // ---------------------------------------------------------------------------
-
-  def cross[A: Meta, B: Meta](
-    xs: DataBag[A], ys: DataBag[B]
-  )(implicit flink: FlinkEnv): DataBag[(A, B)] = (xs, ys) match {
-    case (xs: FlinkDataSet[A], ys: FlinkDataSet[B]) => xs.rep.cross(ys.rep)
-  }
-
-  def equiJoin[A: Meta, B: Meta, K: Meta](
-    keyx: A => K, keyy: B => K)(xs: DataBag[A], ys: DataBag[B]
-  )(implicit flink: FlinkEnv): DataBag[(A, B)] = {
-    val rddOf = new DataSetExtractor(flink)
-    (xs, ys) match {
-      case (rddOf(xsDS), rddOf(ysDS)) =>
-        (xsDS join ysDS) where keyx equalTo keyy
-    }
-  }
-
-  private class DataSetExtractor(flink: FlinkEnv) {
-    def unapply[A: Meta](bag: DataBag[A]): Option[DataSet[A]] = bag match {
-      case bag: FlinkDataSet[A] => Some(bag.rep)
-      case _ => Some(flink.fromCollection(bag.fetch()))
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // RuntimeOps
-  // ---------------------------------------------------------------------------
-
-  def cache[A: Meta](xs: DataBag[A])(implicit flink: FlinkEnv): DataBag[A] =
-    xs match {
-      case xs: FlinkDataSet[A] =>
-        val sinkName = sink(xs.rep)
-        xs.env.execute(s"emma-cache-$sinkName")
-        source[A](sinkName)
-      case _ => xs
-    }
-
-  private[api] def sink[A: Meta](xs: DataSet[A])(implicit flink: FlinkEnv): String = {
-    val typeInfo = typeInfoForType[A]
-    val tempName = tempNames.next()
-    val outFmt = new TypeSerializerOutputFormat[A]
-    outFmt.setInputType(typeInfo, flink.getConfig)
-    outFmt.setSerializer(typeInfo.createSerializer(flink.getConfig))
-    xs.write(outFmt, tempPath(tempName), FileSystem.WriteMode.OVERWRITE)
-    tempName
-  }
-
-  private[api] def source[A: Meta](fileName: String)(implicit flink: FlinkEnv): DataSet[A] = {
-    val filePath = tempPath(fileName)
-    val typeInfo = typeInfoForType[A]
-    val inFmt = new TypeSerializerInputFormat[A](typeInfo)
-    inFmt.setFilePath(filePath)
-    flink.readFile(inFmt, filePath)
-  }
-
-  def foldGroup[A: Meta, B: Meta, K: Meta](
-    xs: DataBag[A], key: A => K, sng: A => B, uni: (B, B) => B
-  )(implicit flink: FlinkEnv): DataBag[(K, B)] = xs match {
-    case xs: FlinkDataSet[A] => xs.rep
-      .map(x => key(x) -> sng(x)).groupBy("_1")
-      .reduce((x, y) => x._1 -> uni(x._2, y._2))
-  }
-
-  private val tempBase =
-    new URI(System.getProperty("emma.flink.temp-base", "file:///tmp/emma/flink-temp/"))
-
-  private[api] val tempNames = Stream.iterate(0)(_ + 1)
-    .map(i => f"dataflow$i%03d")
-    .toIterator
-
-  private[api] def tempPath(tempName: String): String =
-    tempBase.resolve(tempName).toURL.toString
 }

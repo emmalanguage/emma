@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.ir
+package api.backend
 
 import scala.Function.const
 import scala.annotation.tailrec
 import scala.util.Random
 
 /**
- * Intermediate representation nodes for expanded `DataBag` folds.
+ * Backend representation nodes for expanded `DataBag` folds.
  * These provide implementations of the `emp`, `sng` and `uni` functions
  * corresponding to folds available in the `DataBag` API.
  */

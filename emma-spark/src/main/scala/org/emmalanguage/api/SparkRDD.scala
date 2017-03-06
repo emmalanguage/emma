@@ -20,7 +20,9 @@ import io.csv._
 import io.parquet._
 
 import org.apache.spark.rdd._
+import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
 import scala.language.higherKinds
 import scala.language.implicitConversions
@@ -28,8 +30,11 @@ import scala.util.hashing.MurmurHash3
 
 /** A `DataBag` implementation backed by a Spark `RDD`. */
 class SparkRDD[A: Meta] private[api]
-  (@transient private[api] val rep: RDD[A])
-  (@transient private[api] implicit val spark: SparkSession) extends DataBag[A] {
+(
+  @transient private[emmalanguage] val rep: RDD[A]
+)(
+  @transient private[emmalanguage] implicit val spark: SparkSession
+) extends DataBag[A] {
 
   import Meta.Projections._
   import SparkRDD.encoderForType
@@ -149,9 +154,6 @@ object SparkRDD extends DataBagCompanion[SparkSession] {
 
   import Meta.Projections._
 
-  import org.apache.spark.sql.Encoder
-  import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-
   implicit def encoderForType[T: Meta]: Encoder[T] =
     ExpressionEncoder[T]
 
@@ -200,56 +202,4 @@ object SparkRDD extends DataBagCompanion[SparkSession] {
 
   implicit def wrap[A: Meta](rep: RDD[A])(implicit spark: SparkSession): DataBag[A] =
     new SparkRDD(rep)
-
-  // ---------------------------------------------------------------------------
-  // ComprehensionCombinators
-  // (these should correspond to `compiler.ir.ComprehensionCombinators`)
-  // ---------------------------------------------------------------------------
-
-  def cross[A: Meta, B: Meta](
-    xs: DataBag[A], ys: DataBag[B]
-  )(implicit spark: SparkSession): DataBag[(A, B)] = {
-    val rddOf = new RDDExtractor(spark)
-    (xs, ys) match {
-      case (rddOf(xsRdd), rddOf(ysRdd)) => xsRdd cartesian ysRdd
-    }
-  }
-
-  def equiJoin[A: Meta, B: Meta, K: Meta](
-    keyx: A => K, keyy: B => K)(xs: DataBag[A], ys: DataBag[B]
-  )(implicit spark: SparkSession): DataBag[(A, B)] = {
-    val rddOf = new RDDExtractor(spark)
-    (xs, ys) match {
-      case (rddOf(xsRDD), rddOf(ysRDD)) =>
-        (xsRDD.map(extend(keyx)) join ysRDD.map(extend(keyy))).values
-    }
-  }
-
-  private def extend[X, K](k: X => K): X => (K, X) =
-    x => (k(x), x)
-
-  private class RDDExtractor(spark: SparkSession) {
-    def unapply[A: Meta](bag: DataBag[A]): Option[RDD[A]] = bag match {
-      case bag: SparkRDD[A] => Some(bag.rep)
-      case _ => Some(spark.sparkContext.parallelize(bag.fetch()))
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // RuntimeOps
-  // ---------------------------------------------------------------------------
-
-  def cache[A: Meta](xs: DataBag[A])(implicit spark: SparkSession): DataBag[A] =
-    xs match {
-      case xs: SparkRDD[A] => xs.rep.cache()
-      case xs: SparkDataset[A] => xs.rep.rdd.cache()
-      case _ => xs
-    }
-
-  def foldGroup[A: Meta, B: Meta, K: Meta](
-    xs: DataBag[A], key: A => K, sng: A => B, uni: (B, B) => B
-  )(implicit spark: SparkSession): DataBag[(K, B)] = xs match {
-    case xs: SparkRDD[A] => xs.rep.map(x => key(x) -> sng(x)).reduceByKey(uni)
-    case xs: SparkDataset[A] => SparkDataset.foldGroup(xs, key, sng, uni)
-  }
 }

@@ -34,10 +34,8 @@ private[backend] trait TranslateToDataflows extends Common {
     import UniverseImplicits._
     import Core.{Lang => core}
 
-    private val modules  = Set[u.TermSymbol](
-      API.bagModuleSymbol, ComprehensionCombinators.module, Runtime.module)
-
-    private val methods  = API.sourceOps | ComprehensionCombinators.ops | Runtime.ops
+    private val backendModules  = Set[u.TermSymbol](ComprehensionCombinators.module, Runtime.module)
+    private val backendMethods  = ComprehensionCombinators.ops | Runtime.ops
     private val scalaSeq = Some(api.ModuleRef(API.scalaSeqModuleSymbol))
 
     /**
@@ -51,9 +49,11 @@ private[backend] trait TranslateToDataflows extends Common {
      *
      * - A tree where DataBag operations have been translated to dataflow operations.
      *
-     * @param backend The symbol of the target backend.
+     * @param bagCompanion The symbol of the target backend.
+     * @param backend The symbol of the target IR module.
      */
-    def translateToDataflows(backend: u.ModuleSymbol): u.Tree => u.Tree = {
+    def translateToDataflows(bagCompanion: u.ModuleSymbol, backend: u.ModuleSymbol): u.Tree => u.Tree = {
+      val bagRef = Some(core.Ref(bagCompanion))
       val backendRef = Some(core.Ref(backend))
       Order.disambiguate.andThen { case (disambiguated, highOrd) =>
         val fetched = api.TopDown.break.withBindDefs.withBindUses
@@ -89,9 +89,15 @@ private[backend] trait TranslateToDataflows extends Common {
           // Are we nested in a higher-order function?
           case core.ValDef(lhs, _) => highOrd(lhs)
         } (disj).transformWith {
-          // Change static method calls to their corresponding backend calls.
+          // Change DataBag companion method calls to their corresponding backend calls.
           case Attr.inh(core.DefCall(Some(core.Ref(target)), method, targs, argss), false :: _)
-            if modules(target) && methods(method) =>
+            if target == API.bagModuleSymbol && API.sourceOps(method) =>
+            val translated = bagCompanion.info.member(method.name).asTerm
+            core.DefCall(bagRef, translated, targs, argss)
+
+          // Change backend IR method calls to their corresponding backend calls.
+          case Attr.inh(core.DefCall(Some(core.Ref(target)), method, targs, argss), false :: _)
+            if backendModules(target) && backendMethods(method) =>
             val translated = backend.info.member(method.name).asTerm
             core.DefCall(backendRef, translated, targs, argss)
 
