@@ -121,7 +121,7 @@ trait Common extends AST {
 
     val implicitTypes = Set(
       api.Type[org.emmalanguage.api.Meta[Any]].typeConstructor,
-      api.Type[ScalaEnv],
+      api.Type[LocalEnv],
       api.Type[CSVConverter[Any]].typeConstructor,
       api.Type[ParquetConverter[Any]].typeConstructor
     )

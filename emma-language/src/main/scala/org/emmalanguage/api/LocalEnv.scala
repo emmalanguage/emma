@@ -17,8 +17,8 @@ package org.emmalanguage
 package api
 
 /** A dummy execution environment to pass to local DataBag implementations. */
-class ScalaEnv extends Serializable
+class LocalEnv extends Serializable
 
-object ScalaEnv {
-  implicit def apply: ScalaEnv = new ScalaEnv
+object LocalEnv {
+  implicit def apply: LocalEnv = new LocalEnv
 }

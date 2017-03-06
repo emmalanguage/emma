@@ -95,30 +95,30 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
     rep
 }
 
-object ScalaSeq extends DataBagCompanion[ScalaEnv] {
+object ScalaSeq extends DataBagCompanion[LocalEnv] {
 
   // ---------------------------------------------------------------------------
   // Constructors
   // ---------------------------------------------------------------------------
 
   def empty[A: Meta](
-    implicit env: ScalaEnv
+    implicit env: LocalEnv
   ): DataBag[A] = new ScalaSeq(Seq.empty)
 
   def apply[A: Meta](values: Seq[A])(
-    implicit env: ScalaEnv
+    implicit env: LocalEnv
   ): DataBag[A] = new ScalaSeq(values)
 
   def readText(path: String)(
-    implicit env: ScalaEnv
+    implicit env: LocalEnv
   ): DataBag[String] = new ScalaSeq(TextSupport.read(path).toStream)
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(
-    implicit env: ScalaEnv
+    implicit env: LocalEnv
   ): DataBag[A] = new ScalaSeq(CSVScalaSupport(format).read(path).toStream)
 
   def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(
-    implicit env: ScalaEnv
+    implicit env: LocalEnv
   ): DataBag[A] = new ScalaSeq(ParquetScalaSupport(format).read(path).toStream)
 
   // This is used in the code generation in TranslateToDataflows when inserting fetches
