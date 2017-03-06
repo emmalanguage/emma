@@ -14,20 +14,19 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.ir
+package api.backend
 
-import api._
+import api.DataBag
+import api.Meta
 
-import scala.language.higherKinds
+/** Runtime operators (backend-agnostic IR nodes API). */
+trait Runtime[E] {
 
-/** Dummy IR nodes that model comprehension combinators in the Emma IR. */
-object ComprehensionCombinators {
+  /** Mark the dataset for caching. */
+  def cache[A: Meta](xs: DataBag[A])(implicit env: E): DataBag[A]
 
-  def cross[A : Meta, B : Meta]
-    (xs: DataBag[A], ys: DataBag[B]): DataBag[(A,B)] = ???
-
-  def equiJoin[A : Meta, B : Meta, K : Meta]
-    (keyx: A => K, keyy: B => K)
-    (xs: DataBag[A], ys: DataBag[B]): DataBag[(A,B)] = ???
-
+  /** Fuse a groupBy and a subsequent fold into a single operator. */
+  def foldGroup[A: Meta, B: Meta, K: Meta](
+    xs: DataBag[A], key: A => K, sng: A => B, uni: (B, B) => B
+  )(implicit env: E): DataBag[(K, B)]
 }

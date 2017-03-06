@@ -14,14 +14,19 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.ir
+package api.backend
 
-import api._
+import api.DataBag
+import api.Meta
 
-/** Dummy IR nodes that model runtime operators (i.e. purely physical operators) in the Emma IR. */
-object Runtime {
+/** Comprehension combinators (backend-agnostic IR nodes). */
+trait ComprehensionCombinators[E] {
 
-  /** Implement the underlying logical semantics only (identity function). */
-  def cache[A: Meta](xs: DataBag[A]): DataBag[A] = xs
+  def cross[A: Meta, B: Meta](
+    xs: DataBag[A], ys: DataBag[B]
+  )(implicit env: E): DataBag[(A, B)]
 
+  def equiJoin[A: Meta, B: Meta, K: Meta](
+    kx: A => K, ky: B => K)(xs: DataBag[A], ys: DataBag[B]
+  )(implicit env: E): DataBag[(A, B)]
 }

@@ -25,6 +25,7 @@ trait SparkCompiler extends Compiler {
 
   object SparkAPI {
     lazy val rddModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.SparkRDD")
+    lazy val backendModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.spark.Backend")
     lazy val mutableBagModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.SparkMutableBag")
     lazy val sessionSymbol = universe.rootMirror.staticClass(s"org.apache.spark.sql.SparkSession")
     lazy val sessionType = sessionSymbol.info

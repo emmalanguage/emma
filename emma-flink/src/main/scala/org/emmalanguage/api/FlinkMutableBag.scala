@@ -16,10 +16,10 @@
 package org.emmalanguage
 package api
 
-import FlinkDataSet.cache
 import FlinkMutableBag.State
 import Meta.Projections._
 import flink._
+import flink.Backend.cache
 
 import org.apache.flink.api.scala.DataSet
 import org.apache.flink.api.scala.ExecutionEnvironment

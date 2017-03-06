@@ -20,14 +20,16 @@ import io.csv._
 import io.parquet._
 
 import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
 import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
 
 /** A `DataBag` implementation backed by a Spark `Dataset`. */
-class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Dataset[A]) extends DataBag[A] {
+class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val rep: Dataset[A]) extends DataBag[A] {
 
   import SparkDataset.encoderForType
   import SparkDataset.wrap
@@ -36,7 +38,7 @@ class SparkDataset[A: Meta] private[api](@transient private[api] val rep: Datase
   import rep.sparkSession.sqlContext.implicits._
 
   @transient override val m = implicitly[Meta[A]]
-  private implicit def spark = this.rep.sparkSession
+  private[emmalanguage] implicit def spark = this.rep.sparkSession
 
   // -----------------------------------------------------
   // Structural recursion
@@ -151,9 +153,6 @@ object SparkDataset extends DataBagCompanion[SparkSession] {
 
   import Meta.Projections._
 
-  import org.apache.spark.sql.Encoder
-  import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
-
   implicit def encoderForType[T: Meta]: Encoder[T] =
     ExpressionEncoder[T]
 
@@ -202,23 +201,4 @@ object SparkDataset extends DataBagCompanion[SparkSession] {
 
   implicit def wrap[A: Meta](rep: Dataset[A]): DataBag[A] =
     new SparkDataset(rep)
-
-  // ---------------------------------------------------------------------------
-  // RuntimeOps
-  // ---------------------------------------------------------------------------
-
-  def cache[A: Meta](xs: DataBag[A])(implicit spark: SparkSession): DataBag[A] =
-    xs match {
-      case xs: SparkRDD[A] => spark.createDataset(xs.rep).cache()
-      case xs: SparkDataset[A] => xs.rep.cache()
-      case _ => xs
-    }
-
-  def foldGroup[A: Meta, B: Meta, K: Meta](
-    xs: DataBag[A], key: A => K, sng: A => B, uni: (B, B) => B
-  )(implicit spark: SparkSession): DataBag[(K, B)] = xs match {
-    case xs: SparkRDD[A] => SparkRDD.foldGroup(xs, key, sng, uni)
-    case xs: SparkDataset[A] => spark.createDataset(
-      xs.rep.rdd.map(x => key(x) -> sng(x)).reduceByKey(uni))
-  }
 }

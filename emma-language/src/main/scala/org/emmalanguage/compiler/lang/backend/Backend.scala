@@ -31,7 +31,8 @@ trait Backend extends Common
   object Backend {
 
     /** Delegates to [[TranslateToDataflows.translateToDataflows]]. */
-    def translateToDataflows(to: u.ModuleSymbol) = TranslateToDataflows.translateToDataflows(to)
+    def translateToDataflows(bagCompanion: u.ModuleSymbol, ir: u.ModuleSymbol) =
+      TranslateToDataflows.translateToDataflows(bagCompanion, ir)
 
     /** Delegates to [[Caching.addCacheCalls]]. */
     lazy val addCacheCalls = Caching.addCacheCalls
