@@ -422,25 +422,25 @@ trait DataBagCompanion[E] {
   def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(implicit env: E): DataBag[A]
 }
 
-object DataBag extends DataBagCompanion[ScalaEnv] {
+object DataBag extends DataBagCompanion[LocalEnv] {
 
   // -----------------------------------------------------
   // Constructors & Sources
   // -----------------------------------------------------
 
-  def empty[A: Meta](implicit env: ScalaEnv): DataBag[A] =
+  def empty[A: Meta](implicit env: LocalEnv): DataBag[A] =
     ScalaSeq.empty[A]
 
-  def apply[A: Meta](values: Seq[A])(implicit env: ScalaEnv): DataBag[A] =
+  def apply[A: Meta](values: Seq[A])(implicit env: LocalEnv): DataBag[A] =
     ScalaSeq(values)
 
-  def readText(path: String)(implicit env: ScalaEnv): DataBag[String] =
+  def readText(path: String)(implicit env: LocalEnv): DataBag[String] =
     ScalaSeq.readText(path)
 
-  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit env: ScalaEnv): DataBag[A] =
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit env: LocalEnv): DataBag[A] =
     ScalaSeq.readCSV[A](path, format)
 
-  def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(implicit env: ScalaEnv): DataBag[A] =
+  def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(implicit env: LocalEnv): DataBag[A] =
     ScalaSeq.readParquet(path, format)
 
   // -----------------------------------------------------
