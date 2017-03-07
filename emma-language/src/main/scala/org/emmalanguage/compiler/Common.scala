@@ -26,7 +26,7 @@ import org.scalactic._
 import org.scalactic.Accumulation._
 
 /** Common IR tools. */
-trait Common extends AST {
+trait Common extends AST with API {
 
   import universe._
 
@@ -48,12 +48,11 @@ trait Common extends AST {
   }
 
   /** A set of API method symbols to be comprehended. */
+  @scala.deprecated("Use _API_.DataBag instead", "pre-0.2")
   protected[emmalanguage] object API extends IRModule {
     //@formatter:off
     val emmaModuleSymbol      = api.Sym[emma.`package`.type].asModule
-    val csvPkgSymbol          = rootMirror.staticPackage(s"$rootPkg.io.csv")
     val bagSymbol             = api.Sym[DataBag[Any]].asClass
-    val groupSymbol           = api.Sym[Group[Any, Any]].asClass
     val bagModuleSymbol       = bagSymbol.companion.asModule
     val scalaSeqModuleSymbol  = api.Sym[ScalaSeq.type].asModule
     def module                = emmaModuleSymbol
@@ -129,13 +128,14 @@ trait Common extends AST {
 
     // Type constructors
     val DataBag               = api.Type[DataBag[Any]].typeConstructor
-    val Group                 = api.Type[Group[Any, Any]].typeConstructor
 
     // Backend-only operations
     val byFetch               = methodIn(scalaSeqModuleSymbol, "byFetch")
     //@formatter:on
   }
 
+  /** A set of API method symbols to be comprehended. */
+  @scala.deprecated("Use _API_.MutableBag instead", "pre-0.2")
   protected[emmalanguage] object MutableBagAPI extends IRModule {
     //@formatter:off
     val module                = api.Sym[org.emmalanguage.api.MutableBag.type].asModule
@@ -164,6 +164,7 @@ trait Common extends AST {
     //@formatter:on
   }
 
+  @scala.deprecated("Use _API_.BackendOps instead", "pre-0.2")
   protected[emmalanguage] object ComprehensionCombinators extends IRModule {
     //@formatter:off
     val module                = api.Sym[Backend.type].asModule
@@ -175,6 +176,7 @@ trait Common extends AST {
     //@formatter:on
   }
 
+  @scala.deprecated("Use _API_.BackendOps instead", "pre-0.2")
   protected[emmalanguage] object Runtime extends IRModule {
     //@formatter:off
     val module                = api.Sym[Backend.type].asModule
@@ -185,6 +187,7 @@ trait Common extends AST {
     //@formatter:on
   }
 
+  @scala.deprecated("Use _API_.GraphRepresentation instead", "pre-0.2")
   protected[emmalanguage] object GraphRepresentation extends IRModule {
     //@formatter:off
     val module  = api.Sym[ir.GraphRepresentation.type].asModule
@@ -195,6 +198,7 @@ trait Common extends AST {
     //@formatter:on
   }
 
+  @scala.deprecated("Use _API_.DSCFAnnotations instead", "pre-0.2")
   protected[emmalanguage] object DSCFAnnotations extends IRModule {
     import ir.DSCFAnnotations._
     //@formatter:off
