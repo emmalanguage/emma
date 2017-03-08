@@ -16,35 +16,33 @@
 package org.emmalanguage
 package api
 
+import cogadb.CoGaDB
+import compiler.lang.cogadb._
 import io.csv._
-import io.text._
 import io.parquet._
+import io.text._
 
 import scala.language.higherKinds
 import scala.language.implicitConversions
-import scala.reflect.ClassTag
-import scala.reflect.runtime.universe._
-
-import scala.language.{higherKinds, implicitConversions}
 
 /** A `DataBag` implementation backed by a Scala `Seq`. */
-class CoGaDBTable[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] {
+class CoGaDBTable[A: Meta] private[api]
+(
+  private[api] val rep: ast.Op
+)(
+  @transient implicit val cogadb: CoGaDB
+) extends DataBag[A] {
 
-  import ScalaSeq.wrap
+  import Meta.Projections._
 
-  //@formatter:off
-  @transient override val m: Meta[A] = new Meta[A] {
-    override def ctag: ClassTag[A] = null
-    override def ttag: TypeTag[A] = null
-  }
-  //@formatter:on
+  @transient override val m = implicitly[Meta[A]]
 
   // -----------------------------------------------------
   // Structural recursion
   // -----------------------------------------------------
 
   override def fold[B: Meta](z: B)(s: A => B, p: (B, B) => B): B =
-    rep.foldLeft(z)((acc, x) => p(s(x), acc))
+    ???
 
   // -----------------------------------------------------
   // Monad Ops
@@ -81,47 +79,48 @@ class CoGaDBTable[A] private[api](private[api] val rep: Seq[A]) extends DataBag[
   // -----------------------------------------------------
 
   def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
-    CSVScalaSupport(format).write(path)(rep)
+    CSVScalaSupport(format).write(path)(fetch())
 
   def writeText(path: String): Unit =
-    TextSupport.write(path)(rep map (_.toString))
+    TextSupport.write(path)(fetch() map (_.toString))
 
   def writeParquet(path: String, format: Parquet)(implicit converter: ParquetConverter[A]): Unit =
-    ParquetScalaSupport(format).write(path)(rep)
+    ParquetScalaSupport(format).write(path)(fetch())
 
   override def fetch(): Seq[A] =
-    rep
+    cogadb.exportSeq(rep)
 }
 
-object CoGaDBTable {
+object CoGaDBTable extends DataBagCompanion[CoGaDB] {
 
   // ---------------------------------------------------------------------------
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def empty[A]: DataBag[A] =
-    new ScalaSeq(Seq.empty)
+  def empty[A: Meta](
+    implicit cogadb: CoGaDB
+  ): DataBag[A] = CoGaDBTable.apply(Seq.empty[A])
 
-  def apply[A](values: Seq[A]): DataBag[A] =
-    new ScalaSeq(values)
+  def apply[A: Meta](values: Seq[A])(
+    implicit cogadb: CoGaDB
+  ): DataBag[A] = cogadb.importSeq(values)
 
-  def readCSV[A: CSVConverter](path: String, format: CSV): DataBag[A] =
-    new ScalaSeq(CSVScalaSupport(format).read(path).toStream)
+  def readText(path: String)(
+    implicit cogadb: CoGaDB
+  ): DataBag[String] = DataBag(TextSupport.read(path).toStream)
 
-  def readText(path: String): DataBag[String] =
-    new ScalaSeq(TextSupport.read(path).toStream)
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(
+    implicit cogadb: CoGaDB
+  ): DataBag[A] = DataBag(CSVScalaSupport(format).read(path).toStream)
 
-  def readParquet[A: ParquetConverter](path: String, format: Parquet): DataBag[A] =
-    new ScalaSeq(ParquetScalaSupport(format).read(path).toStream)
-
-  // This is used in the code generation in TranslateToDataflows when inserting fetches
-  def byFetch[A](bag: DataBag[A]): DataBag[A] =
-    new ScalaSeq(bag.fetch())
+  def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(
+    implicit cogadb: CoGaDB
+  ): DataBag[A] = DataBag(ParquetScalaSupport(format).read(path).toStream)
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  private implicit def wrap[A](rep: Seq[A]): DataBag[A] =
-    new ScalaSeq(rep)
+  private implicit def wrap[A: Meta](rep: ast.Op)(implicit cogadb: CoGaDB): DataBag[A] =
+    new CoGaDBTable[A](rep)
 }

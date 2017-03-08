@@ -16,6 +16,8 @@
 package org.emmalanguage
 package runtime
 
+import api._
+import cogadb.CoGaDB
 import compiler.lang.cogadb.ast
 import test.util._
 
@@ -29,35 +31,37 @@ class TPCHQueriesExecutionSpec extends FreeSpec with Matchers with BeforeAndAfte
   val dir = "/cogadb"
   val path = tempPath("/cogadb")
 
-  var cogadb: CoGaDB = null
+  implicit var cogadb: CoGaDB = null
 
   before {
     new File(path).mkdirs()
-    val coGaDBPath = Paths.get(System.getProperty("coGaDBPath", "cogadb"))
+    //val coGaDBPath = Paths.get(Option(System.getenv("COGADB_HOME")) getOrElse "/tmp/cogadb")
+    //val coGaDBPath = Paths.get("/home/harry/falcon/debug_build_2/")
+    val coGaDBPath = Paths.get("/home/harry/falcontest/falcon/build/")
     val configPath = Paths.get(materializeResource(s"$dir/tpch.coga"))
 
     cogadb = CoGaDB(coGaDBPath, configPath)
   }
 
   after {
-    deleteRecursive(new File(path))
+    //deleteRecursive(new File(path))
     cogadb.destroy()
   }
 
-  "read CUSTOMER" in {
+  "read CUSTOMER" ignore {
     val plan = ast.TableScan("CUSTOMER")
-    cogadb.execute(plan)
+    //cogadb.materialize(plan)
   }
 
-  "sort CUSTOMER" in {
+  "sort CUSTOMER" ignore {
     val plan = ast.Sort(Seq(
       ast.SortCol("CUSTOMER", "C_CUSTKEY", "INT", "C_CUSTKEY", 1, "ASCENDING")),
       ast.TableScan("CUSTOMER"))
 
-    cogadb.execute(plan)
+    //cogadb.materialize(plan)
   }
 
-  "filter CUSTOMER" in {
+  "filter CUSTOMER" ignore {
     val plan =
       ast.Selection(
         Seq(ast.And(Seq(
@@ -67,11 +71,11 @@ class TPCHQueriesExecutionSpec extends FreeSpec with Matchers with BeforeAndAfte
             ast.LessEqual)))),
         ast.TableScan("CUSTOMER"))
 
-    cogadb.execute(plan)
+    //cogadb.materialize(plan)
   }
 
 
-  "create A" in {
+  "create A" ignore {
     val schema = Seq(
       ast.SchemaAttr("INT", "id"),
       ast.SchemaAttr("VARCHAR", "name"))
@@ -79,40 +83,72 @@ class TPCHQueriesExecutionSpec extends FreeSpec with Matchers with BeforeAndAfte
     //FIXME: @harrygav
     val plan = ast.ImportFromCsv("A", "/home/haros/Desktop/emmaToCoGaDB/sample_tables/A.csv", ",", schema)
 
-    cogadb.execute(plan)
+    //cogadb.materialize(plan)
     //cogadb.executeGeneral("import_csv_file","dataflow0000 /home/haros/Desktop/emmaToCoGaDB/sample_tables/A.csv")
 
   }
 
-  "write" in {
+  "write" ignore {
     val x = Seq(1)
-    val scan = cogadb.write(x)
+    val scan = cogadb.importSeq(x)
 
     //scan shouldBe
   }
 
-  "write and read" in {
+  "create and fetch pair" in {
     val A = Seq((1, "foo"), (2, "bar"))
-    val scanA = cogadb.write(A)
 
-    val written = cogadb.execute(scanA)
+    //load seq in cogadb
+    val scanA = cogadb.importSeq[(Int,String)](A)
 
-    val res = cogadb.read[(Int, String)](written).toList
+    //val written = cogadb.apply(scanA)
+
+    val res = cogadb.exportSeq[(Int,String)](scanA)
     val exp = Seq((1, "foo"), (2, "bar"))
+
+    res shouldBe exp
+  }
+
+  "create and fetch pair of doubles" in {
+    val A = Seq((1.1, 2.1), (2.1, 3.1))
+
+    //load seq in cogadb
+    val scanA = cogadb.importSeq[(Double,Double)](A)
+
+    //val written = cogadb.apply(scanA)
+
+    val res = cogadb.exportSeq[(Double,Double)](scanA)
+    val exp = Seq((1.1, 2.1), (2.1, 3.1))
 
     res shouldBe exp
   }
 
   "cross join A and B" in {
     val A = Seq((1, 10), (2, 20))
-    val B = Seq((1, 10.0), (2, 20.0))
+    val B = Seq((1, 30), (2, 40))
 
-    val res = cogadb.read[(Int, String, Double)](
-      cogadb.execute(ast.CrossJoin(
-        cogadb.write(A),
-        cogadb.write(B))))
+    val scanA = cogadb.importSeq[(Int, Int)](A)
+    val scanB = cogadb.importSeq[(Int, Int)](B)
+
+    //print(ast.CrossJoin(scanA, scanB))
+    val res = cogadb.exportSeq[(Int, Int, Int, Int)](ast.CrossJoin(scanA, scanB))
+
+    //print(res)
+
+    //val res = cogadb.importSeq[(Int, Int, Int, Int)](crossed)
+
+    //println(res)
+    /*val res = cogadb.exportSeq[(Int, String, Double)](
+      cogadb.
+        CrossJoin(
+        cogadb.importSeq(A),
+        cogadb.importSeq(B)))*/
     val exp = for (a <- A; b <- B) yield (a._1, a._2, b._1, b._2)
 
     res shouldBe exp
+  }
+
+  "create and fetch empty" in {
+    CoGaDBTable.empty[Int].fetch() shouldBe Seq.empty[Int]
   }
 }

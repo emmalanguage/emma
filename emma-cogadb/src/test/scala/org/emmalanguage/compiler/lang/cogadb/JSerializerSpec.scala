@@ -16,7 +16,7 @@
 package org.emmalanguage
 package compiler.lang.cogadb
 
-import runtime.CoGaDB
+import cogadb.CoGaDB
 
 import net.liftweb.json._
 import org.junit.runner.RunWith
