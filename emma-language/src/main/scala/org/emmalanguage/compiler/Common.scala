@@ -16,11 +16,8 @@
 package org.emmalanguage
 package compiler
 
-import api._
 import api.backend.Backend
 import ast.AST
-import io.csv.CSVConverter
-import io.parquet.ParquetConverter
 
 import org.scalactic._
 import org.scalactic.Accumulation._
@@ -45,93 +42,6 @@ trait Common extends AST with API {
 
     protected def methodIn(target: u.Symbol, name: String): u.MethodSymbol =
       target.info.member(api.TermName(name)).asMethod
-  }
-
-  /** A set of API method symbols to be comprehended. */
-  @scala.deprecated("Use _API_.DataBag instead", "pre-0.2")
-  protected[emmalanguage] object API extends IRModule {
-    //@formatter:off
-    val emmaModuleSymbol      = api.Sym[emma.`package`.type].asModule
-    val bagSymbol             = api.Sym[DataBag[Any]].asClass
-    val bagModuleSymbol       = bagSymbol.companion.asModule
-    val scalaSeqModuleSymbol  = api.Sym[ScalaSeq.type].asModule
-    def module                = emmaModuleSymbol
-
-    private def bagOp(name: String) =
-      methodIn(bagSymbol, name)
-
-    // Sources
-    val from                  = methodIn(bagModuleSymbol, "from")
-    val empty                 = methodIn(bagModuleSymbol, "empty")
-    val apply                 = methodIn(bagModuleSymbol, "apply")
-    val readCSV               = methodIn(bagModuleSymbol, "readCSV")
-    val readParquet           = methodIn(bagModuleSymbol, "readParquet")
-    val readText              = methodIn(bagModuleSymbol, "readText")
-    // Sinks
-    val fetch                 = bagOp("fetch")
-    val as                    = bagOp("as")
-    val writeCSV              = bagOp("writeCSV")
-    val writeParquet          = bagOp("writeParquet")
-    val writeText             = bagOp("writeText")
-    // Monad ops
-    val map                   = bagOp("map")
-    val flatMap               = bagOp("flatMap")
-    val withFilter            = bagOp("withFilter")
-    // Grouping
-    val groupBy               = bagOp("groupBy")
-    // Set operations
-    val union                 = bagOp("union")
-    val distinct              = bagOp("distinct")
-    // Structural recursion & Folds
-    val fold                  = bagOp("fold")
-    val isEmpty               = bagOp("isEmpty")
-    val nonEmpty              = bagOp("nonEmpty")
-    val reduce                = bagOp("reduce")
-    val reduceOption          = bagOp("reduceOption")
-    val min                   = bagOp("min")
-    val max                   = bagOp("max")
-    val sum                   = bagOp("sum")
-    val product               = bagOp("product")
-    val size                  = bagOp("size")
-    val count                 = bagOp("count")
-    val exists                = bagOp("exists")
-    val forall                = bagOp("forall")
-    val find                  = bagOp("find")
-    val bottom                = bagOp("bottom")
-    val top                   = bagOp("top")
-    val sample                = bagOp("sample")
-
-    val sourceOps             = Set(from, empty, apply, readCSV, readParquet, readText)
-    val sinkOps               = Set(fetch, as, writeCSV, writeParquet, writeText)
-    val monadOps              = Set(map, flatMap, withFilter)
-    val nestOps               = Set(groupBy)
-    val setOps                = Set(union, distinct)
-    val foldOps               = Set(
-      fold,
-      isEmpty, nonEmpty,
-      reduce, reduceOption,
-      min, max, sum, product,
-      size, count,
-      exists, forall,
-      find, top, bottom,
-      sample
-    )
-
-    val ops = sourceOps | sinkOps | monadOps | nestOps | setOps | foldOps
-
-    val implicitTypes = Set(
-      api.Type[org.emmalanguage.api.Meta[Any]].typeConstructor,
-      api.Type[LocalEnv],
-      api.Type[CSVConverter[Any]].typeConstructor,
-      api.Type[ParquetConverter[Any]].typeConstructor
-    )
-
-    // Type constructors
-    val DataBag               = api.Type[DataBag[Any]].typeConstructor
-
-    // Backend-only operations
-    val byFetch               = methodIn(scalaSeqModuleSymbol, "byFetch")
-    //@formatter:on
   }
 
   /** A set of API method symbols to be comprehended. */

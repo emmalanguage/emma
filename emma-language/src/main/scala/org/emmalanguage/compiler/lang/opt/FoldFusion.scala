@@ -35,6 +35,7 @@ private[compiler] trait FoldFusion extends Common {
   /** The fold-fusion optimization. */
   object FoldFusion {
 
+    import _API_._
     import UniverseImplicits._
     import Core.{Lang => core}
 
@@ -45,28 +46,28 @@ private[compiler] trait FoldFusion extends Common {
 
     // Folds for which the `emp`, `sng` and `uni` functions don't depend on any arguments.
     private val constFolds = Map(
-      API.isEmpty  -> api.Sym[Aggregations.IsEmpty.type],
-      API.nonEmpty -> api.Sym[Aggregations.NonEmpty.type],
-      API.size     -> api.Sym[Aggregations.Size.type]
+      DataBag.isEmpty  -> api.Sym[Aggregations.IsEmpty.type],
+      DataBag.nonEmpty -> api.Sym[Aggregations.NonEmpty.type],
+      DataBag.size     -> api.Sym[Aggregations.Size.type]
     ).mapValues(_.asModule)
 
     // Folds for which the `emp`, `sng` and `uni` functions depend on some arguments.
     private val dynamicFolds = Map(
-      API.count        -> api.Sym[Aggregations.Count.type],
-      API.sum          -> api.Sym[Aggregations.Sum.type],
-      API.product      -> api.Sym[Aggregations.Product.type],
-      API.exists       -> api.Sym[Aggregations.Exists.type],
-      API.forall       -> api.Sym[Aggregations.Forall.type],
-      API.find         -> api.Sym[Aggregations.Find.type],
-      API.bottom       -> api.Sym[Aggregations.Bottom.type],
-      API.top          -> api.Sym[Aggregations.Top.type],
-      API.reduceOption -> api.Sym[Aggregations.ReduceOpt.type]
+      DataBag.count        -> api.Sym[Aggregations.Count.type],
+      DataBag.sum          -> api.Sym[Aggregations.Sum.type],
+      DataBag.product      -> api.Sym[Aggregations.Product.type],
+      DataBag.exists       -> api.Sym[Aggregations.Exists.type],
+      DataBag.forall       -> api.Sym[Aggregations.Forall.type],
+      DataBag.find         -> api.Sym[Aggregations.Find.type],
+      DataBag.bottom       -> api.Sym[Aggregations.Bottom.type],
+      DataBag.top          -> api.Sym[Aggregations.Top.type],
+      DataBag.reduceOption -> api.Sym[Aggregations.ReduceOpt.type]
     ).mapValues(_.asModule)
 
     // Folds with an optional result that has to be extracted via `get`.
     private val optionalFolds = Map(
-      API.min -> api.Sym[Aggregations.Min.type],
-      API.max -> api.Sym[Aggregations.Max.type]
+      DataBag.min -> api.Sym[Aggregations.Min.type],
+      DataBag.max -> api.Sym[Aggregations.Max.type]
     ).mapValues(_.asModule)
 
     /**
@@ -82,7 +83,7 @@ private[compiler] trait FoldFusion extends Common {
       // Initial fold forest - singleton trees of `xs` symbols in `xs.fold(...)` applications.
       var forest: Stream[Tree[u.TermSymbol]] = valIndex.collect {
         case (fold, core.DefCall(_, method, _, _))
-          if API.foldOps(method) => Tree.leaf(fold)
+          if DataBag.foldOps(method) => Tree.leaf(fold)
       } (breakOut)
 
       // Grow the forest by extending trees with new roots until a fixed point is reached.
@@ -92,7 +93,7 @@ private[compiler] trait FoldFusion extends Common {
         forest = forest.groupBy { case Tree.Node(root, _) =>
           (for { // Group by root DataBag reference.
             core.DefCall(Some(core.Ref(xs)), method, _, _) <- valIndex.get(root)
-            if API.foldOps(method) || API.monadOps(method)
+            if DataBag.foldOps(method) || DataBag.monadOps(method)
           } yield xs).getOrElse(root)
         }.flatMap { case (target, subForest) =>
           // Sub-forest associated with a common DefCall target.
@@ -101,7 +102,7 @@ private[compiler] trait FoldFusion extends Common {
 
           def targetIsMonadicCall = (for {
             core.DefCall(_, method, _, _) <- valIndex.get(target)
-          } yield API.monadOps(method)).getOrElse(false)
+          } yield DataBag.monadOps(method)).getOrElse(false)
 
           val independentSubForest = for {
             tree @ Tree.Node(fold, _) <- subForest
@@ -158,7 +159,7 @@ private[compiler] trait FoldFusion extends Common {
       val Seq(emp, sng, uni) = for ((f, _) <- lambdas) yield core.Ref(f)
       val targs = Seq(emp.tpe)
       val argss = Seq(Seq(emp), Seq(sng, uni))
-      lambdas.toMap + (fold -> core.DefCall(xs, API.fold, targs, argss))
+      lambdas.toMap + (fold -> core.DefCall(xs, DataBag.fold, targs, argss))
     }
 
     /**
@@ -212,18 +213,18 @@ private[compiler] trait FoldFusion extends Common {
               // Leaves - folds to be expanded.
               case (root, Seq()) => valIndex(root) match {
                 // xs.fold(emp)(sng, uni)
-                case rhs @ core.DefCall(_, API.fold, _, _) =>
+                case rhs @ core.DefCall(_, DataBag.fold, _, _) =>
                   root -> Map(root -> rhs)
 
                 // xs.reduce(emp)(uni)
                 // =>
                 // val reduce = Reduce(emp, uni)
                 // xs.fold(reduce.emp)(reduce.sng, reduce.uni)
-                case core.DefCall(xs, API.reduce, targs, argss) =>
+                case core.DefCall(xs, DataBag.reduce, targs, argss) =>
                   val module = core.Ref(api.Sym[Aggregations.Reduce.type].asModule)
                   val apply  = module.tpe.member(api.TermName.app).asMethod
                   val rhs    = core.DefCall(Some(module), apply, targs, argss.take(2))
-                  val reduce = api.ValSym(owner, api.TermName.fresh(API.reduce), rhs.tpe)
+                  val reduce = api.ValSym(owner, api.TermName.fresh(DataBag.reduce), rhs.tpe)
                   root -> (aggregation(xs, root, reduce) + (reduce -> rhs))
 
                 // xs.isEmpty | xs.nonEmpty | xs.size
@@ -270,12 +271,12 @@ private[compiler] trait FoldFusion extends Common {
                 // val sample = Sample(n)
                 // val tmp = xs.fold(sample.emp)(sample.sng, sample.uni)
                 // tmp._2
-                case core.DefCall(xs @ Some(bag), API.sample, _, argss) =>
+                case core.DefCall(xs @ Some(bag), DataBag.sample, _, argss) =>
                   val module  = core.Ref(api.Sym[Aggregations.Sample.type].asModule)
                   val apply   = module.tpe.member(api.TermName.app).asTerm
                   val Elem    = api.Type.arg(1, bag.tpe)
                   val rhs     = core.DefCall(Some(module), apply, Seq(Elem), argss)
-                  val sample  = api.ValSym(owner, api.TermName.fresh(API.sample), rhs.tpe)
+                  val sample  = api.ValSym(owner, api.TermName.fresh(DataBag.sample), rhs.tpe)
                   val Pair    = api.Type.tupleOf(Seq(api.Type.long, root.info))
                   val tmp     = api.ValSym(owner, api.TermName.fresh(root), Pair)
                   val _2      = Pair.member(api.TermName("_2")).asTerm
@@ -290,13 +291,13 @@ private[compiler] trait FoldFusion extends Common {
                 // =>
                 // val sng$f = f.andThen(sng)
                 // ys.fold(emp)(sng$f, uni)
-                case core.DefCall(xs, API.map, _, Seq(Seq(f), _*)) =>
+                case core.DefCall(xs, DataBag.map, _, Seq(Seq(f), _*)) =>
                   val core.DefCall(_, _, b, Seq(Seq(emp), Seq(sng, uni))) = subIndex(child)
                   val andThen = f.tpe.member(api.TermName("andThen")).asTerm
                   val rhs     = core.DefCall(Some(f), andThen, b, Seq(Seq(sng)))
                   val lhs     = api.ValSym(owner, api.TermName.fresh("sng"), rhs.tpe)
                   val lambdas = Seq(Seq(emp), Seq(core.Ref(lhs), uni))
-                  val cata    = core.DefCall(xs, API.fold, b, lambdas)
+                  val cata    = core.DefCall(xs, DataBag.fold, b, lambdas)
                   child -> (subIndex ++ Seq(lhs -> rhs, child -> cata))
 
                 // val xs = ys.filter(p)
@@ -304,14 +305,14 @@ private[compiler] trait FoldFusion extends Common {
                 // =>
                 // val sng$p = Functions.conditional(sng, p, emp)
                 // ys.fold[b](emp)(sng$p, uni)
-                case core.DefCall(xs, API.withFilter, _, Seq(Seq(p))) =>
+                case core.DefCall(xs, DataBag.withFilter, _, Seq(Seq(p))) =>
                   val core.DefCall(_, _, b, Seq(Seq(emp), Seq(sng, uni))) = subIndex(child)
                   val targs   = sng.tpe.dealias.widen.typeArgs
                   val argss   = Seq(Seq(sng, p, emp))
                   val rhs     = core.DefCall(Some(functions), conditional, targs, argss)
                   val lhs     = api.ValSym(owner, api.TermName.fresh("sng"), rhs.tpe)
                   val lambdas = Seq(Seq(emp), Seq(core.Ref(lhs), uni))
-                  val cata    = core.DefCall(xs, API.fold, b, lambdas)
+                  val cata    = core.DefCall(xs, DataBag.fold, b, lambdas)
                   child -> (subIndex ++ Seq(lhs -> rhs, child -> cata))
 
                 // val xs = ys.flatMap(f)
@@ -319,14 +320,14 @@ private[compiler] trait FoldFusion extends Common {
                 // =>
                 // val sng$f = Functions.flatFold(f, emp, sng, uni)
                 // ys.fold[b](emp)(sng$f, uni)
-                case core.DefCall(xs, API.flatMap, _, Seq(Seq(f), _*)) =>
+                case core.DefCall(xs, DataBag.flatMap, _, Seq(Seq(f), _*)) =>
                   val core.DefCall(_, _, b, Seq(Seq(emp), Seq(sng, uni))) = subIndex(child)
                   val targs   = api.Type.arg(1, f.tpe) :: sng.tpe.dealias.widen.typeArgs
                   val argss   = Seq(Seq(f, emp, sng, uni))
                   val rhs     = core.DefCall(Some(functions), flatFold, targs, argss)
                   val lhs     = api.ValSym(owner, api.TermName.fresh("sng"), rhs.tpe)
                   val lambdas = Seq(Seq(emp), Seq(core.Ref(lhs), uni))
-                  val cata    = core.DefCall(xs, API.fold, b, lambdas)
+                  val cata    = core.DefCall(xs, DataBag.fold, b, lambdas)
                   child -> (subIndex ++ Seq(lhs -> rhs, child -> cata))
               }
 
@@ -433,7 +434,7 @@ private[compiler] trait FoldFusion extends Common {
 
                 val fused = api.ValSym(owner, api.TermName.fresh("fused"), Tuple)
                 val argss = Seq(Seq(core.Ref(emp._1)), Seq(core.Ref(sng._1), core.Ref(uni._1)))
-                val rhs   = core.DefCall(Some(core.Ref(root)), API.fold, Seq(Tuple), argss)
+                val rhs   = core.DefCall(Some(core.Ref(root)), DataBag.fold, Seq(Tuple), argss)
 
                 val projections = for { // fused._i
                   ((child, _), i) <- children.zipWithIndex

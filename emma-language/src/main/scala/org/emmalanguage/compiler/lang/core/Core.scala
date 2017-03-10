@@ -35,6 +35,7 @@ trait Core extends Common
   with Trampoline {
   this: AlphaEq with Source =>
 
+  import _API_._
   import UniverseImplicits._
 
   /** Core language. */
@@ -208,7 +209,7 @@ trait Core extends Common
 
     def fold[A](a: Algebra[A])(tree: u.Tree): A = {
       // construct comprehension syntax helper for the given monad
-      val cs = new Comprehension.Syntax(API.bagSymbol)
+      val cs = new Comprehension.Syntax(DataBag.sym)
       def fold(tree: u.Tree): A = tree match {
         // Comprehensions
         case cs.Comprehension(qs, hd) =>
@@ -283,9 +284,9 @@ trait Core extends Common
     /** Lifting. The canonical compiler frontend. */
     lazy val lift: u.Tree => u.Tree = Function.chain(Seq(
       lnf,
-      Comprehension.resugar(API.bagSymbol),
+      Comprehension.resugar(DataBag.sym),
       inlineLetExprs,
-      Comprehension.normalize(API.bagSymbol),
+      Comprehension.normalize(DataBag.sym),
       uninlineLetExprs))
 
     /** Chains [[ANF.transform]], and [[DSCF.transform]]. */
@@ -353,7 +354,7 @@ trait Core extends Common
      * Gets the type argument of the DataBag type that is the type of the given expression.
      */
     def bagElemTpe(xs: u.Tree): u.Type = {
-      assert(api.Type.constructor(xs.tpe) =:= API.DataBag,
+      assert(api.Type.constructor(xs.tpe) =:= DataBag.tpe,
         s"`bagElemTpe` was called with a tree that has a non-bag type. " +
           s"The tree:\n-----\n$xs\n-----\nIts type: `${xs.tpe}`")
       api.Type.arg(1, xs.tpe)

@@ -31,12 +31,13 @@ private[backend] trait TranslateToDataflows extends Common {
   
   private[backend] object TranslateToDataflows {
 
+    import _API_._
     import UniverseImplicits._
     import Core.{Lang => core}
 
     private val backendModules  = Set[u.TermSymbol](ComprehensionCombinators.module, Runtime.module)
     private val backendMethods  = ComprehensionCombinators.ops | Runtime.ops
-    private val scalaSeq = Some(api.ModuleRef(API.scalaSeqModuleSymbol))
+    private val scalaSeq = Some(api.ModuleRef(ScalaSeq$.sym))
 
     /**
      * Translates into a dataflow on the given backend.
@@ -63,7 +64,7 @@ private[backend] trait TranslateToDataflows extends Common {
             case Attr.syn(core.ValDef(lhs, _), uses :: defs :: _)
               if highOrd(lhs) => for {
                 bag <- uses.keySet diff defs.keySet
-                if api.Type.constructor(bag.info) =:= API.DataBag
+                if api.Type.constructor(bag.info) =:= DataBag.tpe
               } yield bag
           }.traverse {
             // Break condition same as above.
@@ -74,12 +75,12 @@ private[backend] trait TranslateToDataflows extends Common {
               defs.get(lhs) match {
                 // DataBag(Seq(..elements)).fetch() == ScalaSeq(Seq(..elements))
                 // Instead of fetching build directly from the underlying Seq.
-                case Some(core.ValDef(_, call @ core.DefCall(_, API.empty | API.apply, _, _))) =>
+                case Some(core.ValDef(_, call @ core.DefCall(_, DataBag$.empty | DataBag$.apply, _, _))) =>
                   lhs -> core.ValDef(alias, call)
                 case _ =>
                   val targs = Seq(api.Type.arg(1, lhs.info))
                   val argss = Seq(Seq(core.Ref(lhs)))
-                  val fetch = core.DefCall(scalaSeq, API.byFetch, targs, argss)
+                  val fetch = core.DefCall(scalaSeq, ScalaSeq$.fromDataBag, targs, argss)
                   lhs -> core.ValDef(alias, fetch)
               }
             } (breakOut)
@@ -91,7 +92,7 @@ private[backend] trait TranslateToDataflows extends Common {
         } (disj).transformWith {
           // Change DataBag companion method calls to their corresponding backend calls.
           case Attr.inh(core.DefCall(Some(core.Ref(target)), method, targs, argss), false :: _)
-            if target == API.bagModuleSymbol && API.sourceOps(method) =>
+            if target == DataBag$.sym && DataBag$.ops(method) =>
             val translated = bagCompanion.info.member(method.name).asTerm
             core.DefCall(bagRef, translated, targs, argss)
 

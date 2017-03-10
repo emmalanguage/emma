@@ -18,7 +18,7 @@ package compiler
 
 trait FlinkCompiler extends Compiler {
 
-  override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ Set(
+  override lazy val implicitTypes: Set[u.Type] = _API_.implicitTypes ++ Set(
     api.Type[org.apache.flink.api.common.typeinfo.TypeInformation[Any]].typeConstructor,
     api.Type[org.apache.flink.api.scala.ExecutionEnvironment]
   )

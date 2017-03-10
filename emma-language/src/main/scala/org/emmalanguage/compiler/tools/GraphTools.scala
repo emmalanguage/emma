@@ -80,7 +80,7 @@ trait GraphTools extends Common
     import CytoscapeGraphJsonProtocol._
     import spray.json._
 
-    val cs = new Comprehension.Syntax(API.bagSymbol)
+    val cs = new Comprehension.Syntax(_API_.DataBag.sym)
 
     def mkGraph(tree: u.Tree): Iterable[Element] = {
       val graph = ControlFlow.cfg(tree)
