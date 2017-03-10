@@ -32,12 +32,11 @@ private[backend] trait Caching extends Common {
 
   private[backend] object Caching {
 
-    import _API_._
     import Core.{Lang => core}
     import UniverseImplicits._
 
-    private val runtime = Some(core.ModuleRef(Runtime.module))
-    private val cache   = Runtime.cache
+    private val runtime = Some(core.Ref(_API_.Backend.sym))
+    private val cache   = _API_.Backend.cache
 
     /** Is `sym` a method defining a loop or the body of a loop? */
     private def isLoop(sym: u.Symbol) = is.method(sym) &&
@@ -45,7 +44,7 @@ private[backend] trait Caching extends Common {
 
     /** Does `sym` have a type of `DataBag` or a subtype? */
     private def isDataBag(sym: u.Symbol) =
-      api.Type.constructor(sym.info) =:= DataBag.tpe
+      api.Type.constructor(sym.info) =:= _API_.DataBag.tpe
 
     /** Caches `x` as the new value `y`. */
     private def cacheAs(x: u.TermSymbol, y: u.TermSymbol) = {
@@ -117,7 +116,7 @@ private[backend] trait Caching extends Common {
           val cachedVals = vals.flatMap {
             // Don't cache reads.
             case value @ core.ValDef(_, core.DefCall(_, method, _, _))
-              if DataBag$.ops(method) => Seq(value)
+              if _API_.DataBag$.ops(method) => Seq(value)
             case core.ValDef(x, rhs) if shouldCache(x) =>
               val y = api.TermSym.fresh(x)
               Seq(core.ValDef(y, rhs), cacheAs(y, x))

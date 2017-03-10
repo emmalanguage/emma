@@ -41,19 +41,19 @@ protected[emmalanguage] trait API extends AST {
 
   trait emmaAPI extends ModuleAPI {
     //@formatter:off
-    val sym                   = api.Sym[org.emmalanguage.api.emma.`package`.type].asModule
+    lazy val sym              = api.Sym[org.emmalanguage.api.emma.`package`.type].asModule
 
     val prettyPrint           = op("prettyPrint")
     val quote                 = op("quote")
 
-    val ops                   = Set(prettyPrint, quote)
+    lazy val ops              = Set(prettyPrint, quote)
     //@formatter:on
   }
 
   class DataBagAPI(cls: u.ClassSymbol) extends ClassAPI {
 
     //@formatter:off
-    val sym                   = cls
+    lazy val sym              = cls
 
     // Sinks
     val fetch                 = op("fetch")
@@ -110,7 +110,7 @@ protected[emmalanguage] trait API extends AST {
 
   class DataBag$API(mod: u.ModuleSymbol) extends ModuleAPI {
     //@formatter:off
-    val sym                   = mod
+    lazy val sym              = mod
 
     val from                  = op("from")
     val empty                 = op("empty")
@@ -119,29 +119,29 @@ protected[emmalanguage] trait API extends AST {
     val readParquet           = op("readParquet")
     val readText              = op("readText")
 
-    val ops                   = Set(from, empty, apply, readCSV, readParquet, readText)
+    lazy val ops              = Set(from, empty, apply, readCSV, readParquet, readText)
     //@formatter:on
   }
 
   class MutableBagAPI(cls: u.ClassSymbol) extends ClassAPI {
     //@formatter:off
-    val sym                   = cls
+    lazy val sym              = cls
 
     val update                = op("update")
     val bag                   = op("bag")
     val copy                  = op("copy")
 
-    val ops                   = Set(update, bag, copy)
+    lazy val ops              = Set(update, bag, copy)
     //@formatter:on
   }
 
   class MutableBag$API(mod: u.ModuleSymbol) extends ModuleAPI {
     //@formatter:off
-    val sym                   = mod
+    lazy val sym              = mod
 
     val apply                 = op("apply")
 
-    val ops                   = Set(apply)
+    lazy val ops              = Set(apply)
     //@formatter:on
   }
 
@@ -164,15 +164,15 @@ protected[emmalanguage] trait API extends AST {
 
   class BackendOpsAPI(mod: u.ModuleSymbol) extends ComprehensionCombinatorsAPI with RuntimeAPI {
     //@formatter:off
-    val sym                   = mod
+    lazy val sym              = mod
 
-    override val ops          = super[ComprehensionCombinatorsAPI].ops ++ super[RuntimeAPI].ops
+    override lazy val ops     = super[ComprehensionCombinatorsAPI].ops ++ super[RuntimeAPI].ops
     //@formatter:on
   }
 
   trait ComprehensionSyntaxAPI extends ModuleAPI {
     //@formatter:off
-    val sym                 = api.Sym[ir.ComprehensionSyntax.type].asModule
+    lazy val sym            = api.Sym[ir.ComprehensionSyntax.type].asModule
 
     val flatten             = op("flatten")
     val generator           = op("generator")
@@ -180,23 +180,23 @@ protected[emmalanguage] trait API extends AST {
     val guard               = op("guard")
     val head                = op("head")
 
-    val ops                 = Set(flatten, generator, comprehension, guard, head)
+    lazy val ops            = Set(flatten, generator, comprehension, guard, head)
     //@formatter:on
   }
 
   trait GraphRepresentationAPI extends ModuleAPI {
     //@formatter:off
-    val sym                   = api.Sym[ir.GraphRepresentation.type].asModule
+    lazy val sym              = api.Sym[ir.GraphRepresentation.type].asModule
 
     val phi                   = op("phi")
 
-    val ops                   = Set(phi)
+    lazy val ops              = Set(phi)
     //@formatter:on
   }
 
   trait DSCFAnnotationsAPI extends ModuleAPI {
     //@formatter:off
-    val sym                   = api.Sym[ir.DSCFAnnotations.type].asModule
+    lazy val sym              = api.Sym[ir.DSCFAnnotations.type].asModule
 
     // Annotation symbols
     val branch                = api.Sym[ir.DSCFAnnotations.branch].asClass
@@ -216,7 +216,7 @@ protected[emmalanguage] trait API extends AST {
     val doWhileAnn            = ann(doWhileLoop)
     val loopBodyAnn           = ann(loopBody)
 
-    val ops                   = Set.empty[u.MethodSymbol]
+    lazy val ops              = Set.empty[u.MethodSymbol]
     //@formatter:on
   }
 
@@ -240,8 +240,8 @@ protected[emmalanguage] trait API extends AST {
 
     object ScalaSeq$ extends DataBag$API(api.Sym[org.emmalanguage.api.ScalaSeq.type].asModule) {
       //@formatter:off
-      val fromDataBag  = op("fromDataBag")
-      override val ops = Set(fromDataBag, from, empty, apply, readCSV, readParquet, readText)
+      val fromDataBag       = op("fromDataBag")
+      override lazy val ops = Set(fromDataBag, from, empty, apply, readCSV, readParquet, readText)
       //@formatter:on
     }
 

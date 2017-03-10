@@ -44,29 +44,6 @@ trait Common extends AST with API {
       target.info.member(api.TermName(name)).asMethod
   }
 
-  @scala.deprecated("Use _API_.BackendOps instead", "pre-0.2")
-  protected[emmalanguage] object ComprehensionCombinators extends IRModule {
-    //@formatter:off
-    val module                = api.Sym[Backend.type].asModule
-
-    val cross                 = op("cross")
-    val equiJoin              = op("equiJoin")
-
-    val ops                   = Set(cross, equiJoin)
-    //@formatter:on
-  }
-
-  @scala.deprecated("Use _API_.BackendOps instead", "pre-0.2")
-  protected[emmalanguage] object Runtime extends IRModule {
-    //@formatter:off
-    val module                = api.Sym[Backend.type].asModule
-
-    val cache                 = op("cache")
-
-    val ops                   = Set(cache)
-    //@formatter:on
-  }
-
   @scala.deprecated("Use _API_.GraphRepresentation instead", "pre-0.2")
   protected[emmalanguage] object GraphRepresentation extends IRModule {
     //@formatter:off

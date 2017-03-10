@@ -43,8 +43,8 @@ private[backend] trait Order extends Common {
      */
     val combinators = Seq(
       _API_.DataBag.ops,
-      ComprehensionCombinators.ops,
-      _API_.MutableBag.ops
+      _API_.MutableBag.ops,
+      _API_.Backend.ops
     ).flatten
 
     /**
