@@ -35,7 +35,7 @@ private[compiler] trait FoldFusion extends Common {
   /** The fold-fusion optimization. */
   object FoldFusion {
 
-    import _API_._
+    import API._
     import UniverseImplicits._
     import Core.{Lang => core}
 

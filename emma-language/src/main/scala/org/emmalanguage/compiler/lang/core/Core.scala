@@ -35,7 +35,7 @@ trait Core extends Common
   with Trampoline {
   this: AlphaEq with Source =>
 
-  import _API_._
+  import API._
   import UniverseImplicits._
 
   /** Core language. */

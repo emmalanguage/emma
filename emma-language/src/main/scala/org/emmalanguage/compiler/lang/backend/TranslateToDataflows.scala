@@ -31,7 +31,7 @@ private[backend] trait TranslateToDataflows extends Common {
   
   private[backend] object TranslateToDataflows {
 
-    import _API_._
+    import API._
     import UniverseImplicits._
     import Core.{Lang => core}
 
@@ -96,7 +96,7 @@ private[backend] trait TranslateToDataflows extends Common {
 
           // Specialize Backend.* as $backend.* calls.
           case Attr.inh(core.DefCall(Some(core.Ref(target)), method, targs, argss), false :: _)
-            if target == _API_.Backend.sym && _API_.Backend.ops(method) =>
+            if target == API.Backend.sym && API.Backend.ops(method) =>
             val translated = backend.info.member(method.name).asTerm
             core.DefCall(backendRef, translated, targs, argss)
 

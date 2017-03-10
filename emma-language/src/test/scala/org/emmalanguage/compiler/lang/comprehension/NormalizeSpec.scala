@@ -37,16 +37,16 @@ class NormalizeSpec extends BaseCompilerSpec {
   val resugarPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lnf,
-      Comprehension.resugar(_API_.DataBag.sym),
+      Comprehension.resugar(API.DataBag.sym),
       Core.inlineLetExprs
     ).compose(_.tree)
 
   val normalizePipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lnf,
-      Comprehension.resugar(_API_.DataBag.sym),
+      Comprehension.resugar(API.DataBag.sym),
       Core.inlineLetExprs,
-      tree => time(Comprehension.normalize(_API_.DataBag.sym)(tree), "normalize")
+      tree => time(Comprehension.normalize(API.DataBag.sym)(tree), "normalize")
     ).compose(_.tree)
 
   // ---------------------------------------------------------------------------

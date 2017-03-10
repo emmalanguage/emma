@@ -42,9 +42,9 @@ private[backend] trait Order extends Common {
      * then that lambda will be called from higher-order context.
      */
     val combinators = Seq(
-      _API_.DataBag.ops,
-      _API_.MutableBag.ops,
-      _API_.Backend.ops
+      API.DataBag.ops,
+      API.MutableBag.ops,
+      API.Backend.ops
     ).flatten
 
     /**
