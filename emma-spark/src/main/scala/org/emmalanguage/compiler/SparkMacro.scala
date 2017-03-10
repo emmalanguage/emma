@@ -33,8 +33,7 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler with SparkCompil
       Core.lift,
       Backend.addCacheCalls,
       Comprehension.combine,
-      Backend.translateToDataflows(SparkAPI.rddModuleSymbol, SparkAPI.backendModuleSymbol),
-      Core.refineModules(Map(API.MutableBag$.sym -> SparkAPI.mutableBagModuleSymbol)),
+      Backend.specialize(SparkAPI),
       Core.inlineLetExprs,
       Core.trampoline
     ).compose(_.tree)

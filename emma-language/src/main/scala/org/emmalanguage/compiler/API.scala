@@ -220,6 +220,22 @@ protected[emmalanguage] trait API extends AST {
     //@formatter:on
   }
 
+  /** Backend-specific APIs. This trait should be implemented by each backend. */
+  trait BackendAPI {
+
+    def implicitTypes: Set[u.Type]
+
+    def DataBag: DataBagAPI
+
+    def DataBag$: DataBag$API
+
+    def MutableBag: MutableBagAPI
+
+    def MutableBag$: MutableBag$API
+
+    def Ops: OpsAPI
+  }
+
   /** Reflection of the Emma API. */
   object API {
 

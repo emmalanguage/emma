@@ -18,17 +18,24 @@ package compiler
 
 trait SparkCompiler extends Compiler {
 
-  override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ Set(
-    api.Type[org.apache.spark.sql.Encoder[Any]].typeConstructor,
-    api.Type[org.apache.spark.sql.SparkSession]
-  )
+  override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ SparkAPI.implicitTypes
 
-  object SparkAPI {
-    lazy val rddModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.SparkRDD")
-    lazy val backendModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.spark.SparkOps")
-    lazy val mutableBagModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.SparkMutableBag")
-    lazy val sessionSymbol = universe.rootMirror.staticClass(s"org.apache.spark.sql.SparkSession")
-    lazy val sessionType = sessionSymbol.info
+  object SparkAPI extends BackendAPI {
+
+    lazy val implicitTypes = Set(
+      api.Type[org.apache.spark.sql.Encoder[Any]].typeConstructor,
+      api.Type[org.apache.spark.sql.SparkSession]
+    )
+
+    lazy val DataBag = new DataBagAPI(api.Sym[org.emmalanguage.api.SparkRDD[Any]].asClass)
+
+    lazy val DataBag$ = new DataBag$API(api.Sym[org.emmalanguage.api.SparkRDD.type].asModule)
+
+    lazy val MutableBag = new MutableBagAPI(api.Sym[org.emmalanguage.api.SparkMutableBag[Any, Any]].asClass)
+
+    lazy val MutableBag$ = new MutableBag$API(api.Sym[org.emmalanguage.api.SparkMutableBag.type].asModule)
+
+    lazy val Ops = new OpsAPI(api.Sym[org.emmalanguage.api.spark.SparkOps.type].asModule)
   }
 
 }

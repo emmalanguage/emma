@@ -23,16 +23,16 @@ import compiler.lang.core.Core
 trait Backend extends Common
   with Caching
   with Order
-  with TranslateToDataflows {
+  with Specialization {
   this: Core =>
 
   import UniverseImplicits._
 
   object Backend {
 
-    /** Delegates to [[TranslateToDataflows.translateToDataflows]]. */
-    def translateToDataflows(bagCompanion: u.ModuleSymbol, ir: u.ModuleSymbol) =
-      TranslateToDataflows.translateToDataflows(bagCompanion, ir)
+    /** Delegates to [[Specialization.specialize]]. */
+    def specialize(backend: BackendAPI) =
+      Specialization.specialize(backend)
 
     /** Delegates to [[Caching.addCacheCalls]]. */
     lazy val addCacheCalls = Caching.addCacheCalls

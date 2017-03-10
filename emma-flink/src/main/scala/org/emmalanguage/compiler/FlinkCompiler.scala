@@ -18,15 +18,24 @@ package compiler
 
 trait FlinkCompiler extends Compiler {
 
-  override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ Set(
-    api.Type[org.apache.flink.api.common.typeinfo.TypeInformation[Any]].typeConstructor,
-    api.Type[org.apache.flink.api.scala.ExecutionEnvironment]
-  )
+  override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ FlinkAPI.implicitTypes
 
-  object FlinkAPI {
-    lazy val bagSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.FlinkDataSet")
-    lazy val backendModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.flink.FlinkOps")
-    lazy val mutableBagModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.FlinkMutableBag")
+  object FlinkAPI extends BackendAPI {
+
+    lazy val implicitTypes = Set(
+      api.Type[org.apache.flink.api.common.typeinfo.TypeInformation[Any]].typeConstructor,
+      api.Type[org.apache.flink.api.scala.ExecutionEnvironment]
+    )
+
+    lazy val DataBag = new DataBagAPI(api.Sym[org.emmalanguage.api.FlinkDataSet[Any]].asClass)
+
+    lazy val DataBag$ = new DataBag$API(api.Sym[org.emmalanguage.api.FlinkDataSet.type].asModule)
+
+    lazy val MutableBag = new MutableBagAPI(api.Sym[org.emmalanguage.api.FlinkMutableBag[Any, Any]].asClass)
+
+    lazy val MutableBag$ = new MutableBag$API(api.Sym[org.emmalanguage.api.FlinkMutableBag.type].asModule)
+
+    lazy val Ops = new OpsAPI(api.Sym[org.emmalanguage.api.flink.FlinkOps.type].asModule)
   }
 
 }

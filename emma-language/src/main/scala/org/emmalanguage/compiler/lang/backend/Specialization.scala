@@ -26,10 +26,10 @@ import shapeless._
 import scala.collection.breakOut
 
 /** Translating to dataflows. */
-private[backend] trait TranslateToDataflows extends Common {
+private[backend] trait Specialization extends Common {
   self: Backend with Core =>
-  
-  private[backend] object TranslateToDataflows {
+
+  private[backend] object Specialization {
 
     import API._
     import UniverseImplicits._
@@ -38,7 +38,7 @@ private[backend] trait TranslateToDataflows extends Common {
     private val scalaSeqRef = Some(api.ModuleRef(ScalaSeq$.sym))
 
     /**
-     * Translates into a dataflow on the given backend.
+     * Specialize backend calls of order 1 to the given [[BackendAPI]].
      *
      * == Preconditions ==
      *
@@ -46,14 +46,36 @@ private[backend] trait TranslateToDataflows extends Common {
      *
      * == Postconditions ==
      *
-     * - A tree where DataBag operations have been translated to dataflow operations.
+     * - A tree where API calls of order 1 have been specialized to the given [[BackendAPI]].
      *
-     * @param bagCompanion The symbol of the target backend.
-     * @param backend The symbol of the target IR module.
+     * @param backendAPI The [[BackendAPI]] to use for specialization.
      */
-    def translateToDataflows(bagCompanion: u.ModuleSymbol, backend: u.ModuleSymbol): u.Tree => u.Tree = {
-      val bagCompanionRef = Some(core.Ref(bagCompanion))
-      val backendRef = Some(core.Ref(backend))
+    def specialize(backendAPI: BackendAPI): u.Tree => u.Tree = {
+
+      // object specialization map
+      val tgs: Map[u.TermSymbol, u.Tree] = Map(
+        //@formatter:off
+        API.DataBag$.sym    -> core.Ref(backendAPI.DataBag$.sym),
+        API.MutableBag$.sym -> core.Ref(backendAPI.MutableBag$.sym),
+        API.Ops.sym         -> core.Ref(backendAPI.Ops.sym)
+        //@formatter:on
+      )
+
+      // methods specialization map
+      val ops: Map[u.MethodSymbol, u.MethodSymbol] =
+        Seq(
+          //@formatter:off
+          API.DataBag$    -> backendAPI.DataBag$,
+          API.MutableBag$ -> backendAPI.MutableBag$,
+          API.Ops         -> backendAPI.Ops
+          //@formatter:on
+        ).flatMap({
+          case (srcOb, tgtOb) =>
+            val srcSorted = srcOb.ops.toSeq.sortBy(_.name.toString)
+            val tgtSorted = tgtOb.ops.toSeq.sortBy(_.name.toString)
+            srcSorted zip tgtSorted
+        })(breakOut)
+
       Order.disambiguate.andThen { case (disambiguated, highOrd) =>
         val fetched = api.TopDown.break.withBindDefs.withBindUses
           .accumulateWith[Set[u.TermSymbol]] {
@@ -88,17 +110,10 @@ private[backend] trait TranslateToDataflows extends Common {
           // Are we nested in a higher-order function?
           case core.ValDef(lhs, _) => highOrd(lhs)
         } (disj).transformWith {
-          // Change DataBag.* method calls as $bacCompanion.* calls.
+          // Specialize API calls.
           case Attr.inh(core.DefCall(Some(core.Ref(target)), method, targs, argss), false :: _)
-            if target == DataBag$.sym && DataBag$.ops(method) =>
-            val translated = bagCompanion.info.member(method.name).asTerm
-            core.DefCall(bagCompanionRef, translated, targs, argss)
-
-          // Specialize Backend.* as $backend.* calls.
-          case Attr.inh(core.DefCall(Some(core.Ref(target)), method, targs, argss), false :: _)
-            if target == API.Ops.sym && API.Ops.ops(method) =>
-            val translated = backend.info.member(method.name).asTerm
-            core.DefCall(backendRef, translated, targs, argss)
+            if (tgs contains target) && (ops contains method) =>
+            core.DefCall(Some(tgs(target)), ops(method), targs, argss)
 
           // Insert fetch calls for method parameters (former variables).
           case Attr.none(core.DefDef(method, tps, pss, core.Let(vals, defs, expr)))
