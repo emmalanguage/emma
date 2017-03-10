@@ -36,7 +36,7 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
     Function.chain(Seq(
       Comprehension.desugar(_API_.DataBag.sym),
       Backend.translateToDataflows(SparkAPI.rddModuleSymbol, SparkAPI.backendModuleSymbol),
-      Core.refineModules(Map(MutableBagAPI.module -> SparkAPI.mutableBagModuleSymbol)),
+      Core.refineModules(Map(_API_.MutableBag$.sym -> SparkAPI.mutableBagModuleSymbol)),
       addContext
     ))
 

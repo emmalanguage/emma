@@ -76,7 +76,7 @@ private[core] trait DCE extends Common {
     private def maybeMutable(method: u.MethodSymbol): Boolean = {
       method.returnType =:= api.Type[Unit]
     } || {
-      MutableBagAPI.update == method
+      _API_.MutableBag.update == method
     }
   }
 }
