@@ -44,20 +44,6 @@ trait Common extends AST with API {
       target.info.member(api.TermName(name)).asMethod
   }
 
-  protected[emmalanguage] object ComprehensionSyntax extends IRModule {
-    //@formatter:off
-    val module                = api.Sym[ir.ComprehensionSyntax.type].asModule
-
-    val flatten               = op("flatten")
-    val generator             = op("generator")
-    val comprehension         = op("comprehension")
-    val guard                 = op("guard")
-    val head                  = op("head")
-
-    val ops                   = Set(flatten, generator, comprehension, guard, head)
-    //@formatter:on
-  }
-
   @scala.deprecated("Use _API_.BackendOps instead", "pre-0.2")
   protected[emmalanguage] object ComprehensionCombinators extends IRModule {
     //@formatter:off

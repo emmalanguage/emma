@@ -368,7 +368,7 @@ private[core] trait ANF extends Common {
     private object Comprehension {
       def unapply(tree: u.Tree): Option[u.Tree] = tree match {
         case src.DefCall(Some(_), method, _, _)
-          if ComprehensionSyntax.ops(method) => Some(tree)
+          if _API_.ComprehensionSyntax.ops(method) => Some(tree)
         case _ => None
       }
     }
