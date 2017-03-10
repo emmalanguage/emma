@@ -44,17 +44,6 @@ trait Common extends AST with API {
       target.info.member(api.TermName(name)).asMethod
   }
 
-  @scala.deprecated("Use _API_.GraphRepresentation instead", "pre-0.2")
-  protected[emmalanguage] object GraphRepresentation extends IRModule {
-    //@formatter:off
-    val module  = api.Sym[ir.GraphRepresentation.type].asModule
-
-    val phi     = op("phi")
-
-    val ops     = Set(phi)
-    //@formatter:on
-  }
-
   @scala.deprecated("Use _API_.DSCFAnnotations instead", "pre-0.2")
   protected[emmalanguage] object DSCFAnnotations extends IRModule {
     import ir.DSCFAnnotations._

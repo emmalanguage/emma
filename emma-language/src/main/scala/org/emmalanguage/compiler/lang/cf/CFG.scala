@@ -36,9 +36,9 @@ private[compiler] trait CFG extends Common {
 
     import UniverseImplicits._
     import Core.{Lang => core}
-    import GraphRepresentation.phi
+    import _API_.GraphRepresentation.phi
 
-    private val module = Some(core.Ref(GraphRepresentation.module))
+    private val module = Some(core.Ref(_API_.GraphRepresentation.sym))
 
     case class FlowGraph[V](
         uses: Map[V, Int],
