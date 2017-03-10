@@ -24,7 +24,7 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
   def parallelizeImpl[T](e: c.Expr[T]): c.Expr[T] = {
     val res = parallelizePipeline(e)
     //c.warning(e.tree.pos, Core.prettyPrint(res))
-    c.Expr[T](unTypeCheck(res))
+    c.Expr[T]((removeShadowedThis andThen unTypeCheck) (res))
   }
 
   private lazy val parallelizePipeline: c.Expr[Any] => u.Tree =
@@ -33,8 +33,7 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
       Core.lift,
       Backend.addCacheCalls,
       Comprehension.combine,
-      Backend.translateToDataflows(FlinkAPI.bagSymbol, FlinkAPI.backendModuleSymbol),
-      Core.refineModules(Map(API.MutableBag$.sym -> FlinkAPI.mutableBagModuleSymbol)),
+      Backend.specialize(FlinkAPI),
       Core.inlineLetExprs,
       Core.trampoline
     ).compose(_.tree)

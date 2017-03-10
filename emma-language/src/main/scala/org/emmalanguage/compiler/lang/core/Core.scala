@@ -359,17 +359,6 @@ trait Core extends Common
           s"The tree:\n-----\n$xs\n-----\nIts type: `${xs.tpe}`")
       api.Type.arg(1, xs.tpe)
     }
-
-    /**
-     * Refine modules.
-     */
-    def refineModules(map: Map[u.ModuleSymbol, u.ModuleSymbol]): u.Tree => u.Tree = {
-      import Lang._
-      api.TopDown.transform({
-        case DefCall(Some(Ref(tgt: u.ModuleSymbol)), method, targs, argss)
-          if map.contains(tgt) => DefCall(Some(Ref(map(tgt))), method, targs, argss)
-      })._tree
-    }
   }
 
 }
