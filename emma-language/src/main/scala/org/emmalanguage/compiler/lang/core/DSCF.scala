@@ -90,8 +90,8 @@ private[core] trait DSCF extends Common {
   private[core] object DSCF {
 
     import u.Flag._
+    import _API_.DSCFAnnotations._
     import UniverseImplicits._
-    import DSCFAnnotations._
     import Core.{Lang => core}
     import Source.{Lang => src}
 

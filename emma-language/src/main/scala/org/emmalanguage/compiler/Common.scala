@@ -44,37 +44,6 @@ trait Common extends AST with API {
       target.info.member(api.TermName(name)).asMethod
   }
 
-  @scala.deprecated("Use _API_.DSCFAnnotations instead", "pre-0.2")
-  protected[emmalanguage] object DSCFAnnotations extends IRModule {
-    import ir.DSCFAnnotations._
-    //@formatter:off
-    val module        = api.Sym[ir.DSCFAnnotations.type].asModule
-
-    // Annotation symbols
-    val branch        = api.Sym[branch].asClass
-    val loop          = api.Sym[loop].asClass
-    val suffix        = api.Sym[suffix].asClass
-    val thenBranch    = api.Sym[thenBranch].asClass
-    val elseBranch    = api.Sym[elseBranch].asClass
-    val whileLoop     = api.Sym[whileLoop].asClass
-    val doWhileLoop   = api.Sym[doWhileLoop].asClass
-    val loopBody      = api.Sym[loopBody].asClass
-
-    private def ann(sym: u.ClassSymbol) =
-      u.Annotation(api.Inst(sym.toType, argss = Seq(Seq.empty)))
-
-    // Annotation trees
-    val suffixAnn     = ann(suffix)
-    val thenAnn       = ann(thenBranch)
-    val elseAnn       = ann(elseBranch)
-    val whileAnn      = ann(whileLoop)
-    val doWhileAnn    = ann(doWhileLoop)
-    val loopBodyAnn   = ann(loopBody)
-
-    val ops           = Set.empty[u.MethodSymbol]
-    //@formatter:on
-  }
-
   /** Common validation helpers. */
   object Validation {
 
