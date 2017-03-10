@@ -27,13 +27,8 @@ import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
 import scala.language.higherKinds
 
-/**
- * IR nodes added by backend-agnostic transformations.
- *
- * Do not use those directly unless you want to hardcode physical execution aspects such as
- * join order and caching you know exactly what you are doing.
- */
-object Backend extends ComprehensionCombinators[SparkSession] with Runtime[SparkSession] {
+/** Spark backend operators. */
+object SparkOps extends ComprehensionCombinators[SparkSession] with Runtime[SparkSession] {
 
   import Meta.Projections._
   import SparkRDD.wrap

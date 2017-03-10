@@ -25,7 +25,7 @@ trait FlinkCompiler extends Compiler {
 
   object FlinkAPI {
     lazy val bagSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.FlinkDataSet")
-    lazy val backendModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.flink.Backend")
+    lazy val backendModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.flink.FlinkOps")
     lazy val mutableBagModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.FlinkMutableBag")
   }
 

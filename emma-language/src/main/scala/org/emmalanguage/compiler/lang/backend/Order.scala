@@ -32,6 +32,7 @@ import shapeless._
 private[backend] trait Order extends Common {
   self: Backend with Core =>
 
+  import API._
   import Core.{Lang => core}
   import UniverseImplicits._
 
@@ -42,9 +43,9 @@ private[backend] trait Order extends Common {
      * then that lambda will be called from higher-order context.
      */
     val combinators = Seq(
-      API.DataBag.ops,
-      API.MutableBag.ops,
-      API.Backend.ops
+      DataBag.ops,
+      MutableBag.ops,
+      Ops.ops
     ).flatten
 
     /**

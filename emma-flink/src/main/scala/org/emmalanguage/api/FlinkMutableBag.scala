@@ -19,7 +19,7 @@ package api
 import FlinkMutableBag.State
 import Meta.Projections._
 import flink._
-import flink.Backend.cache
+import flink.FlinkOps.cache
 
 import org.apache.flink.api.scala.DataSet
 import org.apache.flink.api.scala.ExecutionEnvironment

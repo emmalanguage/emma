@@ -17,7 +17,7 @@ package org.emmalanguage
 package compiler.lang.backend
 
 import api.DataBag
-import api.backend.Backend._
+import api.backend.LocalOps._
 import compiler.BaseCompilerSpec
 
 /** A spec for order disambiguation. */

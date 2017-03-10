@@ -162,7 +162,7 @@ protected[emmalanguage] trait API extends AST {
     //@formatter:on
   }
 
-  class BackendOpsAPI(mod: u.ModuleSymbol) extends ComprehensionCombinatorsAPI with RuntimeAPI {
+  class OpsAPI(mod: u.ModuleSymbol) extends ComprehensionCombinatorsAPI with RuntimeAPI {
     //@formatter:off
     lazy val sym              = mod
 
@@ -249,7 +249,7 @@ protected[emmalanguage] trait API extends AST {
 
     object MutableBag$ extends MutableBag$API(api.Sym[org.emmalanguage.api.MutableBag.type].asModule)
 
-    object Backend extends BackendOpsAPI(api.Sym[org.emmalanguage.api.backend.Backend.type].asModule)
+    object Ops extends OpsAPI(api.Sym[org.emmalanguage.api.backend.LocalOps.type].asModule)
 
     object ComprehensionSyntax extends ComprehensionSyntaxAPI
 

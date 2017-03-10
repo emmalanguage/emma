@@ -32,11 +32,12 @@ private[backend] trait Caching extends Common {
 
   private[backend] object Caching {
 
+    import API._
     import Core.{Lang => core}
     import UniverseImplicits._
 
-    private val runtime = Some(core.Ref(API.Backend.sym))
-    private val cache   = API.Backend.cache
+    private val runtime = Some(core.Ref(Ops.sym))
+    private val cache   = Ops.cache
 
     /** Is `sym` a method defining a loop or the body of a loop? */
     private def isLoop(sym: u.Symbol) = is.method(sym) &&
@@ -44,7 +45,7 @@ private[backend] trait Caching extends Common {
 
     /** Does `sym` have a type of `DataBag` or a subtype? */
     private def isDataBag(sym: u.Symbol) =
-      api.Type.constructor(sym.info) =:= API.DataBag.tpe
+      api.Type.constructor(sym.info) =:= DataBag.tpe
 
     /** Caches `x` as the new value `y`. */
     private def cacheAs(x: u.TermSymbol, y: u.TermSymbol) = {

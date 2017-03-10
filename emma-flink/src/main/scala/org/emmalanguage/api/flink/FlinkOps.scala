@@ -29,13 +29,8 @@ import org.apache.flink.core.fs.FileSystem
 
 import java.net.URI
 
-/**
- * IR nodes added by backend-agnostic transformations.
- *
- * Do not use those directly unless you want to hardcode physical execution aspects such as
- * join order and caching you know exactly what you are doing.
- */
-object Backend extends ComprehensionCombinators[FlinkEnv] with Runtime[FlinkEnv] {
+/** Flink backend operators. */
+object FlinkOps extends ComprehensionCombinators[FlinkEnv] with Runtime[FlinkEnv] {
 
   import FlinkDataSet.typeInfoForType
   import FlinkDataSet.wrap

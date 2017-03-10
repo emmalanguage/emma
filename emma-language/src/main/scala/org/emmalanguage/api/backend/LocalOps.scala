@@ -19,12 +19,12 @@ package api.backend
 import api._
 
 /**
- * Nodes added by backend-agnostic transformations.
+ * Operators added by backend-agnostic transformations.
  *
  * Do not use those directly unless you want to hardcode physical execution aspects such as
- * join order and caching you know exactly what you are doing.
+ * join order and caching and you know exactly what you are doing.
  */
-object Backend extends ComprehensionCombinators[LocalEnv] with Runtime[LocalEnv] {
+object LocalOps extends ComprehensionCombinators[LocalEnv] with Runtime[LocalEnv] {
 
   import Meta.Projections._
   import ScalaSeq.wrap
