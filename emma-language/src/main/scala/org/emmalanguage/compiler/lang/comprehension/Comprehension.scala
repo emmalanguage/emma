@@ -51,7 +51,7 @@ trait Comprehension extends Common
 
       //@formatter:off
       val Monad  = monad.asType.toType.typeConstructor
-      val module = Some(core.Ref(ComprehensionSyntax.module))
+      val module = Some(core.Ref(ComprehensionSyntax.sym))
       //@formatter:on
 
       // -----------------------------------------------------------------------
