@@ -34,7 +34,7 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
       Backend.addCacheCalls,
       Comprehension.combine,
       Backend.translateToDataflows(FlinkAPI.bagSymbol, FlinkAPI.backendModuleSymbol),
-      Core.refineModules(Map(MutableBagAPI.module -> FlinkAPI.mutableBagModuleSymbol)),
+      Core.refineModules(Map(_API_.MutableBag$.sym -> FlinkAPI.mutableBagModuleSymbol)),
       Core.inlineLetExprs,
       Core.trampoline
     ).compose(_.tree)

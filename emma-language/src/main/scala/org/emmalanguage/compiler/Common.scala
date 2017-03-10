@@ -44,22 +44,6 @@ trait Common extends AST with API {
       target.info.member(api.TermName(name)).asMethod
   }
 
-  /** A set of API method symbols to be comprehended. */
-  @scala.deprecated("Use _API_.MutableBag instead", "pre-0.2")
-  protected[emmalanguage] object MutableBagAPI extends IRModule {
-    //@formatter:off
-    val module                = api.Sym[org.emmalanguage.api.MutableBag.type].asModule
-    val clzSym                = api.Sym[org.emmalanguage.api.MutableBag[Any, Any]].asClass
-
-    val apply                 = op("apply")
-    val update                = methodIn(clzSym, "update")
-    val bag                   = methodIn(clzSym, "bag")
-    val copy                  = methodIn(clzSym, "copy")
-
-    val ops                   = Set(apply, update, bag, copy)
-    //@formatter:on
-  }
-
   protected[emmalanguage] object ComprehensionSyntax extends IRModule {
     //@formatter:off
     val module                = api.Sym[ir.ComprehensionSyntax.type].asModule

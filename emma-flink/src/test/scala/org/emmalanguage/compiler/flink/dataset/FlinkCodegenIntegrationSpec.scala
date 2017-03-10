@@ -38,7 +38,7 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
     Function.chain(Seq(
       Comprehension.desugar(_API_.DataBag.sym),
       Backend.translateToDataflows(FlinkAPI.bagSymbol, FlinkAPI.backendModuleSymbol),
-      Core.refineModules(Map(MutableBagAPI.module -> FlinkAPI.mutableBagModuleSymbol)),
+      Core.refineModules(Map(_API_.MutableBag$.sym -> FlinkAPI.mutableBagModuleSymbol)),
       addContext
     ))
 
