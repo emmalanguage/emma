@@ -120,7 +120,7 @@ object ScalaSeq extends DataBagCompanion[LocalEnv] {
   ): DataBag[A] = new ScalaSeq(ParquetScalaSupport(format).read(path).toStream)
 
   // This is used in the code generation in TranslateToDataflows when inserting fetches
-  def byFetch[A](bag: DataBag[A]): DataBag[A] =
+  def fromDataBag[A](bag: DataBag[A]): DataBag[A] =
     new ScalaSeq(bag.fetch())
 
   // ---------------------------------------------------------------------------

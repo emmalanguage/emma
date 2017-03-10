@@ -46,7 +46,7 @@ trait Compiler extends AlphaEq
   override val universe: Universe
 
   /** Implicit types to be removed */
-  lazy val implicitTypes: Set[u.Type] = API.implicitTypes
+  lazy val implicitTypes: Set[u.Type] = _API_.implicitTypes
 
   /** Standard pipeline prefix. Brings a tree into a form convenient for transformation. */
   lazy val preProcess: Seq[u.Tree => u.Tree] = Seq(

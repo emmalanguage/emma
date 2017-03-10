@@ -68,9 +68,9 @@ class FoldFusionSpec extends BaseCompilerSpec {
       }.tree.asInstanceOf[u.Tree])
 
       val calls = defCalls(fused)
-      calls.count(API.foldOps) should be (1)
-      calls.count(API.monadOps) should be (0)
-      calls.filter(API.foldOps) should contain only API.fold
+      calls.count(_API_.DataBag.foldOps) should be (1)
+      calls.count(_API_.DataBag.monadOps) should be (0)
+      calls.filter(_API_.DataBag.foldOps) should contain only _API_.DataBag.fold
     }
 
     "one-layer cata-fusion" in {
@@ -83,9 +83,9 @@ class FoldFusionSpec extends BaseCompilerSpec {
       }.tree.asInstanceOf[u.Tree])
 
       val calls = defCalls(fused)
-      calls.count(API.foldOps) should be (3)
-      calls.count(API.monadOps) should be (0)
-      calls.filter(API.foldOps) should contain only API.fold
+      calls.count(_API_.DataBag.foldOps) should be (3)
+      calls.count(_API_.DataBag.monadOps) should be (0)
+      calls.filter(_API_.DataBag.foldOps) should contain only _API_.DataBag.fold
     }
 
     "two-layer banana-fusion" in {
@@ -99,9 +99,9 @@ class FoldFusionSpec extends BaseCompilerSpec {
       }.tree.asInstanceOf[u.Tree])
 
       val calls = defCalls(fused)
-      calls.count(API.foldOps) should be (1)
-      calls.count(API.monadOps) should be (0)
-      calls.filter(API.foldOps) should contain only API.fold
+      calls.count(_API_.DataBag.foldOps) should be (1)
+      calls.count(_API_.DataBag.monadOps) should be (0)
+      calls.filter(_API_.DataBag.foldOps) should contain only _API_.DataBag.fold
     }
 
     "two-layer cata-fusion" in {
@@ -110,9 +110,9 @@ class FoldFusionSpec extends BaseCompilerSpec {
       }.tree.asInstanceOf[u.Tree])
 
       val calls = defCalls(fused)
-      calls.count(API.foldOps) should be (1)
-      calls.count(API.monadOps) should be (0)
-      calls.filter(API.foldOps) should contain only API.fold
+      calls.count(_API_.DataBag.foldOps) should be (1)
+      calls.count(_API_.DataBag.monadOps) should be (0)
+      calls.filter(_API_.DataBag.foldOps) should contain only _API_.DataBag.fold
     }
 
     "preserving data dependencies" in {
@@ -128,9 +128,9 @@ class FoldFusionSpec extends BaseCompilerSpec {
       }.tree.asInstanceOf[u.Tree])
 
       val calls = defCalls(fused)
-      calls.count(API.foldOps) should be (2)
-      calls.count(API.monadOps) should be (0)
-      calls.filter(API.foldOps) should contain only API.fold
+      calls.count(_API_.DataBag.foldOps) should be (2)
+      calls.count(_API_.DataBag.monadOps) should be (0)
+      calls.filter(_API_.DataBag.foldOps) should contain only _API_.DataBag.fold
     }
 
     "more than 22 independent folds" in {
@@ -144,9 +144,9 @@ class FoldFusionSpec extends BaseCompilerSpec {
       """)
 
       val calls = defCalls(fused)
-      calls.count(API.foldOps) should be (1)
-      calls.count(API.monadOps) should be (0)
-      calls.filter(API.foldOps) should contain only API.fold
+      calls.count(_API_.DataBag.foldOps) should be (1)
+      calls.count(_API_.DataBag.monadOps) should be (0)
+      calls.filter(_API_.DataBag.foldOps) should contain only _API_.DataBag.fold
     }
   }
 }

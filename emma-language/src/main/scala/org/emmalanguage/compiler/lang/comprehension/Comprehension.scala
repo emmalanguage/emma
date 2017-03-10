@@ -25,6 +25,7 @@ trait Comprehension extends Common
   with Combination {
   self: Core =>
 
+  import _API_._
   import UniverseImplicits._
   import Core.{Lang => core}
 
@@ -63,7 +64,7 @@ trait Comprehension extends Common
           .member(api.TermName("map")).asMethod
 
         override def apply(xs: u.Tree)(f: u.Tree): u.Tree = {
-          assert(xs.tpe.typeConstructor == API.DataBag)
+          assert(xs.tpe.typeConstructor == DataBag.tpe)
           core.DefCall(Some(xs), symbol, Seq(elemTpe(f)), Seq(Seq(f)))
         }
 
@@ -83,7 +84,7 @@ trait Comprehension extends Common
           .member(api.TermName("flatMap")).asMethod
 
         override def apply(xs: u.Tree)(f: u.Tree): u.Tree = {
-          assert(api.Type.arg(2, f.tpe).typeConstructor == API.DataBag)
+          assert(api.Type.arg(2, f.tpe).typeConstructor == DataBag.tpe)
           core.DefCall(Some(xs), symbol, Seq(elemTpe(f)), Seq(Seq(f)))
         }
 

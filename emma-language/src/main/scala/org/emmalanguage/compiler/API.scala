@@ -21,8 +21,6 @@ import ast.AST
 /** Common IR tools. */
 protected[emmalanguage] trait API extends AST {
 
-  import org.emmalanguage.{api => eapi}
-
   trait ReflectedSymbol[Symbol <: u.Symbol] {
     def sym: Symbol
 
@@ -36,14 +34,14 @@ protected[emmalanguage] trait API extends AST {
   }
 
   trait ClassAPI extends ReflectedSymbol[u.ClassSymbol] {
-    def tpe = api.Type.constructor(sym.info)
+    def tpe = sym.toTypeConstructor
   }
 
   trait ModuleAPI extends ReflectedSymbol[u.ModuleSymbol]
 
-  trait emma$API extends ModuleAPI {
+  trait emmaAPI extends ModuleAPI {
     //@formatter:off
-    val sym                   = api.Sym[eapi.emma.`package`.type].asModule
+    val sym                   = api.Sym[org.emmalanguage.api.emma.`package`.type].asModule
 
     val prettyPrint           = op("prettyPrint")
     val quote                 = op("quote")
@@ -225,21 +223,33 @@ protected[emmalanguage] trait API extends AST {
   /** Reflection of the Emma API. */
   object _API_ {
 
-    object emma$ extends emma$API
+    val implicitTypes = Set(
+      api.Type[org.emmalanguage.api.Meta[Any]].typeConstructor,
+      api.Type[org.emmalanguage.api.LocalEnv],
+      api.Type[org.emmalanguage.io.csv.CSVConverter[Any]].typeConstructor,
+      api.Type[org.emmalanguage.io.parquet.ParquetConverter[Any]].typeConstructor
+    )
 
-    object DataBag extends DataBagAPI(api.Sym[eapi.DataBag[Any]].asClass)
+    object emma extends emmaAPI
 
-    object DataBag$ extends DataBag$API(api.Sym[eapi.DataBag.type].asModule)
+    object DataBag extends DataBagAPI(api.Sym[org.emmalanguage.api.DataBag[Any]].asClass)
 
-    object ScalaSeq extends DataBagAPI(api.Sym[eapi.ScalaSeq[Any]].asClass)
+    object DataBag$ extends DataBag$API(api.Sym[org.emmalanguage.api.DataBag.type].asModule)
 
-    object ScalaSeq$ extends DataBag$API(api.Sym[eapi.ScalaSeq.type].asModule)
+    object ScalaSeq extends DataBagAPI(api.Sym[org.emmalanguage.api.ScalaSeq[Any]].asClass)
 
-    object MutableBag extends MutableBagAPI(api.Sym[eapi.MutableBag[Any, Any]].asClass)
+    object ScalaSeq$ extends DataBag$API(api.Sym[org.emmalanguage.api.ScalaSeq.type].asModule) {
+      //@formatter:off
+      val fromDataBag  = op("fromDataBag")
+      override val ops = Set(fromDataBag, from, empty, apply, readCSV, readParquet, readText)
+      //@formatter:on
+    }
 
-    object MutableBag$ extends MutableBag$API(api.Sym[eapi.MutableBag.type].asModule)
+    object MutableBag extends MutableBagAPI(api.Sym[org.emmalanguage.api.MutableBag[Any, Any]].asClass)
 
-    object Backend extends BackendOpsAPI(api.Sym[eapi.backend.Backend.type].asModule)
+    object MutableBag$ extends MutableBag$API(api.Sym[org.emmalanguage.api.MutableBag.type].asModule)
+
+    object Backend extends BackendOpsAPI(api.Sym[org.emmalanguage.api.backend.Backend.type].asModule)
 
     object ComprehensionSyntax extends ComprehensionSyntaxAPI
 

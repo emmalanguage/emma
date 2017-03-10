@@ -34,7 +34,7 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
 
   override lazy val backendPipeline: u.Tree => u.Tree =
     Function.chain(Seq(
-      Comprehension.desugar(API.bagSymbol),
+      Comprehension.desugar(_API_.DataBag.sym),
       Backend.translateToDataflows(SparkAPI.rddModuleSymbol, SparkAPI.backendModuleSymbol),
       Core.refineModules(Map(MutableBagAPI.module -> SparkAPI.mutableBagModuleSymbol)),
       addContext
