@@ -459,7 +459,7 @@
                         <arg>-Xmax-classfile-name</arg>
                         <arg>140</arg>
                         <arg>-Xlint:package-object-classes</arg>
-                        <!--<arg>-Xfatal-warnings</arg>-->
+                        <arg>-Xfatal-warnings</arg>
                         <!--<arg>-Xdisable-assertions</arg>-->
                     </args>
                 </configuration>
