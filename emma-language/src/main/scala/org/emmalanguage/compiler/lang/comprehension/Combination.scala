@@ -29,7 +29,7 @@ private[comprehension] trait Combination extends Common {
 
   private[comprehension] object Combination {
 
-    import _API_._
+    import API._
     import Comprehension._
     import Core.{Lang => core}
     import UniverseImplicits._

@@ -221,7 +221,7 @@ protected[emmalanguage] trait API extends AST {
   }
 
   /** Reflection of the Emma API. */
-  object _API_ {
+  object API {
 
     val implicitTypes = Set(
       api.Type[org.emmalanguage.api.Meta[Any]].typeConstructor,

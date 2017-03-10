@@ -18,7 +18,7 @@ package compiler
 
 trait SparkCompiler extends Compiler {
 
-  override lazy val implicitTypes: Set[u.Type] = _API_.implicitTypes ++ Set(
+  override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ Set(
     api.Type[org.apache.spark.sql.Encoder[Any]].typeConstructor,
     api.Type[org.apache.spark.sql.SparkSession]
   )

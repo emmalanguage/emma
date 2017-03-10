@@ -149,11 +149,11 @@ private[core] trait CSE extends Common {
         val branch    = rand.nextInt()
         val let       = rand.nextInt()
         // Comprehensions
-        val comprehend = _API_.ComprehensionSyntax.comprehension.##
-        val generator  = _API_.ComprehensionSyntax.generator.##
-        val guard      = _API_.ComprehensionSyntax.guard.##
-        val head       = _API_.ComprehensionSyntax.head.##
-        val flatten    = _API_.ComprehensionSyntax.flatten.##
+        val comprehend = API.ComprehensionSyntax.comprehension.##
+        val generator  = API.ComprehensionSyntax.generator.##
+        val guard      = API.ComprehensionSyntax.guard.##
+        val head       = API.ComprehensionSyntax.head.##
+        val flatten    = API.ComprehensionSyntax.flatten.##
         //@formatter:on
       }
 
