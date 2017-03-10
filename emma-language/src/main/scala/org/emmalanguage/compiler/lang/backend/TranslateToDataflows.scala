@@ -96,7 +96,7 @@ private[backend] trait TranslateToDataflows extends Common {
 
           // Specialize Backend.* as $backend.* calls.
           case Attr.inh(core.DefCall(Some(core.Ref(target)), method, targs, argss), false :: _)
-            if target == API.Backend.sym && API.Backend.ops(method) =>
+            if target == API.Ops.sym && API.Ops.ops(method) =>
             val translated = backend.info.member(method.name).asTerm
             core.DefCall(backendRef, translated, targs, argss)
 

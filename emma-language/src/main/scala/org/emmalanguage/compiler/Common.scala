@@ -16,7 +16,6 @@
 package org.emmalanguage
 package compiler
 
-import api.backend.Backend
 import ast.AST
 
 import org.scalactic._

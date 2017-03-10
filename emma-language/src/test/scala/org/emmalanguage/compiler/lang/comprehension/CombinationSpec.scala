@@ -17,7 +17,7 @@ package org.emmalanguage
 package compiler.lang.comprehension
 
 import api._
-import api.backend.Backend._
+import api.backend.LocalOps._
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import test.schema.Marketing._

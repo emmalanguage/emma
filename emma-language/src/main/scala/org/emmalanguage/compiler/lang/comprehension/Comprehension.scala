@@ -209,11 +209,11 @@ trait Comprehension extends Common
 
     private[compiler] object Combinators {
 
-      val module = Some(core.Ref(API.Backend.sym))
+      val module = Some(core.Ref(Ops.sym))
 
       object Cross {
 
-        val symbol = API.Backend.cross
+        val symbol = Ops.cross
 
         def apply(xs: u.Tree, ys: u.Tree): u.Tree =
           core.DefCall(module, symbol, Seq(Core.bagElemTpe(xs), Core.bagElemTpe(ys)), Seq(Seq(xs, ys)))
@@ -226,7 +226,7 @@ trait Comprehension extends Common
 
       object EquiJoin {
 
-        val symbol = API.Backend.equiJoin
+        val symbol = Ops.equiJoin
 
         def apply(kx: u.Tree, ky: u.Tree)(xs: u.Tree, ys: u.Tree): u.Tree = {
           val keyTpe = api.Type.lub(Seq(
