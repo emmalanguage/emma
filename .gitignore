@@ -1,6 +1,5 @@
 .cache
 .classpath
-.idea
 .idea/*
 .metadata/*
 .project
@@ -14,3 +13,9 @@ dependency-reduced-pom.xml
 # Ensime specific
 .ensime
 .ensime_cache
+
+# Include some IntelliJ settings
+!.idea/codeStyleSettings.xml
+!.idea/copyright/
+!.idea/inspectionProfiles/
+!.idea/fileTemplates/internal/
