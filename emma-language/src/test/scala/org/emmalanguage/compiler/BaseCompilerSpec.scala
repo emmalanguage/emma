@@ -16,15 +16,15 @@
 package org.emmalanguage
 package compiler
 
-// FIXME: import api._ does not work
-import api.DataBag
-
+import api._
 import lang.TreeMatchers
 
+import org.scalatest.FreeSpec
+import org.scalatest.Matchers
 import org.scalatest.prop.PropertyChecks
-import org.scalatest.{FreeSpec, Matchers}
 
-import java.util.{Properties, UUID}
+import java.util.Properties
+import java.util.UUID
 
 /**
  * Common methods and mixins for all compier specs
@@ -40,7 +40,7 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
   // ---------------------------------------------------------------------------
 
   /** Checks if the given tree compiles, and returns the given tree. */
-  val checkCompile: u.Tree => u.Tree = (tree: u.Tree) => {
+  lazy val checkCompile: u.Tree => u.Tree = (tree: u.Tree) => {
     if (BaseCompilerSpec.compileSpecPipelines) {
       val wrapped = wrapInClass(tree)
       val showed = u.showCode(wrapped)
@@ -49,7 +49,7 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
     tree
   }
 
-  val idPipeline: u.Expr[Any] => u.Tree = {
+  lazy val idPipeline: u.Expr[Any] => u.Tree = {
       (_: u.Expr[Any]).tree
     } andThen {
       compiler.identity(typeCheck = true)
