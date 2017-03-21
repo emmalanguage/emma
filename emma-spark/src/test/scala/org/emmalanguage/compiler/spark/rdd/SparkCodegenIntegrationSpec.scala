@@ -39,7 +39,7 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
       addContext
     ))
 
-  override val idPipeline: u.Expr[Any] => u.Tree = {
+  override lazy val idPipeline: u.Expr[Any] => u.Tree = {
     (_: u.Expr[Any]).tree
   } andThen {
     compiler.pipeline(typeCheck = true)(addContext)

@@ -31,9 +31,6 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
 
   import compiler._
 
-  lazy val flinkDataSet = api.Sym[FlinkDataSet.type].asModule
-  lazy val flinkMutableBag = api.Sym[FlinkMutableBag.type].asModule
-
   override lazy val backendPipeline: u.Tree => u.Tree =
     Function.chain(Seq(
       Comprehension.desugar(API.DataBag.sym),
@@ -41,7 +38,7 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
       addContext
     ))
 
-  override val idPipeline: u.Expr[Any] => u.Tree = {
+  override lazy val idPipeline: u.Expr[Any] => u.Tree = {
     (_: u.Expr[Any]).tree
   } andThen {
     compiler.pipeline(typeCheck = true)(addContext)
