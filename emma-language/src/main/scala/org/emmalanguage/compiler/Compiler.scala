@@ -18,7 +18,6 @@ package compiler
 
 import lang.AlphaEq
 import lang.backend.Backend
-import lang.cf.ControlFlow
 import lang.core.Core
 import lang.libsupport.LibSupport
 import lang.opt.Optimizations
@@ -38,7 +37,6 @@ trait Compiler extends AlphaEq
   with Source
   with Core
   with Backend
-  with ControlFlow
   with GraphTools
   with Optimizations {
 
@@ -48,7 +46,6 @@ trait Compiler extends AlphaEq
   /** Implicit types to be removed */
   lazy val implicitTypes: Set[u.Type] = API.implicitTypes
 
-  /** Standard pipeline prefix. Brings a tree into a form convenient for transformation. */
   lazy val preProcess: Seq[u.Tree => u.Tree] = Seq(
     Source.removeImplicits(implicitTypes),
     fixSymbolTypes,
@@ -58,20 +55,17 @@ trait Compiler extends AlphaEq
     Source.normalize
   )
 
-  /** Standard pipeline suffix. Brings a tree into a form acceptable for `scalac` after being transformed. */
   lazy val postProcess: Seq[u.Tree => u.Tree] = Seq(
     api.Owner.atEncl,
     qualifyStatics,
     restoreTypeTrees
   )
 
-  /** The identity transformation with pre- and post-processing. */
-  def identity(typeCheck: Boolean = false): u.Tree => u.Tree =
-    pipeline(typeCheck)()
-
-  /** Combines a sequence of `transformations` into a pipeline with pre- and post-processing. */
-  def pipeline(typeCheck: Boolean = false, withPre: Boolean = true, withPost: Boolean = true)
-    (transformations: (u.Tree => u.Tree)*): u.Tree => u.Tree = {
+  def pipeline(
+    typeCheck: Boolean = false, withPre: Boolean = true, withPost: Boolean = true
+  )(
+    transformations: (u.Tree => u.Tree)*
+  ): u.Tree => u.Tree = {
 
     val bld = Seq.newBuilder[u.Tree => u.Tree]
     //@formatter:off
