@@ -18,8 +18,8 @@ package compiler
 
 import ast.AST
 
-import org.scalactic._
 import org.scalactic.Accumulation._
+import org.scalactic._
 
 /** Common IR tools. */
 trait Common extends AST with API {
@@ -27,21 +27,25 @@ trait Common extends AST with API {
   import universe._
 
   // --------------------------------------------------------------------------
-  // Emma API
+  // Transformation pipelines API
   // --------------------------------------------------------------------------
 
-  val rootPkg = "org.emmalanguage"
+  /** Standard pipeline prefix. Brings a tree into a form convenient for transformation. */
+  def preProcess: Seq[u.Tree => u.Tree]
 
-  trait IRModule {
-    def module: u.ModuleSymbol
-    def ops: Set[u.MethodSymbol]
+  /** Standard pipeline suffix. Brings a tree into a form acceptable for `scalac` after being transformed. */
+  def postProcess: Seq[u.Tree => u.Tree]
 
-    protected def op(name: String): u.MethodSymbol =
-      methodIn(module, name)
+  /** Combines a sequence of `transformations` into a pipeline with pre- and post-processing. */
+  def pipeline(
+    typeCheck: Boolean = false, withPre: Boolean = true, withPost: Boolean = true
+  )(
+    transformations: (u.Tree => u.Tree)*
+  ): u.Tree => u.Tree
 
-    protected def methodIn(target: u.Symbol, name: String): u.MethodSymbol =
-      target.info.member(api.TermName(name)).asMethod
-  }
+  /** The identity transformation with pre- and post-processing. */
+  def identity(typeCheck: Boolean = false): u.Tree => u.Tree =
+    pipeline(typeCheck)()
 
   /** Common validation helpers. */
   object Validation {
