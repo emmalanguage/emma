@@ -37,7 +37,11 @@ protected[emmalanguage] trait API extends AST {
     def tpe = sym.toTypeConstructor
   }
 
-  trait ModuleAPI extends ReflectedSymbol[u.ModuleSymbol]
+  trait ModuleAPI extends ReflectedSymbol[u.ModuleSymbol] {
+    //@formatter:off
+    lazy val ref              = api.Ref(sym)
+    //@formatter:on
+  }
 
   trait emmaAPI extends ModuleAPI {
     //@formatter:off

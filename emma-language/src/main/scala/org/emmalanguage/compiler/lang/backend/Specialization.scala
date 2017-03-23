@@ -35,7 +35,7 @@ private[backend] trait Specialization extends Common {
     import UniverseImplicits._
     import Core.{Lang => core}
 
-    private val scalaSeqRef = Some(api.ModuleRef(ScalaSeq$.sym))
+    private val scalaSeq = Some(ScalaSeq$.ref)
 
     /**
      * Specialize backend calls of order 1 to the given [[BackendAPI]].
@@ -55,9 +55,9 @@ private[backend] trait Specialization extends Common {
       // object specialization map
       val tgs: Map[u.TermSymbol, u.Tree] = Map(
         //@formatter:off
-        API.DataBag$.sym    -> core.Ref(backendAPI.DataBag$.sym),
-        API.MutableBag$.sym -> core.Ref(backendAPI.MutableBag$.sym),
-        API.Ops.sym         -> core.Ref(backendAPI.Ops.sym)
+        API.DataBag$.sym    -> backendAPI.DataBag$.ref,
+        API.MutableBag$.sym -> backendAPI.MutableBag$.ref,
+        API.Ops.sym         -> backendAPI.Ops.ref
         //@formatter:on
       )
 
@@ -100,7 +100,7 @@ private[backend] trait Specialization extends Common {
                 case _ =>
                   val targs = Seq(api.Type.arg(1, lhs.info))
                   val argss = Seq(Seq(core.Ref(lhs)))
-                  val fetch = core.DefCall(scalaSeqRef, ScalaSeq$.fromDataBag, targs, argss)
+                  val fetch = core.DefCall(scalaSeq, ScalaSeq$.fromDataBag, targs, argss)
                   lhs -> core.ValDef(alias, fetch)
               }
             } (breakOut)
