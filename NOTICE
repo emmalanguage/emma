@@ -24,7 +24,8 @@ This project includes:
   Apache Avro Mapred API under The Apache Software License, Version 2.0
   Apache Commons CLI under Apache License, Version 2.0
   Apache Commons Collections under Apache License, Version 2.0
-  Apache Commons Lang under The Apache Software License, Version 2.0
+  Apache Commons Crypto under Apache License, Version 2.0
+  Apache Commons Lang under Apache License, Version 2.0
   Apache Commons Math under The Apache Software License, Version 2.0
   Apache Hadoop Annotations under The Apache Software License, Version 2.0
   Apache Hadoop Auth under The Apache Software License, Version 2.0
@@ -181,7 +182,6 @@ This project includes:
   LZ4 and xxHash under The Apache Software License, Version 2.0
   machinist under MIT
   macros under Apache License
-  mesos under The Apache Software License, Version 2.0
   Metrics Core under Apache License 2.0
   MinLog under New BSD License
   Netty/All-in-One under Apache License, Version 2.0
