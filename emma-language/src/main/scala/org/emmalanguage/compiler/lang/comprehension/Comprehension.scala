@@ -51,7 +51,7 @@ trait Comprehension extends Common
 
       //@formatter:off
       val Monad  = monad.asType.toType.typeConstructor
-      val module = Some(core.Ref(ComprehensionSyntax.sym))
+      val module = Some(ComprehensionSyntax.ref)
       //@formatter:on
 
       // -----------------------------------------------------------------------
@@ -209,7 +209,7 @@ trait Comprehension extends Common
 
     private[compiler] object Combinators {
 
-      val module = Some(core.Ref(Ops.sym))
+      val module = Some(Ops.ref)
 
       object Cross {
 

@@ -36,7 +36,7 @@ private[backend] trait Caching extends Common {
     import Core.{Lang => core}
     import UniverseImplicits._
 
-    private val runtime = Some(core.Ref(Ops.sym))
+    private val runtime = Some(Ops.ref)
     private val cache   = Ops.cache
 
     /** Is `sym` a method defining a loop or the body of a loop? */

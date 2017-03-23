@@ -38,7 +38,7 @@ private[compiler] trait CFG extends Common {
     import Core.{Lang => core}
     import API.GraphRepresentation.phi
 
-    private val module = Some(core.Ref(API.GraphRepresentation.sym))
+    private val module = Some(API.GraphRepresentation.ref)
 
     case class FlowGraph[V](
         uses: Map[V, Int],
