@@ -31,6 +31,7 @@ import scala.util.hashing.MurmurHash3
 /** A `DataBag` implementation backed by a Spark `Dataset`. */
 class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val rep: Dataset[A]) extends DataBag[A] {
 
+  import Meta.Projections._
   import SparkDataset.encoderForType
   import SparkDataset.wrap
   import api.spark.fromRDD
@@ -114,6 +115,26 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
 
   private lazy val collect: Seq[A] =
     rep.collect()
+
+  // -----------------------------------------------------
+  // Pre-defined folds
+  // -----------------------------------------------------
+
+  override def reduceOption(p: (A, A) => A): Option[A] =
+    try {
+      Option(rep.reduce(p))
+    } catch {
+      case e: UnsupportedOperationException if e.getMessage == "empty collection" => None
+      case e: Throwable => throw e
+    }
+
+  override def find(p: A => Boolean): Option[A] =
+    try {
+      Option(rep.filter(p).head())
+    } catch {
+      case e: NoSuchElementException if e.getMessage == "next on empty iterator" => None
+      case e: Throwable => throw e
+    }
 
   // -----------------------------------------------------
   // equals and hashCode
