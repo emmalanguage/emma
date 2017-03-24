@@ -27,31 +27,28 @@ import org.apache.parquet.schema._
 import scala.Function.const
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 
-private[parquet] class ParquetWriteSupport[A](implicit converter: ParquetConverter[A])
-  extends WriteSupport[A] {
-  import WriteSupport.WriteContext
-
+private[parquet] class ParquetWriteSupport[A](implicit converter: ParquetConverter[A]) extends WriteSupport[A] {
   var consumer: RecordConsumer = _
   var callback: A => Unit = const(())
-  val schema = new MessageType("actor", converter.schema)
 
-  def init(configuration: Configuration): WriteContext = {
+  val schema = {
+    val schema = converter.schema
+    if (schema.isPrimitive) new MessageType(ParquetConverter.defaultName, schema)
+    else new MessageType(schema.getName, schema.asGroupType.getFields)
+  }
+
+  def init(configuration: Configuration) = {
     val metadata = Map.empty[String, String].asJava
     new WriteSupport.WriteContext(schema, metadata)
   }
 
-  def prepareForWrite(recordConsumer: RecordConsumer): Unit = {
+  def prepareForWrite(recordConsumer: RecordConsumer) = {
     consumer = recordConsumer
-    callback = converter.writer(consumer)
+    callback = converter.writer(consumer, top = true)
   }
 
-  def write(record: A): Unit = {
-    consumer.startMessage()
-    consumer.startField(ParquetConverter.defaultField, 0)
+  def write(record: A) =
     callback(record)
-    consumer.endField(ParquetConverter.defaultField, 0)
-    consumer.endMessage()
-  }
 }
 
 private[parquet] object ParquetWriteSupport {
