@@ -61,7 +61,7 @@ class CoGaDB private(coGaDBPath: Path, configPath: Path) {
     CSVScalaSupport[A](csv).write(datPath.toString)(seq)
     // create an "import from csv" dataflow
     val impDfl = ast.ImportFromCsv(dflName, datPath.toString, "|", schemaForType.fields())
-    // import dataflow must be wrapped by a STORE_TABLE operator in CoGaDb, in order to be materialized
+    // import dataflow must be wrapped by a STORE_TABLE operator in CoGaDB, in order to be materialized
     val matDfl = ast.MaterializeResult(dflName, false, impDfl)
     // execute the dataflow
     execute(matDfl, dflName)
@@ -129,7 +129,7 @@ object CoGaDB {
 
   case class ExecutionException(message: String, cause: Throwable) extends RuntimeException
 
-  val csv = CSV(delimiter = '|', quote = Some(' '), header = true)
+  val csv = CSV(delimiter = '|', quote = Some(' '), skipRows = 1)
 
   def apply(coGaDBPath: Path, configPath: Path): CoGaDB =
     new CoGaDB(coGaDBPath.resolve("bin/cogadbd"), configPath)

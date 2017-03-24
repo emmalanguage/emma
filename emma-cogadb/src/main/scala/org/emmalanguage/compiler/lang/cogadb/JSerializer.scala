@@ -17,6 +17,7 @@ package org.emmalanguage
 package compiler.lang.cogadb
 
 import net.liftweb.json._
+import org.apache.jute.compiler.JFloat
 
 import scala.language.implicitConversions
 
@@ -55,7 +56,7 @@ object JSerializer extends Algebra[JValue] {
 
   override def Sort(sortCols: Seq[JValue], child: JValue): JValue =
     JObject(
-      JField("OPERATOR_NAME", "SORT BY"),
+      JField("OPERATOR_NAME", "SORT_BY"),
       JField("SORT_COLUMNS", JArray(sortCols.toList)),
       JField("LEFT_CHILD",child),
       JField("RIGHT_CHILD",JNull)
@@ -90,7 +91,7 @@ object JSerializer extends Algebra[JValue] {
     JObject(
       JField("OPERATOR_NAME", "PROJECTION"),
       JField("ATTRIBUTES", JArray(attrRef.toList.map(a => JObject(
-        JField("",a)
+        JField("ATTRIBUTE_REFERENCE",a)
       ))
 
       )),
@@ -107,11 +108,17 @@ object JSerializer extends Algebra[JValue] {
       JField("RIGHT_CHILD",JNull)
     )
 
+  // TODO: fix atomic predicate
   override def Join(joinType: String, predicate: Seq[JValue], lhs: JValue, rhs: JValue): JValue =
     JObject(
       JField("OPERATOR_NAME", "GENERIC_JOIN"),
       JField("JOIN_TYPE", joinType),
-      JField("PREDICATE", JArray(predicate.toList)),
+      JField("PREDICATE", JObject(
+        JField("PREDICATE_TYPE", "AND_PREDICATE"),
+        JField("PREDICATES", JArray(predicate.toList.map(x => JObject(
+          JField("PREDICATE",x)
+        ))))
+      )),
       JField("LEFT_CHILD", lhs),
       JField("RIGHT_CHILD", rhs)
     )
@@ -240,37 +247,37 @@ object JSerializer extends Algebra[JValue] {
 
   def IntConst(value: Int): JValue =
     JObject(
-      JField("CONSTANT_VALUE", "value"),
+      JField("CONSTANT_VALUE", value),
       JField("CONSTANT_TYPE", "INT")
     )
   def FloatConst(value: Float): JValue =
     JObject(
-      JField("CONSTANT_VALUE", "value"),
+      JField("CONSTANT_VALUE", value),
       JField("CONSTANT_TYPE", "FLOAT")
     )
   def VarCharConst(value: String): JValue =
     JObject(
-      JField("CONSTANT_VALUE", "value"),
+      JField("CONSTANT_VALUE", value),
       JField("CONSTANT_TYPE", "VARCHAR")
     )
   def DoubleConst(value: Double): JValue =
     JObject(
-      JField("CONSTANT_VALUE", "value"),
-      JField("CONSTANT_TYPE", "VARCHAR")
+      JField("CONSTANT_VALUE", value),
+      JField("CONSTANT_TYPE", "DOUBLE")
     )
   def CharConst(value: Char): JValue =
     JObject(
-      JField("CONSTANT_VALUE", "value"),
+      JField("CONSTANT_VALUE", value),
       JField("CONSTANT_TYPE", "CHAR")
     )
   def DateConst(value: String): JValue =
     JObject(
-      JField("CONSTANT_VALUE", "value"),
+      JField("CONSTANT_VALUE", value),
       JField("CONSTANT_TYPE", "DATE")
     )
   def BoolConst(value: String): JValue =
     JObject(
-      JField("CONSTANT_VALUE", "value"),
+      JField("CONSTANT_VALUE", value),
       JField("CONSTANT_TYPE", "BOOLEAN")
     )
 

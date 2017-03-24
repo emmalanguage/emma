@@ -31,6 +31,12 @@ object CoGaDBType {
   implicit val DoubleCoGaDBType = new CoGaDBType[Double] {
     val tpe = "DOUBLE"
   }
+  implicit val FloatCogaDBType = new CoGaDBType[Float] {
+    val tpe = "FLOAT"
+  }
+  implicit val CharCogaDBType = new CoGaDBType[Char] {
+    val tpe = "CHAR"
+  }
   implicit val StringCogaDBType = new CoGaDBType[String] {
     val tpe = "VARCHAR"
   }

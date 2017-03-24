@@ -28,7 +28,7 @@ trait CoGaDBSpec extends BeforeAndAfter {
 
   val dir = "/cogadb"
   val path = tempPath("/cogadb")
-  val coGaDBPath = Paths.get(Option(System.getenv("COGADB_HOME")) getOrElse "/tmp/cogadb")
+  val coGaDBPath = Paths.get(Option(System.getenv("COGADB_HOME")) getOrElse "/home/harry/falcontest/falcon/build")
   val configPath = Paths.get(materializeResource(s"$dir/tpch.coga"))
 
   before {

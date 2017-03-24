@@ -102,7 +102,7 @@ class CSVScalaSupport[A](val format: CSV)(implicit conv: CSVConverter[A])
     // hard-coded
     settings.setIgnoreLeadingWhitespaces(true)
     settings.setIgnoreTrailingWhitespaces(true)
-
+    
     settings
   }
 }

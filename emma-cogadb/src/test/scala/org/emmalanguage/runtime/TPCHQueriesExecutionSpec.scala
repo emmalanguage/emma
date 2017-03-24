@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package runtime
+package api
 
 import api._
 import cogadb.CoGaDB
@@ -26,129 +26,161 @@ import org.scalatest._
 import java.io.File
 import java.nio.file.Paths
 
-class TPCHQueriesExecutionSpec extends FreeSpec with Matchers with BeforeAndAfter {
+class TPCHQueriesExecutionSpec extends FreeSpec with Matchers with CoGaDBSpec {
+  
 
-  val dir = "/cogadb"
-  val path = tempPath("/cogadb")
+  "create and fetch tuples of strings" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq(("foo", "bar"), ("Hello", "World"))
+    val act = CoGaDBTable(exp).fetch()
 
-  implicit var cogadb: CoGaDB = null
+    act shouldBe exp
+  }
+  "create and fetch triples of strings" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq(("foo", "bar"), ("Hello", "World"), ("These are", "Two words"))
+    val act = CoGaDBTable(exp).fetch()
 
-  before {
-    new File(path).mkdirs()
-    //val coGaDBPath = Paths.get(Option(System.getenv("COGADB_HOME")) getOrElse "/tmp/cogadb")
-    //val coGaDBPath = Paths.get("/home/harry/falcon/debug_build_2/")
-    val coGaDBPath = Paths.get("/home/harry/falcontest/falcon/build/")
-    val configPath = Paths.get(materializeResource(s"$dir/tpch.coga"))
-
-    cogadb = CoGaDB(coGaDBPath, configPath)
+    act shouldBe exp
   }
 
-  after {
-    //deleteRecursive(new File(path))
-    cogadb.destroy()
-  }
-
-  "read CUSTOMER" ignore {
-    val plan = ast.TableScan("CUSTOMER")
-    //cogadb.materialize(plan)
-  }
-
-  "sort CUSTOMER" ignore {
-    val plan = ast.Sort(Seq(
-      ast.SortCol("CUSTOMER", "C_CUSTKEY", "INT", "C_CUSTKEY", 1, "ASCENDING")),
-      ast.TableScan("CUSTOMER"))
-
-    //cogadb.materialize(plan)
-  }
-
-  "filter CUSTOMER" ignore {
-    val plan =
-      ast.Selection(
-        Seq(ast.And(Seq(
-          ast.ColConst(
-            ast.AttrRef("CUSTOMER", "CUSTKEY", "CUSTKEY", 1),
-            ast.IntConst(500),
-            ast.LessEqual)))),
-        ast.TableScan("CUSTOMER"))
-
-    //cogadb.materialize(plan)
-  }
-
-
-  "create A" ignore {
-    val schema = Seq(
-      ast.SchemaAttr("INT", "id"),
-      ast.SchemaAttr("VARCHAR", "name"))
-
-    //FIXME: @harrygav
-    val plan = ast.ImportFromCsv("A", "/home/haros/Desktop/emmaToCoGaDB/sample_tables/A.csv", ",", schema)
-
-    //cogadb.materialize(plan)
-    //cogadb.executeGeneral("import_csv_file","dataflow0000 /home/haros/Desktop/emmaToCoGaDB/sample_tables/A.csv")
-
-  }
-
-  "write" ignore {
-    val x = Seq(1)
-    val scan = cogadb.importSeq(x)
-
-    //scan shouldBe
-  }
-
-  "create and fetch pair" in {
-    val A = Seq((1, "foo"), (2, "bar"))
-
-    //load seq in cogadb
-    val scanA = cogadb.importSeq[(Int,String)](A)
-
-    //val written = cogadb.apply(scanA)
-
-    val res = cogadb.exportSeq[(Int,String)](scanA)
-    val exp = Seq((1, "foo"), (2, "bar"))
-
-    res shouldBe exp
-  }
-
-  "create and fetch pair of doubles" in {
-    val A = Seq((1.1, 2.1), (2.1, 3.1))
-
-    //load seq in cogadb
-    val scanA = cogadb.importSeq[(Double,Double)](A)
-
-    //val written = cogadb.apply(scanA)
-
-    val res = cogadb.exportSeq[(Double,Double)](scanA)
+  "create and fetch tuples of doubles" in withCoGaDB { implicit cogadb: CoGaDB =>
     val exp = Seq((1.1, 2.1), (2.1, 3.1))
+    val act = CoGaDBTable(exp).fetch()
 
-    res shouldBe exp
+    act shouldBe exp
+  }
+  "create and fetch triples of doubles" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1.1, 2.1, 3.1), (1.2, 2.2, 3.2))
+    val act = CoGaDBTable(exp).fetch()
+
+    act shouldBe exp
   }
 
-  "cross join A and B" in {
-    val A = Seq((1, 10), (2, 20))
-    val B = Seq((1, 30), (2, 40))
+  "create and fetch pair of ints and strings" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1, "Foo"), (2, "Bar"))
+    val act = CoGaDBTable(exp).fetch()
 
-    val scanA = cogadb.importSeq[(Int, Int)](A)
-    val scanB = cogadb.importSeq[(Int, Int)](B)
+    act shouldBe exp
+  }
+  "create and fetch pair of ints and char" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1, 'F'), (2, 'B'))
+    val act = CoGaDBTable(exp).fetch()
 
-    //print(ast.CrossJoin(scanA, scanB))
-    val res = cogadb.exportSeq[(Int, Int, Int, Int)](ast.CrossJoin(scanA, scanB))
+    act shouldBe exp
+  }
+  "create and fetch tuples of ints and floats" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1, 1.1F), (2, 2.2F))
+    val act = CoGaDBTable(exp).fetch()
 
-    //print(res)
+    act shouldBe exp
+  }
+  "create and fetch tuples of floats" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1.1F, 1.2F), (2.1F, 2.2F))
+    val act = CoGaDBTable(exp).fetch()
 
-    //val res = cogadb.importSeq[(Int, Int, Int, Int)](crossed)
+    act shouldBe exp
+  }
+  "create and fetch triples of floats" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1.1F, 1.2F, 1.3F), (2.1F, 2.2F, 2.3F))
+    val act = CoGaDBTable(exp).fetch()
 
-    //println(res)
-    /*val res = cogadb.exportSeq[(Int, String, Double)](
-      cogadb.
-        CrossJoin(
-        cogadb.importSeq(A),
-        cogadb.importSeq(B)))*/
-    val exp = for (a <- A; b <- B) yield (a._1, a._2, b._1, b._2)
+    act shouldBe exp
+  }
+  "create and fetch quadruples of floats" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1.1F, 1.2F, 1.3F, 1.4F), (2.1F, 2.2F, 2.3F, 2.4F))
+    val act = CoGaDBTable(exp).fetch()
 
-    res shouldBe exp
+    act shouldBe exp
+  }
+  "create and fetch quintuples of floats" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1.1F, 1.2F, 1.3F, 1.4F, 1.5F), (2.1F, 2.2F, 2.3F, 2.4F, 2.5F))
+    val act = CoGaDBTable(exp).fetch()
+
+    act shouldBe exp
+  }
+  "create and fetch sextuples of floats" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1.1F, 1.2F, 1.3F, 1.4F, 1.5F, 1.6F), (2.1F, 2.2F, 2.3F, 2.4F, 2.5F, 2.6F))
+    val act = CoGaDBTable(exp).fetch()
+
+    act shouldBe exp
   }
 
-  "create and fetch empty" in {
+  "create and fetch tuples of ints" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1, 2), (3, 4))
+    val act = CoGaDBTable(exp).fetch()
+
+    act shouldBe exp
+  }
+  "create and fetch triples of ints" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1, 2, 3), (7, 8, 9))
+    val act = CoGaDBTable(exp).fetch()
+
+    act shouldBe exp
+  }
+  "create and fetch quintuples of ints" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1, 2, 3, 4, 5), (7, 8, 9, 10, 11))
+    val act = CoGaDBTable(exp).fetch()
+
+    act shouldBe exp
+  }
+  "create and fetch sextuples of ints" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val exp = Seq((1, 2, 3, 4, 5, 6), (7, 8, 9, 10, 11, 12))
+    val act = CoGaDBTable(exp).fetch()
+
+    act shouldBe exp
+  }
+
+
+  "test cross join" in withCoGaDB { implicit cogadb: CoGaDB =>
+    val aSeq = Seq((1, 10), (2, 20))
+    val bSeq = Seq((3, 30), (4, 40))
+
+    val as = new CoGaDBTable[(Int,String)](cogadb.importSeq(aSeq))
+    val bs = new CoGaDBTable[(Int,String)](cogadb.importSeq(bSeq))
+
+    val act = new CoGaDBTable[(Int, Int, Int, Int)]({
+      ast.CrossJoin(as.rep, bs.rep)
+    })
+    //val res = cogadb.exportSeq[(Int, Int, Int, Int)](ast.CrossJoin(as.rep, bs.rep))
+
+    val exp = for (a <- aSeq; b <- bSeq) yield (a._1, a._2, b._1, b._2)
+
+    act.fetch().toList should contain theSameElementsAs exp
+  }
+
+  "create and fetch empty" in withCoGaDB { implicit cogadb: CoGaDB =>
     CoGaDBTable.empty[Int].fetch() shouldBe Seq.empty[Int]
+  }
+
+  "test join" in withCoGaDB { implicit cogadb: CoGaDB =>
+
+    val as = new CoGaDBTable[(Int,String)](cogadb.importSeq(Seq((1, "Foo"), (2, "Hello"))))
+    val bs = new CoGaDBTable[(Int,String)](cogadb.importSeq(Seq((1, "Bar"), (2, "World"))))
+
+    val act = new CoGaDBTable[(Int,String,String)]({
+      val joinPred = Seq(
+        ast.ColCol(
+          lhs = ast.AttrRef("DATAFLOW0000", "_1", "_1"),
+          rhs = ast.AttrRef("DATAFLOW0001", "_1", "_1"),
+          cmp = ast.Equal
+        )
+      )
+      val projectedFields = Seq(
+        ast.AttrRef("DATAFLOW0000", "_1", "_1"),
+        ast.AttrRef("DATAFLOW0000", "_2", "_2"),
+        ast.AttrRef("DATAFLOW0001", "_2", "_3")
+      )
+
+      ast.Projection(projectedFields,
+        ast.Join("INNER_JOIN", joinPred, as.rep, bs.rep))
+    })
+
+    val exp = for {
+      a <- as.fetch()
+      b <- bs.fetch()
+      if a._1 == b._1
+    } yield (a._1, a._2, b._2)
+
+    act.fetch() should contain theSameElementsAs exp
+
   }
 }

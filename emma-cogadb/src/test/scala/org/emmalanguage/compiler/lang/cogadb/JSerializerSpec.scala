@@ -71,17 +71,17 @@ class JSerializerSpec extends FreeSpec with Matchers {
 
     //join
 
-    val joinPred = ast.And(Seq(
+    val joinPred = Seq(
       ast.ColCol(
         lhs = ast.AttrRef("SUPPLIER","S_SUPPKEY","S_SUPPKEY"),
         rhs = ast.AttrRef("PARTSUPP","PS_SUPPKEY","PS_SUPPKEY"),
         cmp = ast.Equal
       )
-    ))
+    )
     val partSuppScan = ast.TableScan("PARTSUPP")
     val suppScan = ast.TableScan("SUPPLIER")
 
-    val join = ast.Root(ast.Join("INNER_JOIN",Seq(joinPred),suppScan,partSuppScan))
+    val join = ast.Root(ast.Join("INNER_JOIN",joinPred,suppScan,partSuppScan))
 
 
     //export to csv

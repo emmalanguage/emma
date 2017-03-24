@@ -26,9 +26,9 @@ import scala.language.higherKinds
 import scala.language.implicitConversions
 
 /** A `DataBag` implementation backed by a Scala `Seq`. */
-class CoGaDBTable[A: Meta] private[api]
+class CoGaDBTable[A: Meta] private[emmalanguage]
 (
-  private[api] val rep: ast.Op
+  private[emmalanguage] val rep: ast.Op
 )(
   @transient implicit val cogadb: CoGaDB
 ) extends DataBag[A] {
