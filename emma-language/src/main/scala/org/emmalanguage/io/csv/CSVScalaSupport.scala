@@ -95,6 +95,7 @@ class CSVScalaSupport[A](val format: CSV)(implicit conv: CSVConverter[A])
     format.escape.foreach(escape => settings.getFormat.setQuoteEscape(escape))
     format.comment.foreach(comment => settings.getFormat.setComment(comment))
     settings.setNullValue(format.nullValue)
+    settings.setNumberOfRowsToSkip(format.skipRows)
     // hard-coded
     settings.setIgnoreLeadingWhitespaces(true)
     settings.setIgnoreTrailingWhitespaces(true)
