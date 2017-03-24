@@ -27,21 +27,19 @@ import java.util
 
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 
-private[parquet] class ParquetReadSupport[A](implicit converter: ParquetConverter[A])
-  extends ReadSupport[A] {
+private[parquet] class ParquetReadSupport[A](implicit converter: ParquetConverter[A]) extends ReadSupport[A] {
   import ReadSupport.ReadContext
 
   var current: A = _
-  val schema = new MessageType("actor", converter.schema)
+  val reader = converter.reader(current = _, top = true).asGroupConverter
 
-  val reader = new GroupConverter {
-    val underlying = converter.reader(current = _)
-    def getConverter(i: Int) = underlying
-    def start() = ()
-    def end() = ()
+  val schema = {
+    val schema = converter.schema
+    if (schema.isPrimitive) new MessageType(ParquetConverter.defaultName, schema)
+    else new MessageType(schema.getName, schema.asGroupType.getFields)
   }
 
-  override def init(context: InitContext): ReadSupport.ReadContext = {
+  override def init(context: InitContext) = {
     val metadata = Map.empty[String, String].asJava
     new ReadContext(schema, metadata)
   }
@@ -51,7 +49,7 @@ private[parquet] class ParquetReadSupport[A](implicit converter: ParquetConverte
     keyValueMetaData: util.Map[String, String],
     fileSchema: MessageType,
     readContext: ReadContext
-  ): RecordMaterializer[A] = new RecordMaterializer[A] {
+  ) = new RecordMaterializer[A] {
     def getRootConverter = reader
     def getCurrentRecord = current
   }

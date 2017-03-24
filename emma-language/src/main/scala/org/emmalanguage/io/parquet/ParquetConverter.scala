@@ -16,20 +16,18 @@
 package org.emmalanguage
 package io.parquet
 
-import util._
-
 import org.apache.parquet.io.api._
 import org.apache.parquet.schema._
 import Type.Repetition._
 
 import shapeless._
-import shapeless.labelled._
-import shapeless.ops.hlist._
-import shapeless.ops.nat._
-import shapeless.tag._
 
+import scala.collection.JavaConversions._
 import scala.collection.generic.CanBuild
 import scala.language.higherKinds
+import scala.reflect.ClassTag
+
+import java.util.Date
 
 /**
  * Codec (provides encoding and decoding) type-class for the Parquet columnar format.
@@ -39,298 +37,243 @@ import scala.language.higherKinds
  */
 trait ParquetConverter[A] {
   def schema: Type
-  def reader(read: A => Unit): Converter
-  def writer(consumer: RecordConsumer): A => Unit
+  def reader(read: A => Unit, top: Boolean = false): Converter
+  def writer(consumer: RecordConsumer, top: Boolean = false): A => Unit
 }
 
 /** Factory methods and implicit instances of Parquet codecs. */
-object ParquetConverter extends IsoParquetConverters {
+object ParquetConverter extends IsomorphicParquetConverters {
 
   /** Summons an implicit codec for type `A` available in scope. */
-  def apply[A](implicit converter: ParquetConverter[A]): ParquetConverter[A] =
-    converter
+  def apply[A: ParquetConverter]: ParquetConverter[A] = implicitly
 }
 
-trait IsoParquetConverters extends GenericParquetConverters {
-
-  private implicit val binaryIsoArrayByte: Binary <=> Array[Byte] =
-    Iso.make(_.getBytes, Binary.fromByteArray)
-
-  private implicit val binaryIsoByte: Binary <=> Byte =
-    Iso.make(_.getBytes.head, b => Binary.fromByteArray(Array(b)))
-
-  private implicit val binaryIsoShort: Binary <=> Short =
-    Iso.make(bin => {
-      val bytes = bin.getBytes
-      (bytes(0) + (bytes(1) << 8)).toShort
-    }, short => {
-      val bytes = Array(short.toByte, (short >> 8).toByte)
-      Binary.fromByteArray(bytes)
-    })
-
-  private implicit val binaryIsoString: Binary <=> String =
-    Iso.make(_.toStringUsingUTF8, Binary.fromString)
-
-  private implicit val shortIsoChar: Short <=> Char =
-    Iso.make(_.toChar, _.toShort)
+/** Isomorphic [[ParquetConverter]] instances. */
+trait IsomorphicParquetConverters extends PrimitiveParquetConverters {
+  import util.Default
+  import OriginalType._
 
   /**
    * Derives a new Parquet codec for type `B` from an existing codec for type `A`,
    * given an (implicit) isomorphism between `A` and `B`.
-   *
-   * Handles Java primitives and collections
-   * (the latter requires `import scala.collection.JavaConversions._`).
    */
-  implicit def iso[A, B](implicit iso: A <=> B, underlying: ParquetConverter[A])
-  : ParquetConverter[B] = new ParquetConverter[B] {
-    def schema = underlying.schema
-    def reader(read: B => Unit) = underlying.reader(read.compose(iso.from))
-    def writer(consumer: RecordConsumer) = underlying.writer(consumer).compose(iso.to)
+  def isomorphic[A, B](from: A => B, to: B => A, original: OriginalType = null)(
+    implicit underlying: ParquetConverter[A], default: Default[B]
+  ): ParquetConverter[B] = new ParquetConverter[B] {
+    val schema = {
+      val schema = underlying.schema
+      val arity  = schema.getRepetition
+      copy(schema)(
+        arity     = if (arity == REQUIRED && default.nullable) OPTIONAL else arity,
+        original  = if (original == null) schema.getOriginalType else original)
+    }
+
+    def reader(read: B => Unit, top: Boolean) =
+      underlying.reader(read.compose(from), top)
+
+    def writer(consumer: RecordConsumer, top: Boolean) = {
+      val write = underlying.writer(consumer, top)
+      value => if (!default.empty(value)) write(to(value))
+    }
   }
 
-  // Isomorphic converters
-  implicit val byteParquetConverter:      ParquetConverter[Byte]        = iso[Binary, Byte]
-  implicit val shortParquetConverter:     ParquetConverter[Short]       = iso[Binary, Short]
-  implicit val charParquetConverter:      ParquetConverter[Char]        = iso[Short, Char]
-  implicit val stringParquetConverter:    ParquetConverter[String]      = iso[Binary, String]
-  implicit val byteArrayParquetConverter: ParquetConverter[Array[Byte]] = iso[Binary, Array[Byte]]
+  // Isomorphic parquet converters
+
+  implicit val byte: ParquetConverter[Byte] =
+    isomorphic[Int, Byte](_.toByte, _.toInt, original = INT_8)
+
+  implicit val short: ParquetConverter[Short] =
+    isomorphic[Int, Short](_.toShort, _.toInt, original = INT_16)
+
+  implicit val char: ParquetConverter[Char] =
+    isomorphic[Int, Char](_.toChar, _.toInt, original = INT_16)
+
+  implicit val string: ParquetConverter[String] =
+    isomorphic[Binary, String](_.toStringUsingUTF8, Binary.fromString, original = UTF8)
+
+  implicit val symbol: ParquetConverter[Symbol] =
+    isomorphic[String, Symbol](Symbol.apply, _.name)
+
+  implicit val bigInt: ParquetConverter[BigInt] =
+    isomorphic[String, BigInt](BigInt.apply, _.toString)
+
+  implicit val bigDec: ParquetConverter[BigDecimal] =
+    isomorphic[String, BigDecimal](BigDecimal.apply, _.toString)
+
+  implicit val date: ParquetConverter[Date] =
+    isomorphic[Long, Date](new Date(_), _.getTime, original = DATE)
+
+  implicit def array[E: ParquetConverter: Default: ClassTag]: ParquetConverter[Array[E]] =
+    isomorphic[Seq[E], Array[E]](_.toArray, _.toSeq, original = LIST)
+
+  implicit def map[K, V](
+    implicit kv: ParquetConverter[(K, V)], default: Default[(K, V)]
+  ): ParquetConverter[Map[K, V]] = isomorphic[Seq[(K, V)], Map[K, V]](_.toMap, _.toSeq, original = MAP)
 }
 
-trait GenericParquetConverters extends PrimitiveParquetConverters {
+trait PrimitiveParquetConverters extends GenericParquetConverters {
+  import PrimitiveType.PrimitiveTypeName
+  import PrimitiveTypeName._
+
+  private def primitive[A](tpe: PrimitiveTypeName)(
+    mkReader: (A => Unit) => PrimitiveConverter,
+    mkWriter: RecordConsumer => (A => Unit)
+  ): ParquetConverter[A] = new ParquetConverter[A] {
+    val schema = new PrimitiveType(REQUIRED, tpe, defaultName)
+
+    def reader(read: A => Unit, top: Boolean) = {
+      val reader = mkReader(read)
+      if (top) new GroupConverter {
+        def getConverter(i: Int) = reader
+        def start() = ()
+        def end() = ()
+      } else reader
+    }
+
+    def writer(consumer: RecordConsumer, top: Boolean) = {
+      val write = mkWriter(consumer)
+      if (top) value => message(consumer) {
+        field(consumer) { write(value) }
+      } else write
+    }
+  }
+
+  /** Codec for raw binary Parquet data. */
+  implicit val binary: ParquetConverter[Binary] =
+    primitive(BINARY)(read => new PrimitiveConverter {
+      override def addBinary(value: Binary) = read(value)
+    }, _.addBinary)
+
+  implicit val boolean: ParquetConverter[Boolean] =
+    primitive(BOOLEAN)(read => new PrimitiveConverter {
+      override def addBoolean(value: Boolean) = read(value)
+    }, _.addBoolean)
+
+  implicit val int: ParquetConverter[Int] =
+    primitive(INT32)(read => new PrimitiveConverter {
+      override def addInt(value: Int) = read(value)
+    }, _.addInteger)
+
+  implicit val long: ParquetConverter[Long] =
+    primitive(INT64)(read => new PrimitiveConverter {
+      override def addLong(value: Long) = read(value)
+    }, _.addLong)
+
+  implicit val float: ParquetConverter[Float] =
+    primitive(FLOAT)(read => new PrimitiveConverter {
+      override def addFloat(value: Float) = read(value)
+    }, _.addFloat)
+
+  implicit val double: ParquetConverter[Double] =
+    primitive(DOUBLE)(read => new PrimitiveConverter {
+      override def addDouble(value: Double) = read(value)
+    }, _.addDouble)
+}
+
+/** Generic [[ParquetConverter]] instances. */
+trait GenericParquetConverters extends DefaultParquetConverters {
+  import util.Default
 
   /** Creates an optional Parquet codec from an existing codec. */
-  implicit def optionParquetConverter[A](
-    implicit A: ParquetConverter[A]
+  implicit def optional[A](
+    implicit underlying: ParquetConverter[A]
   ): ParquetConverter[Option[A]] = new ParquetConverter[Option[A]] {
-    val schema = new GroupType(REQUIRED, defaultField, copy(A.schema)(arity = OPTIONAL))
-
-    def reader(read: Option[A] => Unit) = new GroupConverter {
-      var optional = Option.empty[A]
-      val underlying = A.reader(v => optional = Some(v))
-      def getConverter(i: Int) = underlying
-      def start() = optional = None
-      def end() = read(optional)
-    }
-
-    def writer(consumer: RecordConsumer) = {
-      val write = A.writer(consumer)
-      optional => {
-        consumer.startGroup()
-        for (value <- optional) {
-          consumer.startField(defaultField, 0)
-          write(value)
-          consumer.endField(defaultField, 0)
-        }
-        consumer.endGroup()
-      }
-    }
+    val schema = copy(underlying.schema)(arity = OPTIONAL)
+    def reader(read: Option[A] => Unit, top: Boolean) =
+      underlying.reader(read.compose(Option.apply), top)
+    def writer(consumer: RecordConsumer, top: Boolean) =
+      _.foreach(underlying.writer(consumer, top))
   }
 
   /** Creates Parquet codec for a [[Traversable]] collection from an element codec. */
-  implicit def traversableParquetConverter[T[x] <: Traversable[x], A](
-    implicit TA: CanBuild[A, T[A]], A: ParquetConverter[A]
-  ): ParquetConverter[T[A]] = new ParquetConverter[T[A]] {
-    val schema = new GroupType(REQUIRED, defaultField, copy(A.schema)(arity = REPEATED))
+  implicit def traversable[T[x] <: Traversable[x], E](
+    implicit element: ParquetConverter[E], default: Default[E], cbf: CanBuild[E, T[E]]
+  ): ParquetConverter[T[E]] = new ParquetConverter[T[E]] {
+    val schema = GroupSchema(OPTIONAL, defaultName, OriginalType.LIST,
+      new GroupType(REPEATED, repeatedName, copy(element.schema)(name = elementName)))
 
-    def reader(read: T[A] => Unit) = new GroupConverter {
-      val builder = TA()
-      val element = A.reader(builder += _)
-      def getConverter(i: Int) = element
+    def reader(read: T[E] => Unit, top: Boolean) = new GroupConverter {
+      val builder = cbf()
+      val underlying: Converter = new GroupConverter {
+        var current = default.value
+        val underlying = element.reader(current = _)
+        def getConverter(i: Int) = underlying
+        def start() = current = default.value
+        def end() = builder += current
+      }
+
+      def getConverter(i: Int) = underlying
       def start() = builder.clear()
       def end() = read(builder.result())
     }
 
-    def writer(consumer: RecordConsumer) = {
-      val write = A.writer(consumer)
-      values => {
-        consumer.startGroup()
-        consumer.startField(defaultField, 0)
-        values.foreach(write)
-        consumer.endField(defaultField, 0)
-        consumer.endGroup()
+    def writer(consumer: RecordConsumer, top: Boolean) = {
+      val write = element.writer(consumer)
+      def all(values: T[E]) = field(consumer, repeatedName) {
+        for (value <- values) group(consumer) {
+          if (!default.empty(value)) {
+            field(consumer, elementName) { write(value) }
+          }
+        }
       }
-    }
-  }
 
-  /**
-   * Creates a labelled Parquet codec for a generic field.
-   * @tparam K The singleton label symbol used as a field name in the schema.
-   * @tparam V The underlying type of the field with an existing codec.
-   * @tparam N The natural number type specifying the index of the field in a group.
-   */
-  implicit def fieldParquetConverter[K <: Symbol, V, N <: Nat](
-    implicit K: Witness.Aux[K], V: ParquetConverter[V], toInt: ToInt[N]
-  ): ParquetConverter[FieldType[K, V] @@ N] = new ParquetConverter[FieldType[K, V] @@ N] {
-    def key = K.value.name
-    val idx = toInt()
-    val schema = copy(V.schema)(name = key)
-
-    def reader(read: FieldType[K, V] @@ N => Unit) =
-      V.reader(read.compose(v => tag[N](field[K](v))))
-
-    def writer(consumer: RecordConsumer) = {
-      val write = V.writer(consumer)
-      value => {
-        consumer.startField(key, idx)
-        write(value)
-        consumer.endField(key, idx)
-      }
-    }
-  }
-
-  /** Induction base for deriving generic Parquet codecs (an empty group is not allowed). */
-  implicit def hConsParquetConverter[H](
-    implicit H: Lazy[ParquetConverter[H]]
-  ): ParquetConverter[H :: HNil] = new ParquetConverter[H :: HNil] {
-    def head = H.value
-    val schema = new GroupType(REQUIRED, defaultField, head.schema)
-
-    def reader(read: H :: HNil => Unit) = new GroupConverter {
-      val underlying = head.reader(read.compose(_ :: HNil))
-      def getConverter(i: Int) = underlying
-      def start() = ()
-      def end() = ()
-    }
-
-    def writer(consumer: RecordConsumer) =
-      head.writer(consumer).compose(_.head)
-  }
-
-  /** Induction step for deriving generic Parquet codecs. */
-  implicit def hListParquetConverter[A, B, T <: HList](
-    implicit H: Lazy[ParquetConverter[A]], T: Lazy[ParquetConverter[B :: T]]
-  ): ParquetConverter[A :: B :: T] = new ParquetConverter[A :: B :: T] {
-    def head = H.value
-    def tail = T.value
-
-    val schema = {
-      val underlying = tail.schema.asGroupType
-      val fields = new java.util.ArrayList[Type](underlying.getFieldCount + 1)
-      fields.add(head.schema)
-      fields.addAll(underlying.getFields)
-      new GroupType(REQUIRED, defaultField, fields)
-    }
-
-    def reader(read: A :: B :: T => Unit) = new GroupConverter {
-      var value: A = _
-      val hReader = head.reader(value = _)
-      val tReader = tail.reader(read.compose(value :: _)).asGroupConverter
-      def getConverter(i: Int) = if (i == 0) hReader else tReader.getConverter(i - 1)
-      def start() = ()
-      def end() = ()
-    }
-
-    def writer(consumer: RecordConsumer) = {
-      val writeH = head.writer(consumer)
-      val writeT = tail.writer(consumer)
-      value => {
-        writeH(value.head)
-        writeT(value.tail)
-      }
-    }
-  }
-
-  /** Polymorphic function for tagging generic fields. */
-  object tagWith extends Poly1 {
-    implicit def tagField[K, V, T] =
-      at[(FieldType[K, V], T)] { case (kv, _) => tag[T](kv) }
-  }
-
-  /** Polymorphic function for stripping tagged fields. */
-  object stripTag extends Poly1 {
-    implicit def stripField[K, V, T] =
-      at[FieldType[K, V] @@ T](identity[FieldType[K, V]])
-  }
-
-  /** Generic Parquet codec for case classes and tuples. */
-  implicit def genericParquetConverter[A, R <: HList, I <: HList, T <: HList](implicit
-    generic: LabelledGeneric.Aux[A, R],
-    indexed: ZipWithIndex.Aux[R, I],
-    tagged:  Mapper.Aux[tagWith.type, I, T],
-    strip:   Mapper.Aux[stripTag.type, T, R],
-    T: Lazy[ParquetConverter[T]]
-  ): ParquetConverter[A] = new ParquetConverter[A] {
-    def underlying = T.value
-    def schema = underlying.schema
-
-    def reader(read: A => Unit) = underlying
-      .reader(v => read(generic.from(strip(v))))
-
-    def writer(consumer: RecordConsumer) = {
-      val write = underlying.writer(consumer)
-      value => {
-        consumer.startGroup()
-        write(tagged(indexed(generic.to(value))))
-        consumer.endGroup()
+      values => if (values != null && values.nonEmpty) {
+        if (top) message(consumer) { all(values) }
+        else group(consumer) { all(values) }
       }
     }
   }
 }
 
-trait PrimitiveParquetConverters {
-  import PrimitiveType.PrimitiveTypeName._
+/** Lowest priority [[ParquetConverter]] instances. */
+trait DefaultParquetConverters {
+  val defaultName  = "value"
+  val elementName  = "element"
+  val repeatedName = "list"
 
-  /** The default field name used for group wrappers. */
-  val defaultField = "value"
+  // Workaround to suppress deprecated warning.
+  protected object GroupSchema extends GroupSchema
+  @deprecated("", "") protected trait GroupSchema {
+    def apply(arity: Type.Repetition, name: String, original: OriginalType, fields: Type*): GroupType =
+      new GroupType(arity, name, original, fields: _*)
+  }
 
   /** Copies a Parquet `schema`, changing its repetition or name. */
-  protected def copy(schema: Type)(
-    arity: Type.Repetition = schema.getRepetition,
-    name:  String          = schema.getName
+  def copy(schema: Type)(
+    arity:    Type.Repetition = schema.getRepetition,
+    name:     String          = schema.getName,
+    original: OriginalType    = schema.getOriginalType
   ): Type = if (schema.isPrimitive) {
-    val prim = schema.asPrimitiveType
-    new PrimitiveType(arity, prim.getPrimitiveTypeName, name)
+    new PrimitiveType(arity, schema.asPrimitiveType.getPrimitiveTypeName, name, original)
   } else {
-    val group = schema.asGroupType
-    new GroupType(arity, name, group.getFields)
+    GroupSchema(arity, name, original, schema.asGroupType.getFields: _*)
   }
 
-  /** Codec for raw binary Parquet data. */
-  implicit val binaryParquetConverter: ParquetConverter[Binary] = new ParquetConverter[Binary] {
-    val schema = new PrimitiveType(REQUIRED, BINARY, defaultField)
-    def writer(consumer: RecordConsumer) = consumer.addBinary
-    def reader(read: Binary => Unit) = new PrimitiveConverter {
-      override def addBinary(value: Binary) = read(value)
-    }
+  /** Helper method for writing a message. */
+  def message(consumer: RecordConsumer)(write: => Unit): Unit = {
+    consumer.startMessage()
+    write
+    consumer.endMessage()
   }
 
-  implicit val booleanParquetConverter: ParquetConverter[Boolean] = new ParquetConverter[Boolean] {
-    val schema = new PrimitiveType(REQUIRED, BOOLEAN, defaultField)
-    def writer(consumer: RecordConsumer) = consumer.addBoolean
-    def reader(read: Boolean => Unit) = new PrimitiveConverter {
-      override def addBoolean(value: Boolean) = read(value)
-    }
+  /** Helper method for writing a group. */
+  def group(consumer: RecordConsumer)(write: => Unit): Unit = {
+    consumer.startGroup()
+    write
+    consumer.endGroup()
   }
 
-  implicit val intParquetConverter: ParquetConverter[Int] = new ParquetConverter[Int] {
-    val schema = new PrimitiveType(REQUIRED, INT32, defaultField)
-    def writer(consumer: RecordConsumer) = consumer.addInteger
-    def reader(read: Int => Unit) = new PrimitiveConverter {
-      override def addInt(value: Int) = read(value)
-    }
+  /** Helper method for writing a field. */
+  def field(consumer: RecordConsumer,
+    name: String = defaultName, index: Int = 0
+  )(write: => Unit): Unit = {
+    consumer.startField(name, index)
+    write
+    consumer.endField(name, index)
   }
 
-  implicit val longParquetConverter: ParquetConverter[Long] = new ParquetConverter[Long] {
-    val schema = new PrimitiveType(REQUIRED, INT64, defaultField)
-    def writer(consumer: RecordConsumer) = consumer.addLong
-    def reader(read: Long => Unit) = new PrimitiveConverter {
-      override def addLong(value: Long) = read(value)
-    }
-  }
-
-  implicit val floatParquetConverter: ParquetConverter[Float] = new ParquetConverter[Float] {
-    val schema = new PrimitiveType(REQUIRED, FLOAT, defaultField)
-    def writer(consumer: RecordConsumer) = consumer.addFloat
-    def reader(read: Float => Unit) = new PrimitiveConverter {
-      override def addFloat(value: Float) = read(value)
-    }
-  }
-
-  implicit val doubleParquetConverter: ParquetConverter[Double] = new ParquetConverter[Double] {
-    val schema = new PrimitiveType(REQUIRED, DOUBLE, defaultField)
-    def writer(consumer: RecordConsumer) = consumer.addDouble
-    def reader(read: Double => Unit) = new PrimitiveConverter {
-      override def addDouble(value: Double) = read(value)
-    }
-  }
+  /** Resolves only when there is no other implicit [[ParquetConverter]] in scope. */
+  implicit def derived[A](
+    implicit lp: LowPriority, mk: Strict[MkParquetConverter[A]]
+  ): ParquetConverter[A] = mk.value()
 }
