@@ -25,16 +25,11 @@ class SparkDatasetSpec extends DataBagSpec {
   override type Bag[A] = SparkDataset[A]
   override type BackendContext = SparkSession
 
+  override val Bag = SparkDataset
   override val suffix = "spark-dataset"
 
   override def withBackendContext[T](f: BackendContext => T): T =
     LocalSparkSession.withSparkSession(f)
-
-  override def Bag[A: Meta]()(implicit spark: SparkSession): DataBag[A] =
-    SparkDataset.empty[A]
-
-  override def Bag[A: Meta](seq: Seq[A])(implicit spark: SparkSession): DataBag[A] =
-    SparkDataset(seq)
 
   override def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): DataBag[A] =
     SparkDataset.readCSV(path, format)
