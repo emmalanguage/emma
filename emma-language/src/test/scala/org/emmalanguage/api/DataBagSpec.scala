@@ -35,23 +35,20 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
   // abstract trait methods
   // ---------------------------------------------------------------------------
 
+  /** The type of the backend context associated with the refinement type (e.g. SparkContext). */
+  type BackendContext
+
   /** The [[DataBag]] refinement type under test (e.g. SparkRDD). */
   type Bag[A] <: DataBag[A]
 
-  /** The type of the backend context associated with the refinement type (e.g. SparkContext). */
-  type BackendContext
+  /** The [[DataBag]] refinement companion type under test (e.g. SparkRDD). */
+  val Bag: DataBagCompanion[BackendContext]
 
   /** A system-specific suffix to append to test files. */
   def suffix: String
 
   /** A function providing a backend context instance which lives for the duration of `f`. */
   def withBackendContext[T](f: BackendContext => T): T
-
-  /** An empty [[DataBag]] refinement type constructor. */
-  def Bag[A: Meta]()(implicit ctx: BackendContext): DataBag[A]
-
-  /** An [[DataBag]] refinement type constructor which takes a Scala Seq. */
-  def Bag[A: Meta](seq: Seq[A])(implicit ctx: BackendContext): DataBag[A]
 
   /** Read a CSV file. */
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit ctx: BackendContext): DataBag[A]
@@ -63,6 +60,8 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
   "structural recursion" in {
     withBackendContext { implicit ctx =>
       val act = {
+        val vs = Bag(Seq((0, 0.0)))
+        val ws = Bag(Seq(0))
         val xs = Bag(hhCrts)
         val ys = Bag(hhCrts.map(DataBagSpec.f))
         val zs = Bag(Seq.empty[Double])
@@ -71,8 +70,12 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
           //@formatter:off
           "isEmpty"     -> xs.isEmpty,
           "nonEmpty"    -> xs.nonEmpty,
-          "min"         -> ys.min,
-          "max"         -> ys.max,
+          "min (1)"     -> vs.min,
+          "min (2)"     -> ws.min,
+          "min (3)"     -> vs.min,
+          "max (1)"     -> vs.max,
+          "max (2)"     -> ws.max,
+          "max (3)"     -> ys.max,
           "sum (1)"     -> ys.sum,
           "sum (2)"     -> zs.sum,
           "product (1)" -> ys.product,
@@ -94,6 +97,8 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
       }
 
       val exp = {
+        val vs = Bag(Seq((0, 0.0)))
+        val ws = Seq(0)
         val xs = hhCrts
         val ys = hhCrts.map(_.book.title.length)
         val zs = Seq.empty[Double]
@@ -102,8 +107,12 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
           //@formatter:off
           "isEmpty"     -> xs.isEmpty,
           "nonEmpty"    -> xs.nonEmpty,
-          "min"         -> ys.min,
-          "max"         -> ys.max,
+          "min (1)"     -> vs.min,
+          "min (2)"     -> ws.min,
+          "min (3)"     -> vs.min,
+          "max (1)"     -> vs.max,
+          "max (2)"     -> ws.max,
+          "max (3)"     -> ys.max,
           "sum (1)"     -> ys.sum,
           "sum (2)"     -> zs.sum,
           "product (1)" -> ys.product,
@@ -122,6 +131,14 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
           "top"         -> ys.sorted.slice(0, 2)
           //@formatter:on
         )
+      }
+
+
+      withClue("Bag.empty[(Int, Double)].min throws `NoSuchElementException`") {
+        intercept[NoSuchElementException](Bag.empty[(Int, Double)].min)
+      }
+      withClue("Bag.empty[Int].max throws `NoSuchElementException`") {
+        intercept[NoSuchElementException](Bag.empty[Int].max)
       }
 
       act should have size exp.size

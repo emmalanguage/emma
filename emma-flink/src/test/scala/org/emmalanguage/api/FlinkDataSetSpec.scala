@@ -32,16 +32,11 @@ class FlinkDataSetSpec extends DataBagSpec with BeforeAndAfter {
   override type Bag[A] = FlinkDataSet[A]
   override type BackendContext = FlinkEnv
 
+  override val Bag = FlinkDataSet
   override val suffix = "flink"
 
   override def withBackendContext[T](f: BackendContext => T): T =
     f(FlinkEnv.getExecutionEnvironment)
-
-  override def Bag[A: Meta]()(implicit flink: FlinkEnv): DataBag[A] =
-    FlinkDataSet.empty[A]
-
-  override def Bag[A: Meta](seq: Seq[A])(implicit flink: FlinkEnv): DataBag[A] =
-    FlinkDataSet(seq)
 
   override def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit flink: FlinkEnv): DataBag[A] =
     FlinkDataSet.readCSV(path, format)

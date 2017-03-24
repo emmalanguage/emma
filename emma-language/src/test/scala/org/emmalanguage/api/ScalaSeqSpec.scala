@@ -21,18 +21,13 @@ import io.csv.{CSV, CSVConverter}
 class ScalaSeqSpec extends DataBagSpec {
 
   override type Bag[A] = ScalaSeq[A]
-  override type BackendContext = Unit
+  override type BackendContext = LocalEnv
 
-  override def withBackendContext[T](f: BackendContext => T): T =
-    f(Unit)
-
+  override val Bag = ScalaSeq
   override val suffix = "scala"
 
-  override def Bag[A: Meta]()(implicit unit: BackendContext): DataBag[A] =
-    ScalaSeq.empty[A]
-
-  override def Bag[A: Meta](seq: Seq[A])(implicit unit: BackendContext): DataBag[A] =
-    ScalaSeq(seq)
+  override def withBackendContext[T](f: BackendContext => T): T =
+    f(LocalEnv.apply)
 
   override def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit unit: BackendContext): DataBag[A] =
     ScalaSeq.readCSV(path, format)
