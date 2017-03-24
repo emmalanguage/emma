@@ -1,6 +1,7 @@
 .cache
 .classpath
 .idea/*
+.idea/fileTemplates/*
 .metadata/*
 .project
 .settings
@@ -17,5 +18,6 @@ dependency-reduced-pom.xml
 # Include some IntelliJ settings
 !.idea/codeStyleSettings.xml
 !.idea/copyright/
-!.idea/inspectionProfiles/
+!.idea/fileTemplates/
 !.idea/fileTemplates/internal/
+!.idea/inspectionProfiles/
