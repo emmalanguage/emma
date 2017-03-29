@@ -51,7 +51,7 @@ class LanguageSpec extends BaseCompilerSpec {
 
   /** Tree [[Validator]] matcher. */
   def satisfy(validator: Validator) =
-     be (good) compose { (tree: u.Tree) =>
+    be (good) compose { (tree: u.Tree) =>
       time(validateAs(validator, tree), "validate")
     }
 

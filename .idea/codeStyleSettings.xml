@@ -29,6 +29,9 @@
             </array>
           </option>
           <option name="USE_SCALADOC2_FORMATTING" value="false" />
+          <option name="MULTILINE_STRING_SUPORT" value="0" />
+          <option name="MULTI_LINE_STRING_MARGIN_INDENT" value="1" />
+          <option name="PROCESS_MARGIN_ON_COPY_PASTE" value="false" />
           <option name="PUBLIC_PROPERTY_TYPE_ANNOTATION" value="0" />
           <option name="PROTECTED_PROPERTY_TYPE_ANNOTATION" value="0" />
           <option name="PUBLIC_METHOD_TYPE_ANNOTATION" value="0" />

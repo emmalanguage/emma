@@ -45,13 +45,13 @@ class MonoidSpec extends FreeSpec with Checkers with Equivalences with Arbitrari
         check(GroupLaws[String].monoid(last("")).all)
       }
     }
-    
+
     "for booleans" - {
-      
+
       "conjunctive" in {
         check(GroupLaws[Boolean].monoid(conj).all)
       }
-      
+
       "disjunctive" in {
         check(GroupLaws[Boolean].monoid(disj).all)
       }

@@ -65,13 +65,11 @@ object DirectorsMuses {
         x <- muses; if x.director.name contains name
       } yield x
 
-      for {
-        (d, ccs) <- matches.fetch().groupBy(_.director)
-      } println(
+      for ((d, ccs) <- matches.fetch().groupBy(_.director)) println(
         s"""
-           |Director ${d.name} has the following muses:
-           |${ccs.map(cc => s"- ${cc.actor.name} (collaborated in ${cc.count} movies").mkString("\n")}
-           """.stripMargin)
+        |Director ${d.name} has the following muses:
+        |${ccs.map(cc => s"- ${cc.actor.name} (collaborated in ${cc.count} movies").mkString("\n")}
+        """.stripMargin)
     }
   }
 
