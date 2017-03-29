@@ -38,7 +38,6 @@ This project includes:
   Apache Parquet Common under The Apache Software License, Version 2.0
   Apache Parquet Encodings under The Apache Software License, Version 2.0
   Apache Parquet Format (Incubating) under The Apache Software License, Version 2.0
-  Apache Parquet Generator under The Apache Software License, Version 2.0
   Apache Parquet Hadoop under The Apache Software License, Version 2.0
   Apache Parquet Jackson under The Apache Software License, Version 2.0
   Apache XBean :: ASM 5 shaded (repackaged) under null or null
