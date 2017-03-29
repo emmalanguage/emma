@@ -23,5 +23,4 @@ import scala.language.experimental.macros
 object onFlink {
 
   final def apply[T](e: T): T = macro FlinkMacro.parallelizeImpl[T]
-  
 }

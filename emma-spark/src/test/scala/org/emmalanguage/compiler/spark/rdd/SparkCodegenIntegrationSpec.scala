@@ -50,8 +50,8 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
   private lazy val addContext: u.Tree => u.Tree = tree => {
     import u._
     q"""
-        implicit val ctx = _root_.org.emmalanguage.LocalSparkSession.getOrCreate()
-        $tree
+    implicit val ctx = _root_.org.emmalanguage.LocalSparkSession.getOrCreate()
+    $tree
     """
   }
 

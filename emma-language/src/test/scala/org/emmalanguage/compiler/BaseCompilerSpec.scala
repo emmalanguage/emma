@@ -50,20 +50,21 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
   }
 
   lazy val idPipeline: u.Expr[Any] => u.Tree = {
-      (_: u.Expr[Any]).tree
-    } andThen {
-      compiler.identity(typeCheck = true)
-    } andThen {
-      checkCompile
-    }
+    compiler.identity(typeCheck = true) andThen checkCompile
+  } compose (_.tree)
 
   /**
    * Combines a sequence of `transformations` into a pipeline with pre- and post-processing.
    * If the IT maven profile is set, then it also checks if the resulting code is valid by compiling it.
    */
-  def pipeline(typeCheck: Boolean = false, withPre: Boolean = true, withPost: Boolean = true)
-              (transformations: (u.Tree => u.Tree)*): u.Tree => u.Tree = {
-    compiler.pipeline(typeCheck, withPre, withPost)(transformations: _*) andThen checkCompile
+  def pipeline(
+    typeCheck: Boolean = false, withPre: Boolean = true, withPost: Boolean = true
+  )(
+    transformations: (u.Tree => u.Tree)*
+  ): u.Tree => u.Tree = {
+    compiler.pipeline(typeCheck, withPre, withPost)(transformations: _*)
+  } andThen {
+    checkCompile
   }
 
   // ---------------------------------------------------------------------------
@@ -90,18 +91,18 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
   /** Wraps the given tree in a class and a method whose params are the closure of the tree. */
   private def wrapInClass(tree: u.Tree): u.Tree = {
     import universe._
-    val params = api.Tree.closure(tree).map{ sym =>
+    val params = api.Tree.closure(tree).map { sym =>
       val name = sym.name
       val tpt = sym.typeSignature
       q"val $name: $tpt"
     }
     q"""
-      class ${api.TypeName(UUID.randomUUID().toString)} {
-        def ${u.TermName(RuntimeCompiler.default.runMethod)}(..$params) = {
-          $tree
-        }
+    class ${api.TypeName(UUID.randomUUID().toString)} {
+      def ${u.TermName(RuntimeCompiler.default.runMethod)}(..$params) = {
+        $tree
       }
-     """
+    }
+    """
   }
 }
 

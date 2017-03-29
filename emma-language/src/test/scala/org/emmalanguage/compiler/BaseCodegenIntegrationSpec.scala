@@ -57,11 +57,12 @@ abstract class BaseCodegenIntegrationSpec
   def verify(e: u.Expr[Any]): Unit = {
     val expected = eval[Any](idPipeline(e))
     val actual = eval[Any](codegenPipeline(e))
-    assert(actual == expected, s"""
-                                  |actual != expected
-                                  |actual: ${show(actual)}
-                                  |expected: ${show(expected)}
-                                  |""".stripMargin)
+    assert(actual == expected,
+      s"""
+      |actual != expected
+      |actual: ${show(actual)}
+      |expected: ${show(expected)}
+      """.stripMargin)
   }
 
   lazy val checkValid = (tree: u.Tree) => if (!Source.validate(tree)) fail else tree
@@ -237,28 +238,28 @@ abstract class BaseCodegenIntegrationSpec
 
     //todo: After we have parallelize on newir, move this to a test where we test parallelize
     // (it doesn't work here because of the closure)
-//    "multi-way on case classes with local input" in {
-//      val imdbMovies = imdb
-//      val cannesWinners = cannes
-//      val berlinWinnera = berlin
-//
-//      // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
-//      verify(u.reify {
-//        val cannesTop100 = for {
-//          movie <- DataBag(imdbMovies)
-//          winner <- DataBag(cannesWinners)
-//          if (winner.title, winner.year) == (movie.title, movie.year)
-//        } yield (movie.year, winner.title)
-//
-//        val berlinTop100 = for {
-//          movie <- DataBag(imdbMovies)
-//          winner <- DataBag(berlinWinnera)
-//          if (winner.title, winner.year) == (movie.title, movie.year)
-//        } yield (movie.year, winner.title)
-//
-//        cannesTop100 plus berlinTop100
-//      })
-//    }
+    //    "multi-way on case classes with local input" in {
+    //      val imdbMovies = imdb
+    //      val cannesWinners = cannes
+    //      val berlinWinnera = berlin
+    //
+    //      // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
+    //      verify(u.reify {
+    //        val cannesTop100 = for {
+    //          movie <- DataBag(imdbMovies)
+    //          winner <- DataBag(cannesWinners)
+    //          if (winner.title, winner.year) == (movie.title, movie.year)
+    //        } yield (movie.year, winner.title)
+    //
+    //        val berlinTop100 = for {
+    //          movie <- DataBag(imdbMovies)
+    //          winner <- DataBag(berlinWinnera)
+    //          if (winner.title, winner.year) == (movie.title, movie.year)
+    //        } yield (movie.year, winner.title)
+    //
+    //        cannesTop100 plus berlinTop100
+    //      })
+    //    }
   }
 
   "Cross" in verify(u.reify {
@@ -453,8 +454,7 @@ abstract class BaseCodegenIntegrationSpec
       } yield x
     })
 
-    // otherwise ImdbYear could not be found
-    "of case class names" in  verify(u.reify {
+    "of names of case classes" in verify(u.reify {
       val movies = DataBag(imdb)
       val years = for (mov <- movies) yield ImdbYear(mov.year)
       years forall { case iy @ ImdbYear(y) => iy == ImdbYear(y) }
@@ -462,21 +462,21 @@ abstract class BaseCodegenIntegrationSpec
 
     //todo: After we have parallelize on newir, move this to a test where we test parallelize
     // (it doesn't work here because of the closure)
-//    "of enclosing class parameters" in {
-//      // a class that wraps an Emma program and a parameter used within the `parallelize` call
-//      case class MoviesWithinPeriodQuery(minYear: Int, period: Int) {
-//        lazy val algorithm = verify(u.reify {
-//          for {
-//            movie <- DataBag(imdb)
-//            if movie.year >= minYear && movie.year < minYear + period
-//          } yield movie
-//        }
-//      }
-//
-//      // run the algorithm
-//      MoviesWithinPeriodQuery(1990, 10)
-//        .algorithm)
-//    }
+    //    "of enclosing class parameters" in {
+    //      // a class that wraps an Emma program and a parameter used within the `parallelize` call
+    //      case class MoviesWithinPeriodQuery(minYear: Int, period: Int) {
+    //        lazy val algorithm = verify(u.reify {
+    //          for {
+    //            movie <- DataBag(imdb)
+    //            if movie.year >= minYear && movie.year < minYear + period
+    //          } yield movie
+    //        }
+    //      }
+    //
+    //      // run the algorithm
+    //      MoviesWithinPeriodQuery(1990, 10)
+    //        .algorithm)
+    //    }
 
     "of local functions" in verify(u.reify {
       val double = (x: Int) => 2 * x
