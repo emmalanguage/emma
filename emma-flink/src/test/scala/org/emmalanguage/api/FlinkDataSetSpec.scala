@@ -29,17 +29,16 @@ import java.io.File
 
 class FlinkDataSetSpec extends DataBagSpec with BeforeAndAfter {
 
-  override type Bag[A] = FlinkDataSet[A]
+  override val supportsParquet = false
+
+  override type TestBag[A] = FlinkDataSet[A]
   override type BackendContext = FlinkEnv
 
-  override val Bag = FlinkDataSet
+  override val TestBag = FlinkDataSet
   override val suffix = "flink"
 
   override def withBackendContext[T](f: BackendContext => T): T =
     f(FlinkEnv.getExecutionEnvironment)
-
-  override def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit flink: FlinkEnv): DataBag[A] =
-    FlinkDataSet.readCSV(path, format)
 
   val codegenDir = new File(tempPath("codegen"))
 

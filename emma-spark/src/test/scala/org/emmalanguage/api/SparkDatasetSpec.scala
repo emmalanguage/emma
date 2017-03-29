@@ -22,15 +22,12 @@ import org.apache.spark.sql.SparkSession
 
 class SparkDatasetSpec extends DataBagSpec {
 
-  override type Bag[A] = SparkDataset[A]
+  override type TestBag[A] = SparkDataset[A]
   override type BackendContext = SparkSession
 
-  override val Bag = SparkDataset
+  override val TestBag = SparkDataset
   override val suffix = "spark-dataset"
 
   override def withBackendContext[T](f: BackendContext => T): T =
     LocalSparkSession.withSparkSession(f)
-
-  override def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): DataBag[A] =
-    SparkDataset.readCSV(path, format)
 }
