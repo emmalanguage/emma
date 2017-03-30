@@ -17,12 +17,10 @@ package org.emmalanguage
 package examples.graphs
 
 import api._
-import examples.graphs.model.Edge
-import io.csv.CSV
+import io.csv._
+import model.Edge
 
-import org.apache.spark.sql.SparkSession
-
-class SparkTransitiveClosureIntegrationSpec extends BaseTransitiveClosureIntegrationSpec {
+class SparkTransitiveClosureIntegrationSpec extends BaseTransitiveClosureIntegrationSpec with SparkAware {
 
   override def transitiveClosure(input: String, csv: CSV): Set[Edge[Long]] =
     emma.onSpark {
@@ -33,9 +31,4 @@ class SparkTransitiveClosureIntegrationSpec extends BaseTransitiveClosureIntegra
       // return the closure as local set
       paths.fetch().toSet
     }
-
-  implicit lazy val sparkSession = SparkSession.builder()
-    .master("local[*]")
-    .appName(this.getClass.getSimpleName)
-    .getOrCreate()
 }

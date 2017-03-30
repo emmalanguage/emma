@@ -17,9 +17,7 @@ package org.emmalanguage
 package examples.graphs
 
 import api._
-import examples.graphs.model._
-
-import org.apache.spark.sql.SparkSession
+import model._
 
 class SparkConnectedComponentsIntegrationSpec extends BaseConnectedComponentsIntegrationSpec {
 
@@ -27,15 +25,10 @@ class SparkConnectedComponentsIntegrationSpec extends BaseConnectedComponentsInt
     SparkConnectedComponentsIntegrationSpec(edges)
 }
 
-object SparkConnectedComponentsIntegrationSpec {
+object SparkConnectedComponentsIntegrationSpec extends SparkAware {
 
   def apply(edges: Seq[Edge[Int]]): Seq[LVertex[Int, Int]] =
     emma.onSpark {
       ConnectedComponents[Int](DataBag(edges)).fetch()
     }
-
-  implicit lazy val sparkSession = SparkSession.builder()
-    .master("local[*]")
-    .appName(this.getClass.getSimpleName)
-    .getOrCreate()
 }

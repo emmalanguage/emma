@@ -17,12 +17,10 @@ package org.emmalanguage
 package examples.graphs
 
 import api._
-import examples.graphs.model.Edge
-import io.csv.CSV
+import io.csv._
+import model.Edge
 
-import org.apache.spark.sql.SparkSession
-
-class SparkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec {
+class SparkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec with SparkAware {
 
   override def triangleCount(input: String, csv: CSV): Long =
     emma.onSpark {
@@ -36,9 +34,4 @@ class SparkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec
       // count and return the number of enumerated triangles
       triangles.size
     }
-
-  implicit lazy val sparkSession = SparkSession.builder()
-    .master("local[*]")
-    .appName(this.getClass.getSimpleName)
-    .getOrCreate()
 }

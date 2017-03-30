@@ -24,7 +24,7 @@ import compiler.SparkCompiler
 
 import org.apache.spark.rdd.RDD
 
-class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
+class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkAware {
 
   override lazy val compiler = new RuntimeCompiler with SparkCompiler
 
@@ -50,12 +50,10 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
   private lazy val addContext: u.Tree => u.Tree = tree => {
     import u._
     q"""
-    implicit val ctx = _root_.org.emmalanguage.LocalSparkSession.getOrCreate()
+    implicit val ctx = _root_.org.apache.spark.sql.SparkSession.builder().master("local[*]").getOrCreate()
     $tree
     """
   }
-
-  implicit val ctx = LocalSparkSession.getOrCreate()
 
   // --------------------------------------------------------------------------
   // Distributed collection conversion

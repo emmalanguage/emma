@@ -17,12 +17,10 @@ package org.emmalanguage
 package examples.graphs
 
 import api._
-import examples.graphs.model.Edge
 import io.csv.CSV
+import model.Edge
 
-import org.apache.flink.api.scala.ExecutionEnvironment
-
-class FlinkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec {
+class FlinkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec with FlinkAware {
 
   override def triangleCount(input: String, csv: CSV): Long =
     emma.onFlink {
@@ -36,6 +34,4 @@ class FlinkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec
       // count and return the number of enumerated triangles
       triangles.size
     }
-
-  implicit lazy val flinkEnv = ExecutionEnvironment.getExecutionEnvironment
 }

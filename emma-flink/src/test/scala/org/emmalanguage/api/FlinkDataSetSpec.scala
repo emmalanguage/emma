@@ -16,18 +16,14 @@
 package org.emmalanguage
 package api
 
-import io.csv.CSV
-import io.csv.CSVConverter
-import test.util.addToClasspath
-import test.util.deleteRecursive
-import test.util.tempPath
+import test.util._
 
 import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
 import org.scalatest.BeforeAndAfter
 
 import java.io.File
 
-class FlinkDataSetSpec extends DataBagSpec with BeforeAndAfter {
+class FlinkDataSetSpec extends DataBagSpec with BeforeAndAfter with FlinkAware {
 
   override val supportsParquet = false
 
@@ -38,7 +34,7 @@ class FlinkDataSetSpec extends DataBagSpec with BeforeAndAfter {
   override val suffix = "flink"
 
   override def withBackendContext[T](f: BackendContext => T): T =
-    f(FlinkEnv.getExecutionEnvironment)
+    f(flinkEnv)
 
   val codegenDir = new File(tempPath("codegen"))
 
