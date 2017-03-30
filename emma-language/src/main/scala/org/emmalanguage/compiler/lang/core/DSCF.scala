@@ -211,29 +211,23 @@ private[core] trait DSCF extends Common {
               val loopCall = core.DefCall(None, loopMeth, argss = Seq(loopArgs))
 
               // Suffix
-              val sufBody = src.Block(suffix, expr)
-              val sufVars = loopVars & uses(sufBody).keySet
-              val sufArgs = if (sufVars.size == loopVars.size) loopArgs else varArgs(sufVars)
-              val sufPars = if (sufVars.size == loopVars.size) loopPars else varPars(sufVars)
-              val sufName = api.TermName.fresh("suffix")
-              val sufMeth = monomorphic(loopMeth, sufName, sufPars, tpe, suffixAnn)
+              val suffName = api.TermName.fresh("suffix")
+              val suffMeth = monomorphic(loopMeth, suffName, Seq.empty, tpe, suffixAnn)
 
               // Loop body
-              val bodyVars = loopVars & uses(src.Block(bodyStats)).keySet
-              val bodyArgs = if (bodyVars.size == loopVars.size) loopArgs else varArgs(bodyVars)
-              val bodyPars = if (bodyVars.size == loopVars.size) loopPars else varPars(bodyVars)
               val bodyName = api.TermName.fresh("body")
-              val bodyMeth = monomorphic(loopMeth, bodyName, bodyPars, tpe, loopBodyAnn)
+              val bodyMeth = monomorphic(loopMeth, bodyName, Seq.empty, tpe, loopBodyAnn)
 
               src.Block(prefix :+
                 core.DefDef(loopMeth, paramss = Seq(loopPars),
                   body = src.Block(condStats ++ Seq(
-                    core.DefDef(bodyMeth, paramss = Seq(bodyPars),
+                    core.DefDef(bodyMeth, paramss = Seq(Seq.empty),
                       body = src.Block(bodyStats, loopCall)),
-                    core.DefDef(sufMeth, paramss = Seq(sufPars), body = sufBody)),
+                    core.DefDef(suffMeth, paramss = Seq(Seq.empty),
+                      body = src.Block(suffix, expr))),
                     core.Branch(condExpr,
-                      core.DefCall(None, bodyMeth, argss = Seq(bodyArgs)),
-                      core.DefCall(None, sufMeth, argss = Seq(sufArgs))))),
+                      core.DefCall(None, bodyMeth, argss = Seq(Seq.empty)),
+                      core.DefCall(None, suffMeth, argss = Seq(Seq.empty))))),
                 loopCall)
 
             // Do-while loop

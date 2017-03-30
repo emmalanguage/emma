@@ -38,7 +38,7 @@ class TrampolineSpec extends BaseCompilerSpec {
       Core.anf
     ).compose(_.tree)
 
-  "Talor Series expansion for sin(x) around x = 0" in {
+  "Taylor Series expansion for sin(x) around x = 0" in {
 
     val act = trampolinePipeline(u.reify {
       val sin = (x: Double) => {
@@ -152,19 +152,19 @@ class TrampolineSpec extends BaseCompilerSpec {
         val remaining$1 = customers - served$2
         def while$1(barber$2: Int, remaining$2: Long, time$2: Long): TailRec[Int] = {
           val greater$1 = remaining$2 > 0
-          def body$1(barber$3: Int, remaining$3: Long, time$3: Long): TailRec[Int] = {
-            val time$4 = time$3 + barbers.map(b => b - time$3 % b).min
+          def body$1(): TailRec[Int] = {
+            val time$4 = time$2 + barbers.map(b => b - time$2 % b).min
             val iter$1 = barbers.zipWithIndex.toIterator
             val bi$1 = null.asInstanceOf[(Int, Int)]
             def while$2(barber$4: Int, bi$2: (Int, Int), remaining$4: Long): TailRec[Int] = {
               val hasNext$1 = iter$1.hasNext
-              def body$2(barber$5: Int, bi$3: (Int, Int), remaining$5: Long): TailRec[Int] = {
+              def body$2(): TailRec[Int] = {
                 val bi$4 = iter$1.next()
                 val b = bi$4._1
                 val i = bi$4._2
                 val eq$1 = time$4 % b == 0
                 def then$1(): TailRec[Int] = {
-                  val remaining$7 = remaining$5 - 1
+                  val remaining$7 = remaining$4 - 1
                   val eq$2 = remaining$7 == 0
                   def then$2(): TailRec[Int] = {
                     val barber$9 = i + 1
@@ -174,27 +174,27 @@ class TrampolineSpec extends BaseCompilerSpec {
                     tailcall(suffix$3(barber$10, remaining$7))
                   }
                   if (eq$2) tailcall(then$2())
-                  else tailcall(suffix$2(barber$5))
+                  else tailcall(suffix$2(barber$4))
                 }
                 def suffix$3(barber$11: Int, remaining$8: Long): TailRec[Int] = {
                   tailcall(while$2(barber$11, bi$4, remaining$8))
                 }
                 if (eq$1) tailcall(then$1())
-                else tailcall(suffix$3(barber$5, remaining$5))
+                else tailcall(suffix$3(barber$4, remaining$4))
               }
-              def suffix$4(barber$12: Int, remaining$9: Long): TailRec[Int] = {
-                tailcall(while$1(barber$12, remaining$9, time$4))
+              def suffix$4(): TailRec[Int] = {
+                tailcall(while$1(barber$4, remaining$4, time$4))
               }
-              if (hasNext$1) tailcall(body$2(barber$4, bi$2, remaining$4))
-              else tailcall(suffix$4(barber$4, remaining$4))
+              if (hasNext$1) tailcall(body$2())
+              else tailcall(suffix$4())
             }
-            tailcall(while$2(barber$3, bi$1, remaining$3))
+            tailcall(while$2(barber$2, bi$1, remaining$2))
           }
-          def suffix$5(barber$13: Int): TailRec[Int] = {
-            done(barber$13)
+          def suffix$5(): TailRec[Int] = {
+            done(barber$2)
           }
-          if (greater$1) tailcall(body$1(barber$2, remaining$2, time$2))
-          else tailcall(suffix$5(barber$2))
+          if (greater$1) tailcall(body$1())
+          else tailcall(suffix$5())
         }
         tailcall(while$1(barber$1, remaining$1, time$1))
       }
@@ -241,31 +241,31 @@ class TrampolineSpec extends BaseCompilerSpec {
         val digits$1 = 0
         def while$1(digits$2: Int, sheep$2: Int): TailRec[Unit] = {
           val neq$1 = digits$2 != 1023
-          def body$1(digits$3: Int, sheep$3: Int): TailRec[Unit] = {
-            val current$1 = sheep$3
+          def body$1(): TailRec[Unit] = {
+            val current$1 = sheep$2
             def while$2(current$2: Int, digits$4: Int): TailRec[Unit] = {
               val neq$2 = current$2 != 0
-              def body$2(current$3: Int, digits$5: Int): TailRec[Unit] = {
-                val digits$6 = digits$5 | (1 << (current$3 % 10))
-                val current$4 = current$3 / 10
+              def body$2(): TailRec[Unit] = {
+                val digits$6 = digits$4 | (1 << (current$2 % 10))
+                val current$4 = current$2 / 10
                 tailcall(while$2(current$4, digits$6))
               }
-              def suffix$1(digits$7: Int): TailRec[Unit] = {
-                val sheep$4 = sheep$3 + step
-                tailcall(while$1(digits$7, sheep$4))
+              def suffix$1(): TailRec[Unit] = {
+                val sheep$4 = sheep$2 + step
+                tailcall(while$1(digits$4, sheep$4))
               }
-              if (neq$2) tailcall(body$2(current$2, digits$4))
-              else tailcall(suffix$1(digits$4))
+              if (neq$2) tailcall(body$2())
+              else tailcall(suffix$1())
             }
-            tailcall(while$2(current$1, digits$3))
+            tailcall(while$2(current$1, digits$2))
           }
-          def suffix$2(sheep$5: Int): TailRec[Unit] = {
-            val sheep$6 = sheep$5 - step
+          def suffix$2(): TailRec[Unit] = {
+            val sheep$6 = sheep$2 - step
             val println$2 = println(s"Case #$t1: ${sheep$6}")
             tailcall(suffix$3(println$2))
           }
-          if (neq$1) tailcall(body$1(digits$2, sheep$2))
-          else tailcall(suffix$2(sheep$2))
+          if (neq$1) tailcall(body$1())
+          else tailcall(suffix$2())
         }
         tailcall(while$1(digits$1, sheep$1))
       }
@@ -309,32 +309,32 @@ class TrampolineSpec extends BaseCompilerSpec {
       val tile$1 = one
       def while$1(check$2: List[BigInt], infoGain$2: Int, tile$2: BigInt): TailRec[String] = {
         val less$1 = infoGain$2 < tiles
-        def body$1(check$3: List[BigInt], infoGain$3: Int, tile$3: BigInt): TailRec[String] = {
+        def body$1(): TailRec[String] = {
           val level$1 = 1
           def while$2(level$2: Int, tile$4: BigInt): TailRec[String] = {
             val less$2 = level$2 < necessary
-            def body$2(level$3: Int, tile$5: BigInt): TailRec[String] = {
-              val level$4 = level$3 + 1
-              val tile$6 = (tile$5 - one) * tiles +
-                tile$5 % tiles + one
+            def body$2(): TailRec[String] = {
+              val level$4 = level$2 + 1
+              val tile$6 = (tile$4 - one) * tiles +
+                tile$4 % tiles + one
               tailcall(while$2(level$4, tile$6))
             }
-            def suffix$1(level$5: Int, tile$8: BigInt): TailRec[String] = {
-              val infoGain$4 = infoGain$3 + level$5
-              val check$4 = check$3.::(tile$8)
+            def suffix$1(): TailRec[String] = {
+              val infoGain$4 = infoGain$2 + level$2
+              val check$4 = check$2.::(tile$4)
               val tile$9 = infoGain$4 + 1
               tailcall(while$1(check$4, infoGain$4, tile$9))
             }
-            if (less$2) tailcall(body$2(level$2, tile$4))
-            else tailcall(suffix$1(level$2, tile$4))
+            if (less$2) tailcall(body$2())
+            else tailcall(suffix$1())
           }
-          tailcall(while$2(level$1, tile$3))
+          tailcall(while$2(level$1, tile$2))
         }
-        def suffix$2(check$5: List[BigInt]): TailRec[String] = {
-          done(check$5.reverse.mkString(" "))
+        def suffix$2(): TailRec[String] = {
+          done(check$2.reverse.mkString(" "))
         }
-        if (less$1) tailcall(body$1(check$2, infoGain$2, tile$2))
-        else tailcall(suffix$2(check$2))
+        if (less$1) tailcall(body$1())
+        else tailcall(suffix$2())
       }
       while$1(check$1, infoGain$1, tile$1).result
     })
