@@ -22,9 +22,22 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
-package org.emmalanguage]]></parameter>
+ */]]></parameter>
   </parameters>
+ </check>
+ <check enabled="true" class="org.scalastyle.file.RegexChecker" level="warning">
+  <parameters>
+   <parameter name="regex">package org\.emmalanguage\S+</parameter>
+   <parameter name="line">true</parameter>
+  </parameters>
+  <customMessage>Top-level package should be `org.emmalanguage`</customMessage>
+ </check>
+ <check enabled="true" class="org.scalastyle.file.RegexChecker" level="warning">
+  <parameters>
+   <parameter name="regex">import org\.emmalanguage.\S+</parameter>
+   <parameter name="line">true</parameter>
+  </parameters>
+  <customMessage>Imports should be relative to `org.emmalanguage` or the current package</customMessage>
  </check>
  <check level="warning" class="org.scalastyle.scalariform.SpacesAfterPlusChecker" enabled="true"/>
  <check level="error" class="org.scalastyle.file.WhitespaceEndOfLineChecker" enabled="true"/>

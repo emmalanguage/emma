@@ -36,21 +36,22 @@ trait TreeMatchers {
 
     override def apply(lhs: u.Tree): MatchResult = {
       // Message helper function
-      def msg(err: Neq, negated: Boolean) = s"""
-         |Left tree ${if (negated) "was" else "was not"} alpha equivalent to right tree.
-         |
-         |${asSource("lhs")(lhs)}
-         |${asSource("rhs")(rhs)}
-         |
-         |due to the following difference
-         |
-         |  "${err.msg}"
-         |
-         |detected at the following subtrees
-         |
-         |${asSource("lhs subtree")(err.lhs)}
-         |${asSource("rhs subtree")(err.rhs)}
-      """.stripMargin
+      def msg(err: Neq, negated: Boolean) =
+        s"""
+        |Left tree ${if (negated) "was" else "was not"} alpha equivalent to right tree.
+        |
+        |${asSource("lhs")(lhs)}
+        |${asSource("rhs")(rhs)}
+        |
+        |due to the following difference
+        |
+        |  "${err.msg}"
+        |
+        |detected at the following subtrees
+        |
+        |${asSource("lhs subtree")(err.lhs)}
+        |${asSource("rhs subtree")(err.rhs)}
+        """.stripMargin
 
       compiler.alphaEq(lhs, rhs) match {
         case Good(_) =>
