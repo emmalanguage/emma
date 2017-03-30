@@ -14,20 +14,17 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package examples.text
 
-import api._
-import io.csv._
+import org.apache.flink.api.scala.ExecutionEnvironment
+import org.apache.log4j.Logger
 
-class SparkWordCountIntegrationSpec extends BaseWordCountIntegrationSpec with SparkAware {
+trait FlinkAware {
 
-  override def wordCount(input: String, output: String, csv: CSV): Unit =
-    emma.onSpark {
-      // read the input
-      val docs = DataBag.readCSV[String](input, csv)
-      // parse and count the words
-      val counts = WordCount(docs)
-      // write the results into a file
-      counts.writeCSV(output, csv)
-    }
+  Logger.getLogger("org.apache.flink").setLevel(org.apache.log4j.Level.WARN)
+
+  implicit lazy val flinkEnv = {
+    val env = ExecutionEnvironment.getExecutionEnvironment
+    env.getConfig.disableSysoutLogging()
+    env
+  }
 }

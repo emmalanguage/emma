@@ -16,15 +16,14 @@
 package org.emmalanguage
 package examples.ml.classification
 
-import api._
 import api.Meta.Projections._
+import api._
 import examples.ml.model._
-import io.csv.CSV
+import io.csv._
 
 import breeze.linalg.{Vector => Vec}
-import org.apache.spark.sql.SparkSession
 
-class SparkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec {
+class SparkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec with SparkAware {
 
   def naiveBayes(input: String, lambda: Double, modelType: MType): Set[Model] =
     emma.onSpark {
@@ -38,9 +37,4 @@ class SparkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec {
       // fetch the result locally
       result.fetch().toSet[Model]
     }
-
-  implicit lazy val sparkSession = SparkSession.builder()
-    .master("local[*]")
-    .appName(this.getClass.getSimpleName)
-    .getOrCreate()
 }

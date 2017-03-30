@@ -17,9 +17,7 @@ package org.emmalanguage
 package examples.graphs
 
 import api._
-import examples.graphs.model._
-
-import org.apache.flink.api.scala.ExecutionEnvironment
+import model._
 
 class FlinkConnectedComponentsIntegrationSpec extends BaseConnectedComponentsIntegrationSpec {
 
@@ -27,7 +25,7 @@ class FlinkConnectedComponentsIntegrationSpec extends BaseConnectedComponentsInt
     FlinkConnectedComponentsIntegrationSpec(edges)
 }
 
-object FlinkConnectedComponentsIntegrationSpec {
+object FlinkConnectedComponentsIntegrationSpec extends FlinkAware {
 
   def apply(edges: Seq[Edge[Int]]): Seq[LVertex[Int, Int]] =
     emma.onFlink {
@@ -35,6 +33,4 @@ object FlinkConnectedComponentsIntegrationSpec {
       val rs = ConnectedComponents[Int](es)
       rs.fetch()
     }
-
-  implicit lazy val flinkEnv = ExecutionEnvironment.getExecutionEnvironment
 }

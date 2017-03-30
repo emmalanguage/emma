@@ -16,11 +16,9 @@
 package org.emmalanguage
 package api
 
-import io.csv.{CSV, CSVConverter}
-
 import org.apache.spark.sql.SparkSession
 
-class SparkRDDSpec extends DataBagSpec {
+class SparkRDDSpec extends DataBagSpec with SparkAware {
 
   override type TestBag[A] = SparkRDD[A]
   override type BackendContext = SparkSession
@@ -29,5 +27,5 @@ class SparkRDDSpec extends DataBagSpec {
   override val suffix = "spark-rdd"
 
   override def withBackendContext[T](f: BackendContext => T): T =
-    LocalSparkSession.withSparkSession(f)
+    f(sparkSession)
 }

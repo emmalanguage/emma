@@ -14,20 +14,16 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package examples.text
 
-import api._
-import io.csv._
+import org.apache.log4j.Logger
+import org.apache.spark.sql.SparkSession
 
-class SparkWordCountIntegrationSpec extends BaseWordCountIntegrationSpec with SparkAware {
+trait SparkAware {
 
-  override def wordCount(input: String, output: String, csv: CSV): Unit =
-    emma.onSpark {
-      // read the input
-      val docs = DataBag.readCSV[String](input, csv)
-      // parse and count the words
-      val counts = WordCount(docs)
-      // write the results into a file
-      counts.writeCSV(output, csv)
-    }
+  Logger.getLogger("org.apache.spark").setLevel(org.apache.log4j.Level.WARN)
+
+  implicit lazy val sparkSession = SparkSession.builder()
+    .master("local[*]")
+    .appName(this.getClass.getSimpleName)
+    .getOrCreate()
 }
