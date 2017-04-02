@@ -436,6 +436,10 @@
                     </execution>
                 </executions>
                 <configuration>
+                    <scalaCompatVersion>${scala.tools.version}</scalaCompatVersion>
+                    <scalaVersion>${scala.version}</scalaVersion>
+                    <recompileMode>incremental</recompileMode>
+                    <useZincServer>true</useZincServer>
                     <compilerPlugins>
                         <compilerPlugin>
                             <groupId>org.scalamacros</groupId>
@@ -443,11 +447,12 @@
                             <version>2.1.0</version>
                         </compilerPlugin>
                     </compilerPlugins>
-                    <recompileMode>incremental</recompileMode>
-                    <useZincServer>true</useZincServer>
                     <jvmArgs>
-                        <jvmArg>-Xms128m</jvmArg>
+                        <jvmArg>-Xms256m</jvmArg>
                         <jvmArg>-Xmx512m</jvmArg>
+                        <jvmArg>-Xss16m</jvmArg>
+                        <jvmArg>-XX:+UseConcMarkSweepGC</jvmArg>
+                        <jvmArg>-XX:+CMSClassUnloadingEnabled</jvmArg>
                         <javacArg>-Xlint:unchecked</javacArg>
                         <javacArg>-Xlint:deprecation</javacArg>
                     </jvmArgs>
@@ -565,7 +570,7 @@
                     <!-- Adding code generation folder to the classpath -->
                     <runpath>${java.io.tmpdir}/emma/codegen/</runpath>
                     <!-- Memory for the Travis build -->
-                    <argLine>-Xms1024m -Xmx2048m</argLine>
+                    <argLine>-Xms3096m -Xms3096m -XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled</argLine>
                     <!-- Reporters configuration -->
                     <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
                     <junitxml>.</junitxml>
