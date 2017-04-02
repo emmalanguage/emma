@@ -32,8 +32,7 @@ import scala.util.Random
 import java.io.File
 import java.nio.file.Paths
 
-abstract class BaseCodegenIntegrationSpec
-  extends BaseCompilerSpec with BeforeAndAfter {
+abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAndAfter {
 
   import BaseCodegenIntegrationSpec._
 
@@ -44,9 +43,15 @@ abstract class BaseCodegenIntegrationSpec
   val codegenDir = new File(tempPath("codegen"))
   implicit val imdbMovieCSVConverter = CSVConverter[ImdbMovie]
 
+  type Env
+
+  def Env: u.Type
+
+  def env: Env
+
   def backendPipeline: u.Tree => u.Tree
 
-  val codegenPipeline: u.Expr[Any] => u.Tree =
+  lazy val codegenPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
       checkValid,
       Core.lift,
@@ -54,9 +59,18 @@ abstract class BaseCodegenIntegrationSpec
       backendPipeline
     ).compose(_.tree)
 
+  lazy val addContext: u.Tree => u.Tree = tree => {
+    import u._
+    q"(env: $Env) => { implicit val e: $Env = env; $tree }"
+  }
+
+  override lazy val idPipeline: u.Expr[Any] => u.Tree = {
+    compiler.pipeline(typeCheck = true)(addContext) andThen checkCompile
+  } compose (_.tree)
+
   def verify(e: u.Expr[Any]): Unit = {
-    val expected = eval[Any](idPipeline(e))
-    val actual = eval[Any](codegenPipeline(e))
+    val expected = eval[Env => Any](idPipeline(e))(env)
+    val actual = eval[Env => Any](codegenPipeline(e))(env)
     assert(actual == expected,
       s"""
       |actual != expected
@@ -374,9 +388,9 @@ abstract class BaseCodegenIntegrationSpec
 
   "MutableBag" - {
     "create and fetch" in {
-      val act = eval[Seq[(Int, Long)]](codegenPipeline(u.reify(
+      val act = eval[Env => Seq[(Int, Long)]](codegenPipeline(u.reify(
         MutableBag(DataBag((1 to 100).map(x => x -> x.toLong))).bag().fetch()
-      )))
+      )))(env)
 
       val exp = (1 to 100).map(x => x -> x.toLong)
 
@@ -392,7 +406,7 @@ abstract class BaseCodegenIntegrationSpec
       val exp6 = (1 to 10).map(x => x -> (if (x % 2 != 0) 2L * x else x))
 
       val act1 :: act2 :: act3 :: act4 :: act5 :: act6 :: Nil =
-        eval[List[Seq[(Int, Long)]]](codegenPipeline(u.reify {
+        eval[Env => List[Seq[(Int, Long)]]](codegenPipeline(u.reify {
           val inputs = DataBag((1 to 10).map(x => x -> x.toLong))
           val state1 = MutableBag(inputs)
           val state2 = state1
@@ -415,7 +429,7 @@ abstract class BaseCodegenIntegrationSpec
           val act6 = state3.bag().fetch()
 
           act1 :: act2 :: act3 :: act4 :: act5 :: act6 :: Nil
-        }))
+        }))(env)
 
       act1 should contain theSameElementsAs exp1
       act2 should contain theSameElementsAs exp2
