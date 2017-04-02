@@ -25,11 +25,16 @@ import compiler.RuntimeCompiler
 import org.apache.flink.api.scala.DataSet
 import org.apache.flink.api.scala.ExecutionEnvironment
 
-class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
+class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkAware {
 
   override lazy val compiler = new RuntimeCompiler with FlinkCompiler
 
   import compiler._
+
+  type Env = ExecutionEnvironment
+
+  override lazy val Env = api.Type[org.apache.flink.api.scala.ExecutionEnvironment]
+  override lazy val env = flinkEnv
 
   override lazy val backendPipeline: u.Tree => u.Tree =
     Function.chain(Seq(
@@ -37,24 +42,6 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
       Backend.specialize(FlinkAPI),
       addContext
     ))
-
-  override lazy val idPipeline: u.Expr[Any] => u.Tree = {
-    (_: u.Expr[Any]).tree
-  } andThen {
-    compiler.pipeline(typeCheck = true)(addContext)
-  } andThen {
-    checkCompile
-  }
-
-  private lazy val addContext: u.Tree => u.Tree = tree => {
-    import u._
-    q"""
-    implicit val ctx = _root_.org.apache.flink.api.scala.ExecutionEnvironment.getExecutionEnvironment
-    $tree
-    """
-  }
-
-  implicit val ctx = ExecutionEnvironment.getExecutionEnvironment
 
   // --------------------------------------------------------------------------
   // Distributed collection conversion

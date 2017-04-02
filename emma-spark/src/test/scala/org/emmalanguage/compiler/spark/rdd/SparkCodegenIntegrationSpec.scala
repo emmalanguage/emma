@@ -23,6 +23,7 @@ import compiler.RuntimeCompiler
 import compiler.SparkCompiler
 
 import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SparkSession
 
 class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkAware {
 
@@ -30,7 +31,10 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkA
 
   import compiler._
 
-  lazy val sparkMutableBag = api.Sym[SparkMutableBag.type].asModule
+  type Env = SparkSession
+
+  override lazy val Env = api.Type[org.apache.spark.sql.SparkSession]
+  override lazy val env = sparkSession
 
   override lazy val backendPipeline: u.Tree => u.Tree =
     Function.chain(Seq(
@@ -38,22 +42,6 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkA
       Backend.specialize(SparkAPI),
       addContext
     ))
-
-  override lazy val idPipeline: u.Expr[Any] => u.Tree = {
-    (_: u.Expr[Any]).tree
-  } andThen {
-    compiler.pipeline(typeCheck = true)(addContext)
-  } andThen {
-    checkCompile
-  }
-
-  private lazy val addContext: u.Tree => u.Tree = tree => {
-    import u._
-    q"""
-    implicit val ctx = _root_.org.apache.spark.sql.SparkSession.builder().master("local[*]").getOrCreate()
-    $tree
-    """
-  }
 
   // --------------------------------------------------------------------------
   // Distributed collection conversion
