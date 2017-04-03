@@ -30,6 +30,11 @@
     <name>${project.artifactId}</name>
 
     <properties>
+        <!-- Predicates -->
+        <scala-maven-plugin.skip>false</scala-maven-plugin.skip>
+        <scalastyle-maven-plugin.skip>false</scalastyle-maven-plugin.skip>
+        <scalatest-maven-plugin.skip>${skipTests}</scalatest-maven-plugin.skip>
+
         <!-- Breeze -->
         <breeze.version>0.11.2</breeze.version>
     </properties>

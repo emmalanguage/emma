@@ -58,6 +58,7 @@ This project includes:
   Commons Compress under The Apache Software License, Version 2.0
   Commons Configuration under The Apache Software License, Version 2.0
   Commons Daemon under The Apache Software License, Version 2.0
+  Commons Digester under The Apache Software License, Version 2.0
   Commons IO under The Apache Software License, Version 2.0
   Commons Lang under The Apache Software License, Version 2.0
   Commons Logging under The Apache Software License, Version 2.0
@@ -163,6 +164,7 @@ This project includes:
   Jetty :: XML utilities under Apache Software License - Version 2.0 or Eclipse Public License - Version 1.0
   Jetty Server under Apache Software License - Version 2.0 or Eclipse Public License - Version 1.0
   Jetty Utilities under Apache Software License - Version 2.0 or Eclipse Public License - Version 1.0
+  JLine under BSD
   JSch under BSD
   json4s-ast under ASL
   json4s-core under ASL
