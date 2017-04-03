@@ -31,7 +31,7 @@ import java.util.UUID
  */
 trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with TreeMatchers {
 
-  lazy val compiler = new RuntimeCompiler()
+  lazy val compiler = RuntimeCompiler.default.instance
 
   import compiler._
 
