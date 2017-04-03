@@ -29,6 +29,13 @@
     <artifactId>emma-flink</artifactId>
     <name>${project.artifactId}</name>
 
+    <properties>
+        <!-- Predicates -->
+        <scala-maven-plugin.skip>false</scala-maven-plugin.skip>
+        <scalastyle-maven-plugin.skip>false</scalastyle-maven-plugin.skip>
+        <scalatest-maven-plugin.skip>${skipTests}</scalatest-maven-plugin.skip>
+    </properties>
+
     <dependencies>
         <!-- Scala -->
         <dependency>
@@ -54,16 +61,6 @@
             <groupId>org.emmalanguage</groupId>
             <artifactId>emma-language</artifactId>
             <type>test-jar</type>
-        </dependency>
-
-        <!-- HDFS -->
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-hdfs</artifactId>
         </dependency>
 
         <!-- Flink -->

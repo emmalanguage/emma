@@ -27,8 +27,16 @@
         <version>0.2-SNAPSHOT</version>
     </parent>
 
+
     <artifactId>emma-spark</artifactId>
     <name>${project.artifactId}</name>
+
+    <properties>
+        <!-- Predicates -->
+        <scala-maven-plugin.skip>false</scala-maven-plugin.skip>
+        <scalastyle-maven-plugin.skip>false</scalastyle-maven-plugin.skip>
+        <scalatest-maven-plugin.skip>${skipTests}</scalatest-maven-plugin.skip>
+    </properties>
 
     <dependencies>
         <!-- Scala -->

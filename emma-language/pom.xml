@@ -29,6 +29,13 @@
     <artifactId>emma-language</artifactId>
     <name>${project.artifactId}</name>
 
+    <properties>
+        <!-- Predicates -->
+        <scala-maven-plugin.skip>false</scala-maven-plugin.skip>
+        <scalastyle-maven-plugin.skip>false</scalastyle-maven-plugin.skip>
+        <scalatest-maven-plugin.skip>${skipTests}</scalatest-maven-plugin.skip>
+    </properties>
+
     <dependencies>
         <!-- Scala -->
         <dependency>
@@ -137,6 +144,9 @@
         <profile>
             <id>dev</id>
             <properties>
+                <scala.scope>compile</scala.scope>
+                <flink.scope>compile</flink.scope>
+                <spark.scope>compile</spark.scope>
                 <hadoop.scope>compile</hadoop.scope>
             </properties>
         </profile>
