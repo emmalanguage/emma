@@ -22,7 +22,7 @@ import compiler.lang.source.Source
 import cats.std.all._
 import shapeless._
 
-import scala.annotation.tailrec
+import scala.Function.const
 
 /** Administrative Normal Form (ANF) bypassing control-flow and for-comprehensions. */
 private[core] trait ANF extends Common {
@@ -36,138 +36,127 @@ private[core] trait ANF extends Common {
   private[core] object ANF {
 
     /** The ANF transformation. */
-    private lazy val anf: u.Tree => u.Tree = api.BottomUp
-      .inherit { // Inherit all method definitions in scope (local methods)
-        case core.Let(_, defs, _) => defs.map(_.symbol.asMethod).toSet
-      }.withParent.withOwner.transformWith {
-        // Bypass atomics (except in lambdas, methods and comprehensions)
-        case Attr.inh(src.Atomic(atom), _ :: Some(parent) :: _) => parent match {
-          case src.Lambda(_, _, _)     => src.Block(expr = atom)
-          case core.DefDef(_, _, _, _) => src.Block(expr = atom)
-          case Comprehension(_)        => src.Block(expr = atom)
-          case _ => atom
-        }
+    private lazy val anf: u.Tree => u.Tree =
+      api.BottomUp.withParent.withOwner.transformWith {
+        // lit | this | x
+        case Attr.inh(src.Atomic(atom), _ :: parent :: _) => parent.collect {
+          // Convert atoms to trivial blocks in lambdas, comprehensions and continuations.
+          case src.Lambda(_, _, _) =>
+          case core.Comprehension(_) =>
+          case core.DefDef(_, _, _, _) =>
+        }.fold(atom)(const(src.Block(expr = atom)))
 
-        // Bypass parameters
-        case Attr.none(param @ src.ParDef(_, _)) =>
-          param
+        // comprehension[T] { ... }
+        case Attr.none(compr @ core.Comprehension(_)) =>
+          src.Block(expr = compr)
 
-        // Bypass comprehensions
-        case Attr.none(comprehension @ Comprehension(_)) =>
-          src.Block(expr = comprehension)
+        // cont(..args) | if (cond) cont1(..args1) else cont2(..args2)
+        case Attr.none(cont @ core.Continuation(_)) => cont
 
-        // Bypass local method calls in branches
-        case Attr.inh(
-          call @ src.DefCall(_, method, _, _),
-          _ :: Some(src.Branch(_, _, _)) :: local :: _
-        ) if local(method) => call
-
-        // Simplify RHS
-        case Attr.none(src.VarMut(lhs, rhs)) =>
-          val (stats, expr) = decompose(rhs, unline = true)
-          val mut = src.VarMut(lhs, expr)
-          if (stats.isEmpty) mut
-          else src.Block(stats :+ mut)
-
-        // Simplify RHS
-        case Attr.none(src.BindingDef(lhs, rhs)) =>
-          val (stats, expr) = decompose(rhs, unline = true)
-          val dfn = core.BindingDef(lhs, expr)
-          src.Block(stats :+ dfn)
-
-        // Simplify expression
-        case Attr.inh(src.TypeAscr(target, tpe), owner :: _) =>
-          val (stats, expr) = decompose(target, unline = false)
-          if (expr.tpe =:= tpe) {
-            src.Block(stats, expr)
-          } else {
-            val nme = api.TermName.fresh(nameOf(expr))
-            val lhs = api.ValSym(owner, nme, tpe)
-            val rhs = core.TypeAscr(expr, tpe)
-            val dfn = core.ValDef(lhs, rhs)
-            val ref = core.ValRef(lhs)
-            src.Block(stats :+ dfn, ref)
+        // def cont(..params) = { ..stats; atom }
+        case Attr.none(defn @ core.DefDef(method, tparams, paramss, AsBlock(stats, expr))) =>
+          if (stats.nonEmpty) defn else {
+            val pss = for (params <- paramss) yield for (core.ParDef(p, _) <- params) yield p
+            core.DefDef(method, tparams, pss, src.Block(expr = expr))
           }
 
-        // Simplify target
-        case Attr.inh(src.ModuleAcc(target, module), owner :: _) =>
-          val (stats, expr) = decompose(target, unline = false)
+        // { ..stats; atom }: T
+        case Attr.inh(src.TypeAscr(block @ AsBlock(stats, expr), tpe), owner :: _) =>
+          if (expr.tpe =:= tpe) block else {
+            val nme = api.TermName.fresh(expr.symbol)
+            val lhs = api.ValSym(owner, nme, tpe)
+            val rhs = core.TypeAscr(expr, tpe)
+            val tmp = core.ValDef(lhs, rhs)
+            val ref = core.Ref(lhs)
+            src.Block(stats :+ tmp, ref)
+          }
+
+        // { ..stats; atom }.module
+        case Attr.inh(src.ModuleAcc(AsBlock(stats, expr), module), owner :: _) =>
           val nme = api.TermName.fresh(module)
           val lhs = api.ValSym(owner, nme, module.info)
           val rhs = core.ModuleAcc(expr, module)
-          val dfn = core.ValDef(lhs, rhs)
-          val ref = core.ValRef(lhs)
-          src.Block(stats :+ dfn, ref)
+          val tmp = core.ValDef(lhs, rhs)
+          val ref = core.Ref(lhs)
+          src.Block(stats :+ tmp, ref)
 
-        // Simplify target & arguments
-        case Attr.inh(
-          src.DefCall(target, method, targs, argss),
-          owner :: _ :: local :: _
-        ) =>
-          val (tgtStats, tgtExpr) = target
-            .map(decompose(_, unline = false))
-            .map { case (stats, expr) => (stats, Some(expr)) }
-            .getOrElse(Seq.empty, None)
+        // target.method[..targs](...argss)
+        case Attr.inh(src.DefCall(target, method, targs, argss), owner :: _) =>
+          val expr = for (AsBlock(_, a) <- target) yield a
+          val exprss = for (args <- argss) yield
+            for (AsBlock(_, arg) <- args) yield arg
 
-          val (argStats, argExprss) = decompose(argss, unline = false)
-          val allStats = tgtStats ++ argStats
-          val call = core.DefCall(tgtExpr, method, targs, argExprss)
-          if (local contains method) {
-            src.Block(allStats, call)
-          } else {
-            val nme = api.TermName.fresh(method)
-            val lhs = api.ValSym(owner, nme, call.tpe)
-            val dfn = core.ValDef(lhs, call)
-            val ref = core.ValRef(lhs)
-            src.Block(allStats :+ dfn, ref)
-          }
+          val prefix = for {
+            AsBlock(ss, _) <- target.toSeq
+            stat <- ss
+          } yield stat
 
-        // Simplify arguments
-        case Attr.inh(inst @ src.Inst(cls, targs, argss), owner :: _) =>
-          val (stats, exprss) = decompose(argss, unline = false)
-          val nme = api.TermName.fresh(cls.typeSymbol)
-          val lhs = api.ValSym(owner, nme, inst.tpe)
+          val suffix = for {
+            args <- argss
+            AsBlock(ss, _) <- args
+            stat <- ss
+          } yield stat
+
+          val rhs = core.DefCall(expr, method, targs, exprss)
+          val nme = api.TermName.fresh(method)
+          val lhs = api.ValSym(owner, nme, rhs.tpe)
+          val tmp = core.ValDef(lhs, rhs)
+          val ref = core.Ref(lhs)
+          src.Block(Seq.concat(prefix, suffix, Seq(tmp)), ref)
+
+        // new cls[..targs](...argss)
+        case Attr.inh(src.Inst(cls, targs, argss), owner :: _) =>
+          val exprss = for (args <- argss) yield
+            for (AsBlock(_, arg) <- args) yield arg
+
+          val stats = for {
+            args <- argss
+            AsBlock(ss, _) <- args
+            stat <- ss
+          } yield stat
+
           val rhs = core.Inst(cls, targs, exprss)
-          val dfn = core.ValDef(lhs, rhs)
-          val ref = core.ValRef(lhs)
-          src.Block(stats :+ dfn, ref)
+          val nme = api.TermName.fresh(cls.typeSymbol)
+          val lhs = api.ValSym(owner, nme, rhs.tpe)
+          val tmp = core.ValDef(lhs, rhs)
+          val ref = core.Ref(lhs)
+          src.Block(stats :+ tmp, ref)
 
-        // Flatten blocks
-        case Attr.none(src.Block(outer, expr)) =>
-          val (inner, result) = decompose(expr, unline = false)
-          val flat = outer.flatMap {
-            case src.Block(stats, src.Atomic(_)) => stats
-            case src.Block(stats, stat) => stats :+ stat
-            case stat => Some(stat)
-          }
-
-          src.Block(flat ++ inner, result)
-
-        // All lambdas on the RHS
+        // (params) => { ..stats; atom }
         case Attr.none(lambda @ src.Lambda(fun, _, _)) =>
           val nme = api.TermName.fresh(api.TermName.lambda)
           val lhs = api.ValSym(fun.owner, nme, lambda.tpe)
-          val dfn = core.ValDef(lhs, lambda)
-          val ref = core.ValRef(lhs)
-          src.Block(Seq(dfn), ref)
+          val tmp = core.ValDef(lhs, lambda)
+          val ref = core.Ref(lhs)
+          src.Block(Seq(tmp), ref)
 
-        // All branches on the RHS
-        case Attr.inh(
-          src.Branch(cond, thn, els),
-          owner :: _ :: local :: _
-        ) =>
-          val (stats, expr) = decompose(cond, unline = false)
-          val branch = core.Branch(expr, thn, els)
-          if (isDSCF(branch)(local)) {
-            src.Block(stats, branch)
-          } else {
-            val nme = api.TermName.fresh("if")
-            val lhs = api.ValSym(owner, nme, branch.tpe)
-            val dfn = core.ValDef(lhs, branch)
-            val ref = core.ValRef(lhs)
-            src.Block(stats :+ dfn, ref)
+        // if ({ ..stats, cond }) thn else els
+        case Attr.inh(src.Branch(AsBlock(stats, cond), thn, els), owner :: _) =>
+          val rhs = src.Branch(cond, thn, els)
+          val nme = api.TermName.fresh("if")
+          val lhs = api.ValSym(owner, nme, rhs.tpe)
+          val tmp = core.ValDef(lhs, rhs)
+          val ref = core.ValRef(lhs)
+          src.Block(stats :+ tmp, ref)
+
+        // { ..outer; { ..inner; atom } }
+        case Attr.none(src.Block(outer, AsBlock(inner, expr))) =>
+          val stats = outer.flatMap {
+            case src.ValDef(x, AsBlock(ss :+ core.ValDef(y, rhs), core.Ref(z)))
+              if y == z => ss :+ core.ValDef(x, rhs)
+            case src.ValDef(lhs, AsBlock(ss, rhs)) =>
+              ss :+ src.ValDef(lhs, rhs)
+            case src.VarDef(lhs, AsBlock(ss, rhs)) =>
+              ss :+ src.VarDef(lhs, rhs)
+            case src.VarMut(lhs, AsBlock(ss, rhs)) =>
+              ss :+ src.VarMut(lhs, rhs)
+            case src.Block(ss, src.Atomic(_)) => ss
+            case src.Block(ss, stat) => ss :+ stat
+            case stat => Seq(stat)
           }
-      }.andThen(_.tree)
+
+          src.Block(stats ++ inner, expr)
+      }._tree
 
     /**
      * Converts a tree into administrative normal form (ANF).
@@ -295,48 +284,6 @@ private[core] trait ANF extends Common {
       inStats || inExpr
     }
 
-    /** Returns the encoded name associated with this subtree. */
-    @tailrec private def nameOf(tree: u.Tree): u.Name = tree match {
-      case id: u.Ident => id.name.encodedName
-      case value: u.ValDef => value.name.encodedName
-      case method: u.DefDef => method.name.encodedName
-      case u.Select(_, member) => member.encodedName
-      case u.Typed(expr, _) => nameOf(expr)
-      case u.Block(_, expr) => nameOf(expr)
-      case u.Apply(target, _) => nameOf(target)
-      case u.TypeApply(target, _) => nameOf(target)
-      case _: u.Function => api.TermName.lambda
-      case _ => api.TermName("x")
-    }
-
-    /** Decomposes a [[src.Block]] into statements and expressions. */
-    private def decompose(tree: u.Tree, unline: Boolean)
-      : (Seq[u.Tree], u.Tree) = tree match {
-        case src.Block(stats :+ src.ValDef(x, rhs), src.ValRef(y))
-          if unline && x == y => (stats, rhs)
-        case src.Block(stats, expr) =>
-          (stats, expr)
-        case _ =>
-          (Seq.empty, tree)
-      }
-
-    /** Decomposes a nested sequence of [[src.Block]]s into statements and expressions. */
-    private def decompose(treess: Seq[Seq[u.Tree]], unline: Boolean)
-      : (Seq[u.Tree], Seq[Seq[u.Tree]]) = {
-
-      val stats = for {
-        trees <- treess
-        tree <- trees
-        stat <- decompose(tree, unline)._1
-      } yield stat
-
-      val exprss = for (trees <- treess)
-        yield for (tree <- trees)
-          yield decompose(tree, unline)._2
-
-      (stats, exprss)
-    }
-
     /** Checks whether the given expression represents direct-style control-flow. */
     private def isDSCF(expr: u.Tree)(isLocal: u.MethodSymbol => Boolean): Boolean = expr match {
       //@formatter:off
@@ -364,12 +311,11 @@ private[core] trait ANF extends Common {
       //@formatter:on
     }
 
-    /** Extractor for arbitrary comprehensions. */
-    private object Comprehension {
-      def unapply(tree: u.Tree): Option[u.Tree] = tree match {
-        case src.DefCall(Some(_), method, _, _)
-          if API.ComprehensionSyntax.ops(method) => Some(tree)
-        case _ => None
+    /** Extract `(stats, expr)` from blocks and non-blocks. */
+    object AsBlock {
+      def unapply(tree: u.Tree): Option[(Seq[u.Tree], u.Tree)] = tree match {
+        case src.Block(stats, expr) => Some(stats, expr)
+        case expr => Some(Seq.empty, expr)
       }
     }
   }

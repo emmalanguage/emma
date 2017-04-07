@@ -17,11 +17,10 @@ package org.emmalanguage
 package compiler.lang.core
 
 import compiler.Common
+import compiler.ir.DSCFAnnotations._
 import compiler.lang.AlphaEq
 import compiler.lang.comprehension.Comprehension
 import compiler.lang.source.Source
-
-import cats.Monoid
 
 /** Core language. */
 trait Core extends Common
@@ -161,6 +160,28 @@ trait Core extends Common
           case api.DefCall(_, `head`, _, _) => true
           case _ => false
         }
+      }
+
+      // Matcher for comprehensions
+      object Comprehension {
+        import API.ComprehensionSyntax._
+        def unapply(tree: u.Tree): Option[u.Tree] = tree match {
+          case DefCall(Some(Ref(`sym`)), _, _, _) => Some(tree)
+          case _ => None
+        }
+      }
+
+      // Matcher for continuations (local method calls and branches)
+      object Continuation {
+        def unapply(tree: u.Tree): Option[u.Tree] = tree match {
+          case DefCall(None, method, _, _) if isCont(method) => Some(tree)
+          case Branch(_, DefCall(None, thn, _, _), DefCall(None, els, _, _))
+            if isCont(thn) && isCont(els) => Some(tree)
+          case _ => None
+        }
+
+        private def isCont(method: u.TermSymbol) =
+          api.Sym.findAnn[continuation](method).isDefined
       }
 
       //@formatter:on

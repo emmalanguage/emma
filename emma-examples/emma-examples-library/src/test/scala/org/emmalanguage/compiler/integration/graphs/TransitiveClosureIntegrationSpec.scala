@@ -20,6 +20,7 @@ import api.Meta.Projections._
 import api._
 import compiler.integration.BaseCompilerIntegrationSpec
 import compiler.ir.ComprehensionSyntax._
+import compiler.ir.DSCFAnnotations._
 import examples.graphs._
 import examples.graphs.model._
 import io.csv._
@@ -27,6 +28,7 @@ import io.csv._
 class TransitiveClosureIntegrationSpec extends BaseCompilerIntegrationSpec {
 
   import compiler._
+  import universe.reify
 
   // ---------------------------------------------------------------------------
   // Program closure
@@ -42,7 +44,7 @@ class TransitiveClosureIntegrationSpec extends BaseCompilerIntegrationSpec {
   // Program representations
   // ---------------------------------------------------------------------------
 
-  val sourceExpr = liftPipeline(u.reify {
+  val sourceExpr = liftPipeline(reify {
     // read an initial collection of edges
     val edges = DataBag.readCSV[Edge[Int]](input, csv)
     // compute the transitive closure of the edges
@@ -51,17 +53,14 @@ class TransitiveClosureIntegrationSpec extends BaseCompilerIntegrationSpec {
     closure.writeCSV(output, csv)
   })
 
-  val coreExpr = anfPipeline(u.reify {
+  val coreExpr = anfPipeline(reify {
     // read in a directed graph
     val input = this.input
     val csv$1 = this.csv
     val readCSV = DataBag.readCSV[Edge[Int]](input, csv$1)
     val paths$1 = readCSV.distinct
     val count$1 = paths$1.size
-    val added$1 = 0L
-
-    def doWhile$1(added$3: Long, count$3: Long, paths$3: DataBag[Edge[Int]]): Unit = {
-
+    @whileLoop def doWhile$1(added$3: Long, count$3: Long, paths$3: DataBag[Edge[Int]]): Unit = {
       val closure = comprehension[Edge[Int], DataBag] {
         val e1 = generator[Edge[Int], DataBag](paths$3)
         val e2 = generator[Edge[Int], DataBag](paths$3)
@@ -75,8 +74,7 @@ class TransitiveClosureIntegrationSpec extends BaseCompilerIntegrationSpec {
       val added$2 = paths$2.size - count$3
       val count$2 = paths$2.size
       val isReady = added$2 > 0
-
-      def suffix$1(): Unit = {
+      @suffix def suffix$1(): Unit = {
         val closure = paths$2
         val output = this.output
         val csv$2 = this.csv
@@ -87,7 +85,7 @@ class TransitiveClosureIntegrationSpec extends BaseCompilerIntegrationSpec {
       else suffix$1()
     }
 
-    doWhile$1(added$1, count$1, paths$1)
+    doWhile$1(0L, count$1, paths$1)
   })
 
   // ---------------------------------------------------------------------------
