@@ -21,7 +21,6 @@ import api.Meta
 
 import scala.Function.const
 import scala.annotation.tailrec
-import scala.util.Random
 
 /**
  * A (non-initial) union-representation algebra.

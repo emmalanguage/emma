@@ -483,7 +483,7 @@
                         <arg>-Ywarn-unused-import</arg>
                         <arg>-Xmax-classfile-name</arg>
                         <arg>140</arg>
-                        <arg>-Xlint:package-object-classes</arg>
+                        <arg>-Xlint:-adapted-args,_</arg>
                         <arg>-Xfatal-warnings</arg>
                         <!--<arg>-Xdisable-assertions</arg>-->
                     </args>
