@@ -23,8 +23,8 @@ protected[emmalanguage] trait API extends AST {
 
   import UniverseImplicits._
 
-  trait ReflectedSymbol[Symbol <: u.Symbol] {
-    def sym: Symbol
+  trait ReflectedSymbol[S <: u.Symbol] {
+    def sym: S
 
     def ops: Set[u.MethodSymbol]
 
