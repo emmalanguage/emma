@@ -18,8 +18,6 @@ package compiler.lang.libsupport
 
 import compiler.BaseCompilerSpec
 
-import test.schema.Literature.Book
-
 /** A spec for the `Beta.reduce` transformation. */
 trait LibSupportExamples extends BaseCompilerSpec {
 

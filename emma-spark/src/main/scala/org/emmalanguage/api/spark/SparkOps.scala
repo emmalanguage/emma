@@ -26,8 +26,6 @@ import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
-import scala.language.higherKinds
-
 /** Spark backend operators. */
 object SparkOps extends ComprehensionCombinators[SparkSession] with Runtime[SparkSession] {
 

@@ -21,7 +21,6 @@ import io.csv._
 import io.parquet._
 import io.text._
 
-import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._

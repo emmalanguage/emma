@@ -23,7 +23,6 @@ import compiler.BaseCompilerSpec
 class FoldGroupFusionSpec extends BaseCompilerSpec {
 
   import compiler._
-  import UniverseImplicits._
 
   val testPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(

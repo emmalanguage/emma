@@ -21,7 +21,6 @@ import api.alg._
 import api.backend.ComprehensionCombinators
 import api.backend.Runtime
 
-import scala.language.higherKinds
 import org.apache.flink.api.java.io.TypeSerializerInputFormat
 import org.apache.flink.api.java.io.TypeSerializerOutputFormat
 import org.apache.flink.api.scala.DataSet

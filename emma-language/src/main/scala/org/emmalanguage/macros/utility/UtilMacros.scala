@@ -18,7 +18,6 @@ package macros.utility
 
 import compiler.MacroCompiler
 
-import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
 class UtilMacros(val c: blackbox.Context) extends MacroCompiler {

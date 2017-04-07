@@ -21,8 +21,6 @@ import io.ScalaSupport
 
 import resource._
 
-import scala.language.experimental.macros
-
 import java.io._
 import java.net.URI
 import java.nio.charset.StandardCharsets
