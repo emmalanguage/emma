@@ -293,9 +293,9 @@ trait Transversers { this: AST =>
       inherit { case api.Owner(sym) => sym } (last(default))
 
     /** Inherits the owner chain of the current node. */
-    def withOwnerChain = inherit(Attr.collect[Vector, Symbol] {
-      case api.Owner(sym) => sym
-    })
+    def withOwnerChain = inheritInit(Vector(api.Owner.encl)) {
+      case Attr.none(api.Owner(sym)) => Vector(sym)
+    }
 
     /** Synthesizes all term definitions contained in the current node and its children. */
     def withDefs = synthesize(Attr.group {
@@ -381,6 +381,12 @@ trait Transversers { this: AST =>
 
     override def transform(tree: Tree): Tree =
       at(tree)(super.transform(tree))
+
+    override def transformStats(stats: List[Tree], owner: Symbol) =
+      super.transformStats(stats, owner).filter {
+        case api.Empty(_) => false
+        case _ => true
+      }
 
     protected final def accTransform(tree: Tree): Tree = {
       accumulate(tree)

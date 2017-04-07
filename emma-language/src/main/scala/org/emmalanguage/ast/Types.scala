@@ -30,6 +30,8 @@ trait Types { this: AST =>
     /** Type names. */
     object TypeName extends Node {
 
+      private val regex = s"(.*)\\$$$freshNameSuffix.*".r
+
       // Predefined type names
       lazy val empty    = u.typeNames.EMPTY
       lazy val wildcard = u.typeNames.WILDCARD
@@ -55,22 +57,23 @@ trait Types { this: AST =>
       }
 
       /** Creates a fresh type name with the given `prefix`. */
-      def fresh(prefix: String): u.TypeName = apply {
+      def fresh(prefix: String = "T"): u.TypeName = apply {
         assert(prefix.nonEmpty, "Cannot create a fresh name with empty prefix")
         freshTypeName(s"$prefix$$$freshNameSuffix")
       }
 
       /** Creates a fresh type name with the given `prefix`. */
-      def fresh(prefix: u.Name): u.TypeName = {
-        assert(is.defined(prefix), "Undefined prefix")
-        fresh(prefix.toString)
-      }
+      def fresh(prefix: u.Name): u.TypeName =
+        if (is.defined(prefix)) fresh(prefix.toString) else fresh()
 
       /** Creates a fresh type name with the given symbol's name as `prefix`. */
-      def fresh(prefix: u.Symbol): u.TypeName = {
-        assert(is.defined(prefix), "Undefined prefix")
-        assert(has.nme(prefix),   s"Prefix $prefix has no name")
-        fresh(prefix.name)
+      def fresh(prefix: u.Symbol): u.TypeName =
+        if (is.defined(prefix)) fresh(prefix.name) else fresh()
+
+      /** Tries to return the original name used to create this `fresh` name. */
+      def original(fresh: u.Name): u.TypeName = fresh match {
+        case u.TypeName(regex(original)) => u.TypeName(original)
+        case _ => fresh.toTypeName
       }
 
       def unapply(name: u.TypeName): Option[String] =

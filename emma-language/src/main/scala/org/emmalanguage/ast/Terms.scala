@@ -27,6 +27,8 @@ trait Terms { this: AST =>
     /** Term names. */
     object TermName extends Node {
 
+      private val regex = s"(.*)\\$$$freshNameSuffix.*".r
+
       // Predefined term names
       lazy val anon      = apply("anon")
       lazy val app       = apply("apply")
@@ -61,22 +63,23 @@ trait Terms { this: AST =>
       }
 
       /** Creates a fresh term name with the given `prefix`. */
-      def fresh(prefix: String): u.TermName = apply {
+      def fresh(prefix: String = "x"): u.TermName = apply {
         assert(prefix.nonEmpty, "Cannot create a fresh name with empty prefix")
         freshTermName(s"$prefix$$$freshNameSuffix")
       }
 
       /** Creates a fresh term name with the given `prefix`. */
-      def fresh(prefix: u.Name): u.TermName = {
-        assert(is.defined(prefix), "Undefined prefix")
-        fresh(prefix.toString)
-      }
+      def fresh(prefix: u.Name): u.TermName =
+        if (is.defined(prefix)) fresh(prefix.toString) else fresh()
 
       /** Creates a fresh term name with the given symbol's name as `prefix`. */
-      def fresh(prefix: u.Symbol): u.TermName = {
-        assert(is.defined(prefix), "Undefined prefix")
-        assert(has.nme(prefix),   s"Prefix $prefix has no name")
-        fresh(prefix.name)
+      def fresh(prefix: u.Symbol): u.TermName =
+        if (is.defined(prefix)) fresh(prefix.name) else fresh()
+
+      /** Tries to return the original name used to create this `fresh` name. */
+      def original(fresh: u.Name): u.TermName = fresh match {
+        case u.TermName(regex(original)) => u.TermName(original)
+        case _ => fresh.toTermName
       }
 
       def unapply(name: u.TermName): Option[String] =
