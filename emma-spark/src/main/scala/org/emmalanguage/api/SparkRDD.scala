@@ -25,7 +25,6 @@ import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
-import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
 

@@ -29,7 +29,6 @@ import org.apache.flink.configuration.Configuration
 import org.apache.flink.core.fs.FileSystem
 import org.apache.flink.util.Collector
 
-import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
 

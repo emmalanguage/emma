@@ -16,7 +16,6 @@
 package org.emmalanguage
 package io.csv
 
-import io.Format
 import io.ScalaSupport
 
 import com.univocity.parsers.csv.CsvParser
@@ -25,12 +24,10 @@ import com.univocity.parsers.csv.CsvWriter
 import com.univocity.parsers.csv.CsvWriterSettings
 import resource._
 
-import scala.language.experimental.macros
-
 import java.io._
 import java.net.URI
 
-/** A [[ScalaSupport]] implementation for the [[CSV]] [[Format]]. */
+/** A [[ScalaSupport]] implementation for the [[CSV]] [[io.Format]]. */
 class CSVScalaSupport[A](val format: CSV)(implicit conv: CSVConverter[A])
   extends ScalaSupport[A, CSV] {
 

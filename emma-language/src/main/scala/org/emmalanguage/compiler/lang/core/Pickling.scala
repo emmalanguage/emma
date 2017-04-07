@@ -25,8 +25,6 @@ import scala.Function.const
 private[core] trait Pickling extends Common {
   this: Source with Core =>
 
-  import UniverseImplicits._
-
   private[core] object Pickle {
 
     type D = Int => String // semantic domain (offset => string representation)

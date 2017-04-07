@@ -27,7 +27,6 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
 
   import compiler._
   import universe.reify
-  import UniverseImplicits._
 
   def testPipeline(prefix: u.Tree => u.Tree): u.Tree => u.Tree =
     pipeline(typeCheck = true)(

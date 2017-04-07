@@ -18,7 +18,6 @@ package compiler
 
 import com.typesafe.config.Config
 
-import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
 class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompiler {

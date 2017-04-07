@@ -24,8 +24,6 @@ import shapeless._
 import shapeless.ops.hlist._
 import shapeless.ops.record._
 
-import scala.language.higherKinds
-
 /** Implicit [[ParquetConverter]] privder. */
 trait MkParquetConverter[A] extends (() => ParquetConverter[A])
 

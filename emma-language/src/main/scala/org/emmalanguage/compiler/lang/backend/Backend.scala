@@ -26,8 +26,6 @@ trait Backend extends Common
   with Specialization {
   this: Core =>
 
-  import UniverseImplicits._
-
   object Backend {
 
     /** Delegates to [[Specialization.specialize]]. */
