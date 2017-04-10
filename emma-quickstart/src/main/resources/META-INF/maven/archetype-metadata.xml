@@ -1,29 +1,93 @@
-<archetype-descriptor
-        xmlns="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.0.0"
-        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:schemaLocation="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.0.0 http://maven.apache.org/xsd/archetype-descriptor-1.0.0.xsd"
-        name="emma-quickstart">
-    <fileSets>
+<?xml version="1.0" encoding="UTF-8"?>
+<archetype-descriptor xsi:schemaLocation="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.0.0 http://maven.apache.org/xsd/archetype-descriptor-1.0.0.xsd" name="emma-quickstart"
+    xmlns="http://maven.apache.org/plugins/maven-archetype-plugin/archetype-descriptor/1.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <fileSets>
+    <fileSet filtered="true" encoding="UTF-8">
+      <directory></directory>
+      <includes>
+        <include>scalastyle_config.xml</include>
+      </includes>
+    </fileSet>
+    <fileSet encoding="UTF-8">
+      <directory></directory>
+      <includes>
+        <include>.gitignore</include>
+      </includes>
+    </fileSet>
+  </fileSets>
+  <modules>
+    <module id="${rootArtifactId}-library" dir="__rootArtifactId__-library" name="${rootArtifactId}-library">
+      <fileSets>
         <fileSet filtered="true" packaged="true" encoding="UTF-8">
-            <directory>src/main/scala</directory>
-            <includes>
-                <include>**/*.scala</include>
-            </includes>
-        </fileSet>
-        <fileSet filtered="true" packaged="true" encoding="UTF-8">
-            <directory>src/test/scala</directory>
-            <includes>
-                <include>**/*.scala</include>
-            </includes>
+          <directory>src/main/scala</directory>
+          <includes>
+            <include>**/*.scala</include>
+          </includes>
         </fileSet>
         <fileSet encoding="UTF-8">
-            <directory>src/assembly</directory>
+          <directory>src/main/resources</directory>
+          <includes>
+            <include>**/*.csv</include>
+          </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/test/scala</directory>
+          <includes>
+            <include>**/*.scala</include>
+          </includes>
         </fileSet>
         <fileSet encoding="UTF-8">
-            <directory>doc</directory>
-            <includes>
-                <include>**/*.md</include>
-            </includes>
+          <directory>src/test/resources</directory>
+          <includes>
+            <include>**/*.tsv</include>
+          </includes>
         </fileSet>
-    </fileSets>
+      </fileSets>
+    </module>
+    <module id="${rootArtifactId}-flink" dir="__rootArtifactId__-flink" name="${rootArtifactId}-flink">
+      <fileSets>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/main/scala</directory>
+          <includes>
+            <include>**/*.scala</include>
+          </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/test/scala</directory>
+          <includes>
+            <include>**/*.scala</include>
+          </includes>
+        </fileSet>
+        <fileSet filtered="true" encoding="UTF-8">
+          <directory></directory>
+          <includes>
+            <include>dependency-reduced-pom.xml</include>
+          </includes>
+        </fileSet>
+      </fileSets>
+    </module>
+    <module id="${rootArtifactId}-spark" dir="__rootArtifactId__-spark" name="${rootArtifactId}-spark">
+      <fileSets>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/main/scala</directory>
+          <includes>
+            <include>**/*.scala</include>
+          </includes>
+        </fileSet>
+        <fileSet filtered="true" packaged="true" encoding="UTF-8">
+          <directory>src/test/scala</directory>
+          <includes>
+            <include>**/*.scala</include>
+          </includes>
+        </fileSet>
+        <fileSet filtered="true" encoding="UTF-8">
+          <directory></directory>
+          <includes>
+            <include>dependency-reduced-pom.xml</include>
+          </includes>
+        </fileSet>
+      </fileSets>
+    </module>
+  </modules>
 </archetype-descriptor>
