@@ -170,7 +170,7 @@ into scalable Flink/Spark dataflows.
 
 The presented API is not abstract. The semantics of each operator are given directly by the
 default implementation in
-[`ScalaSeq[A]`](emma-language/src/main/scala/eu/stratosphere/emma/api/ScalaSeq.scala).
+[`ScalaSeq[A]`](emma-language/src/main/scala/org/emmalanguage/api/ScalaSeq.scala).
 This allows you to incrementally develop, test, and debug data analysis algorithms
 at small scale locally as a pure Scala programs.
 
@@ -274,8 +274,7 @@ For more advanced build options including integration tests for the target runti
 
 ## Examples
 
-The [emma-examples](emma-examples/src/main/scala/eu/stratosphere/emma/examples) module contains examples from various fields.
+The [emma-examples](emma-examples/emma-examples-library/src/main/scala/org/emmalanguage/examples) module contains examples from various fields.
 
-- [Data Mining](emma-examples/src/main/scala/eu/stratosphere/emma/examples/datamining)
-- [Relational Databases](emma-examples/src/main/scala/eu/stratosphere/emma/examples/tpch)
-- [Graph Analysis](emma-examples/src/main/scala/eu/stratosphere/emma/examples/graphs)
+- [Graph Analysis](emma-examples/emma-examples-library/src/main/scala/org/emmalanguage/examples/graphs)
+- [Machine Learning](emma-examples/emma-examples-library/src/main/scala/org/emmalanguage/examples/ml)
