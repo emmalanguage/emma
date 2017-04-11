@@ -235,14 +235,14 @@ object SparkExamplesRunner {
   def kMeans(c: Config)(implicit spark: SparkSession): Unit =
     emma.onSpark {
       // read the input
-      val points = for (line <- DataBag.readCSV[String](c.input, c.csv)) yield {
+      val points = for (line <- DataBag.readText(c.input)) yield {
         val record = line.split("\t")
         Point(record.head.toLong, Vec(record.tail.map(_.toDouble)))
       }
       // do the clustering
       val solution = KMeans(c.k, c.epsilon, c.iterations)(points)
-      // write the result model into a file
-      solution.writeCSV(c.output, c.csv)
+      // write the (pointID, clusterID) pairs into a file
+      solution.map(s => (s.point.id, s.clusterID)).writeCSV(c.output, c.csv)
     }
 
   // Text
@@ -250,7 +250,7 @@ object SparkExamplesRunner {
   def wordCount(c: Config)(implicit spark: SparkSession): Unit =
     emma.onSpark {
       // read the input files and split them into lowercased words
-      val docs = DataBag.readCSV[String](c.input, c.csv)
+      val docs = DataBag.readText(c.input)
       // parse and count the words
       val counts = WordCount(docs)
       // write the results into a file
@@ -263,7 +263,7 @@ object SparkExamplesRunner {
 
   private def sparkSession(c: Config): SparkSession = SparkSession.builder()
     .master(c.master)
-    .appName(s"Emma example: c.command")
+    .appName(s"Emma example: ${c.command.get}")
     .getOrCreate()
 
   class Parser extends scopt.OptionParser[Config]("emma-examples") {

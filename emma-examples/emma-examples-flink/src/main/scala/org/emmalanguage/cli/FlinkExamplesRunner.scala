@@ -66,6 +66,13 @@ object FlinkExamplesRunner {
     help("help")
       .text("Show this help message")
 
+    opt[String]("codegen")
+      .text("custom codegen path")
+      .action((x, c) => {
+        System.setProperty("emma.codegen.dir", x)
+        c
+      })
+
     section("Graph Analytics")
     cmd("connected-components")
       .text("Label undirected graph vertices with component IDs")
@@ -229,14 +236,14 @@ object FlinkExamplesRunner {
   def kMeans(c: Config)(implicit flink: ExecutionEnvironment): Unit =
     emma.onFlink {
       // read the input
-      val points = for (line <- DataBag.readCSV[String](c.input, c.csv)) yield {
+      val points = for (line <- DataBag.readText(c.input)) yield {
         val record = line.split("\t")
         Point(record.head.toLong, Vec(record.tail.map(_.toDouble)))
       }
       // do the clustering
       val solution = KMeans(c.k, c.epsilon, c.iterations)(points)
-      // write the result model into a file
-      solution.writeCSV(c.output, c.csv)
+      // write the (pointID, clusterID) pairs into a file
+      solution.map(s => (s.point.id, s.clusterID)).writeCSV(c.output, c.csv)
     }
 
   // Text
@@ -244,7 +251,7 @@ object FlinkExamplesRunner {
   def wordCount(c: Config)(implicit flink: ExecutionEnvironment): Unit =
     emma.onFlink {
       // read the input files and split them into lowercased words
-      val docs = DataBag.readCSV[String](c.input, c.csv)
+      val docs = DataBag.readText(c.input)
       // parse and count the words
       val counts = WordCount(docs)
       // write the results into a file
