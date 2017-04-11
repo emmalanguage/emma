@@ -1,0 +1,18 @@
+.highlight {
+    padding: 1ex 1em;
+    margin: 1ex 0em 2ex 0em;
+}
+.highlight code {
+    background-color: inherit;
+    font-family: inherit;
+    color: inherit;
+    border: inherit;
+    font-weight: inherit;
+    font-size: inherit;
+    margin: 0;
+    padding: 0;
+}
+
+section.content-container {
+    margin: 2ex 0;
+}

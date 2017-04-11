@@ -675,6 +675,7 @@
                         <exclude>src/main/resources/**</exclude>
                         <exclude>public/js/paper-full-v0.9.23.min.js</exclude>
                         <exclude>public/**/*foundation*</exclude>
+                        <exclude>docs/**</exclude>
                     </excludes>
                     <mapping>
                         <scala>SLASHSTAR_STYLE</scala>
