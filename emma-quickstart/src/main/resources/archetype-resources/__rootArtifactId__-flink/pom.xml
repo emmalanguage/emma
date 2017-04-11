@@ -76,7 +76,7 @@
                             <transformers>
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer" />
                                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>org.emmalanguage.cli.FlinkExamplesRunner</mainClass>
+                                    <mainClass>${package}.cli.FlinkRunner</mainClass>
                                 </transformer>
                             </transformers>
                             <artifactSet>
