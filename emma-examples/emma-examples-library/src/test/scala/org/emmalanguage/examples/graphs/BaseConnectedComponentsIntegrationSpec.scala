@@ -38,7 +38,7 @@ trait BaseConnectedComponentsIntegrationSpec extends FlatSpec with Matchers with
     deleteRecursive(new File(codegenDir))
   }
 
-  "Connected components" should "find all connected sub-graphs" in {
+  it should "find all connected sub-graphs" in {
     val act = connectedComponents(Seq(
       Edge(1, 2), Edge(1, 5), Edge(1, 7),
       Edge(2, 1), Edge(2, 5), Edge(2, 7),

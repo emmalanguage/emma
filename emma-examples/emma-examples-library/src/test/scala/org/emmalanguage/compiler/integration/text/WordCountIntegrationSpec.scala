@@ -63,6 +63,10 @@ class WordCountIntegrationSpec extends BaseCompilerIntegrationSpec {
       val word = generator[String, DataBag] {
         DataBag[String](line.toLowerCase.split("\\W+"))
       }
+      guard {
+        val nonEmpty = word != ""
+        nonEmpty
+      }
       head {
         word
       }

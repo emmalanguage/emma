@@ -46,7 +46,7 @@ trait BaseTransitiveClosureIntegrationSpec extends FlatSpec with Matchers with B
     deleteRecursive(new File(path))
   }
 
-  "TransitiveClosure" should "compute the transitive closure of a directed graph" in {
+  it should "compute the transitive closure of a directed graph" in {
     val graph = (for {
       line <- Source.fromFile(s"$path/edges.tsv").getLines
     } yield {
