@@ -30,7 +30,7 @@ import java.io.File
 trait BaseKMeansIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
   val codegenDir = tempPath("codegen")
-  val dir = "/clustering/kmeans"
+  val dir = "/ml/clustering/kmeans"
   val path = tempPath(dir)
   val epsilon = 1e-3
   val iterations = 10
