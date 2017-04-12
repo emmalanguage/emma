@@ -1,9 +1,9 @@
 ---
 layout: simple
-title: Emma Programming Guide
+title: Programming Guide
 ---
 
-# Emma Programming Guide
+# {{ page.title }}
 
 Emma programs require the following import.
 
