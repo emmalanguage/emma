@@ -33,7 +33,7 @@ trait BaseNaiveBayesIntegrationSpec extends FlatSpec with Matchers with BeforeAn
   type Model = NaiveBayes.Model[Double]
 
   val codegenDir = tempPath("codegen")
-  val dir = "/classification/naivebayes"
+  val dir = "/ml.classification/naivebayes"
   val path = tempPath(dir)
 
   before {
