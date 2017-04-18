@@ -27,29 +27,25 @@ import java.time.Instant
 class PrettyPrintSpec extends BaseCompilerSpec {
 
   import compiler._
+  import universe.reify
   import Core.{Lang => core}
 
   val liftPipeline: u.Expr[Any] => u.Tree =
-    pipeline(typeCheck = true)(
-      Core.lnf,
-      Core.inlineLetExprs
-    ) andThen unQualifyStatics compose (_.tree)
+    pipeline(typeCheck = true)(Core.lnf)
+      .andThen(unQualifyStatics).compose(_.tree)
 
   val prettyPrint: u.Tree => String =
     tree => time(Core.prettyPrint(tree), "pretty print")
 
   "Atomics:" - {
-
     "Lit" in {
-      val acts = idPipeline(u.reify(
+      val acts = idPipeline(reify(
         42, 42L, 3.14, 3.14F, .1e6, 'c', "string"
-      )) collect {
-        case act@core.Lit(_) => prettyPrint(act)
+      )) collect { case act @ core.Lit(_) =>
+        prettyPrint(act)
       }
 
-      val exps = Seq(
-        "42", "42L", "3.14", "3.14F", "100000.0", "'c'", "\"string\""
-      )
+      val exps = Seq("42", "42L", "3.14", "3.14F", "100000.0", "'c'", "\"string\"")
 
       (acts zip exps) foreach { case (act, exp) =>
         act shouldEqual exp
@@ -57,7 +53,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
     }
 
     "Ref" in {
-      val acts = idPipeline(u.reify {
+      val acts = idPipeline(reify {
         val x = 1
         val y = 2
         val * = 3
@@ -65,13 +61,11 @@ class PrettyPrintSpec extends BaseCompilerSpec {
         val ⋈ = 5
         val `foo and bar` = 6
         x * y * `*` * `p$^s` * ⋈ * `foo and bar`
-      }) collect {
-        case act@core.Ref(_) => prettyPrint(act)
+      }) collect { case act @ core.Ref(_) =>
+        prettyPrint(act)
       }
 
-      val exps = Seq(
-        "x", "y", "`*`", "`p$^s`", "`⋈`", "`foo and bar`"
-      )
+      val exps = Seq("x", "y", "`*`", "`p$^s`", "`⋈`", "`foo and bar`")
 
       (acts zip exps) foreach { case (act, exp) =>
         act shouldEqual exp
@@ -79,7 +73,6 @@ class PrettyPrintSpec extends BaseCompilerSpec {
     }
 
     "This" in {
-
       class Unqualified {
         val expr = emma.prettyPrint {
           println(this)
@@ -108,15 +101,13 @@ class PrettyPrintSpec extends BaseCompilerSpec {
         new Unqualified().expr,
         new Qualified().expr,
         new Inner().expr,
-        Module.expr
-      )
+        Module.expr)
 
       val exps = Seq(
         "Predef println Unqualified.this",
         "Predef println Qualified.this",
         "Predef println PrettyPrintSpec.this",
-        "Predef println Module.this"
-      )
+        "Predef println Module.this")
 
       (acts zip exps) foreach { case (act, exp) =>
         act shouldEqual exp
@@ -127,25 +118,22 @@ class PrettyPrintSpec extends BaseCompilerSpec {
   "Definitions:" - {
 
     "DefDef" in {
-
-      val acts = idPipeline(u.reify {
+      val acts = idPipeline(reify {
         def fn1(needle: Char, haystack: String): Int = {
           val z = needle.toInt
           haystack indexOf z
         }
-        ()
-      }) match {
-        case u.Block(stats, _) => stats map prettyPrint
+        fn1('o', "Hello, World!")
+      }) match { case u.Block(stats, _) =>
+        stats map prettyPrint
       }
 
-      val exps = Seq(
-        s"""
+      val exps = Seq("""
         |def fn1(needle: Char, haystack: String): Int = {
         |  val z = needle.toInt
         |  haystack indexOf z
         |}
-        """.stripMargin.trim
-      )
+      """.stripMargin.trim)
 
       (acts zip exps) foreach { case (act, exp) =>
         act shouldEqual exp
@@ -154,30 +142,27 @@ class PrettyPrintSpec extends BaseCompilerSpec {
   }
 
   "Other:" - {
-
     "TypeAscr" in {
-
       val pi = 3.14
 
-      val acts = (idPipeline(u.reify {
+      val acts = (idPipeline(reify {
         val x = 42: Int // literal
         val y = pi: Double // reference
         val u = "string": CharSequence // upcast
         val v = 42: Long // coercion
-        ()
-      }) collect {
-        case u.Block(stats, _) => stats collect {
-          case u.ValDef(_, _, _, rhs) => prettyPrint(rhs)
+        (x, y, u, v)
+      }) collect { case u.Block(stats, _) =>
+        stats collect { case u.ValDef(_, _, _, rhs) =>
+          prettyPrint(rhs)
         }
       }).flatten
 
-      val exps =
-        s"""
+      val exps = """
         |42: Int
         |pi: Double
         |"string": CharSequence
         |42L: Long
-        """.stripMargin.trim.split('\n')
+      """.stripMargin.trim.split('\n')
 
       (acts zip exps) foreach { case (act, exp) =>
         act shouldEqual exp
@@ -185,14 +170,12 @@ class PrettyPrintSpec extends BaseCompilerSpec {
     }
 
     "DefCall" in {
-
       val n = 42
-      val list = List(1, 2, 3)
       implicit val pair = 3.14 -> "pi"
       val c = clicks.fetch().head
       val a = ads.fetch().head
 
-      val acts = (idPipeline(u.reify {
+      val acts = (idPipeline(reify {
         def summon[A] = implicitly[(Double, String)]
         //@formatter:off
         val x$01 = Predef.println("string")                  // literal
@@ -206,16 +189,15 @@ class PrettyPrintSpec extends BaseCompilerSpec {
         val x$09 = Predef.implicitly[(Double, String)]       // implicit args
         val x$10 = (c.time, a.`class`)                       // Tuple constructor, keywords
         // this.wait(5)                                      // `this` reference FIXME: does not work
-        ()
+        (x$01, x$02, x$03, x$04, x$05, x$06, x$07, x$08, x$09, x$10)
         //@formatter:on
-      }) collect {
-        case u.Block(stats, _) => stats.tail collect {
-          case u.ValDef(_, _, _, rhs) => prettyPrint(rhs)
+      }) collect { case u.Block(stats, _) =>
+        stats.tail collect { case u.ValDef(_, _, _, rhs) =>
+          prettyPrint(rhs)
         }
       }).flatten
 
-      val exps =
-        s"""
+      val exps = """
         |Predef println "string"
         |n - 2
         |2 - n
@@ -227,7 +209,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
         |Predef implicitly pair
         |(c.time, a.`class`)
         |this wait 5L
-        """.stripMargin.trim.split('\n')
+      """.stripMargin.trim.split('\n')
 
       (acts zip exps) foreach { case (act, exp) =>
         act shouldEqual exp
@@ -235,8 +217,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
     }
 
     "Lambda" in {
-
-      val acts = idPipeline(u.reify {
+      val acts = idPipeline(reify {
         val fn1 = (needle: Char, haystack: String) => {
           val z = needle.toInt
           haystack indexOf z
@@ -245,25 +226,23 @@ class PrettyPrintSpec extends BaseCompilerSpec {
           val ys = xs map fn
           ys
         }
-        ()
-      }) match {
-        case u.Block(stats, _) => for (u.ValDef(_, _, _, rhs) <- stats) yield prettyPrint(rhs)
+        (fn1('o', "Hello, World!"), fn2(DataBag(Seq.empty), _._1))
+      }) match { case u.Block(stats, _) =>
+        for (u.ValDef(_, _, _, rhs) <- stats)
+          yield prettyPrint(rhs)
       }
 
-      val exps = Seq(
-        s"""
+      val exps = Seq("""
         |(needle: Char, haystack: String) => {
         |  val z = needle.toInt
         |  haystack indexOf z
         |}
-        """,
-        s"""
+      """, """
         |(xs: DataBag[(Int, Int)], fn: ((Int, Int)) => Int) => {
         |  val ys = xs map fn
         |  ys
         |}
-        """
-      ).map(_.stripMargin.trim)
+      """).map(_.stripMargin.trim)
 
       (acts zip exps) foreach { case (act, exp) =>
         act shouldEqual exp
@@ -271,10 +250,10 @@ class PrettyPrintSpec extends BaseCompilerSpec {
     }
 
     "Inst" in {
-
       val services = AdClass.SERVICES
 
-      val acts = idPipeline(u.reify {
+      //noinspection RedundantNewCaseClass
+      val acts = idPipeline(reify {
         //@formatter:off
         new Ad(1L, "Uber AD", services)                 // args
         new Tuple2(3.14, "pi")                          // type-args and args
@@ -282,17 +261,16 @@ class PrettyPrintSpec extends BaseCompilerSpec {
         new Object                                      // no-args
         ()
         //@formatter:on
-      }) match {
-        case u.Block(stats, _) => stats map Pickle.prettyPrint
+      }) match { case u.Block(stats, _) =>
+        stats map Pickle.prettyPrint
       }
 
-      val exps =
-        s"""
+      val exps = """
         |new Ad(1L, "Uber AD", services)
         |new Tuple2(3.14, "pi")
         |new ListBuffer[String]()
         |new Object()
-        """.stripMargin.trim.split("\n")
+      """.stripMargin.trim.split("\n")
 
       (acts zip exps) foreach { case (act, exp) =>
         act shouldEqual exp
@@ -300,24 +278,23 @@ class PrettyPrintSpec extends BaseCompilerSpec {
     }
 
     "Branch" in {
-
       val pi = 3.14
 
-      val acts = idPipeline(u.reify {
+      val acts = idPipeline(reify {
         //@formatter:off
         def then$1(x: Int, y: Double) = 2 * x * y
         def else$1(x: Int, y: Double) = 2 * x * y
         if (pi == 3.14) then$1(1, 16.0) else else$1(3, pi)
         ()
         //@formatter:on
-      }) match {
-        case u.Block(stats, _) => for (branch@core.Branch(_, _, _) <- stats) yield prettyPrint(branch)
+      }) match { case u.Block(stats, _) =>
+        for (branch @ core.Branch(_, _, _) <- stats)
+          yield prettyPrint(branch)
       }
 
-      val exps =
-        s"""
-        |if (pi == 3.14) then$$1(1, 16.0) else else$$1(3, pi)
-        """.stripMargin.trim.split("\n")
+      val exps = """
+        |if (pi == 3.14) then$1(1, 16.0) else else$1(3, pi)
+      """.stripMargin.trim.split("\n")
 
       (acts zip exps) foreach { case (act, exp) =>
         act shouldEqual exp
@@ -325,8 +302,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
     }
 
     "Let" in {
-
-      val act = prettyPrint(idPipeline(u.reify {
+      val act = prettyPrint(idPipeline(reify {
         val x = 15
         val y = {
           val a = 15
@@ -344,8 +320,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
         if (x > 0) thn(x, y) else els(x, y)
       }))
 
-      val exp =
-        s"""
+      val exp = """
         |{
         |  val x = 15
         |  val y = {
@@ -362,77 +337,77 @@ class PrettyPrintSpec extends BaseCompilerSpec {
         |    r2 * 24
         |  }
         |  if (x > 0) thn(x, y) else els(x, y)
-        |}
-        """.stripMargin.trim
+        |}""".stripMargin.trim
 
       act shouldEqual exp
     }
   }
 
   "Comprehensions:" - {
-
     "with three generators and two interleaved filters" in {
-
-      val act = prettyPrint(liftPipeline(u.reify {
+      val act = prettyPrint(liftPipeline(reify {
         val clicks$1 = clicks
         val users$1 = users
         val ads$1 = ads
-
         comprehension[(Instant, AdClass.Value), DataBag] {
           val c = generator(clicks$1)
           val u = generator(users$1)
           guard {
             val id$1 = u.id
-            val userID$1 = c.userID
-            id$1 == userID$1
+            val userID = c.userID
+            val eq$1 = id$1 == userID
+            eq$1
           }
           val a = generator(ads$1)
           guard {
             val id$2 = a.id
-            val adID$1 = c.adID
-            id$2 == adID$1
+            val adID = c.adID
+            val eq$2 = id$2 == adID
+            eq$2
           }
           head {
-            val time$1 = c.time
-            val class$1 = a.`class`
-            (time$1, class$1)
+            val time = c.time
+            val clas = a.`class`
+            val tuple$1 = (time, clas)
+            tuple$1
           }
         }
       }))
 
-      val exp =
-        s"""
+      val exp = """
         |{
-        |  val clicks$$1 = Marketing.clicks
-        |  val users$$1 = Marketing.users
-        |  val ads$$1 = Marketing.ads
+        |  val clicks$1 = Marketing.clicks
+        |  val users$1 = Marketing.users
+        |  val ads$1 = Marketing.ads
         |  for {
         |    c <- {
-        |      clicks$$1
+        |      clicks$1
         |    }
         |    u <- {
-        |      users$$1
+        |      users$1
         |    }
         |    if {
-        |      val id$$1 = u.id
-        |      val userID$$1 = c.userID
-        |      id$$1 == userID$$1
+        |      val id$1 = u.id
+        |      val userID = c.userID
+        |      val eq$1 = id$1 == userID
+        |      eq$1
         |    }
         |    a <- {
-        |      ads$$1
+        |      ads$1
         |    }
         |    if {
-        |      val id$$2 = a.id
-        |      val adID$$1 = c.adID
-        |      id$$2 == adID$$1
+        |      val id$2 = a.id
+        |      val adID = c.adID
+        |      val eq$2 = id$2 == adID
+        |      eq$2
         |    }
         |  } yield {
-        |    val time$$1 = c.time
-        |    val class$$1 = a.`class`
-        |    (time$$1, class$$1)
+        |    val time = c.time
+        |    val clas = a.`class`
+        |    val tuple$1 = (time, clas)
+        |    tuple$1
         |  }
-        |}
-        """.stripMargin.trim
+        |}""".stripMargin.trim
 
       act shouldEqual exp
     }
