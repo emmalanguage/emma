@@ -27,8 +27,9 @@ import shapeless._
 /** A spec for comprehension combination. */
 class CombinationSpec extends BaseCompilerSpec {
 
-  import compiler.Combination._
   import compiler._
+  import Combination._
+  import universe.reify
 
   // ---------------------------------------------------------------------------
   // Transformation pipelines
@@ -54,8 +55,7 @@ class CombinationSpec extends BaseCompilerSpec {
     pipeline(typeCheck = true)(
       Core.lnf,
       tree => time(transform(tree), "match rule"),
-      Core.flatten,
-      Core.dce
+      Core.flatten
     ).compose(_.tree)
   }
 
@@ -65,7 +65,7 @@ class CombinationSpec extends BaseCompilerSpec {
 
   "match once " - {
     "filter" in {
-      val inp = u.reify(comprehension[User, DataBag] {
+      val inp = reify(comprehension[User, DataBag] {
         val u = generator[User, DataBag] {
           users withFilter { _.id > 0 }
         }
@@ -73,7 +73,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { u }
       })
 
-      val exp = u.reify(comprehension[User, DataBag] {
+      val exp = reify(comprehension[User, DataBag] {
         val u = generator[User, DataBag] {
           val filtered$1 = users withFilter { _.id > 0 }
           filtered$1 withFilter { _.id < 11 }
@@ -85,7 +85,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "flatMap" in {
-      val inp = u.reify(comprehension[Long, DataBag] {
+      val inp = reify(comprehension[Long, DataBag] {
         val x = generator[User, DataBag] { users }
         val y = generator[Long, DataBag] {
           DataBag(Seq(x.id, x.id))
@@ -93,7 +93,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { y }
       })
 
-      val exp = u.reify(comprehension[Long, DataBag] {
+      val exp = reify(comprehension[Long, DataBag] {
         val y = generator[Long, DataBag] {
           users flatMap { x => DataBag(Seq(x.id, x.id)) }
         }
@@ -104,7 +104,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "flatMap2" in {
-      val inp = u.reify(comprehension[(User, Long, User), DataBag] {
+      val inp = reify(comprehension[(User, Long, User), DataBag] {
         val x = generator[User, DataBag] { users }
         val y = generator[Long, DataBag] {
           DataBag(Seq(x.id, x.id))
@@ -116,7 +116,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { (x, y, z) }
       })
 
-      val exp = u.reify(comprehension[(User, Long, User), DataBag] {
+      val exp = reify(comprehension[(User, Long, User), DataBag] {
         val xy = generator[(User, Long), DataBag] {
           users flatMap { x =>
             DataBag(Seq(x.id, x.id)) map { (x, _) }
@@ -141,13 +141,13 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "cross (simple)" in {
-      val inp = u.reify(comprehension[(User, User), DataBag] {
+      val inp = reify(comprehension[(User, User), DataBag] {
         val x = generator[User, DataBag] { users }
         val y = generator[User, DataBag] { users }
         head { (x, y) }
       })
 
-      val exp = u.reify(comprehension[(User, User), DataBag] {
+      val exp = reify(comprehension[(User, User), DataBag] {
         val xy = generator[(User, User), DataBag] {
           cross(users, users)
         }
@@ -158,7 +158,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "cross (complex)" in {
-      val inp = u.reify(comprehension[String, DataBag] {
+      val inp = reify(comprehension[String, DataBag] {
         val u = generator[DataBag[User], DataBag] {
           DataBag(Seq(users, users))
         }
@@ -173,7 +173,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { (x.id + y + z).toString }
       })
 
-      val exp = u.reify(comprehension[String, DataBag] {
+      val exp = reify(comprehension[String, DataBag] {
         val u = generator[DataBag[User], DataBag] {
           DataBag(Seq(users, users))
         }
@@ -197,14 +197,14 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "equiJoin (simple)" in {
-      val inp = u.reify(comprehension[(User, User), DataBag] {
+      val inp = reify(comprehension[(User, User), DataBag] {
         val x = generator[User, DataBag] { users }
         val y = generator[User, DataBag] { users }
         guard { x.id == y.id }
         head { (x, y) }
       })
 
-      val exp = u.reify(comprehension[(User, User), DataBag] {
+      val exp = reify(comprehension[(User, User), DataBag] {
         val xy = generator[(User, User), DataBag] {
           val users$1 = users
           val users$2 = users
@@ -219,7 +219,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "equiJoin (reversed)" in {
-      val inp = u.reify(comprehension[(User, User), DataBag] {
+      val inp = reify(comprehension[(User, User), DataBag] {
         val x = generator[User, DataBag] { users }
         val y = generator[User, DataBag] { users }
         // lhs of `==` refers to the second generator, rhs refers to the first
@@ -227,7 +227,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { (x, y) }
       })
 
-      val exp = u.reify(comprehension[(User, User), DataBag] {
+      val exp = reify(comprehension[(User, User), DataBag] {
         val xy = generator[(User, User), DataBag] {
           val users$1 = users
           val users$2 = users
@@ -242,7 +242,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "equiJoin (not applicable)" in {
-      val inp = u.reify(comprehension[(User, User), DataBag] {
+      val inp = reify(comprehension[(User, User), DataBag] {
         val x = generator[User, DataBag] { users }
         val y = generator[User, DataBag] { users }
         // the lhs of `==` refers to both x and y, so this is not an equiJoin
@@ -254,7 +254,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "equiJoin (complex)" in {
-      val inp = u.reify(comprehension[Short, DataBag] {
+      val inp = reify(comprehension[Short, DataBag] {
         val w = generator[Int, DataBag] {
           DataBag(Seq(8))
         }
@@ -272,7 +272,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { (x + y.name.first.length - z * w).asInstanceOf[Short] }
       })
 
-      val exp = u.reify(comprehension[Short, DataBag] {
+      val exp = reify(comprehension[Short, DataBag] {
         val w = generator[Int, DataBag] {
           DataBag[Int](Seq(8))
         }
@@ -302,12 +302,12 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "residual" in {
-      val inp = u.reify(comprehension[User, DataBag] {
+      val inp = reify(comprehension[User, DataBag] {
         val x = generator[User, DataBag] { users }
         head { x }
       })
 
-      val exp = u.reify(users map { x => x })
+      val exp = reify(users map { x => x })
       val lifted = liftPipeline(exp)
       applyOnce(MatchResidual)(inp) shouldBe alphaEqTo(lifted)
       combine(inp) shouldBe alphaEqTo(lifted)
@@ -316,7 +316,7 @@ class CombinationSpec extends BaseCompilerSpec {
 
   "combine" - {
     "three-way cross" in {
-      val inp = u.reify(comprehension[(User, User, Int), DataBag] {
+      val inp = reify(comprehension[(User, User, Int), DataBag] {
         val x = generator[User, DataBag] { users.distinct }
         val y = generator[User, DataBag] { users union users }
         val z = generator[Int, DataBag] {
@@ -325,7 +325,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { (x, y, z) }
       })
 
-      val exp = u.reify {
+      val exp = reify {
         cross(
           cross(
             users.distinct,
@@ -344,14 +344,14 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "cross then filter" in {
-      val inp = u.reify(comprehension[(User, User), DataBag] {
+      val inp = reify(comprehension[(User, User), DataBag] {
         val x = generator[User, DataBag] { users }
         val y = generator[User, DataBag] { users }
         guard { x.id != y.id }
         head { (x, y) }
       })
 
-      val exp = u.reify {
+      val exp = reify {
         cross(users, users) withFilter { xy =>
           val x = xy._1
           val y = xy._2
@@ -363,7 +363,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "filter twice then cross" in {
-      val inp = u.reify(comprehension[(User, User), DataBag] {
+      val inp = reify(comprehension[(User, User), DataBag] {
         val x = generator[User, DataBag] { users }
         val y = generator[User, DataBag] { users }
         guard { x.id != 3 }
@@ -371,7 +371,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { (x, y) }
       })
 
-      val exp = u.reify {
+      val exp = reify {
         cross(
           users withFilter { _.id != 3 },
           users withFilter { _.id != 5 }
@@ -384,7 +384,7 @@ class CombinationSpec extends BaseCompilerSpec {
 
   "combine nested" - {
     "in head" in {
-      val inp = u.reify(comprehension[DataBag[User], DataBag] {
+      val inp = reify(comprehension[DataBag[User], DataBag] {
         val x = generator[DataBag[User], DataBag] {
           DataBag(Seq(users,users))
         }
@@ -396,7 +396,7 @@ class CombinationSpec extends BaseCompilerSpec {
         }
       })
 
-      val exp = u.reify {
+      val exp = reify {
         val nested$1 = DataBag(Seq(users, users))
         nested$1 map { _ map { x => x } }
       }
@@ -405,7 +405,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "complex" in {
-      val inp = u.reify(comprehension[DataBag[User], DataBag] {
+      val inp = reify(comprehension[DataBag[User], DataBag] {
         val x = generator[DataBag[User], DataBag] {
           DataBag(Seq(users,users))
         }
@@ -425,7 +425,7 @@ class CombinationSpec extends BaseCompilerSpec {
         }
       })
 
-      val exp = u.reify {
+      val exp = reify {
         val nested$1 = DataBag(Seq(users, users))
         val fmapped$1 = nested$1 flatMap { xs$1 =>
           val union$1 = xs$1 union xs$1
@@ -446,7 +446,7 @@ class CombinationSpec extends BaseCompilerSpec {
 
   "match once with control flow" - {
     "filter" in {
-      val inp = u.reify(comprehension[User, DataBag] {
+      val inp = reify(comprehension[User, DataBag] {
         val u = generator[User, DataBag] {
           var us = users
           while (us.size < 100) us = us union us
@@ -456,7 +456,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { u }
       })
 
-      val exp = u.reify(comprehension[User, DataBag] {
+      val exp = reify(comprehension[User, DataBag] {
         val u = generator[User, DataBag] {
           var us = users
           while (us.size < 100) us = us union us
@@ -469,7 +469,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "flatMap" in {
-      val inp = u.reify(comprehension[Long, DataBag] {
+      val inp = reify(comprehension[Long, DataBag] {
         val x = generator[User, DataBag] {
           var us = users
           while (us.size < 100) us = us union us
@@ -481,7 +481,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { y }
       })
 
-      val exp = u.reify(comprehension[Long, DataBag] {
+      val exp = reify(comprehension[Long, DataBag] {
         val y = generator[Long, DataBag] {
           var us = users
           while (us.size < 100) us = us union us
@@ -494,7 +494,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "flatMap2" in {
-      val inp = u.reify(comprehension[(User, Long, User), DataBag] {
+      val inp = reify(comprehension[(User, Long, User), DataBag] {
         val x = generator[User, DataBag] {
           var us = users
           while (us.size < 100) us = us union us
@@ -510,7 +510,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { (x, y, z) }
       })
 
-      val exp = u.reify(comprehension[(User, Long, User), DataBag] {
+      val exp = reify(comprehension[(User, Long, User), DataBag] {
         val xy = generator[(User, Long), DataBag] {
           var us = users
           while (us.size < 100) us = us union us
@@ -537,7 +537,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "cross" in {
-      val inp = u.reify(comprehension[(User, User), DataBag] {
+      val inp = reify(comprehension[(User, User), DataBag] {
         val x = generator[User, DataBag] {
           var us1 = users
           while (us1.size < 100) us1 = us1 union us1
@@ -551,7 +551,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { (x, y) }
       })
 
-      val exp = u.reify(comprehension[(User, User), DataBag] {
+      val exp = reify(comprehension[(User, User), DataBag] {
         val xy = generator[(User, User), DataBag] {
           var us1 = users
           while (us1.size < 100) us1 = us1 union us1
@@ -566,7 +566,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "equiJoin" in {
-      val inp = u.reify(comprehension[(User, User), DataBag] {
+      val inp = reify(comprehension[(User, User), DataBag] {
         val x = generator[User, DataBag] {
           var us1 = users
           while (us1.size < 100) us1 = us1 union us1
@@ -581,7 +581,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { (x, y) }
       })
 
-      val exp = u.reify(comprehension[(User, User), DataBag] {
+      val exp = reify(comprehension[(User, User), DataBag] {
         val xy = generator[(User, User), DataBag] {
           var us1 = users
           while (us1.size < 100) us1 = us1 union us1
@@ -598,7 +598,7 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "residual" in {
-      val inp = u.reify(comprehension[User, DataBag] {
+      val inp = reify(comprehension[User, DataBag] {
         val x = generator[User, DataBag] {
           var us = users
           while (us.size < 100) us = us union us
@@ -607,7 +607,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { x }
       })
 
-      val exp = u.reify {
+      val exp = reify {
         var us = users
         while (us.size < 100) us = us union us
         us map { x => x }
