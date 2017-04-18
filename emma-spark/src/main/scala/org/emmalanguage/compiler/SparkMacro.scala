@@ -34,7 +34,6 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler with SparkCompil
       Backend.addCacheCalls,
       Comprehension.combine,
       Backend.specialize(SparkAPI),
-      Core.inlineLetExprs,
       Core.trampoline
     ).compose(_.tree)
 }

@@ -19,7 +19,6 @@ package compiler.lang.core
 import compiler.Common
 import compiler.lang.source.Source
 
-import cats.std.all._
 import shapeless._
 
 import scala.Function.const
@@ -173,50 +172,6 @@ private[core] trait ANF extends Common {
       resolveNameClashes andThen anf
 
     /**
-     * Inlines `Ident` return expressions in blocks whenever the referred symbol is used only once.
-     * The resulting tree is said to be in ''simplified ANF'' form.
-     *
-     * == Preconditions ==
-     * - The input `tree` is in ANF (see [[transform]]).
-     *
-     * == Postconditions ==
-     * - `Ident` return expressions in blocks have been inlined whenever possible.
-     */
-    lazy val inlineLetExprs: u.Tree => u.Tree =
-      api.BottomUp.withValDefs.withValUses.transformWith {
-        case Attr.syn(src.Block(stats, src.ValRef(target)), uses :: defs :: _)
-          if defs.contains(target) && uses(target) == 1 =>
-            val value = defs(target)
-            src.Block(stats.filter(_ != value), value.rhs)
-      }.andThen(_.tree)
-
-    /**
-     * Introduces `Ident` return expressions in blocks whenever the original expr is not a ref or
-     * literal.The opposite of [[inlineLetExprs]].
-     *
-     * == Preconditions ==
-     * - The input `tree` is in ANF (see [[transform]]).
-     *
-     * == Postconditions ==
-     * - `Ident` return expressions in blocks have been introduced whenever possible.
-     */
-    lazy val uninlineLetExprs: u.Tree => u.Tree = api.TopDown
-      // Accumulate all method definitions seen so far.
-      .accumulate { case core.Let(_, defs, _) =>
-        (for (core.DefDef(method, _, _, _) <- defs) yield method).toSet
-      }.withOwner.transformWith {
-        case Attr.acc(let @ core.Let(_, _, expr), local :: _)
-          if isDSCF(expr)(local) => let
-
-        case Attr.inh(core.Let(vals, defs, expr), owner :: _) =>
-          val nme = api.TermName.fresh("x")
-          val lhs = api.ValSym(owner, nme, expr.tpe)
-          val ref = core.Ref(lhs)
-          val dfn = core.ValDef(lhs, expr)
-          core.Let(vals :+ dfn, defs, ref)
-      }.andThen(_.tree)
-
-    /**
      * Un-nests nested blocks.
      *
      * == Preconditions ==
@@ -282,33 +237,6 @@ private[core] trait ANF extends Common {
         case _ => false
       }
       inStats || inExpr
-    }
-
-    /** Checks whether the given expression represents direct-style control-flow. */
-    private def isDSCF(expr: u.Tree)(isLocal: u.MethodSymbol => Boolean): Boolean = expr match {
-      //@formatter:off
-      // 1a) branch with one local method call and one atomic
-      case core.Branch(core.Atomic(_),
-        core.DefCall(_, thn, _, _),
-        core.Atomic(_)
-      ) => isLocal(thn)
-      // 1b) reversed version of 1a
-      case core.Branch(core.Atomic(_),
-        core.Atomic(_),
-        core.DefCall(_, els, _, _)
-      ) => isLocal(els)
-      // 2) branch with two local method calls
-      case core.Branch(core.Atomic(_),
-        core.DefCall(_, thn, _, _),
-        core.DefCall(_, els, _, _)
-      ) => isLocal(thn) && isLocal(els)
-      // 3) simple local method call
-      case core.DefCall(_, method, _, _) => isLocal(method)
-      // 4) simple atomic
-      case core.Atomic(_) => true
-      // 5) anything else
-      case _ => false
-      //@formatter:on
     }
 
     /** Extract `(stats, expr)` from blocks and non-blocks. */

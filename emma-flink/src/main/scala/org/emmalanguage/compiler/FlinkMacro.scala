@@ -34,7 +34,6 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
       Backend.addCacheCalls,
       Comprehension.combine,
       Backend.specialize(FlinkAPI),
-      Core.inlineLetExprs,
       Core.trampoline
     ).compose(_.tree)
 }

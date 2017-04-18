@@ -306,9 +306,8 @@ trait Core extends Common
     lazy val lift: u.Tree => u.Tree = Function.chain(Seq(
       lnf,
       Comprehension.resugar(DataBag.sym),
-      inlineLetExprs,
-      Comprehension.normalize(DataBag.sym),
-      uninlineLetExprs))
+      Comprehension.normalize(DataBag.sym)
+    ))
 
     /** Chains [[ANF.transform]], and [[DSCF.transform]]. */
     lazy val lnf: u.Tree => u.Tree = anf andThen dscf
@@ -321,12 +320,6 @@ trait Core extends Common
 
     /** Delegates to [[ANF.flatten]]. */
     lazy val flatten = ANF.flatten
-
-    /** Delegates to [[ANF.inlineLetExprs]]. */
-    lazy val inlineLetExprs = ANF.inlineLetExprs
-
-    /** Delegates to [[ANF.uninlineLetExprs]]. */
-    lazy val uninlineLetExprs = ANF.uninlineLetExprs
 
     /** Delegates to [[DSCF.stripAnnotations]]. */
     lazy val stripAnnotations = DSCF.stripAnnotations
