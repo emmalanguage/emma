@@ -32,10 +32,7 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
   def testPipeline(prefix: u.Tree => u.Tree): u.Tree => u.Tree =
     pipeline(typeCheck = true)(
       prefix,
-      tree => {
-        val cfg = CFG.graph(tree)
-        time(FoldFusion.foldForestFusion(cfg)(tree), "foldForestFusion")
-      },
+      tree =>time(FoldForestFusion.foldForestFusion(tree), "foldForestFusion"),
       Core.dce
     )
 

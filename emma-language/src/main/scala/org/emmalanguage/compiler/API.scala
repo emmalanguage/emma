@@ -157,12 +157,34 @@ protected[emmalanguage] trait API extends AST {
     //@formatter:on
   }
 
+  trait GroupAPI extends ClassAPI {
+    //@formatter:off
+    lazy val sym              = api.Sym[org.emmalanguage.api.Group[Any, Any]].asClass
+
+    val key                   = op("key")
+    val values                = op("values")
+
+    lazy val ops              = Set(key, values)
+    //@formatter:on
+  }
+
+  class Group$API extends ModuleAPI {
+    //@formatter:off
+    lazy val sym              = api.Sym[org.emmalanguage.api.Group.type].asModule
+
+    val apply                 = op("apply")
+
+    lazy val ops              = Set(apply)
+    //@formatter:on
+  }
+
   trait ComprehensionCombinatorsAPI extends ModuleAPI {
     //@formatter:off
     val cross                 = op("cross")
     val equiJoin              = op("equiJoin")
+    val foldGroup             = op("foldGroup")
 
-    def ops                   = Set(cross, equiJoin)
+    def ops                   = Set(cross, equiJoin, foldGroup)
     //@formatter:on
   }
 
@@ -276,6 +298,10 @@ protected[emmalanguage] trait API extends AST {
     object MutableBag extends MutableBagAPI(api.Sym[org.emmalanguage.api.MutableBag[Any, Any]].asClass)
 
     object MutableBag$ extends MutableBag$API(api.Sym[org.emmalanguage.api.MutableBag.type].asModule)
+
+    object Group extends GroupAPI
+
+    object Group$ extends Group$API
 
     object Ops extends OpsAPI(api.Sym[org.emmalanguage.api.backend.LocalOps.type].asModule)
 

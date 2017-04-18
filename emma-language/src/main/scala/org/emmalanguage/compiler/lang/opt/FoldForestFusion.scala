@@ -35,7 +35,7 @@ private[compiler] trait FoldForestFusion extends Common {
   this: Core with ControlFlow with Comprehension =>
 
   /** The fold-fusion optimization. */
-  object FoldFusion {
+  object FoldForestFusion {
 
     import API._
     import Core.{Lang => core}
@@ -323,17 +323,18 @@ private[compiler] trait FoldForestFusion extends Common {
      *   val x = xs.fold(alg.FlatMap(f, alg))
      * }}}
      */
-    def foldForestFusion(cfg: CFG.FlowGraph[u.TermSymbol]): u.Tree => u.Tree =
+    lazy val foldForestFusion: u.Tree => u.Tree = tree => {
+      val cfg = CFG.graph(tree)
       api.BottomUp.withOwner.transformWith {
         // Fuse only folds within a single block.
-        case Attr.inh(let @ core.Let(vals, defs, expr), owner :: _) =>
+        case Attr.inh(let@core.Let(vals, defs, expr), owner :: _) =>
           val valIndex = lhs2rhs(vals)
 
           def fuse(root: u.TermSymbol, children: Stream[Node]): Node = children match {
             // Case 1: Leaves - folds to be expanded.
             case Seq() => valIndex(root) match {
               // val root = xs.fold[B](alg)
-              case rhs @ core.DefCall(_, DataBag.fold1, _, _) =>
+              case rhs@core.DefCall(_, DataBag.fold1, _, _) =>
                 root -> mkIndex(root -> rhs)
 
               // Γ ⊢ xs : DataBag[A]
@@ -341,7 +342,7 @@ private[compiler] trait FoldForestFusion extends Common {
               // =>
               // val alg$Fold$i = Fold[A, B](zero)(init, plus)
               // val root = xs.fold[B](alg$Fold$i)
-              case core.DefCall(xs @ Some(bag), DataBag.fold2, targs, argss) =>
+              case core.DefCall(xs@Some(bag), DataBag.fold2, targs, argss) =>
                 val A = api.Type.arg(1, bag.tpe)
 
                 val alg = { // val alg$Fold$i = Fold[A, B](zero)(init, plus)
@@ -398,9 +399,9 @@ private[compiler] trait FoldForestFusion extends Common {
               // =>
               // val alg$<Alg>$i = <Alg>(<args>)
               // val root = xs.fold(alg$<Alg>$i)
-              case core.DefCall(xs @ Some(bag), method, targs, argss)
+              case core.DefCall(xs@Some(bag), method, targs, argss)
                 if dynamicAlgs contains method =>
-                val A   = api.Type.arg(1, bag.tpe)
+                val A = api.Type.arg(1, bag.tpe)
 
                 val alg = { // val alg$<Alg>$i = <Alg>(<args>)
                   val mod = dynamicAlgs(method)
@@ -422,7 +423,7 @@ private[compiler] trait FoldForestFusion extends Common {
               // val alg$<Alg>$i = alg.<Alg>[A](p)
               // val app$<Alg>$j = xs.fold[A](alg$<Alg>$i)
               // val root = app$<Alg>$j.get
-              case core.DefCall(xs @ Some(bag), method, _, argss)
+              case core.DefCall(xs@Some(bag), method, _, argss)
                 if optionalAlgs contains method =>
                 val A = api.Type.arg(1, bag.tpe)
                 val Opt = api.Type.kind1[Option](root.info)
@@ -454,7 +455,7 @@ private[compiler] trait FoldForestFusion extends Common {
               // val alg$Sample$i = alg.Sample(n)
               // val app$Sample$j = xs.fold[A](alg$Sample$i)
               // val root = app$Sample$j._2
-              case core.DefCall(xs @ Some(bag), DataBag.sample, _, argss) =>
+              case core.DefCall(xs@Some(bag), DataBag.sample, _, argss) =>
                 val A = api.Type.arg(1, bag.tpe)
                 val Pair = api.Type.tupleOf(Seq(api.Type.long, root.info))
 
@@ -492,9 +493,9 @@ private[compiler] trait FoldForestFusion extends Common {
               //
               // val child = root.fold(alg$j)
               case cs.Comprehension(
-                (q @ cs.Generator(x, core.Let(Seq(), Seq(), core.Ref(xs)))) +:
+              (q@cs.Generator(x, core.Let(Seq(), Seq(), core.Ref(xs)))) +:
                 qs,
-                cs.Head(ret)) if isLinear(q +: qs) =>
+              cs.Head(ret)) if isLinear(q +: qs) =>
 
                 val core.DefCall(/* root */ _, DataBag.fold1, _, Seq(Seq(alg$1))) = subIndex(child)
 
@@ -512,9 +513,9 @@ private[compiler] trait FoldForestFusion extends Common {
 
                   val fun = ret match {
                     case core.Let(
-                      Seq(core.ValDef(s, core.DefCall(Some(core.Ref(f)), m, Seq(), Seq(Seq(core.Ref(`x`)))))),
-                      Seq(),
-                      core.Ref(t)) if s == t && m.name == api.TermName.app =>
+                    Seq(core.ValDef(s, core.DefCall(Some(core.Ref(f)), m, Seq(), Seq(Seq(core.Ref(`x`)))))),
+                    Seq(),
+                    core.Ref(t)) if s == t && m.name == api.TermName.app =>
                       // $ret = { val s = f.apply(x); s }
                       // call `f` directly
                       f -> u.EmptyTree
@@ -609,9 +610,9 @@ private[compiler] trait FoldForestFusion extends Common {
 
                   val fun = bdy match {
                     case core.Let(
-                      Seq(core.ValDef(s, core.DefCall(Some(core.Ref(f)), m, Seq(), Seq(Seq(core.Ref(`x`)))))),
-                      Seq(),
-                      core.Ref(t)) if s == t && m.name == api.TermName.app =>
+                    Seq(core.ValDef(s, core.DefCall(Some(core.Ref(f)), m, Seq(), Seq(Seq(core.Ref(`x`)))))),
+                    Seq(),
+                    core.Ref(t)) if s == t && m.name == api.TermName.app =>
                       // $rhs = { val s = f.apply(x); s }
                       // call `f` directly
                       f -> u.EmptyTree
@@ -710,7 +711,7 @@ private[compiler] trait FoldForestFusion extends Common {
                 }
 
               // Root is a monad op (Emma LNF)
-              case core.DefCall(xs @ Some(bag), method, _, Seq(Seq(f), _*))
+              case core.DefCall(xs@Some(bag), method, _, Seq(Seq(f), _*))
                 if monadOpsAlgs contains method =>
                 val core.DefCall(/* root */ _, DataBag.fold1, targs, Seq(Seq(alg$1))) = subIndex(child)
 
@@ -789,7 +790,7 @@ private[compiler] trait FoldForestFusion extends Common {
             // val x$N = app$AlgN$j._N
             case _ =>
               val cs = children.sortBy(_._1)(ordTermSymbol) // order the children sequence
-              val n = cs.size
+            val n = cs.size
 
               val mod = productAlgs(n)
               val folds = for ((child, subIndex) <- cs) yield subIndex(child)
@@ -808,7 +809,7 @@ private[compiler] trait FoldForestFusion extends Common {
                 lhs -> rhs
               }
 
-              val res  = { // val app$AlgN$j = xs.fold(alg$AlgN$i)
+              val res = { // val app$AlgN$j = xs.fold(alg$AlgN$i)
                 val ars = Seq(refOf(alg))
                 val rhs = core.DefCall(tgtOf(root), DataBag.fold1, Seq(B), Seq(ars))
                 val lhs = api.ValSym(owner, freshApp(mod), B)
@@ -849,6 +850,7 @@ private[compiler] trait FoldForestFusion extends Common {
             } yield core.ValDef(lhs, index(lhs))
             core.Let(sortedVals, defs, expr)
           }
-      }._tree
+      }._tree(tree)
+    }
   }
 }
