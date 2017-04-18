@@ -292,12 +292,14 @@ trait Comprehension extends Common
 
     /** Prepends and binds free variables in `tree` to `vals`. */
     private[comprehension] def capture(
-      cs: Comprehension.Syntax,
-      vals: Seq[u.ValDef],
-      prune: Boolean = true
+      cs: Comprehension.Syntax, vals: Seq[u.ValDef]
     )(tree: u.Tree): u.Tree = {
-      val prefix = if (!prune) vals
-        else vals.filter(api.Tree.refs(tree).compose(_.symbol.asTerm))
+      val prefix = vals.foldRight(
+        List.empty[u.ValDef], api.Tree.refs(tree)
+      ) { case (v, acc @ (pre, refs)) =>
+        if (!refs(v.symbol.asTerm)) acc
+        else (v :: pre, refs | api.Tree.refs(v))
+      }._1
 
       def prepend(let: u.Tree): u.Block = let match {
         case core.Let(suffix, defs, expr) =>
