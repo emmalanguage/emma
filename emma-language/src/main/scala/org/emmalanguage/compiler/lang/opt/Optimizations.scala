@@ -22,16 +22,15 @@ import compiler.lang.core.Core
 
 /** Static (compile-time) optimizations. */
 trait Optimizations extends Common
-  with FoldForestFusion {
+  with FoldForestFusion
+  with FoldGroupFusion {
   this: Core with ControlFlow =>
 
   /** Static (compile-time) optimizations. */
   object Optimizations {
 
-    /** Performs [[FoldFusion.foldForestFusion()]]. */
-    lazy val foldFusion: u.Tree => u.Tree = tree => {
-      val cfg = CFG.graph(tree)
-      FoldFusion.foldForestFusion(cfg)(tree)
-    }
+    /** Performs [[FoldForestFusion.foldForestFusion()]] followed by [[FoldGroupFusion.foldGroupFusion]]. */
+    lazy val foldFusion: u.Tree => u.Tree =
+      FoldForestFusion.foldForestFusion andThen FoldGroupFusion.foldGroupFusion
   }
 }
