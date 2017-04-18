@@ -49,7 +49,7 @@ private[comprehension] trait Normalize extends Common {
         cs.rules.foldLeft(Option.empty[u.Tree]) {
           (done, rule) => done orElse rule(attr)
         }.getOrElse(attr.tree)
-      }.andThen(_.tree).andThen(Core.dce).andThen {
+      }.andThen(_.tree).andThen {
         // eliminate trivial guards produced by normalization
         api.BottomUp.transform { case cs.Comprehension(qs, hd) =>
           cs.Comprehension(qs filter {
@@ -73,112 +73,67 @@ private[comprehension] trait Normalize extends Common {
      *
      * ==Matching Pattern==
      *
-     * (1) A `flatten` expression occurring in the `expr` position in the enclosing `let` block.
-     *
      * {{{
      * {
-     *   $vals
-     *   flatten {
-     *     $outerVals
-     *     comprehension {
-     *       $outerQs
-     *       head {
-     *         $innerVals
-     *         comprehension {
-     *           $innerQs
-     *           head $innerHd
-     *         } // child comprehension
-     *       }
-     *     } // outer comprehension
-     *   } // parent expression
-     * } // enclosing block
-     * }}}
-     *
-     * (2) A `flatten` expression occurring in the `rhs` position of some binding in the enclosing
-     * `let` block.
-     *
-     * {{{
-     * {
-     *   $enclPre
+     *   $pre
      *   val x = flatten {
-     *     $outerVals
+     *     $xvs
      *     comprehension {
-     *       $outerQs
+     *       $xqs
      *       head {
-     *         $innerVals
-     *         comprehension {
-     *           $innerQs
-     *           head $innerHd
-     *         } // child comprehension
+     *         $yvs
+     *         val y = comprehension {
+     *           $yqs
+     *           $yhd
+     *         } // inner comprehension
+     *         y
      *       }
      *     } // outer comprehension
-     *   } // parent valdef
-     *   $enclSuf
+     *   } // parent val
+     *   $suf
+     *   $defs // parent defs
      *   $expr // parent expression
      * } // enclosing block
      * }}}
      *
      * ==Rewrite==
      *
-     * Let $innerVals decompose into the following two subsets:
-     * - $dep (transitively) depends on symbols defined in $outerQs, and
-     * - $indep is the independent complement $innerVals \ $dep.
-     *
-     * For a match of type (1):
+     * Let $yvs decompose into the following two subsets:
+     * - $dep (transitively) depends on symbols defined in $xqs, and
+     * - $indep is the independent complement $yvs \ $dep.
      *
      * {{{
      * {
-     *   $vals
-     *   $outerVals
-     *   $indep
-     *   comprehension {
-     *     $outerQs
-     *     $innerQs' // where let blocks are prefixed with $dep
-     *     head $innerHd' // where let blocks are prefixed with $dep
-     *   } // flattened result comprehension
-     * } // enclosing block
-     * }}}
-     *
-     * For a match of type (2):
-     *
-     * {{{
-     * {
-     *   $enclPre
-     *   $outerVals
+     *   $pre
+     *   $xvs
      *   $indep
      *   val x = comprehension {
-     *     $outerQs
-     *     $innerQs' // where let blocks are prefixed with $dep
-     *     head $innerHd' // where let blocks are prefixed with $dep
+     *     $xqs
+     *     $yqs' // where let blocks are prefixed with $dep
+     *     $yhd' // where let blocks are prefixed with $dep
      *   } // flattened result comprehension
-     *   $enclSuf
+     *   $suf
+     *   $defs
      *   $expr
      * } // enclosing block
      * }}}
      */
     private[Normalize] val UnnestHead: Rule = {
-      case Attr.none(core.Let(vals, defs, expr)) =>
-        vals.map(v => v -> v.rhs) :+ (expr -> expr) collectFirst {
-          case (encl, Flatten(core.Let(outerVals, Seq(),
-            Comprehension(outerQs,
-              Head(core.Let(innerVals, Seq(),
-                DataBagExprToCompr(innerQs, Head(innerHd)))))))) =>
-
-            val (dep, indep) = split(innerVals, outerQs)
-            val qs = outerQs ++ innerQs.map(capture(self, dep, prune = false))
-            val hd = capture(self, dep, prune = false)(Head(innerHd))
-            val flat = Core.inlineLetExprs(Comprehension(qs, hd))
-            val (flatVals, flatExpr) = encl match {
-              case encl @ core.ValDef(lhs, _) =>
-                val (enclPre, enclSuf) = splitAt(encl)(vals)
-                val flatVal = core.ValDef(lhs, flat)
-                (Seq.concat(enclPre, outerVals, indep, Seq(flatVal), enclSuf), expr)
-              case _ =>
-                (Seq.concat(vals, outerVals, indep), flat)
-            }
-
-            core.Let(flatVals, defs, flatExpr)
-        }
+      case Attr.none(core.Let(vals, defs, expr)) => {
+        for {
+          xv @ core.ValDef(x, Flatten(
+            core.Let(xvs, Seq(), Comprehension(xqs, Head(
+              core.Let(yvs :+ core.ValDef(y, AsComprehension(yqs, yhd)), Seq(), core.Ref(z))
+          ))))) <- vals.view
+          if y == z
+          (dep, indep) = split(yvs, xqs)
+          qs = xqs ++ yqs.map(capture(self, dep))
+          hd = capture(self, dep)(yhd)
+          (pre, suf) = splitAt(xv)(vals)
+          unnested = Seq(core.ValDef(x, Comprehension(qs, hd)))
+          flatVals = Seq.concat(pre, xvs, indep, unnested, suf)
+        } yield core.Let(flatVals, defs, expr)
+      }.headOption
 
       case _ => None
     }
@@ -187,12 +142,12 @@ private[comprehension] trait Normalize extends Common {
      * This matches any DataBag expression.
      * If it is not a comprehension, then it wraps it into one.
      */
-    object DataBagExprToCompr {
+    object AsComprehension {
       def unapply(tree: u.Tree): Option[(Seq[u.Tree], u.Tree)] = tree match {
         case Comprehension(qs, hd) => Some(qs, hd)
         case _ if tree.tpe.dealias.widen.typeConstructor =:= Monad =>
           val tpe = api.Type.arg(1, tree.tpe.dealias.widen)
-          val lhs = api.TermSym.free(api.TermName.fresh("x"), tpe)
+          val lhs = api.TermSym.free(api.TermName.fresh(), tpe)
           val rhs = core.Let(expr = tree)
           val ref = core.Let(expr = api.TermRef(lhs))
           Some(Seq(Generator(lhs, rhs)), Head(ref))
@@ -230,115 +185,68 @@ private[comprehension] trait Normalize extends Common {
      * comprehension that occurs in one of the previous value bindings within the enclosing `let`
      * block.
      *
-     * (1) The `parent` comprehension is an `expr` position in the enclosing `let` block.
-     *
      * {{{
      * {
-     *   $yPre
-     *   val y = comprehension {
-     *     $yQs
-     *     head $yHd
+     *   $xpre
+     *   val x = comprehension {
+     *     $xqs
+     *     head {
+     *       $xvs
+     *       $alias
+     *     }
      *   } // child comprehension
-     *   $ySuf
-     *   comprehension {
-     *     $xPre
-     *     val x = generator(y) // gen
-     *     $xSuf
-     *     head $enclHd
-     *   } // parent comprehension
-     * } // enclosing block
-     * }}}
-     *
-     * (2) The `parent` comprehension is an `rhs` position for some value definitions in the
-     * enclosing `let` block.
-     *
-     * {{{
-     * {
-     *   $yPre
+     *   $ypre
      *   val y = comprehension {
-     *     $yQs
-     *     head $yHd
-     *   } // child comprehension
-     *   $ySuf
-     *   val z = comprehension {
-     *     $xPre
-     *     val x = generator(y) // gen
-     *     $xSuf
-     *     head $enclHd
+     *     $zpre
+     *     val z = generator(x) // gen
+     *     $zsuf
+     *     $yhd
      *   } // parent comprehension
-     *   $enclSuf
+     *   $ysuf
      *   $expr
      * } // enclosing block
      * }}}
      *
      * ==Rewrite==
      *
-     * For a match of type (1):
-     *
      * {{{
      * {
-     *   $yPre
-     *   $ySuf
-     *   comprehension {
-     *     $xPre
-     *     $yQs
-     *     $xSuf [ $enclHd \ x ]
-     *     head $yHd [ $enclHd \ x ]
+     *   $xpre
+     *   $ypre
+     *   val y = comprehension {
+     *     $zpre
+     *     $xqs
+     *     $zsuf [ x := alias ]
+     *     $yhd [ x := alias ]
      *   } // unnested result comprehension
-     * } // enclosing block
-     * }}}
-     *
-     * For a match of type (2):
-     *
-     * {{{
-     * {
-     *   $yPre
-     *   $ySuf
-     *   val z = comprehension {
-     *     $xPre
-     *     $yQs
-     *     $xSuf [ $enclHd \ x ]
-     *     head $yHd [ $enclHd \ x ]
-     *   } // unnested result comprehension
-     *   $enclSuf
+     *   $ysuf
      *   $expr
      * } // enclosing block
      * }}}
      */
     private[Normalize] val UnnestGenerator: Rule = {
-      case Attr.syn(core.Let(vals, defs, expr), valUses :: _) => (for {
-        yVal @ core.ValDef(y, Comprehension(yQs, Head(yHd))) <- vals.view
-        if valUses(y) == 1
-        (yPre, ySuf) = splitAt(yVal)(vals)
-        enclosing = ySuf.view.map(x => x -> x.rhs) :+ (expr -> expr)
-        (encl, Comprehension(enclQs, Head(enclHd))) <- enclosing
-        xGen @ Generator(x, core.Let(Seq(), Seq(), core.ValRef(`y`))) <- enclQs.view
-      } yield {
-        // define a substitution function `· [ $hd2 \ x ]`
-        val subst = yHd match {
-          case core.Let(Seq(), Seq(), wrapped) => api.Tree.subst(Seq(x -> wrapped))
-          case _ => api.Tree.subst(Seq(x -> yHd))
-        }
-
-        val (xPre, xSuf) = splitAt[u.Tree](xGen)(enclQs)
-        val qs = Seq.concat(xPre, yQs, xSuf map subst)
-        val flat = Comprehension(qs, Head(asLet(subst(enclHd))))
-        val (flatVals, flatExpr) = encl match {
-          case encl @ core.ValDef(lhs, _) =>
-            val (enclPre, enclSuf) = splitAt(encl)(ySuf)
-            val flatVal = core.ValDef(lhs, flat)
-            (Seq.concat(yPre, enclPre, Seq(flatVal), enclSuf), expr)
-          case _ =>
-            (Seq.concat(yPre, ySuf), flat)
-        }
-
-        core.Let(flatVals, defs, flatExpr)
-      }).headOption
+      case Attr.syn(core.Let(vals, defs, expr), uses :: _) => {
+        for {
+          xv @ core.ValDef(x, Comprehension(xqs, Head(
+            core.Let(xvs, Seq(), core.Ref(alias))
+          ))) <- vals.view
+          if uses(x) == 1
+          (xpre, xsuf) = splitAt(xv)(vals)
+          yv @ core.ValDef(y, Comprehension(yqs, yhd)) <- xsuf
+          gen @ Generator(z, core.Let(Seq(), Seq(), core.Ref(`x`))) <- yqs.view
+          (ypre, ysuf) = splitAt(yv)(xsuf)
+          (zpre, zsuf) = splitAt[u.Tree](gen)(yqs)
+          subst = api.Tree.rename(Seq(z -> alias)).andThen(capture(self, xvs))
+          qs = Seq.concat(zpre, xqs, zsuf.map(subst))
+          unnested = Seq(core.ValDef(y, Comprehension(qs, subst(yhd))))
+          flatVals = Seq.concat(xpre, ypre, unnested, ysuf)
+        } yield core.Let(flatVals, defs, expr)
+      }.headOption
 
       case _ => None
     }
 
-    private[Normalize] val rules = Seq(
-      UnnestGenerator, UnnestHead)
+    private[Normalize] val rules =
+      Seq(UnnestGenerator, UnnestHead)
   }
 }
