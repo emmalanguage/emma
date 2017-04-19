@@ -52,12 +52,16 @@ trait Transversers { this: AST =>
       initAcc: A, initInh: I, initSyn: S,
       accumulation: Attr[A, I, S] => A,
       inheritance:  Attr[HNil, I, S] => I,
-      synthesis:    Attr[HNil, HNil, S] => S
+      synthesis:    Attr[HNil, HNil, S] => S,
+      typeSafe:     Boolean = true
   )(implicit
     val MAcc: Monoid[A],
     val MInh: Monoid[I],
     val MSyn: Monoid[S]
   ) {
+
+    /** Skip type-safety assertions. WARNING: Use only if you mean to change types in the tree. */
+    def unsafe = copy(typeSafe = false)
 
     /** Prepends an accumulated (along the traversal path) attribute. */
     def accumulate[X](init: X, acc: Attr[X :: A, I, S] =?> X)(implicit M: Monoid[X]) =
@@ -198,6 +202,9 @@ trait Transversers { this: AST =>
     type Acc = A
     type Inh = I
     type Syn = S
+
+    /** Skip type-safety assertions. WARNING: Use only if you mean to change types in the tree. */
+    def unsafe = copy(grammar = grammar.unsafe)
 
     /** Prepends an accumulated attribute based on all attributes. */
     def accumulateInit[X: Monoid](init: X)(acc: Attr[X :: A, I, S] =?> X) =
@@ -390,7 +397,13 @@ trait Transversers { this: AST =>
 
     protected final def accTransform(tree: Tree): Tree = {
       accumulate(tree)
-      complete(transformation)(tree)(tree)
+      complete(transformation andThen { xtree =>
+        assert(!grammar.typeSafe
+          || xtree.tpe == tree.tpe
+          || xtree.tpe <:< tree.tpe.widen,
+          s"${xtree.tpe} <!:< ${tree.tpe.widen}")
+        xtree
+      })(tree)(tree)
     }
 
     @tailrec
