@@ -22,6 +22,7 @@ import compiler.BaseCompilerSpec
 class DCESpec extends BaseCompilerSpec {
 
   import compiler._
+  import universe.reify
 
   val dcePipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
@@ -30,15 +31,15 @@ class DCESpec extends BaseCompilerSpec {
     ).compose(_.tree)
 
   "eliminate unused valdefs" - {
-
     "directly" in {
-      val act = dcePipeline(u.reify {
+      //noinspection ScalaUnusedSymbol
+      val act = dcePipeline(reify {
         val x = 15
         15 * t._1
       })
 
-      val exp = idPipeline(u.reify {
-        val x$1 = t
+      val exp = idPipeline(reify {
+        val x$1: this.t.type = t
         val x$2 = x$1._1
         val x$3 = 15 * x$2
         x$3
@@ -48,14 +49,15 @@ class DCESpec extends BaseCompilerSpec {
     }
 
     "transitively" in {
-      val act = dcePipeline(u.reify {
+      //noinspection ScalaUnusedSymbol
+      val act = dcePipeline(reify {
         val x = 15
         val y = 2 * x
         15 * t._1
       })
 
-      val exp = idPipeline(u.reify {
-        val x$1 = t
+      val exp = idPipeline(reify {
+        val x$1: this.t.type = t
         val x$2 = x$1._1
         val x$3 = 15 * x$2
         x$3
@@ -67,13 +69,14 @@ class DCESpec extends BaseCompilerSpec {
 
   "don't eliminate unit valdefs" - {
     "println" in {
-      val act = dcePipeline(u.reify {
+      val act = dcePipeline(reify {
         println("alma")
         val x = 5
         x
       })
 
-      val exp = idPipeline(u.reify {
+      //noinspection ScalaUnusedSymbol
+      val exp = idPipeline(reify {
         val res = println("alma")
         val x = 5
         x

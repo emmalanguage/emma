@@ -55,8 +55,8 @@ class TransitiveClosureIntegrationSpec extends BaseCompilerIntegrationSpec {
 
   val coreExpr = anfPipeline(reify {
     // read in a directed graph
-    val input = this.input
-    val csv$1 = this.csv
+    val input: this.input.type = this.input
+    val csv$1: this.csv.type   = this.csv
     val readCSV = DataBag.readCSV[Edge[Int]](input, csv$1)
     val paths$1 = readCSV.distinct
     val count$1 = paths$1.size
@@ -76,8 +76,8 @@ class TransitiveClosureIntegrationSpec extends BaseCompilerIntegrationSpec {
       val isReady = added$2 > 0
       @suffix def suffix$1(): Unit = {
         val closure = paths$2
-        val output = this.output
-        val csv$2 = this.csv
+        val output: this.output.type = this.output
+        val csv$2:  this.csv.type    = this.csv
         closure.writeCSV(output, csv$2)
       }
 

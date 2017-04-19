@@ -25,6 +25,7 @@ import test.schema.Literature._
 class CSESpec extends BaseCompilerSpec {
 
   import compiler._
+  import universe.reify
 
   val csePipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
@@ -40,12 +41,12 @@ class CSESpec extends BaseCompilerSpec {
   "field selections" - {
 
     "as argument" in {
-      val act = csePipeline(u.reify {
+      val act = csePipeline(reify {
         15 * t._1
       })
 
-      val exp = idPipeline(u.reify {
-        val x$1 = t
+      val exp = idPipeline(reify {
+        val x$1: this.t.type = t
         val x$2 = x$1._1
         val x$3 = 15 * x$2
         x$3
@@ -55,12 +56,12 @@ class CSESpec extends BaseCompilerSpec {
     }
 
     "as selection" in {
-      val act = csePipeline(u.reify {
+      val act = csePipeline(reify {
         t._1 * 15
       })
 
-      val exp = idPipeline(u.reify {
-        val x$1 = t
+      val exp = idPipeline(reify {
+        val x$1: this.t.type = t
         val x$2 = x$1._1
         val x$3 = x$2 * 15
         x$3
@@ -70,12 +71,12 @@ class CSESpec extends BaseCompilerSpec {
     }
 
     "package selections" in {
-      val act = csePipeline(u.reify {
+      val act = csePipeline(reify {
         val bag = DataBag(Seq(1, 2, 3))
         scala.Predef.println(bag.fetch())
       })
 
-      val exp = idPipeline(u.reify {
+      val exp = idPipeline(reify {
         val x$1 = Seq(1, 2, 3)
         val bag = DataBag(x$1)
         val x$2 = bag.fetch()
@@ -89,12 +90,12 @@ class CSESpec extends BaseCompilerSpec {
 
   "complex arguments" - {
     "lhs" in {
-      val act = csePipeline(u.reify {
+      val act = csePipeline(reify {
         y.substring(y.indexOf('l') + 1)
       })
 
-      val exp = csePipeline(u.reify {
-        val y$1 = y
+      val exp = csePipeline(reify {
+        val y$1: this.y.type = y
         val x$1 = y$1.indexOf('l')
         val x$2 = x$1 + 1
         val x$3 = y$1.substring(x$2)
@@ -106,7 +107,7 @@ class CSESpec extends BaseCompilerSpec {
   }
 
   "nested blocks" in {
-    val act = csePipeline(u.reify {
+    val act = csePipeline(reify {
       val z = y
       val a = {
         val b = y.indexOf('a')
@@ -119,7 +120,7 @@ class CSESpec extends BaseCompilerSpec {
       a + c
     })
 
-    val exp = idPipeline(u.reify {
+    val exp = idPipeline(reify {
       val y$1 = y
       val b$1 = y$1.indexOf('a')
       val a = b$1 + 15
@@ -131,26 +132,26 @@ class CSESpec extends BaseCompilerSpec {
   }
 
   "copy propagation" in {
-    val act = csePipeline(u.reify {
+    val act = csePipeline(reify {
       val a = 42
       val b = a
       val c = b
       c
     })
 
-    val exp = u.Block(Nil, u.reify(42).tree)
+    val exp = u.Block(Nil, reify(42).tree)
     act shouldBe alphaEqTo(exp)
   }
 
   "lambdas" in {
-    val act = csePipeline(u.reify {
+    val act = csePipeline(reify {
       val f = (i: Int) => i + 1
       val g = (i: Int) => i + 1
       val xs = Seq(1, 2, 3)
       xs.map(f).map(g)
     })
 
-    val exp = idPipeline(u.reify {
+    val exp = idPipeline(reify {
       val f = (i: Int) => {
         val i$1 = i + 1
         i$1
@@ -166,18 +167,18 @@ class CSESpec extends BaseCompilerSpec {
   }
 
   "for-comprehensions" in {
-    val act = csePipeline(u.reify {
+    val act = csePipeline(reify {
       val xs = comprehension[(Character, Character), DataBag] {
         val x = generator[Character, DataBag](DataBag(hhCrts))
         val y = generator[Character, DataBag](DataBag(hhCrts))
         head (x, y)
       }
       val sze = xs.size
-      val cnt = xs.count{ case (x, y) => x.name == y.name }
+      val cnt = xs.count { case (x1, x2) => x1.name == x2.name }
       sze / cnt.toDouble
     })
 
-    val exp = lnfPipeline(u.reify {
+    val exp = lnfPipeline(reify {
       val xs = comprehension[(Character, Character), DataBag] {
         val x = generator[Character, DataBag](DataBag(hhCrts))
         val y = generator[Character, DataBag](DataBag(hhCrts))
@@ -188,8 +189,8 @@ class CSESpec extends BaseCompilerSpec {
       val fn$4 = (x0$1: (Character, Character)) => {
         val x = x0$1._1
         val y = x0$1._2
-        val name$1 = x.name
-        val name$2 = y.name
+        val name$1: x.name.type = x.name
+        val name$2: y.name.type = y.name
         val `==$1` = name$1 == name$2
         `==$1`
       }
