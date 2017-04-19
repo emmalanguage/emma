@@ -281,14 +281,16 @@ trait Types { this: AST =>
 
       /** Returns the original type-tree corresponding to `tpe`. */
       def tree(tpe: u.Type): u.Tree = {
+        /** Resolve if static, otherwise reference. */
+        def resolve(sym: u.Symbol) =
+          if (sym.isStatic) api.Tree.resolveStatic(sym) else Id(sym)
+
         /** Converts stable path-dependent types to a selection chain. */
         def stable(tpe: u.Type): u.Tree = tpe match {
-          // Degenerate static type: `this[T]`.
-          case u.ThisType(encl) if encl.isStatic =>
-            api.Tree.resolveStatic(encl)
           // Qualified this type: `T.this`.
           case u.ThisType(encl) =>
-            api.This(encl)
+            if (!encl.isStatic) api.This(encl)
+            else api.Tree.resolveStatic(encl)
           // Super type: `this.super[T]`
           case u.SuperType(ths, parent) =>
             val sym = parent.typeSymbol.asType
@@ -296,13 +298,13 @@ trait Types { this: AST =>
             setType(setSymbol(sup, sym), tpe)
           // Singleton type: `target.type`.
           case u.SingleType(u.NoPrefix, target) =>
-            Id(target)
+            resolve(target)
           // Path-dependent singleton type: `prefix.target.type`.
           case u.SingleType(prefix, target) =>
             Sel(stable(prefix), target)
           // Singleton type: `target.type`.
           case u.TypeRef(u.NoPrefix, target, Nil) =>
-            Id(target)
+            resolve(target)
           // Path-dependent singleton type: `prefix.target.type`.
           case u.TypeRef(prefix, target, Nil) if is.stable(prefix) =>
             Sel(stable(prefix), target)
@@ -320,7 +322,7 @@ trait Types { this: AST =>
             u.SingletonTypeTree(stable(tpe))
           // Abstract type: `T`.
           case u.TypeRef(u.NoPrefix, target, Nil) =>
-            Id(target)
+            resolve(target)
           // Path dependent type: `prefix.T`.
           // Type projection: `Prefix#T`
           case u.TypeRef(prefix, target, Nil) => original(prefix) match {
