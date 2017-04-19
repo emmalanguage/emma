@@ -273,7 +273,8 @@ trait Symbols { this: AST =>
             } else tpe
             // Can't be fused with the traversal above,
             // because method calls might appear before their definition.
-            if (dict.isEmpty) tree else TopDown.transform { case t
+            // Unsafe: The type of substituted symbols might change.
+            if (dict.isEmpty) tree else TopDown.unsafe.transform { case t
               if has.tpe(t) || (has.sym(t) && dict.contains(t.symbol))
               => Tree.With(t)(sym = dict(t.symbol), tpe = subst(t.tpe))
             }._tree(tree)

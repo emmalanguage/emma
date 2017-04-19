@@ -248,7 +248,8 @@ private[core] trait DSCF extends Common {
               method -> api.Sym.With.tpe(method, tpe)
             } (breakOut)
 
-          api.BottomUp.withOwner.transformWith {
+          // Unsafe: The result type changes to Some(result).
+          api.BottomUp.unsafe.withOwner.transformWith {
             case Attr.inh(core.Let(vals, defs, expr), owner :: _) =>
               if (defs.isEmpty && api.Sym.findAnn[suffix](owner).isDefined) f(vals, expr)
               else core.Let(vals, defs, expr)

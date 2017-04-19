@@ -51,8 +51,9 @@ private[core] trait Trampoline extends Common {
      * - All return values and tail calls are wrapped in a trampoline.
      * - The ANF shape of the input is NOT preserved.
      */
-    lazy val transform: u.Tree => u.Tree = api.BottomUp.withAncestors
-      .inherit { // Local method definitions.
+    // Unsafe: Return type of methods changes to TailRec[OriginalType].
+    lazy val transform: u.Tree => u.Tree = api.BottomUp.unsafe
+      .withAncestors.inherit { // Local method definitions.
         case core.Let(_, defs, _) =>
           (for (core.DefDef(method, tparams, paramss, _) <- defs) yield {
             val (own, nme, pos) = (method.owner, method.name, method.pos)
