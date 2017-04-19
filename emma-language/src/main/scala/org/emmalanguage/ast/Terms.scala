@@ -107,7 +107,7 @@ trait Terms { this: AST =>
         assert(is.defined(nme), s"$this name is not defined")
         assert(is.defined(tpe),  s"$this type is not defined")
         val sym = newTermSymbol(own, TermName(nme), pos, flg)
-        setInfo(sym, tpe.dealias.widen)
+        setInfo(sym, tpe.dealias)
         setAnnotations(sym, ans.toList)
       }
 
@@ -119,7 +119,7 @@ trait Terms { this: AST =>
         assert(is.defined(name), s"$this name is not defined")
         assert(is.defined(tpe),  s"$this type is not defined")
         val free = internal.newFreeTerm(TermName(name).toString, null, flg, null)
-        setInfo(free, tpe.dealias.widen)
+        setInfo(free, tpe.dealias)
         setAnnotations(free, ans.toList)
       }
 

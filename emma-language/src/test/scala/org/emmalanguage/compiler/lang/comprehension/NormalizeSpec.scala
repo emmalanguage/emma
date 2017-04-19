@@ -194,9 +194,9 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
 
     val exp = reify {
-      val users$1 = users
-      val ads$1 = ads
-      val clicks$1 = clicks
+      val users$1:  test.schema.Marketing.users.type  = users
+      val ads$1:    test.schema.Marketing.ads.type    = ads
+      val clicks$1: test.schema.Marketing.clicks.type = clicks
       val compr$1 = comprehension[(Instant, AdClass.Value), DataBag] {
         val u = generator(users$1)
         val a = generator(ads$1)
@@ -224,9 +224,9 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
 
     val exp = reify {
-      val clicks$1 = clicks
-      val users$1 = users
-      val ads$1 = ads
+      val clicks$1: test.schema.Marketing.clicks.type = clicks
+      val users$1:  test.schema.Marketing.users.type  = users
+      val ads$1:    test.schema.Marketing.ads.type    = ads
       val compr$1 = comprehension[(Instant, AdClass.Value), DataBag] {
         val c = generator(clicks$1)
         val u = generator(users$1)
@@ -250,10 +250,14 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
 
     val exp = reify {
-      val clicks$1 = clicks
+      val clicks$1: test.schema.Marketing.clicks.type = clicks
       val compr$1 = comprehension[(Long, Instant), DataBag] {
         val c = generator(clicks$1)
-        head(c.adID, c.time)
+        head{
+          val adID = c.adID
+          val time = c.time
+          (adID, time)
+        }
       }
       compr$1
     }
@@ -272,17 +276,21 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
 
     val exp = reify {
-      val clicks$1 = clicks
-      val ads$1 = ads
+      val clicks$1: test.schema.Marketing.clicks.type = clicks
+      val ads$1:    test.schema.Marketing.ads.type    = ads
       val compr$1 = comprehension[(Long, Instant), DataBag] {
         val c = generator(clicks$1)
         val a = generator(ads$1)
         guard {
-          val adID = c.adID
+          val adID$1 = c.adID
           val id = a.id
-          id == adID
+          id == adID$1
         }
-        head(c.adID, c.time)
+        head {
+          val adID$2 = c.adID
+          val time = c.time
+          (adID$2, time)
+        }
       }
       compr$1
     }
@@ -301,8 +309,8 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
 
     val exp = reify {
-      val clicks$1 = clicks
-      val ads$1 = ads
+      val clicks$1: test.schema.Marketing.clicks.type = clicks
+      val ads$1:    test.schema.Marketing.ads.type    = ads
       val xs = comprehension[Long, DataBag] {
         val c = generator(clicks$1)
         val a = generator(ads$1)
@@ -311,7 +319,10 @@ class NormalizeSpec extends BaseCompilerSpec {
           val id = a.id
           id == adID
         }
-        head(c.time.toEpochMilli)
+        head {
+          val time = c.time
+          time.toEpochMilli
+        }
       }
       xs.fetch()
     }
@@ -329,10 +340,13 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
 
     val exp = reify {
-      val ads$1 = ads
+      val ads$1: test.schema.Marketing.ads.type = ads
       val xs = comprehension[String, DataBag]({
         val a = generator(ads$1)
-        val token = generator(DataBag(a.name.split("\\s+")))
+        val token = generator[String, DataBag] {
+          val name = a.name
+          DataBag(name.split("\\s+"))
+        }
         head(token)
       })
       xs.fetch()
@@ -358,18 +372,30 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
 
     val exp = reify {
-      val ads$1 = ads
+      val ads$1: test.schema.Marketing.ads.type = ads
       // pre-process
       val xs = comprehension[(Long, String), DataBag] {
         val a = generator(ads$1)
-        head(a.id, a.name)
+        head {
+          val id = a.id
+          val name = a.name
+          (id, name)
+        }
       }
       // self-join
       val ys = comprehension[(String, String), DataBag] {
         val x$1 = generator(xs)
         val x$2 = generator(xs)
-        guard(x$1._1 == x$2._1)
-        head(x$1._2, x$2._2)
+        guard {
+          val id1 = x$1._1
+          val id2 = x$2._1
+          id1 == id2
+        }
+        head {
+          val name1 = x$1._2
+          val name2 = x$2._2
+          (name1, name2)
+        }
       }
       ys.fetch()
     }
@@ -387,7 +413,7 @@ class NormalizeSpec extends BaseCompilerSpec {
     }
 
     val exp = reify {
-      val xs$1 = xs
+      val xs$1: this.xs.type = xs
       val compr$1 = comprehension[(Int, Int), DataBag] {
         val x = generator(xs$1)
         val y = generator(DataBag(Seq(x, x)))

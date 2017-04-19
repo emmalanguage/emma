@@ -120,7 +120,7 @@ trait Symbols { this: AST =>
               else newTermSymbol(own, termNme, pos, flg)
             }
 
-            setInfo(dup, tpe.dealias.widen)
+            setInfo(dup, tpe.dealias)
             setAnnotations(dup, ans.toList)
             dup.asInstanceOf[S]
           }

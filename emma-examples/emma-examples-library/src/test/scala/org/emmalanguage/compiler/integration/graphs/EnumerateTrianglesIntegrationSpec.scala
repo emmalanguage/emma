@@ -30,6 +30,7 @@ import scala.Ordering.Implicits._
 class EnumerateTrianglesIntegrationSpec extends BaseCompilerIntegrationSpec {
 
   import compiler._
+  import universe.reify
 
   // ---------------------------------------------------------------------------
   // Program closure
@@ -44,7 +45,7 @@ class EnumerateTrianglesIntegrationSpec extends BaseCompilerIntegrationSpec {
   // Program representations
   // ---------------------------------------------------------------------------
 
-  val sourceExpr = liftPipeline(u.reify {
+  val sourceExpr = liftPipeline(reify {
     // convert a list of directed edges
     val incoming = DataBag.readCSV[Edge[Long]](input, csv)
     val outgoing = incoming.map(e => Edge(e.dst, e.src))
@@ -57,10 +58,10 @@ class EnumerateTrianglesIntegrationSpec extends BaseCompilerIntegrationSpec {
     println(s"The number of triangles in the graph is $triangleCount")
   })
 
-  val coreExpr = anfPipeline(u.reify {
+  val coreExpr = anfPipeline(reify {
     // convert a list of directed edges
-    val input = this.input
-    val csv = this.csv
+    val input: this.input.type = this.input
+    val csv:   this.csv.type   = this.csv
     val incoming = DataBag.readCSV[Edge[Long]](input, csv)
     val outgoing = comprehension[Edge[Long], DataBag] {
       val e = generator[Edge[Long], DataBag](incoming)

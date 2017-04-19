@@ -26,6 +26,7 @@ import io.csv._
 class WordCountIntegrationSpec extends BaseCompilerIntegrationSpec {
 
   import compiler._
+  import universe.reify
 
   // ---------------------------------------------------------------------------
   // Program closure
@@ -41,7 +42,7 @@ class WordCountIntegrationSpec extends BaseCompilerIntegrationSpec {
   // Program representations
   // ---------------------------------------------------------------------------
 
-  val sourceExpr = liftPipeline(u.reify {
+  val sourceExpr = liftPipeline(reify {
     // read the input files and split them into lowercased words
     val docs = DataBag.readCSV[String](input, csv)
     // parse and count the words
@@ -50,9 +51,9 @@ class WordCountIntegrationSpec extends BaseCompilerIntegrationSpec {
     counts.writeCSV(output, csv)
   })
 
-  val coreExpr = anfPipeline(u.reify {
-    val input = this.input
-    val csv$r1 = this.csv
+  val coreExpr = anfPipeline(reify {
+    val input:  this.input.type = this.input
+    val csv$r1: this.csv.type   = this.csv
     val docs = DataBag.readCSV[String](input, csv$r1)
 
     // read the input files and split them into lowercased words
@@ -90,8 +91,8 @@ class WordCountIntegrationSpec extends BaseCompilerIntegrationSpec {
     }
 
     // write the results into a CSV file
-    val output$r1 = this.output
-    val csv$r2 = this.csv
+    val output$r1: this.output.type = this.output
+    val csv$r2:    this.csv.type    = this.csv
     val x$r1 = counts.writeCSV(output$r1, csv$r2)
     x$r1
   })

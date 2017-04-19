@@ -22,7 +22,7 @@ import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import test.schema.Marketing._
 
-import shapeless._
+import shapeless.::
 
 /** A spec for comprehension combination. */
 class CombinationSpec extends BaseCompilerSpec {
@@ -128,7 +128,8 @@ class CombinationSpec extends BaseCompilerSpec {
           x.id != y
         }
         val z = generator[User, DataBag] {
-          DataBag(Seq(xy._1))
+          val x = xy._1
+          DataBag(Seq(x))
         }
         head {
           val x = xy._1
@@ -151,7 +152,11 @@ class CombinationSpec extends BaseCompilerSpec {
         val xy = generator[(User, User), DataBag] {
           cross(users, users)
         }
-        head { (xy._1, xy._2) }
+        head {
+          val x = xy._1
+          val y = xy._2
+          (x, y)
+        }
       })
 
       applyOnce(MatchCross)(inp) shouldBe alphaEqTo(liftPipeline(exp))
@@ -206,13 +211,17 @@ class CombinationSpec extends BaseCompilerSpec {
 
       val exp = reify(comprehension[(User, User), DataBag] {
         val xy = generator[(User, User), DataBag] {
-          val users$1 = users
-          val users$2 = users
+          val users$1: test.schema.Marketing.users.type = users
+          val users$2: test.schema.Marketing.users.type = users
           val kx = (x: User) => x.id
           val ky = (y: User) => y.id
           equiJoin(kx, ky)(users$1, users$2)
         }
-        head { (xy._1, xy._2) }
+        head {
+          val x = xy._1
+          val y = xy._2
+          (x, y)
+        }
       })
 
       applyOnce(MatchEquiJoin)(inp) shouldBe alphaEqTo(liftPipeline(exp))
@@ -229,13 +238,17 @@ class CombinationSpec extends BaseCompilerSpec {
 
       val exp = reify(comprehension[(User, User), DataBag] {
         val xy = generator[(User, User), DataBag] {
-          val users$1 = users
-          val users$2 = users
+          val users$1: test.schema.Marketing.users.type = users
+          val users$2: test.schema.Marketing.users.type = users
           val kx = (x: User) => x.id
           val ky = (y: User) => y.id
           equiJoin(kx, ky)(users$1, users$2)
         }
-        head { (xy._1, xy._2) }
+        head {
+          val x = xy._1
+          val y = xy._2
+          (x, y)
+        }
       })
 
       applyOnce(MatchEquiJoin)(inp) shouldBe alphaEqTo(liftPipeline(exp))
@@ -356,7 +369,11 @@ class CombinationSpec extends BaseCompilerSpec {
           val x = xy._1
           val y = xy._2
           x.id != y.id
-        } map { xy => (xy._1, xy._2) }
+        } map { xy =>
+          val x = xy._1
+          val y = xy._2
+          (x, y)
+        }
       }
 
       combine(inp) shouldBe alphaEqTo(liftPipeline(exp))
@@ -375,7 +392,11 @@ class CombinationSpec extends BaseCompilerSpec {
         cross(
           users withFilter { _.id != 3 },
           users withFilter { _.id != 5 }
-        ) map { xy => (xy._1, xy._2) }
+        ) map { xy =>
+          val x = xy._1
+          val y = xy._2
+          (x, y)
+        }
       }
 
       combine(inp) shouldBe alphaEqTo(liftPipeline(exp))
@@ -524,7 +545,8 @@ class CombinationSpec extends BaseCompilerSpec {
           x.id != y
         }
         val z = generator[User, DataBag] {
-          DataBag(Seq(xy._1))
+          val x = xy._1
+          DataBag(Seq(x))
         }
         head {
           val x = xy._1
@@ -559,7 +581,11 @@ class CombinationSpec extends BaseCompilerSpec {
           do us2 = us2 union us2 while (us2.size < 100)
           cross(us1, us2)
         }
-        head { (xy._1, xy._2) }
+        head {
+          val x = xy._1
+          val y = xy._2
+          (x, y)
+        }
       })
 
       applyOnce(MatchCross)(inp) shouldBe alphaEqTo(liftPipeline(exp))
@@ -591,7 +617,11 @@ class CombinationSpec extends BaseCompilerSpec {
           val ky = (y: User) => y.id
           equiJoin(kx, ky)(us1, us2)
         }
-        head { (xy._1, xy._2) }
+        head {
+          val x = xy._1
+          val y = xy._2
+          (x, y)
+        }
       })
 
       applyOnce(MatchEquiJoin)(inp) shouldBe alphaEqTo(liftPipeline(exp))
