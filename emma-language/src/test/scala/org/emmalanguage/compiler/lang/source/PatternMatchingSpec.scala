@@ -19,11 +19,12 @@ package compiler.lang.source
 import compiler.BaseCompilerSpec
 
 /** A spec for the `Core.foreach2loop` transformation. */
+//noinspection ScalaUnusedSymbol
 class PatternMatchingSpec extends BaseCompilerSpec {
 
   import PatternMatchingSpec._
-
   import compiler._
+  import universe.reify
 
   val destructPatternMatchesPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true, withPre = false)(
@@ -45,7 +46,7 @@ class PatternMatchingSpec extends BaseCompilerSpec {
 
       val dogs = (Dog("Max"), Dog("Gidget"))
 
-      val act = destructPatternMatchesPipeline(u.reify {
+      val act = destructPatternMatchesPipeline(reify {
         val nameFst = dogs match {
           case pair@(Dog(name), _) => name
         }
@@ -57,7 +58,7 @@ class PatternMatchingSpec extends BaseCompilerSpec {
         nameFst == nameSnd
       })
 
-      val exp = idPipeline(u.reify {
+      val exp = idPipeline(reify {
         val nameFst = {
           val pair = dogs
           val name = pair._1.name
@@ -80,7 +81,7 @@ class PatternMatchingSpec extends BaseCompilerSpec {
 
       val dogs = (Dog("Max"), Dog("Gidget"))
 
-      val act = destructPatternMatchesPipeline(u.reify {
+      val act = destructPatternMatchesPipeline(reify {
         val nameFst = (dogs: (Dog, Dog)@unchecked) match {
           case pair@(Dog(name), _) => name
         }
@@ -92,7 +93,7 @@ class PatternMatchingSpec extends BaseCompilerSpec {
         nameFst == nameSnd
       })
 
-      val exp = idPipeline(u.reify {
+      val exp = idPipeline(reify {
         val nameFst = {
           val pair = dogs
           val name = pair._1.name
@@ -113,7 +114,7 @@ class PatternMatchingSpec extends BaseCompilerSpec {
 
     "with complex lhs" in {
 
-      val act = destructPatternMatchesPipeline(u.reify {
+      val act = destructPatternMatchesPipeline(reify {
         val nameFst = (Dog("Max"), Dog("Gidget")) match {
           case pair@(Dog(name), _) => name
         }
@@ -125,7 +126,7 @@ class PatternMatchingSpec extends BaseCompilerSpec {
         nameFst == nameSnd
       })
 
-      val exp = idPipeline(u.reify {
+      val exp = idPipeline(reify {
         val nameFst = {
           val x$1 = (Dog("Max"), Dog("Gidget"))
           val pair = x$1

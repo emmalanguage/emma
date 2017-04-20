@@ -24,6 +24,7 @@ import compiler.BaseCompilerSpec
 class CachingSpec extends BaseCompilerSpec {
 
   import compiler._
+  import universe.reify
 
   val liftPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
@@ -40,7 +41,7 @@ class CachingSpec extends BaseCompilerSpec {
 
     "used multiple times" in {
 
-      val inp = u.reify {
+      val inp = reify {
         val i = 2
         val xs = DataBag(1 to 5).withFilter(_ % 2 == 0)
         val ys = xs.map(_ + i)
@@ -48,7 +49,7 @@ class CachingSpec extends BaseCompilerSpec {
         ys union zs
       }
 
-      val exp = u.reify {
+      val exp = reify {
         val i = 2
         val xs = cache {
           DataBag(1 to 5).withFilter(_ % 2 == 0)
@@ -64,7 +65,7 @@ class CachingSpec extends BaseCompilerSpec {
 
     "passed as arguments to a loop method" in {
 
-      val inp = u.reify {
+      val inp = reify {
         val i = 2
         val N = 5
         var xs = DataBag(1 to 5)
@@ -72,7 +73,7 @@ class CachingSpec extends BaseCompilerSpec {
         xs
       }
 
-      val exp = u.reify {
+      val exp = reify {
         val i = 2
         val N = 5
         var xs = DataBag(1 to 5)
@@ -88,8 +89,7 @@ class CachingSpec extends BaseCompilerSpec {
 
     "referenced in the closure of a loop method" in {
 
-      val inp = u.reify {
-        val i = 2
+      val inp = reify {
         val N = 5
         var xs = DataBag(1 to 5)
         val ys = DataBag(1 to 5).withFilter(_ % 2 == 0)
@@ -97,8 +97,7 @@ class CachingSpec extends BaseCompilerSpec {
         xs
       }
 
-      val exp = u.reify {
-        val i = 2
+      val exp = reify {
         val N = 5
         var xs = DataBag(1 to 5)
         val ys = cache {

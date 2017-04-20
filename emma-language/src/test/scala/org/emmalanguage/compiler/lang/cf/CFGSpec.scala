@@ -25,7 +25,9 @@ import test.schema.Graphs._
 
 /** A spec for comprehension normalization. */
 class CFGSpec extends BaseCompilerSpec {
+
   import compiler._
+  import universe.reify
 
   val anfPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
@@ -39,7 +41,7 @@ class CFGSpec extends BaseCompilerSpec {
       val output = "file://path/to/output"
       implicit val edgeCSVConverter = CSVConverter[Edge[Long]]
 
-      val tree = idPipeline(u.reify {
+      val tree = idPipeline(reify {
         // read in a directed graph
         val csv$1 = CSV()
         val read$1 = DataBag.readCSV[Edge[Long]](input, csv$1)
@@ -97,7 +99,7 @@ class CFGSpec extends BaseCompilerSpec {
     }
 
     "with nested methods" in {
-      val tree = anfPipeline(u.reify {
+      val tree = anfPipeline(reify {
         implicit val zipSeqWithIdx = Seq.canBuildFrom[(Int, Int)]
         val customers = 4
         val barbers = Seq(10, 5)

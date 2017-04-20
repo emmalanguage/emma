@@ -26,10 +26,10 @@ import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.SparkSession
 
 class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkAware {
-
-  override lazy val compiler = new RuntimeCompiler with SparkCompiler
+  override val compiler = new RuntimeCompiler with SparkCompiler
 
   import compiler._
+  import universe.reify
 
   type Env = SparkSession
 
@@ -43,7 +43,7 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkA
   // Distributed collection conversion
   // --------------------------------------------------------------------------
 
-  "Convert from/to a Spark RDD" in verify(u.reify {
+  "Convert from/to a Spark RDD" in verify(reify {
     val xs = DataBag(1 to 1000).withFilter(_ > 800)
     val ys = xs.as[RDD].filter(_ < 200)
     val zs = DataBag.from(ys)

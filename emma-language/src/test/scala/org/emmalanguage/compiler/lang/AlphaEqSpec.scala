@@ -22,15 +22,16 @@ import compiler.BaseCompilerSpec
 class AlphaEqSpec extends BaseCompilerSpec {
 
   import compiler._
+  import universe.reify
 
   "simple valdefs and expressions" in {
-    val lhs = idPipeline(u.reify {
+    val lhs = idPipeline(reify {
       val a$01 = 42 * x
       val a$02 = a$01 * t._1
       15 * a$01 * a$02
     })
 
-    val rhs = idPipeline(u.reify {
+    val rhs = idPipeline(reify {
       val b$01 = 42 * x
       val b$02 = b$01 * t._1
       15 * b$01 * b$02
@@ -40,12 +41,12 @@ class AlphaEqSpec extends BaseCompilerSpec {
   }
 
   "conditionals" in {
-    val lhs = idPipeline(u.reify {
+    val lhs = idPipeline(reify {
       val a$01 = 42 * x
       if (x < 42) x * t._1 else x / a$01
     })
 
-    val rhs = idPipeline(u.reify {
+    val rhs = idPipeline(reify {
       val b$01 = 42 * x
       if (x < 42) x * t._1 else x / b$01
     })
@@ -54,7 +55,7 @@ class AlphaEqSpec extends BaseCompilerSpec {
   }
 
   "variable assignment and loops" in {
-    val lhs = idPipeline(u.reify {
+    val lhs = idPipeline(reify {
       var u = x
       while (u < 20) {
         println(y)
@@ -66,7 +67,7 @@ class AlphaEqSpec extends BaseCompilerSpec {
       } while (u < 20)
     })
 
-    val rhs = idPipeline(u.reify {
+    val rhs = idPipeline(reify {
       var v = x
       while (v < 20) {
         println(y)
@@ -82,7 +83,7 @@ class AlphaEqSpec extends BaseCompilerSpec {
   }
 
   "loops" in {
-    val lhs = idPipeline(u.reify {
+    val lhs = idPipeline(reify {
       def b$00(): Unit = {
         val i$1 = 0
         val r$1 = 0
@@ -103,7 +104,7 @@ class AlphaEqSpec extends BaseCompilerSpec {
       b$00()
     })
 
-    val rhs = idPipeline(u.reify {
+    val rhs = idPipeline(reify {
       def x$00(): Unit = {
         val j$1 = 0
         val k$1 = 0
@@ -128,17 +129,17 @@ class AlphaEqSpec extends BaseCompilerSpec {
   }
 
   "pattern matching" in {
-    val lhs = idPipeline(u.reify {
+    val lhs = idPipeline(reify {
       val u = (t, x)
       u match {
-        case ((i, j: String), _) => i * 42
+        case ((i, _: String), _) => i * 42
       }
     })
 
-    val rhs = idPipeline(u.reify {
+    val rhs = idPipeline(reify {
       val v = (t, x)
       v match {
-        case ((l, m: String), _) => l * 42
+        case ((l, _: String), _) => l * 42
       }
     })
 

@@ -255,8 +255,9 @@ class PrettyPrintSpec extends BaseCompilerSpec {
       //noinspection RedundantNewCaseClass
       val acts = idPipeline(reify {
         //@formatter:off
+        //noinspection RedundantNewCaseClass
         new Ad(1L, "Uber AD", services)                 // args
-        new Tuple2(3.14, "pi")                          // type-args and args
+        new String("pi")                                // type-args and args
         new scala.collection.mutable.ListBuffer[String] // type-args only
         new Object                                      // no-args
         ()
@@ -267,7 +268,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
 
       val exps = """
         |new Ad(1L, "Uber AD", services)
-        |new Tuple2(3.14, "pi")
+        |new String("pi")
         |new ListBuffer[String]()
         |new Object()
       """.stripMargin.trim.split("\n")
