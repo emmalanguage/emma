@@ -19,7 +19,7 @@ case class Email(id: Long, from: String, to: String, msg: String)
 case class Movie(id: Long, year: Int, title: String)
 ```
 
-## Primitive Type: `DataBag[A]`
+## Primitive Type: DataBag
 
 Parallel computation in Emma is represented by expressions over a core type `DataBag[A]`
 which models a distributed collection of elements of type `A`
@@ -43,7 +43,7 @@ movies.writeCSV("hdfs://movies.csv", CSV())               // Unit
 squares.writeParquet("hdfs://squares.parquet", Parquet()) // Unit
 ```
 
-## Primitive Computations: `fold`s
+## Primitive Computations: fold
 
 The core processing abstraction provided by `DataBag[A]` is a generic pattern for parallel
 collection processing called *structural recursion*.
@@ -59,16 +59,16 @@ the `Empty` bag, a singleton bag `Singleton(x)`, or the union of two existing ba
 Formally, the above procedure can be specified as the following second-order function called `fold`.
 
 ```scala
-def fold[B](e: B)(s: A => B, u: (B, B) => B): B = this match {
-  case Empty         => e
-  case Singleton(x)  => s(x)
-  case Union(xs, ys) => u(xs.fold(e)(s, u), ys.fold(e)(s, u))
+def fold[B](zero: B)(init: A => B, plus: (B, B) => B): B = this match {
+  case Empty         => zero
+  case Singleton(x)  => init(x)
+  case Union(xs, ys) => plus(xs.fold(e)(s, u), ys.fold(e)(s, u))
 }
 ```
 
-In the above signature, `e` substitutes `Empty`,
-`s(x)` substitutes `Singleton(x)`,
-and `u(xs, ys)`substitutes `Union(xs, ys)`.
+In the above signature, `zero` substitutes `Empty`,
+`init(x)` substitutes `Singleton(x)`,
+and `plus(xs, ys)`substitutes `Union(xs, ys)`.
 
 Various collection processing primitives can be specified as a `fold`. 
 
