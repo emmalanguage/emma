@@ -26,10 +26,10 @@ import org.apache.flink.api.scala.DataSet
 import org.apache.flink.api.scala.ExecutionEnvironment
 
 class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkAware {
-
-  override lazy val compiler = new RuntimeCompiler with FlinkCompiler
+  override val compiler = new RuntimeCompiler with FlinkCompiler
 
   import compiler._
+  import universe.reify
 
   type Env = ExecutionEnvironment
 
@@ -43,7 +43,7 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkA
   // Distributed collection conversion
   // --------------------------------------------------------------------------
 
-  "Convert from/to a Flink DataSet" in verify(u.reify {
+  "Convert from/to a Flink DataSet" in verify(reify {
     val xs = DataBag(1 to 1000).withFilter(_ > 800)
     val ys = xs.as[DataSet].filter(_ < 200)
     val zs = DataBag.from(ys)

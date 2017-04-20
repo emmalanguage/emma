@@ -21,10 +21,10 @@ import org.scalactic.Equality
 /** A spec for the `FunSupport.callGraph` function. */
 class LibSupportSpec extends LibSupportExamples {
 
-  import compiler.LibSupport.CG
-  import compiler.LibSupport.LibDefRegistry
   import compiler._
   import compiler.api._
+  import LibSupport.CG
+  import LibSupport.LibDefRegistry
 
   val prePipeline: u.Expr[Any] => u.Tree = compiler
     .pipeline(typeCheck = true, withPost = false)(

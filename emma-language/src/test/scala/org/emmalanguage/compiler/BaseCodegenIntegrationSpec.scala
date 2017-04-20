@@ -35,8 +35,8 @@ import java.nio.file.Paths
 abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAndAfter {
 
   import BaseCodegenIntegrationSpec._
-
   import compiler._
+  import universe.reify
 
   val inputDir = new File(tempPath("test/input"))
   val outputDir = new File(tempPath("test/output"))
@@ -107,15 +107,15 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   // --------------------------------------------------------------------------
 
   "Filter" - {
-    "strings" in verify(u.reify {
+    "strings" in verify(reify {
       DataBag(jabberwocky) withFilter { _.length > 10 }
     })
 
-    "tuples" in verify(u.reify {
+    "tuples" in verify(reify {
       DataBag(jabberwocky map {(_,1)}) withFilter { _._1.length > 10 }
     })
 
-    "case classes" in verify(u.reify {
+    "case classes" in verify(reify {
       DataBag(imdb)
         .withFilter { _.year > 1980 }
         .withFilter { _.title.length > 10 }
@@ -127,19 +127,19 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   // --------------------------------------------------------------------------
 
   "Map" - {
-    "primitives" in verify(u.reify {
+    "primitives" in verify(reify {
       val whiteList = DataBag(1 to 5)
       for { even <- DataBag(2 to 10 by 2) }
         yield if (whiteList exists { _ == even }) even else 0
     })
 
-    "tuples" in verify(u.reify {
+    "tuples" in verify(reify {
       for { edge <- DataBag((1, 4, "A") :: (2, 5, "B") :: (3, 6, "C") :: Nil) }
         yield if (edge._1 < edge._2) edge._1 -> edge._2 else edge._2 -> edge._1
     })
 
     "case classes" in {
-      verify(u.reify {
+      verify(reify {
         for { edge <- DataBag(graph) } yield
           if (edge.label == "B") LabelledEdge(edge.dst, edge.src, "B")
           else edge.copy(label = "Y")
@@ -152,7 +152,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   // --------------------------------------------------------------------------
 
   "FlatMap" - {
-    "strings" in verify(u.reify {
+    "strings" in verify(reify {
       DataBag(jabberwocky) flatMap { line =>
         DataBag(line split "\\W+" filter { word =>
           word.length > 3 && word.length < 9
@@ -160,7 +160,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       }
     })
 
-    "with filter" in verify(u.reify {
+    "with filter" in verify(reify {
       DataBag(jabberwocky) flatMap { line =>
         DataBag(line split "\\W+" filter {
           word => word.length > 3 && word.length < 9
@@ -168,7 +168,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       } withFilter { _.length > 5 }
     })
 
-    "comprehension with uncorrelated result" in verify(u.reify {
+    "comprehension with uncorrelated result" in verify(reify {
       for {
         line <- DataBag(jabberwocky)
         word <- DataBag(line split "\\W+" filter { word =>
@@ -177,7 +177,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       } yield word
     })
 
-    "comprehension with correlated result" in verify(u.reify {
+    "comprehension with correlated result" in verify(reify {
       for {
         line <- DataBag(jabberwocky)
         word <- DataBag(line split "\\W+")
@@ -190,17 +190,17 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   // --------------------------------------------------------------------------
 
   "Distinct" - {
-    "strings" in verify(u.reify {
+    "strings" in verify(reify {
       DataBag(jabberwocky flatMap { _ split "\\W+" }).distinct
     })
 
-    "tuples" in verify(u.reify {
+    "tuples" in verify(reify {
       DataBag(jabberwocky.flatMap { _ split "\\W+" } map {(_,1)}).distinct
     })
   }
 
   "Union" in {
-    verify(u.reify {
+    verify(reify {
       DataBag(jabberwockyEven) union DataBag(jabberwockyOdd)
     })
   }
@@ -210,7 +210,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   // --------------------------------------------------------------------------
 
   "Join" - {
-    "two-way on primitives" in verify(u.reify {
+    "two-way on primitives" in verify(reify {
       for {
         x <- DataBag(1 to 50)
         y <- DataBag(1 to 100)
@@ -218,7 +218,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       } yield (x, 2 * y, 2)
     })
 
-    "two-way on tuples" in verify(u.reify {
+    "two-way on tuples" in verify(reify {
       for {
         x <- DataBag(zipWithIndex(5 to 15))
         y <- DataBag(zipWithIndex(1 to 20))
@@ -227,7 +227,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
     })
 
     // Q: how many cannes winners are there in the IMDB top 100?
-    "two-way on case classes" in verify(u.reify {
+    "two-way on case classes" in verify(reify {
       val cannesTop100 = for {
         movie <- DataBag(imdb)
         winner <- DataBag(cannes)
@@ -243,7 +243,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       berlinTop100 union cannesTop100
     })
 
-    "multi-way on primitives" in verify(u.reify {
+    "multi-way on primitives" in verify(reify {
       for {
         x <- DataBag(1 to 10)
         y <- DataBag(1 to 20)
@@ -254,7 +254,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
 
     "multi-way on case classes with local input" in {
       // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
-      verify(u.reify {
+      verify(reify {
         val cannesTop100 = for {
           movie <- DataBag(imdb)
           winner <- DataBag(cannes)
@@ -272,7 +272,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
     }
   }
 
-  "Cross" in verify(u.reify {
+  "Cross" in verify(reify {
     for {
       x <- DataBag(3 to 100 by 3)
       y <- DataBag(5 to 100 by 5)
@@ -284,11 +284,11 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   // --------------------------------------------------------------------------
 
   "Group" - {
-    "materialization" in verify(u.reify {
+    "materialization" in verify(reify {
       DataBag(Seq(1)) groupBy Predef.identity
     })
 
-    "materialization with closure" in verify(u.reify {
+    "materialization with closure" in verify(reify {
       val semiFinal = 8
       val bag = DataBag(new Random shuffle 0.until(100).toList)
       val top = for (g <- bag groupBy { _ % semiFinal })
@@ -299,17 +299,17 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   }
 
   "FoldGroup" - {
-    "of primitives" in verify(u.reify {
+    "of primitives" in verify(reify {
       for (g <- DataBag(1 to 100 map { _ -> 0 }) groupBy { _._1 })
         yield g.values.map { _._2 }.sum
     })
 
-    "of case classes" in verify(u.reify {
+    "of case classes" in verify(reify {
       for (yearly <- DataBag(imdb) groupBy { _.year })
         yield yearly.values.size
     })
 
-    "of case classes multiple times" in verify(u.reify {
+    "of case classes multiple times" in verify(reify {
       val movies = DataBag(imdb)
 
       for (decade <- movies groupBy { _.year / 10 }) yield {
@@ -323,7 +323,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       }
     })
 
-    "with a complex key" in verify(u.reify {
+    "with a complex key" in verify(reify {
       val yearlyRatings = DataBag(imdb)
         .groupBy { movie => (movie.year / 10, movie.rating.toInt) }
 
@@ -333,7 +333,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       }
     })
 
-    "with duplicate group names" in verify(u.reify {
+    "with duplicate group names" in verify(reify {
       val movies = DataBag(imdb)
 
       val leastPopular = for {
@@ -347,7 +347,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       (leastPopular, mostPopular)
     })
 
-    "with multiple groups in the same comprehension" in verify(u.reify {
+    "with multiple groups in the same comprehension" in verify(reify {
       for {
         can10 <- DataBag(cannes) groupBy { _.year / 10 }
         ber10 <- DataBag(berlin) groupBy { _.year / 10 }
@@ -361,19 +361,19 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   // --------------------------------------------------------------------------
 
   "Fold" - {
-    "of an empty DataBag (nonEmpty)" in verify(u.reify {
+    "of an empty DataBag (nonEmpty)" in verify(reify {
       //(DataBag[Int]().nonEmpty, DataBag(1 to 3).nonEmpty)
     })
 
-    "of primitives (fold)" in verify(u.reify {
+    "of primitives (fold)" in verify(reify {
       DataBag(0 until 100).fold(0)(Predef.identity, _ + _)
     })
 
-    "of primitives (sum)" in verify(u.reify {
+    "of primitives (sum)" in verify(reify {
       DataBag(1 to 200).sum
     })
 
-    "of case classes (count)" in verify(u.reify {
+    "of case classes (count)" in verify(reify {
       DataBag(imdb).size
     })
   }
@@ -384,7 +384,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
 
   "MutableBag" - {
     "create and fetch" in {
-      val act = eval[Env => Seq[(Int, Long)]](codegenPipeline(u.reify(
+      val act = eval[Env => Seq[(Int, Long)]](codegenPipeline(reify(
         MutableBag(DataBag((1 to 100).map(x => x -> x.toLong))).bag().fetch()
       )))(env)
 
@@ -402,7 +402,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       val exp6 = (1 to 10).map(x => x -> (if (x % 2 != 0) 2L * x else x))
 
       val act1 :: act2 :: act3 :: act4 :: act5 :: act6 :: Nil =
-        eval[Env => List[Seq[(Int, Long)]]](codegenPipeline(u.reify {
+        eval[Env => List[Seq[(Int, Long)]]](codegenPipeline(reify {
           val inputs = DataBag((1 to 10).map(x => x -> x.toLong))
           val state1 = MutableBag(inputs)
           val state2 = state1
@@ -442,14 +442,14 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   // --------------------------------------------------------------------------
 
   "Normalization" - {
-    "of filters with simple predicates" in verify(u.reify {
+    "of filters with simple predicates" in verify(reify {
       for {
         x <- DataBag(1 to 1000)
         if !(x > 5 || (x < 2 && x == 0)) || (x > 5 || !(x < 2))
       } yield x
     })
 
-    "of filters with simple predicates and multiple inputs" in verify(u.reify {
+    "of filters with simple predicates and multiple inputs" in verify(reify {
       for {
         x <- DataBag(1 to 1000)
         y <- DataBag(100 to 2000)
@@ -457,20 +457,20 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       } yield y + x
     })
 
-    "of filters with UDF predicates" in verify(u.reify {
+    "of filters with UDF predicates" in verify(reify {
       for {
         x <- DataBag(1 to 1000)
         if !(p1(x) || (p2(x) && p3(x))) || (p1(x) || !p2(x))
       } yield x
     })
 
-    "of names of case classes" in verify(u.reify {
+    "of names of case classes" in verify(reify {
       val movies = DataBag(imdb)
       val years = for (mov <- movies) yield ImdbYear(mov.year)
       years forall { case iy @ ImdbYear(yr) => iy == ImdbYear(yr) }
     })
 
-    "of local functions" in verify(u.reify {
+    "of local functions" in verify(reify {
       val double = (x: Int) => 2 * x
       val add = (x: Int, y: Int) => x + y
 
@@ -486,7 +486,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   // --------------------------------------------------------------------------
 
   "CSV" - {
-    "read/write case classes" in verify(u.reify {
+    "read/write case classes" in verify(reify {
       val inputPath = materializeResource("/cinema/imdb.csv")
       val outputPath = Paths.get(s"${System.getProperty("java.io.tmpdir")}/emma/cinema/imdb_written.csv").toString
       // Read it, write it, and then read it again
@@ -501,32 +501,32 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   // --------------------------------------------------------------------------
 
   "Miscellaneous" - {
-    "Pattern matching in `yield`" in verify(u.reify {
+    "Pattern matching in `yield`" in verify(reify {
       val range = DataBag(zipWithIndex(0 to 100))
-      val squares = for (xy <- range) yield xy match { case (i, j) => i + j }
+      val squares = for (ij <- range) yield ij match { case (i, j) => i + j }
       squares.sum
     })
 
-    "Map with partial function" in verify(u.reify {
+    "Map with partial function" in verify(reify {
       val range = DataBag(zipWithIndex(0 to 100))
       val squares = range map { case (i, j) => i + j }
       squares.sum
     })
 
-    "Destructuring of a generator" in verify(u.reify {
+    "Destructuring of a generator" in verify(reify {
       val range = DataBag(zipWithIndex(0 to 100))
       val squares = for { (x, y) <- range } yield x + y
       squares.sum
     })
 
-    "Intermediate value definition" in verify(u.reify {
+    "Intermediate value definition" in verify(reify {
       val range = DataBag(zipWithIndex(0 to 100))
       val squares = for (xy <- range; sqr = xy._1 * xy._2) yield sqr
       squares.sum
     })
 
     //noinspection ScalaUnusedSymbol
-    "Root package capture" in verify(u.reify {
+    "Root package capture" in verify(reify {
       val eu = "eu"
       val com = "com"
       val java = "java"
@@ -535,7 +535,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       DataBag(0 to 100).sum
     })
 
-    "Constant expressions" in verify(u.reify {
+    "Constant expressions" in verify(reify {
       val as = for { _ <- DataBag(1 to 100) } yield 1 // map
       val bs = DataBag(101 to 200) flatMap { _ => DataBag(2 to 4) } // flatMap
       val cs = for { _ <- DataBag(201 to 300) if 5 == 1 } yield 5 // filter
@@ -543,7 +543,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       as union bs union cs union ds
     })
 
-    "Updated tmp sink (sieve of Eratosthenes)" in verify(u.reify {
+    "Updated tmp sink (sieve of Eratosthenes)" in verify(reify {
       val N = 20
       val payload = "#" * 100
 
@@ -574,7 +574,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       positive union negative
     })
 
-    "val destructuring" in verify(u.reify {
+    "val destructuring" in verify(reify {
       val resource = "file://" + materializeResource("/cinema/imdb.csv")
       val imdbTop100 = DataBag.readCSV[ImdbMovie](resource, CSV())
       val ratingsPerDecade = for {

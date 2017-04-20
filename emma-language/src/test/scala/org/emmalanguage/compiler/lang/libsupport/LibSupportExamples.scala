@@ -22,6 +22,7 @@ import compiler.BaseCompilerSpec
 trait LibSupportExamples extends BaseCompilerSpec {
 
   import compiler._
+  import universe.reify
 
   val liftPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
@@ -44,7 +45,7 @@ trait LibSupportExamples extends BaseCompilerSpec {
 
   lazy val `Example A (Original Expr)` = {
     import lib.example._
-    u.reify {
+    reify {
       val check = (e: Double) => e < ν
       val x = 51L
       val y = 17
@@ -56,7 +57,7 @@ trait LibSupportExamples extends BaseCompilerSpec {
 
   lazy val `Example A (Emma Source)` = {
     import lib.example._
-    u.reify {
+    reify {
       val check = (e: Double) => e < ν
       val x = 51L
       val y = 17
@@ -70,7 +71,7 @@ trait LibSupportExamples extends BaseCompilerSpec {
   }
 
   lazy val `Example A (normalized)` = {
-    u.reify {
+    reify {
       val check = (e: Double) => e < ν
       val x = 51L
       val y = 17
@@ -103,14 +104,14 @@ trait LibSupportExamples extends BaseCompilerSpec {
 
   lazy val `Example B (Original Expr)` = {
     import lib.example._
-    u.reify {
+    reify {
       f1(μ, ν)
     }
   }
 
   lazy val `Example B (Emma Source)` = {
     import lib.example._
-    u.reify {
+    reify {
       f1[Double](μ, ν.toDouble)(Numeric.DoubleIsFractional)
     }
   }
@@ -124,14 +125,14 @@ trait LibSupportExamples extends BaseCompilerSpec {
 
   lazy val `Example C (Original Expr)` = {
     import lib.example._
-    u.reify {
+    reify {
       g1(μ + ν)
     }
   }
 
   lazy val `Example C (Emma Source)` = {
     import lib.example._
-    u.reify {
+    reify {
       g1[Double](μ + ν)(Numeric.DoubleIsFractional)
     }
   }
@@ -145,14 +146,14 @@ trait LibSupportExamples extends BaseCompilerSpec {
 
   lazy val `Example D (Original Expr)` = {
     import lib.example._
-    u.reify {
+    reify {
       baz(μ, ν).x + h1(μ, μ)
     }
   }
 
   lazy val `Example D (Emma Source)` = {
     import lib.example._
-    u.reify {
+    reify {
       baz[Double](μ, ν.toDouble)(Numeric.DoubleIsFractional).x +
         h1[Double](μ, μ)(Numeric.DoubleIsFractional)
     }
@@ -167,7 +168,7 @@ trait LibSupportExamples extends BaseCompilerSpec {
 
   lazy val `Example E (Original Expr)` = {
     import lib.example._
-    u.reify {
+    reify {
       val x = μ * ν
       val y = 100
       val r = pow(x, y)
@@ -177,7 +178,7 @@ trait LibSupportExamples extends BaseCompilerSpec {
 
   lazy val `Example E (Emma Source)` = {
     import lib.example._
-    u.reify {
+    reify {
       val x = μ * ν
       val y = 100
       val r = pow[Double](x, y)(Numeric.DoubleIsFractional)
@@ -186,7 +187,7 @@ trait LibSupportExamples extends BaseCompilerSpec {
   }
 
   lazy val `Example E (normalized)` = {
-    u.reify {
+    reify {
       val x = μ * ν
       val y = 100
       val r = {
@@ -214,7 +215,7 @@ trait LibSupportExamples extends BaseCompilerSpec {
 
   lazy val `Example F (Original Expr)` = {
     import lib.example._
-    u.reify {
+    reify {
       val r = sameAs(μ, ν)
       r
     }
@@ -222,14 +223,14 @@ trait LibSupportExamples extends BaseCompilerSpec {
 
   lazy val `Example F (Emma Source)` = {
     import lib.example._
-    u.reify {
+    reify {
       val r = sameAs[Double](μ, ν.toDouble)
       r
     }
   }
 
   lazy val `Example F (normalized)` = {
-    u.reify {
+    reify {
       val r = {
         μ == ν.toDouble
       }

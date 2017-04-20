@@ -89,7 +89,7 @@ object util {
   /** Deletes a file recursively. */
   def deleteRecursive(path: java.io.File): Boolean = {
     val ret = if (path.isDirectory) {
-      path.listFiles().toSeq.foldLeft(true)((r, f) => deleteRecursive(f))
+      path.listFiles().toSeq.foldLeft(true)((_, f) => deleteRecursive(f))
     } else /* regular file */ {
       true
     }

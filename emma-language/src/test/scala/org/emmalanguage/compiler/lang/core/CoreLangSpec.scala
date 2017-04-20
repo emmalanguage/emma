@@ -28,9 +28,10 @@ import scala.collection.mutable
 class CoreLangSpec extends BaseCompilerSpec {
 
   import compiler._
+  import Validation._
   import Core.valid
   import Core.{Lang => core}
-  import Validation._
+  import universe.reify
 
   // ---------------------------------------------------------------------------
   // Helper methods
@@ -66,7 +67,7 @@ class CoreLangSpec extends BaseCompilerSpec {
     // modeled by
     // - `Lit` objects in `Core.Lang`
     // - `Literal(Constant(value))` nodes in Scala ASTs
-    val examples = extractFrom(u.reify(42, 42L, 3.14, 3.14F, .1e6, 'c', "string"))
+    val examples = extractFrom(reify(42, 42L, 3.14, 3.14F, .1e6, 'c', "string"))
     examples should not be empty
 
     "are valid language constructs" in {
@@ -86,11 +87,11 @@ class CoreLangSpec extends BaseCompilerSpec {
     // - `Ident(sym)` nodes where `sym` is a (free) TermSymbol in Scala ASTs
     val (z, v, w) = (42, 3.14, "string")
 
-    val examples = extractFrom(u.reify(
+    val examples = extractFrom(reify(
       z, v, w, mutable.Seq, util.Monoids
     ))
 
-    val negatives = extractFrom(u.reify {
+    val negatives = extractFrom(reify {
       var x = 42
       var y = 4.2
       var z = "42"
@@ -120,7 +121,7 @@ class CoreLangSpec extends BaseCompilerSpec {
     // modeled by
     // - `This` objects in `Core.Lang`
     // - `This(qualifier)` nodes in Scala ASTs
-    val examples = extractFrom(u.reify {
+    val examples = extractFrom(reify {
       class Unqualified { println(this) }
       class Qualified { println(Qualified.this) }
       class Outer { println(CoreLangSpec.this) }
@@ -152,7 +153,8 @@ class CoreLangSpec extends BaseCompilerSpec {
     // - `ValDef` objects in `Core.Lang`
     // - `ValDef(lhs, rhs)` nodes nodes in Scala ASTs
 
-    val examples = extractFrom(u.reify {
+    //noinspection RedundantNewCaseClass
+    val examples = extractFrom(reify {
       val literal = 42
       val `this` = this
       val reference = literal
@@ -164,7 +166,8 @@ class CoreLangSpec extends BaseCompilerSpec {
       (`this`, selection, lambda, typed)
     })
 
-    val negatives = extractFrom(u.reify {
+    //noinspection RedundantNewCaseClass
+    val negatives = extractFrom(reify {
       val chain = 42.toChar.asDigit
       val methodCall = t._1 * x
       val instance = new Tuple2(chain + 1, methodCall.toString)
@@ -201,7 +204,7 @@ class CoreLangSpec extends BaseCompilerSpec {
     val n = 42
     implicit val boolOrd = Ordering.Boolean
 
-    val examples = extractFrom(u.reify {
+    val examples = extractFrom(reify {
       // definitions
       def sqr(x: Int) = x * x
       def id[A](x: A) = x
@@ -223,7 +226,7 @@ class CoreLangSpec extends BaseCompilerSpec {
       case call: u.Apply => call
     }
 
-    val negatives = extractFrom(u.reify {
+    val negatives = extractFrom(reify {
       // definitions
       def sqr(x: Long) = x * x
       def id[A](x: A) = x
@@ -231,7 +234,7 @@ class CoreLangSpec extends BaseCompilerSpec {
 
       // calls
       sqr(42 + n) // method call
-      id(new Tuple2(3.14, "pi")) // class instantiation
+      id(new String("pi")) // class instantiation
       sqr(n: Long) // type ascription
       fill(this.x)('!') // selection
       sqr(sqr(4)) // nested
@@ -262,7 +265,7 @@ class CoreLangSpec extends BaseCompilerSpec {
     val n = 42
     implicit val pair = 3.14 -> "pi"
 
-    val examples = extractFrom(u.reify((
+    val examples = extractFrom(reify((
       Predef.println("string"), // literal
       n - 2, // reference
       2 - n, // reference
@@ -273,7 +276,7 @@ class CoreLangSpec extends BaseCompilerSpec {
       Predef.implicitly[(Double, String)] // implicit args
     )))
 
-    val negatives = extractFrom(u.reify((
+    val negatives = extractFrom(reify((
       Predef.println(s"n: $n"), // complex argument
       (n / 5) - 2, // complex target
       this.wait(5: Long), // type ascription
@@ -301,7 +304,7 @@ class CoreLangSpec extends BaseCompilerSpec {
     // - `DefDef` nodes nodes in Scala ASTs
     val n = 2
 
-    val examples = extractFrom(u.reify {
+    val examples = extractFrom(reify {
       // zero-args
       def greet() = {
         val greeting = "Hello, World!"
@@ -329,7 +332,7 @@ class CoreLangSpec extends BaseCompilerSpec {
       (greet(), add(1, 2), timesN(3), times2N(4))
     })
 
-    val negatives = extractFrom(u.reify {
+    val negatives = extractFrom(reify {
       // body not a let-expr
       def mul(x: Int, y: Int) = x * y
       mul(3, 4)
@@ -361,7 +364,7 @@ class CoreLangSpec extends BaseCompilerSpec {
     val x = this.x
     val maybe = false
 
-    val examples = extractFrom(u.reify {
+    val examples = extractFrom(reify {
       def add(x: Int, y: Int) = x + y
       println(if (true) "yes" else "no") // literals
       println(if (maybe) x) // references
@@ -371,7 +374,7 @@ class CoreLangSpec extends BaseCompilerSpec {
       case branch: u.If => branch
     })
 
-    val negatives = extractFrom(u.reify(
+    val negatives = extractFrom(reify(
       if (true) x.toString else t._2, // complex branches
       if (t._1 > 42) x // complex condition
     ))
@@ -400,17 +403,18 @@ class CoreLangSpec extends BaseCompilerSpec {
     val csv = CSV()
 
     val services = AdClass.SERVICES
-    val examples = extractFrom(u.reify(
+    //noinspection RedundantNewCaseClass
+    val examples = extractFrom(reify(
       new Ad(1, "Uber AD", services),
-      new Tuple2(3.14, "pi"), // inferred type-args
+      new String("pi"), // inferred type-args
       new Array[Int](10), // explicit type-args
       new mutable.ListBuffer[String], // type-args only
       new Object, // no-args
       new CSVScalaSupport[(Int, String, Int)](csv)
     ))
 
-    val negatives = extractFrom(u.reify(
-      new Tuple2(x + 3.14, "pi"), // method call
+    val negatives = extractFrom(reify(
+      new String("Hello, World!".substring(4, 8)), // method call
       new Array[Int](t._1) // selection
     ))
 
@@ -434,7 +438,7 @@ class CoreLangSpec extends BaseCompilerSpec {
     // - `Lambda` objects in `Core.Lang`
     // - `Function(args, body)` nodes nodes in Scala ASTs
 
-    val examples = extractFrom(u.reify(
+    val examples = extractFrom(reify(
       (x: Int, y: Int) => { val sum = x + y; sum },
       "ellipsis".charAt _
     )).flatMap {
@@ -442,7 +446,7 @@ class CoreLangSpec extends BaseCompilerSpec {
       case tree => Seq(tree)
     }
 
-    val negatives = extractFrom(u.reify(
+    val negatives = extractFrom(reify(
       // body not a let-expr
       (x: Int, y: Int) => x + y,
       (n: Int, x: Int) => {
@@ -473,17 +477,17 @@ class CoreLangSpec extends BaseCompilerSpec {
     // - `Typed(expr, tpt)` nodes nodes in Scala ASTs
     val pi = 3.14
 
-    val examples = extractFrom(u.reify(
+    val examples = extractFrom(reify(
       42: Int, // literal
       pi: Double, // reference
       "string": CharSequence, // upcast
       42: Long // coercion
     ))
 
-    val negatives = extractFrom(u.reify(
+    val negatives = extractFrom(reify(
       x + 42: Int, // method call
       t._2: CharSequence, // selection
-      new Tuple2(pi, "3.14"): (Double, CharSequence) // class instantiation
+      new String("3.14"): CharSequence // class instantiation
     ))
 
     examples should not be empty
@@ -510,7 +514,7 @@ class CoreLangSpec extends BaseCompilerSpec {
     // - `Let` objects in `Core.Lang`
     // - `Block(stats, expr)` nodes nodes in Scala ASTs
 
-    val examples = extractFrom(u.reify {
+    val examples = extractFrom(reify {
       { // vals-only
         val greeting = "Hello, World!"
         println(greeting)
@@ -527,7 +531,7 @@ class CoreLangSpec extends BaseCompilerSpec {
       ()
     })
 
-    val negatives = extractFrom(u.reify {
+    val negatives = extractFrom(reify {
       { // inverted
         def times(n: Int, x: Int) = { val prod = x * n; prod }
         val n = 2
