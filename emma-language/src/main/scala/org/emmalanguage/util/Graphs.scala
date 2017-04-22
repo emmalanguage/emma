@@ -17,6 +17,7 @@ package org.emmalanguage
 package util
 
 import scala.annotation.tailrec
+import scala.collection.Map
 
 /** Utilities for [[quiver.Graph]]s. */
 object Graphs {
