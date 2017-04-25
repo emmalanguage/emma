@@ -279,8 +279,13 @@ trait Comprehension extends Common
 
     /** Wraps `tree` in a Let block if necessary. */
     private[comprehension] def asLet(tree: u.Tree): u.Block = tree match {
-      case let @ core.Let(_, _, _) => let
-      case _ => core.Let(expr = tree)
+      case let @ core.Let(_, _, _) =>
+        let
+      case core.Atomic(_) =>
+        core.Let(expr = tree)
+      case _ =>
+        val lhs = api.TermSym.free(api.TermName.fresh(), tree.tpe)
+        core.Let(Seq(core.ValDef(lhs, tree)), Seq(), core.Ref(lhs))
     }
 
     /** Splits a `Seq[A]` into a prefix and suffix, excluding `pivot`. */

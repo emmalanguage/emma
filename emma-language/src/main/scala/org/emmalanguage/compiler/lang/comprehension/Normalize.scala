@@ -148,7 +148,7 @@ private[comprehension] trait Normalize extends Common {
         case _ if tree.tpe.dealias.widen.typeConstructor =:= Monad =>
           val tpe = api.Type.arg(1, tree.tpe.dealias.widen)
           val lhs = api.TermSym.free(api.TermName.fresh(), tpe)
-          val rhs = core.Let(expr = tree)
+          val rhs = asLet(tree)
           val ref = core.Let(expr = api.TermRef(lhs))
           Some(Seq(Generator(lhs, rhs)), Head(ref))
         case _ => None
