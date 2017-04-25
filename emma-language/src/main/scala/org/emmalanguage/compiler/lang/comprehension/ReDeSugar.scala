@@ -58,7 +58,7 @@ private[comprehension] trait ReDeSugar extends Common {
         sym -> api.Tree.rename(Seq(arg -> sym))(body)
       }.getOrElse {
         val nme = api.TermName.fresh()
-        val tpe = f.info.dealias.widen.typeArgs.last
+        val tpe = f.info.dealias.widen.typeArgs.head
         val arg = api.ValSym(owner, nme, tpe)
         val tgt = Some(core.ValRef(f))
         val app = f.info.member(api.TermName.app).asMethod
