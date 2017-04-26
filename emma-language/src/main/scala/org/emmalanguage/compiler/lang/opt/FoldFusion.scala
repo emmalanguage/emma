@@ -201,7 +201,7 @@ private[compiler] trait FoldFusion extends Common {
      * }}}
      */
     def foldForestFusion(cfg: CFG.FlowGraph[u.TermSymbol]): u.Tree => u.Tree =
-      api.BottomUp.withOwner.transformWith {
+      api.BottomUp.withOwner().transformWith {
         // Fuse only folds within a single block.
         case Attr.inh(let @ core.Let(vals, defs, expr), owner :: _) =>
           val valIndex = lhs2rhs(vals)

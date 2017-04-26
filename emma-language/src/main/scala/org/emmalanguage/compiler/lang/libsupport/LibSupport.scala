@@ -206,7 +206,7 @@ trait LibSupport extends Common {
             .accumulate({
               case api.TermDef(s) => Set[u.Name](s.name)
             })
-            .withOwner
+            .withOwner()
             .transformWith({
               case Attr(DefCall(Some(TermRef(_)), `sym`, targs, argss), _, owner :: _, _) =>
                 // compute type bindings sequence

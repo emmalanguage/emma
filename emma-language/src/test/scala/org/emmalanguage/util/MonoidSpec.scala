@@ -24,7 +24,7 @@ import org.scalatest._
 import org.scalatest.prop.Checkers
 import shapeless._
 
-import scala.collection.SortedSet
+import scala.collection.immutable.SortedSet
 
 class MonoidSpec extends FreeSpec with Checkers with Equivalences with Arbitraries {
 

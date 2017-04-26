@@ -54,7 +54,7 @@ private[source] trait Foreach2Loop extends Common {
     /** The Foreach2Loop transformation. */
     lazy val transform: u.Tree => u.Tree = {
       val asInst = api.Type.any.member(api.TermName("asInstanceOf")).asTerm
-      api.BottomUp.withOwner.withVarDefs.withAssignments
+      api.BottomUp.withOwner().withVarDefs.withAssigns
         .transformWith {
           case Attr.all(
             src.DefCall(xsOpt @ Some(xs), method, _,

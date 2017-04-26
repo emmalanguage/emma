@@ -21,10 +21,10 @@ import compiler.lang.source.Source
 import compiler.ir.DSCFAnnotations._
 import util.Monoids._
 
-import shapeless._
+import shapeless.syntax.singleton._
 
 import scala.collection.breakOut
-import scala.collection.SortedSet
+import scala.collection.immutable.SortedSet
 
 /** Direct-style control-flow transformation. */
 private[core] trait DSCF extends Common {
@@ -88,6 +88,7 @@ private[core] trait DSCF extends Common {
    */
   private[core] object DSCF {
 
+    import Attr._
     import API.DSCFAnnotations._
     import UniverseImplicits._
     import ANF.AsBlock
@@ -101,37 +102,41 @@ private[core] trait DSCF extends Common {
     implicit private val byName: Ordering[u.TermSymbol] =
       Ordering.by(_.name.toString)
 
+    // Attribute definitions
+    val SortedAssigns = ~@('sortedAssigns ->> SortedSet.empty[u.TermSymbol])
+    val VarEnv = ~@('varEnv ->> Map.empty[(u.Symbol, u.TermName), u.Tree])(overwrite)
+
     /** The Direct-Style Control-Flow (DSCF) transformation. */
     lazy val transform: u.Tree => u.Tree = api.TopDown
       .withBindUses.withVarDefs.withOwnerChain
-      .synthesize(Attr.collect[SortedSet, u.TermSymbol] {
+      .synth(SortedAssigns) {
         // Collect all variable assignments in a set sorted by name.
-        case src.VarMut(lhs, _) => lhs
-      }).accumulateWith[Map[(u.Symbol, u.TermName), u.Tree]] {
-        // Accumulate the latest state of each variable per owner.
-        case Attr(VarState(x, rhs), latest :: _, owners :: _, _) =>
+        case src.VarMut(lhs, _) ~@ _ => SortedSet(lhs)
+      }.accum(VarEnv) {
+        // Accumulate the current state of each variable per owner.
+        case VarState(x, rhs) ~@* Seq(VarEnv(env), OwnerChain(owners), _*) =>
           Map((owners.last, x.name) -> (rhs match {
-            case src.VarRef(y) => currentState(y, latest, owners)
+            case src.VarRef(y) => currentState(y, env, owners)
             case _ => rhs
           }))
-        case Attr.none(core.DefDef(method, _, paramss, _)) =>
+        case core.DefDef(method, _, paramss, _) ~@ _ =>
           paramss.flatten.map { case core.ParDef(p, _) =>
             (method, api.TermName.original(p.name)) -> core.Ref(p)
           } (breakOut)
-      } (overwrite).transformSyn {
+      }.transformSyn {
         // Eliminate variables
-        case Attr.none(src.VarDef(_, _)) => api.Empty()
-        case Attr.none(src.VarMut(_, _)) => api.Empty()
-        case Attr(src.VarRef(x), latest :: _, owners :: _, _) =>
-          currentState(x, latest, owners)
+        case src.VarDef(_, _) ~@ _ => api.Empty()
+        case src.VarMut(_, _) ~@ _ => api.Empty()
+        case src.VarRef(x) ~@* Seq(VarEnv(env), OwnerChain(owners), _*) =>
+          currentState(x, env, owners)
 
         // Eliminate control-flow
-        case Attr(block @ src.Block(stats, expr), _, (_ :+ owner) :: _, syn) =>
+        case (block @ src.Block(stats, api.Tree.With.tpe(expr, tpe)))
+          ~@* Seq(OwnerChain(_ :+ owner), attr, _*) =>
           // Extract required attributes
-          val tpe = expr.tpe
-          def uses(tree: u.Tree) = syn(tree).tail.tail.head
-          def mods(tree: u.Tree) = syn(tree) match {
-            case mods :: vars :: _ => mods diff vars.keySet
+          def mods(tree: u.Tree) = {
+            val syn = attr.syn(tree)
+            SortedAssigns(syn) diff VarDefs(syn).keySet
           }
 
           stats.span { // Split blocks
@@ -146,7 +151,7 @@ private[core] trait DSCF extends Common {
             case (prefix, Seq(src.ValDef(lhs, src.Branch(cond, thn, els)), suffix@_*)) =>
               // Suffix
               val suffBody = src.Block(suffix, expr)
-              val suffUses = uses(suffBody)
+              val suffUses = BindUses(attr.syn(suffBody))
               val lhsFree  = suffUses(lhs) > 0
               val suffVars = ((mods(thn) | mods(els)) & suffUses.keySet).toSeq
               val suffArgs = varArgs(suffVars)
@@ -235,8 +240,8 @@ private[core] trait DSCF extends Common {
       (f: (Seq[u.ValDef], u.Tree) => u.Block): u.Block = (let, res) match {
         case (core.Let(vals, Seq(), expr), _) => f(vals, expr)
         case (_, None) =>
-          api.BottomUp.break.withOwner.transformWith {
-            case Attr.inh(core.Let(vals, Seq(), expr), api.DefSym(owner) :: _)
+          api.BottomUp.break.withOwner().transformWith {
+            case core.Let(vals, Seq(), expr) ~@ Owner(api.DefSym(owner))
               if api.Sym.findAnn[suffix](owner).isDefined => f(vals, expr)
           }._tree(let).asInstanceOf[u.Block]
         case (_, Some(result)) =>
@@ -248,16 +253,16 @@ private[core] trait DSCF extends Common {
               method -> api.Sym.With.tpe(method, tpe)
             } (breakOut)
 
-          api.BottomUp.withOwner.transformWith {
-            case Attr.inh(core.Let(vals, defs, expr), owner :: _) =>
+          api.BottomUp.withOwner().transformWith {
+            case core.Let(vals, defs, expr) ~@ Owner(owner) =>
               if (defs.isEmpty && api.Sym.findAnn[suffix](owner).isDefined) f(vals, expr)
               else core.Let(vals, defs, expr)
-            case Attr.none(core.Branch(cond, thn, els)) =>
+            case core.Branch(cond, thn, els) ~@ _ =>
               core.Branch(cond, thn, els)
-            case Attr.none(core.DefCall(None, method, targs, argss))
+            case core.DefCall(None, method, targs, argss) ~@ _
               if dict.contains(method) =>
               core.DefCall(None, dict(method), targs, argss)
-            case Attr.none(core.DefDef(method, tparams, paramss, body))
+            case core.DefDef(method, tparams, paramss, body) ~@ _
               if dict.contains(method) =>
               val pss = paramss.map(_.map(_.symbol.asTerm))
               core.DefDef(dict(method), tparams, pss, body)
@@ -288,10 +293,8 @@ private[core] trait DSCF extends Common {
       for (x <- vars) yield api.ParSym(x.owner, api.TermName.fresh(x), x.info)
 
     /** Looks up the current state of a variable, given an environment and the owner chain. */
-    private def currentState(x: u.TermSymbol,
-      latest: Map[(u.Symbol, u.TermName), u.Tree],
-      owners: Seq[u.Symbol]
-    ) = owners.reverseIterator.map(_ -> x.name).collectFirst(latest).get
+    private def currentState(x: u.TermSymbol, env: Map[(u.Symbol, u.TermName), u.Tree], owners: Seq[u.Symbol]) =
+      owners.reverseIterator.map(_ -> x.name).collectFirst(env).get
 
     /** Extractor for [[src.VarDef]] or [[src.VarMut]], i.e. a state change. */
     private object VarState {

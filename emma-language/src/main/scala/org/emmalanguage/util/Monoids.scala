@@ -19,8 +19,9 @@ package util
 import cats.Monoid
 import quiver.Graph
 import shapeless._
+import shapeless.labelled._
 
-import scala.collection.SortedSet
+import scala.collection.immutable.SortedSet
 import scala.collection.generic.CanBuildFrom
 import scala.language.higherKinds
 
@@ -51,6 +52,14 @@ object Monoids {
       val empty = H.empty :: T.empty
       def combine(x: H :: T, y: H :: T) =
         H.combine(x.head, y.head) :: T.combine(x.tail, y.tail)
+    }
+
+  /** Generic field monoid. */
+  implicit def kv[K, V](implicit V: Monoid[V])
+    : Monoid[FieldType[K, V]] = new Monoid[FieldType[K, V]] {
+      def empty = field[K](V.empty)
+      def combine(x: FieldType[K, V], y: FieldType[K, V]) =
+        field[K](V.combine(x, y))
     }
 
   /** Trivial monoid with bias to the left. */

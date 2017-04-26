@@ -19,14 +19,13 @@ package compiler.lang.core
 import compiler.Common
 import compiler.lang.source.Source
 
-import shapeless._
-
 import scala.Function.const
 
 /** Administrative Normal Form (ANF) bypassing control-flow and for-comprehensions. */
 private[core] trait ANF extends Common {
   this: Source with Core =>
 
+  import Attr._
   import UniverseImplicits._
   import Core.{Lang => core}
   import Source.{Lang => src}
@@ -36,9 +35,9 @@ private[core] trait ANF extends Common {
 
     /** The ANF transformation. */
     private lazy val anf: u.Tree => u.Tree =
-      api.BottomUp.withParent.withOwner.transformWith {
+      api.BottomUp.withParent.withOwner().transformWith {
         // lit | this | x
-        case Attr.inh(src.Atomic(atom), _ :: parent :: _) => parent.collect {
+        case src.Atomic(atom) ~@ Parent(parent) => parent.collect {
           // Convert atoms to trivial blocks in lambdas, comprehensions and continuations.
           case src.Lambda(_, _, _) =>
           case core.Comprehension(_) =>
@@ -46,21 +45,21 @@ private[core] trait ANF extends Common {
         }.fold(atom)(const(src.Block(expr = atom)))
 
         // comprehension[T] { ... }
-        case Attr.none(compr @ core.Comprehension(_)) =>
+        case (compr @ core.Comprehension(_)) ~@ _ =>
           src.Block(expr = compr)
 
         // cont(..args) | if (cond) cont1(..args1) else cont2(..args2)
-        case Attr.none(cont @ core.Continuation(_)) => cont
+        case (cont @ core.Continuation(_)) ~@ _ => cont
 
         // def cont(..params) = { ..stats; atom }
-        case Attr.none(defn @ core.DefDef(method, tparams, paramss, AsBlock(stats, expr))) =>
+        case (defn @ core.DefDef(method, tparams, paramss, AsBlock(stats, expr))) ~@ _ =>
           if (stats.nonEmpty) defn else {
             val pss = for (params <- paramss) yield for (core.ParDef(p, _) <- params) yield p
             core.DefDef(method, tparams, pss, src.Block(expr = expr))
           }
 
         // { ..stats; atom }: T
-        case Attr.inh(src.TypeAscr(block @ AsBlock(stats, expr), tpe), owner :: _) =>
+        case src.TypeAscr(block @ AsBlock(stats, expr), tpe) ~@ Owner(owner) =>
           if (expr.tpe =:= tpe) block else {
             val nme = api.TermName.fresh(expr.symbol)
             val lhs = api.ValSym(owner, nme, tpe)
@@ -71,7 +70,7 @@ private[core] trait ANF extends Common {
           }
 
         // { ..stats; atom }.module
-        case Attr.inh(src.ModuleAcc(AsBlock(stats, expr), module), owner :: _) =>
+        case src.ModuleAcc(AsBlock(stats, expr), module) ~@ Owner(owner) =>
           val nme = api.TermName.fresh(module)
           val lhs = api.ValSym(owner, nme, module.info)
           val rhs = core.ModuleAcc(expr, module)
@@ -80,7 +79,7 @@ private[core] trait ANF extends Common {
           src.Block(stats :+ tmp, ref)
 
         // target.method[..targs](...argss)
-        case Attr.inh(src.DefCall(target, method, targs, argss), owner :: _) =>
+        case src.DefCall(target, method, targs, argss) ~@ Owner(owner) =>
           val expr = for (AsBlock(_, a) <- target) yield a
           val exprss = for (args <- argss) yield
             for (AsBlock(_, arg) <- args) yield arg
@@ -104,7 +103,7 @@ private[core] trait ANF extends Common {
           src.Block(Seq.concat(prefix, suffix, Seq(tmp)), ref)
 
         // new cls[..targs](...argss)
-        case Attr.inh(src.Inst(cls, targs, argss), owner :: _) =>
+        case src.Inst(cls, targs, argss) ~@ Owner(owner) =>
           val exprss = for (args <- argss) yield
             for (AsBlock(_, arg) <- args) yield arg
 
@@ -122,7 +121,7 @@ private[core] trait ANF extends Common {
           src.Block(stats :+ tmp, ref)
 
         // (params) => { ..stats; atom }
-        case Attr.none(lambda @ src.Lambda(fun, _, _)) =>
+        case (lambda @ src.Lambda(fun, _, _)) ~@ _ =>
           val nme = api.TermName.fresh(api.TermName.lambda)
           val lhs = api.ValSym(fun.owner, nme, lambda.tpe)
           val tmp = core.ValDef(lhs, lambda)
@@ -130,7 +129,7 @@ private[core] trait ANF extends Common {
           src.Block(Seq(tmp), ref)
 
         // if ({ ..stats, cond }) thn else els
-        case Attr.inh(src.Branch(AsBlock(stats, cond), thn, els), owner :: _) =>
+        case src.Branch(AsBlock(stats, cond), thn, els) ~@ Owner(owner) =>
           val rhs = src.Branch(cond, thn, els)
           val nme = api.TermName.fresh("if")
           val lhs = api.ValSym(owner, nme, rhs.tpe)
@@ -139,7 +138,7 @@ private[core] trait ANF extends Common {
           src.Block(stats :+ tmp, ref)
 
         // { ..outer; { ..inner; atom } }
-        case Attr.none(src.Block(outer, AsBlock(inner, expr))) =>
+        case src.Block(outer, AsBlock(inner, expr)) ~@ _ =>
           val stats = outer.flatMap {
             case src.ValDef(x, AsBlock(ss :+ core.ValDef(y, rhs), core.Ref(z)))
               if y == z => ss :+ core.ValDef(x, rhs)
