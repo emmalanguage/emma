@@ -21,7 +21,7 @@ import util.Functions._
 import util.Monoids._
 
 import cats.Monoid
-import cats.std.all._
+import cats.instances.all._
 import cats.syntax.group._
 import shapeless._
 

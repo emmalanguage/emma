@@ -16,7 +16,7 @@
 package org.emmalanguage
 package ast
 
-import cats.std.all._
+import cats.instances.all._
 import shapeless._
 
 import scala.annotation.tailrec

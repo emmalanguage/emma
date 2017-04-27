@@ -21,7 +21,7 @@ import compiler.{Common, Compiler}
 import util.Monoids
 import util.Memo
 
-import cats.std.all._
+import cats.instances.all._
 import shapeless._
 
 import scala.annotation.tailrec

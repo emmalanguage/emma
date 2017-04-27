@@ -16,6 +16,7 @@ specific language governing permissions and limitations
 under the License.
 
 This project includes:
+  "Java Concurrency in Practice" book annotations under Creative Commons Attribution License
   An open source Java toolkit for Amazon S3 under Apache License, Version 2.0
   ANTLR 4 Runtime under The BSD License
   aopalliance version 1.0 repackaged as a module under CDDL + GPLv2 with classpath exception
@@ -27,24 +28,37 @@ This project includes:
   Apache Commons Crypto under Apache License, Version 2.0
   Apache Commons Lang under Apache License, Version 2.0
   Apache Commons Math under The Apache Software License, Version 2.0
+  Apache Directory API ASN.1 API under The Apache Software License, Version 2.0
+  Apache Directory LDAP API Utilities under The Apache Software License, Version 2.0
   Apache Hadoop Annotations under The Apache Software License, Version 2.0
-  Apache Hadoop Auth under The Apache Software License, Version 2.0
+  Apache Hadoop Auth under Apache License, Version 2.0
   Apache Hadoop Client under The Apache Software License, Version 2.0
-  Apache Hadoop Common under The Apache Software License, Version 2.0
-  Apache Hadoop HDFS under The Apache Software License, Version 2.0
+  Apache Hadoop Common under Apache License, Version 2.0
+  Apache Hadoop HDFS under Apache License, Version 2.0
+  Apache Hadoop HDFS Client under Apache License, Version 2.0
+  Apache HttpClient under Apache License, Version 2.0
+  Apache HttpCore under Apache License, Version 2.0
   Apache Ivy under The Apache Software License, Version 2.0
   Apache Log4j under The Apache Software License, Version 2.0
   Apache Parquet Column under The Apache Software License, Version 2.0
   Apache Parquet Common under The Apache Software License, Version 2.0
   Apache Parquet Encodings under The Apache Software License, Version 2.0
-  Apache Parquet Format (Incubating) under The Apache Software License, Version 2.0
+  Apache Parquet Format under The Apache Software License, Version 2.0
   Apache Parquet Hadoop under The Apache Software License, Version 2.0
   Apache Parquet Jackson under The Apache Software License, Version 2.0
   Apache XBean :: ASM 5 shaded (repackaged) under null or null
+  ApacheDS I18n under The Apache Software License, Version 2.0
+  ApacheDS Protocol Kerberos Codec under The Apache Software License, Version 2.0
   ASM Core under Apache License, Version 2.0
   Bean Validation API under The Apache Software License, Version 2.0
   breeze under Apache 2
   breeze-macros under Apache 2
+  Cats core under MIT
+  Cats Free under MIT
+  Cats kernel under MIT
+  Cats kernel laws under MIT
+  Cats laws under MIT
+  Cats macros under MIT
   catsJVM under MIT
   chill under Apache 2
   chill-java under Apache 2
@@ -53,7 +67,6 @@ This project includes:
   Commons BeanUtils Core under The Apache Software License, Version 2.0
   Commons CLI under The Apache Software License, Version 2.0
   Commons Codec under The Apache Software License, Version 2.0
-  Commons Collections under The Apache Software License, Version 2.0
   Commons Compiler under New BSD License
   Commons Compress under The Apache Software License, Version 2.0
   Commons Configuration under The Apache Software License, Version 2.0
@@ -64,6 +77,7 @@ This project includes:
   Commons Logging under The Apache Software License, Version 2.0
   Commons Math under The Apache Software License, Version 2.0
   Commons Net under The Apache Software License, Version 2.0
+  Commons Pool under The Apache Software License, Version 2.0
   commons-beanutils under Apache License, Version 2.0
   Compress-LZF under Apache License 2.0
   config under Apache License, Version 2.0
@@ -101,7 +115,6 @@ This project includes:
   flink-shaded-hadoop2 under The Apache Software License, Version 2.0
   force-shading under The Apache Software License, Version 2.0
   Fortran to Java ARPACK under The BSD License
-  free under MIT
   Graphite Integration for Metrics under Apache License 2.0
   grizzled-slf4j under BSD
   Gson under The Apache Software License, Version 2.0
@@ -118,6 +131,7 @@ This project includes:
   Hamcrest Core under New BSD License
   HK2 API module under CDDL + GPLv2 with classpath exception
   HK2 Implementation Utilities under CDDL + GPLv2 with classpath exception
+  htrace-core4 under The Apache Software License, Version 2.0
   HttpClient under Apache License
   Jackson under The Apache Software License, Version 2.0
   Jackson Integration for Metrics under Apache License 2.0
@@ -127,8 +141,6 @@ This project includes:
   Jackson-module-paranamer under The Apache Software License, Version 2.0
   jackson-module-scala under The Apache Software License, Version 2.0
   Janino under New BSD License
-  jasper-compiler under The Apache Software License, Version 2.0
-  jasper-runtime under The Apache Software License, Version 2.0
   Java Servlet API under CDDL + GPLv2 with classpath exception
   java-xmlbuilder under Apache License, Version 2.0
   JavaBeans Activation Framework (JAF) under Common Development and Distribution License (CDDL) v1.0
@@ -163,9 +175,11 @@ This project includes:
   Jetty :: Webapp Application Support under Apache Software License - Version 2.0 or Eclipse Public License - Version 1.0
   Jetty :: XML utilities under Apache Software License - Version 2.0 or Eclipse Public License - Version 1.0
   Jetty Server under Apache Software License - Version 2.0 or Eclipse Public License - Version 1.0
+  Jetty SSLEngine under Apache License Version 2
   Jetty Utilities under Apache Software License - Version 2.0 or Eclipse Public License - Version 1.0
   JLine under BSD
   JSch under BSD
+  JSON Small and Fast Parser under The Apache Software License, Version 2.0
   json4s-ast under ASL
   json4s-core under ASL
   json4s-jackson under ASL
@@ -173,12 +187,10 @@ This project includes:
   JTransforms under MPL or LGPL or GPL
   JUL to SLF4J bridge under MIT License
   JUnit under Eclipse Public License 1.0
+  jvm under MIT
   JVM Integration for Metrics under Apache License 2.0
-  kernel under MIT
-  kernelLaws under MIT
   Kryo under New BSD License
   Kryo Shaded under New BSD License
-  laws under MIT
   leveldbjni-all under The BSD 3-Clause License
   LZ4 and xxHash under The Apache Software License, Version 2.0
   machinist under MIT
@@ -186,7 +198,10 @@ This project includes:
   Metrics Core under Apache License 2.0
   MinLog under New BSD License
   Netty/All-in-One under Apache License, Version 2.0
+  Nimbus JOSE+JWT under The Apache Software License, Version 2.0
   Objenesis under Apache 2
+  OkHttp under Apache 2.0
+  Okio under Apache 2.0
   opencsv under Apache 2
   oro under Apache License, Version 2.0
   OSGi resource locator bundle - used by various API providers that rely on META-INF/services mechanism to locate providers. under CDDL + GPLv2 with classpath exception
@@ -199,7 +214,6 @@ This project includes:
   Scala Compiler under BSD 3-Clause
   Scala Library under BSD 3-Clause
   scala-arm under BSD-Style
-  scala-continuations-library under BSD 3-clause
   scala-logging-api under Apache 2.0 License
   scala-logging-slf4j under Apache 2.0 License
   scala-parser-combinators under BSD 3-clause
@@ -228,13 +242,14 @@ This project includes:
   spire under BSD-style
   spire-macros under BSD-style
   spray-json under Apache 2
-  StAX API under The Apache Software License, Version 2.0
   stream-lib under Apache License, Version 2.0
   Streaming API for XML under Sun Binary Code License
   test-interface under BSD
   The Netty Project under Apache License, Version 2.0
   Uncommons Maths under Apache License, Version 2.0
   univocity-parsers under Apache 2
+  Xerces2 Java Parser under The Apache Software License, Version 2.0
+  XML Commons External Components XML APIs under The Apache Software License, Version 2.0
   Xml Compatibility extensions for Jackson under The Apache Software License, Version 2.0 or GNU Lesser General Public License (LGPL), Version 2.1
   xmlenc Library under The BSD License
   XZ for Java under Public Domain
