@@ -56,6 +56,13 @@ object SparkRunner {
       .action((x, c) => c.copy(master = x))
       .text("Spark master address")
 
+    opt[String]("codegen")
+      .text("custom codegen path")
+      .action { (x, c) =>
+        System.setProperty("emma.codegen.dir", x)
+        c
+      }
+
     section("Graph Analytics")
     cmd("transitive-closure")
       .text("Compute the transitive closure of a directed graph")

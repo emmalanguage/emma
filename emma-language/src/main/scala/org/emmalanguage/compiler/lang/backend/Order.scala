@@ -16,7 +16,7 @@
 package org.emmalanguage
 package compiler.lang.backend
 
-import cats.std.all._
+import cats.instances.all._
 import compiler.Common
 import compiler.lang.core.Core
 import util.Monoids

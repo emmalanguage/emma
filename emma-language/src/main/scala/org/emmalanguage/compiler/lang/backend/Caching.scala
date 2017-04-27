@@ -21,7 +21,7 @@ import compiler.lang.core.Core
 import compiler.ir.DSCFAnnotations._
 import util.Monoids._
 
-import cats.std.all._
+import cats.instances.all._
 import shapeless._
 
 import scala.collection.breakOut
@@ -84,7 +84,7 @@ private[backend] trait Caching extends Common {
             argss.flatten.collect { case core.Ref(target) if isDataBag(target) =>
               target -> (true, 1)
             } (breakOut)
-        } (merge(tuple2Monoid(disj, implicitly))).traverseAny._acc(tree).head
+        } (merge(catsKernelStdMonoidForTuple2(disj, implicitly))).traverseAny._acc(tree).head
 
       /** Cache when referenced in a loop or more than once. */
       def shouldCache(sym: u.Symbol) = {

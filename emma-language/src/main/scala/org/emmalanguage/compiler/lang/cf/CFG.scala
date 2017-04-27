@@ -21,7 +21,7 @@ import compiler.lang.core.Core
 import compiler.ir.DSCFAnnotations.continuation
 import util.Monoids._
 
-import cats.std.all._
+import cats.instances.all._
 import quiver._
 import shapeless._
 

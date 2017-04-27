@@ -51,6 +51,13 @@ object FlinkRunner {
     help("help")
       .text("Show this help message")
 
+    opt[String]("codegen")
+      .text("custom codegen path")
+      .action { (x, c) =>
+        System.setProperty("emma.codegen.dir", x)
+        c
+      }
+
     section("Graph Analytics")
     cmd("transitive-closure")
       .text("Compute the transitive closure of a directed graph")

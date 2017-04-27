@@ -20,7 +20,7 @@ import compiler.Common
 import compiler.lang.core.Core
 import util.Monoids._
 
-import cats.std.all._
+import cats.instances.all._
 import shapeless._
 
 import scala.collection.breakOut

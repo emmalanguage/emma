@@ -18,7 +18,7 @@ package ast
 
 import util.Monoids._
 
-import cats.std.all._
+import cats.instances.all._
 import shapeless._
 
 import scala.annotation.tailrec
@@ -259,7 +259,7 @@ trait Symbols { this: AST =>
                 val dup = With(als)(own = own, tpe = tpe)
                 (Map(sym -> dup), (sym :: Nil, dup :: Nil))
               } else (Map.empty, (Nil, Nil))
-          } (tuple2Monoid(overwrite, tuple2Monoid(reverse, reverse)))
+          } (catsKernelStdMonoidForTuple2(overwrite, catsKernelStdMonoidForTuple2(reverse, reverse)))
           .traverseAny.andThen { case Attr.acc(tree, (dict, (keys, vals)) :: _) =>
             // Handle method types as well.
             def subst(tpe: u.Type) = if (is.defined(tpe)) {

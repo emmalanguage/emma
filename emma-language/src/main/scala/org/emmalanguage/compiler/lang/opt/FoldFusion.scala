@@ -83,7 +83,7 @@ private[compiler] trait FoldFusion extends Common {
       // Initial fold forest - singleton trees of `xs` symbols in `xs.fold(...)` applications.
       var forest: Stream[Tree[u.TermSymbol]] = valIndex.collect {
         case (fold, core.DefCall(_, method, _, _))
-          if DataBag.foldOps(method) => Tree.leaf(fold)
+          if DataBag.foldOps(method) => Tree.Leaf(fold)
       } (breakOut)
 
       // Grow the forest by extending trees with new roots until a fixed point is reached.
@@ -113,7 +113,7 @@ private[compiler] trait FoldFusion extends Common {
           // => Prepend a root representing sequential (cata) fold-fusion.
           if (refCount(target) == 1 && targetIsMonadicCall) {
             forestDidGrow = true
-            Stream(Tree.node(target, subForest))
+            Stream(Tree.Node(target, subForest))
           }
 
           // Target called by multiple independent sub-forest roots.
@@ -123,9 +123,9 @@ private[compiler] trait FoldFusion extends Common {
             // If there are more than `Max.TupleElems` folds,
             // this will generate a nested tuple in the next growing phase.
             val (fuseNow, fuseLater) = independentSubForest.splitAt(Max.TupleElems)
-            val now = Tree.node(target, fuseNow)
+            val now = Tree.Node(target, fuseNow)
             if (fuseLater.isEmpty) Stream(now)
-            else Stream(Tree.node(target, now #:: fuseLater))
+            else Stream(Tree.Node(target, now #:: fuseLater))
           }
 
           // Neither of the above.
@@ -140,7 +140,7 @@ private[compiler] trait FoldFusion extends Common {
     /** Folds a Scalaz Tree bottom-up. */
     private def foldBottomUp[A, B](tree: Tree[A])(f: (A, Stream[B]) => B): Tree[B] = {
       val forest = tree.subForest.map(foldBottomUp(_)(f))
-      Tree.node(f(tree.rootLabel, forest.map(_.rootLabel)), forest)
+      Tree.Node(f(tree.rootLabel, forest.map(_.rootLabel)), forest)
     }
 
     /** Turns a sequence of values into a Map from LHS to RHS. */
