@@ -82,14 +82,15 @@ mvn verify  # with tests
 
 ### HDFS Setup
 
-To run the algorithms on a Flink or Spark cluster, copy the input files to HDFS.
+[Getting started with Hadoop](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SingleCluster.html)
 
+To run the algorithms on a Flink or Spark cluster, copy the input files to HDFS.
 
 Assuming a variable to `bin/hdfs`
 
 ```bash
-export HDFS=/path/to/hdfs-2.x/bin/hdfs
-export HDFS_ADDR="host:port"
+export HDFS=/path/to/hadoop-2.x/bin/hdfs
+export HDFS_ADDR="$HOSTNAME:9000"
 ```
 
 you can run the following commands.
@@ -102,10 +103,12 @@ $HDFS dfs -copyFromLocal emma-quickstart-library/src/test/resources/* /tmp/input
 
 ### Running the Examples on Flink
 
+[Getting started with Flink](https://ci.apache.org/projects/flink/flink-docs-release-1.2/quickstart/setup_quickstart.html)
+
 Assuming a variable to `bin/flink`
 
 ```bash
-export FLINK=/path/to/flink-1.2.0/bin/flink
+export FLINK=/path/to/flink-1.2.x/bin/flink
 ```
 
 and a local filesystem path shared between all nodes in your Flink cluster
@@ -157,10 +160,12 @@ $FLINK run -C "file://$CODEGEN/" \
 
 ### Running the Examples on Spark
 
+[Getting started with Spark](http://spark.apache.org/docs/latest/quick-start.html)
+
 Assuming a variable to `bin/spark-submit`
 
 ```bash
-export SPARK=/path/to/spark-2.1.0/bin/spark-submit
+export SPARK=/path/to/spark-2.1.x/bin/spark-submit
 ```
 
 and a Spark master URL
