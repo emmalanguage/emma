@@ -16,16 +16,21 @@
 package org.emmalanguage
 package ast
 
-import util._
+import util.Functions
 import util.Functions._
+import util.Memo
 import util.Monoids._
 
 import cats.Monoid
 import cats.std.all._
 import cats.syntax.group._
 import shapeless._
+import shapeless.labelled._
+import shapeless.ops.record.Selector
+import shapeless.syntax.singleton._
 
 import scala.Function.const
+import scala.annotation.implicitNotFound
 import scala.annotation.tailrec
 import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
@@ -211,6 +216,10 @@ trait Transversers { this: AST =>
     def accumulate[X: Monoid](acc: Tree =?> X) =
       accumulateWith[X](forgetful(acc))
 
+    /** Prepends an accumulated attribute. */
+    def accum[K, V](attr: K ~@ V)(acc: Attr[FieldType[K, V] :: A, I, S] =?> V) =
+      accumulateInit(attr.init)(acc.andThen(field[K](_)))(kv(attr.M))
+
     /** Prepends an inherited attribute based on inherited and synthesized attributes. */
     def inheritInit[X: Monoid](init: X)(inh: Attr[HNil, X :: I, S] =?> X) =
       copy(grammar = grammar.inherit(init, inh))
@@ -223,6 +232,10 @@ trait Transversers { this: AST =>
     def inherit[X: Monoid](inh: Tree =?> X) =
       inheritWith[X](forgetful(inh))
 
+    /** Prepends an inherited attribute. */
+    def inher[K, V](attr: K ~@ V)(inh: Attr[HNil, FieldType[K, V] :: I, S] =?> V) =
+      inheritInit(attr.init)(inh.andThen(field[K](_)))(kv(attr.M))
+
     /** Prepends a synthesized attribute based on all synthesized attributes. */
     def synthesizeInit[X: Monoid](init: X)(syn: Attr[HNil, HNil, X :: S] =?> X) =
       copy(grammar = grammar.synthesize(init, syn))
@@ -234,6 +247,10 @@ trait Transversers { this: AST =>
     /** Prepends a synthesized attribute based on trees only. */
     def synthesize[X: Monoid](syn: Tree =?> X) =
       synthesizeWith[X](forgetful(syn))
+
+    /** Prepends a synthesized attribute. */
+    def synth[K, V](attr: K ~@ V)(syn: Attr[HNil, HNil, FieldType[K, V] :: S] =?> V) =
+      synthesizeInit(attr.init)(syn.andThen(field[K](_)))(kv(attr.M))
 
     /** Traverses a tree with access to all attributes (and a memoized synthesis function). */
     def traverseSyn(callback: Attr[A, I, Tree => S] =?> Unit): Traversal[A, I, S] = {
@@ -276,91 +293,95 @@ trait Transversers { this: AST =>
       transformWith(forgetful(template))
 
     /** Inherits the root of the tree ([[None]] if the current node is the root). */
-    def withRoot = inherit(partial(Option.apply))(first(None))
+    def withRoot = inher(Attr.Root) {
+      case tree ~@ _ => Option(tree)
+    }
 
     /** Inherits the parent of the current node ([[None]] if the current node is the root). */
-    def withParent = inherit(partial(Option.apply))(last(None))
+    def withParent = inher(Attr.Parent) {
+      case t ~@ _ => Option(t)
+    }
 
     /** Inherits all ancestors of the current node in a vector. */
-    def withAncestors = inherit(Attr.collect[Vector, Tree](partial(identity)))
+    def withAncestors = inher(Attr.Ancestors) {
+      case t ~@ _ => Vector(t)
+    }
 
     /** Inherits the owner of the current node. */
-    def withOwner: Strategy[A, Symbol :: I, S] =
-      withOwner(api.Owner.encl)
-
-    /** Inherits the owner of the current node. */
-    def withOwner(default: Symbol): Strategy[A, Symbol :: I, S] =
-      inherit { case api.Owner(sym) => sym } (last(default))
+    def withOwner(default: Symbol = Attr.Owner.init) = {
+      val Owner = ~@('owner ->> default)(Attr.Owner.M)
+      inher(Owner) { case api.Owner(o) ~@ _ => o }
+    }
 
     /** Inherits the owner chain of the current node. */
-    def withOwnerChain = inheritInit(Vector(api.Owner.encl)) {
-      case Attr.none(api.Owner(sym)) => Vector(sym)
+    def withOwnerChain = inher(Attr.OwnerChain) {
+      case api.Owner(o) ~@ _ => Vector(o)
     }
 
     /** Synthesizes all term definitions contained in the current node and its children. */
-    def withDefs = synthesize(Attr.group {
-      case dfn @ api.TermDef(sym) => sym -> dfn
-    })(overwrite)
+    def withDefs = synth(Attr.Defs) {
+      case (d @ api.TermDef(x)) ~@ _ => Map(x -> d)
+    }
 
     /** Synthesizes all binding definitions contained in the current node and its children. */
-    def withBindDefs = synthesize(Attr.group {
-      case bind @ api.BindingDef(lhs, _) => lhs -> bind
-    })(overwrite)
+    def withBindDefs = synth(Attr.BindDefs) {
+      case (b @ api.BindingDef(x, _)) ~@ _ => Map(x -> b)
+    }
 
     /** Synthesizes all value definitions contained in the current node and its children. */
-    def withValDefs = synthesize(Attr.group {
-      case value @ api.ValDef(lhs, _) => lhs -> value
-    })(overwrite)
+    def withValDefs = synth(Attr.ValDefs) {
+      case (v @ api.ValDef(x, _)) ~@ _ => Map(x -> v)
+    }
 
     /** Synthesizes all variable definitions contained in the current node and its children. */
-    def withVarDefs = synthesize(Attr.group {
-      case variable @ api.VarDef(lhs, _) => lhs -> variable
-    })(overwrite)
+    def withVarDefs = synth(Attr.VarDefs) {
+      case (v @ api.VarDef(x, _)) ~@ _ => Map(x -> v)
+    }
 
     /** Synthesizes all parameter definitions contained in the current node and its children. */
-    def withParDefs = synthesize(Attr.group {
-      case param @ api.ParDef(lhs, _) => lhs -> param
-    })(overwrite)
+    def withParDefs = synth(Attr.ParDefs) {
+      case (p @ api.ParDef(x, _)) ~@ _ => Map(x -> p)
+    }
 
     /** Synthesizes all method definitions contained in the current node and its children. */
-    def withDefDefs = synthesize(Attr.group {
-      case dfn @ api.DefDef(method, _, _, _) => method -> dfn
-    })(overwrite)
+    def withDefDefs = synth(Attr.DefDefs) {
+      case (d @ api.DefDef(m, _, _, _)) ~@ _ => Map(m -> d)
+    }
 
     /** Counts all term references contained in the current node and its children. */
-    def withUses = synthesize(Attr.group {
-      case api.TermRef(target) => target -> 1
-    })(merge)
+    def withUses = synth(Attr.Uses) {
+      case api.TermRef(x) ~@ _ => Map(x -> 1)
+    }
 
     /** Counts all binding references contained in the current node and its children. */
-    def withBindUses = synthesize(Attr.group {
-      case api.BindingRef(target) => target -> 1
-    })(merge)
+    def withBindUses = synth(Attr.BindUses) {
+      case api.BindingRef(x) ~@ _ => Map(x -> 1)
+    }
 
     /** Counts all value references contained in the current node and its children. */
-    def withValUses = synthesize(Attr.group {
-      case api.ValRef(target) => target -> 1
-    })(merge)
+    def withValUses = synth(Attr.ValUses) {
+      case api.ValRef(x) ~@ _ => Map(x -> 1)
+    }
 
     /** Counts all variable references contained in the current node and its children. */
-    def withVarUses = synthesize(Attr.group {
-      case api.VarRef(target) => target -> 1
-    })(merge)
+    def withVarUses = synth(Attr.VarUses) {
+      case api.VarRef(x) ~@ _ => Map(x -> 1)
+    }
 
     /** Counts all parameter references contained in the current node and its children. */
-    def withParUses = synthesize(Attr.group {
-      case api.ParRef(target) => target -> 1
-    })(merge)
+    def withParUses = synth(Attr.ParUses) {
+      case api.ParRef(x) ~@ _ => Map(x -> 1)
+    }
 
     /** Counts all variable assignments contained in the current node and its children. */
-    def withAssignments = synthesize(Attr.group {
-      case api.VarMut(lhs, _) => lhs -> 1
-    })(merge)
+    def withAssigns = synth(Attr.Assigns) {
+      case api.VarMut(x, _) ~@ _ => Map(x -> 1)
+    }
 
     /** Counts all method calls contained in the current node and its children. */
-    def withDefCalls = synthesize(Attr.group {
-      case api.DefCall(_, method, _, _) => method -> 1
-    })(merge)
+    def withDefCalls = synth(Attr.DefCalls) {
+      case api.DefCall(_, m, _, _) ~@ _ => Map(m -> 1)
+    }
 
     /** Converts a partial function over trees to a partial function over attributed trees. */
     private def forgetful[X, Acc, Inh, Syn](pf: Tree =?> X): Attr[Acc, Inh, Syn] =?> X = {
@@ -740,7 +761,89 @@ trait Transversers { this: AST =>
     type Syn = S
   }
 
+  @implicitNotFound("could not lookup key ${K} in ${M}")
+  trait Lookup[K, V, M] extends (M => V)
+  object Lookup extends LookupAcc
+
+  trait LookupAcc extends LookupInh {
+    implicit def acc[K, V, A <: HList, I, S](
+      implicit sel: Selector.Aux[A, K, V]
+    ): Lookup[K, V, Attr[A, I, S]] = new Lookup[K, V, Attr[A, I, S]] {
+      def apply(attr: Attr[A, I, S]) = sel(attr.acc)
+    }
+  }
+
+  trait LookupInh extends LookupSyn {
+    implicit def inh[K, V, A, I <: HList, S](
+      implicit sel: Selector.Aux[I, K, V]
+    ): Lookup[K, V, Attr[A, I, S]] = new Lookup[K, V, Attr[A, I, S]] {
+      def apply(attr: Attr[A, I, S]) = sel(attr.inh)
+    }
+  }
+
+  trait LookupSyn {
+    implicit def syn[K, V, A, I, S <: HList](
+      implicit sel: Selector.Aux[S, K, V]
+    ): Lookup[K, V, Attr[A, I, S]] = new Lookup[K, V, Attr[A, I, S]] {
+      def apply(attr: Attr[A, I, S]) = sel(attr.syn)
+    }
+  }
+
+  // scalastyle:off
+
+  /** Attribute definition. */
+  class ~@[K, V](val init: FieldType[K, V])(implicit val M: Monoid[V]) {
+    def apply[A <: HList](attrs: A)(
+      implicit sel: Selector.Aux[A, K, V]
+    ): V = sel(attrs)
+
+    def apply[A, I, S](attr: Attr[A, I, S])(
+      implicit lookup: Lookup[K, V, Attr[A, I, S]]
+    ): V = lookup(attr)
+
+    def unapply[A, I, S](attr: Attr[A, I, S])(
+      implicit lookup: Lookup[K, V, Attr[A, I, S]]
+    ): Option[V] = Some(lookup(attr))
+  }
+
+  /** Single attribute extraction. */
+  object ~@ {
+    def apply[K, V: Monoid](init: FieldType[K, V]): K ~@ V = new ~@(init)
+    def unapply[A, I, S](attr: Attr[A, I, S]): Option[(u.Tree, Attr[A, I, S])] =
+      Some(attr.tree, attr)
+  }
+
+  /** Multiple attributes extraction. */
+  object ~@* {
+    def unapply[A, I, S](attr: Attr[A, I, S]): Option[(u.Tree, Seq[Attr[A, I, S]])] =
+      Some(attr.tree, Stream.continually(attr))
+  }
+
+  // scalastyle:on
+
   object Attr {
+    private val treeOpt = Option.empty[u.Tree]
+    private val bindMap = Map.empty[u.TermSymbol, u.ValDef]
+    private val termUse = Map.empty[u.TermSymbol, Int].withDefaultValue(0)
+
+    val Root       = ~@('root       ->> treeOpt)(first(None))
+    val Parent     = ~@('parent     ->> treeOpt)(last(None))
+    val Ancestors  = ~@('ancestors  ->> Vector.empty[u.Tree])
+    val Owner      = ~@('owner      ->> api.Owner.encl)(last(api.Owner.encl))
+    val OwnerChain = ~@('ownerChain ->> Vector(api.Owner.encl))
+    val Defs       = ~@('defs       ->> Map.empty[u.TermSymbol, u.Tree])(overwrite)
+    val BindDefs   = ~@('bindDefs   ->> bindMap)(overwrite)
+    val ValDefs    = ~@('valDefs    ->> bindMap)(overwrite)
+    val VarDefs    = ~@('varDefs    ->> bindMap)(overwrite)
+    val ParDefs    = ~@('parDefs    ->> bindMap)(overwrite)
+    val DefDefs    = ~@('defDefs    ->> Map.empty[u.MethodSymbol, u.DefDef])(overwrite)
+    val Uses       = ~@('uses       ->> termUse)(merge)
+    val BindUses   = ~@('bindUses   ->> termUse)(merge)
+    val ValUses    = ~@('valUses    ->> termUse)(merge)
+    val VarUses    = ~@('varUses    ->> termUse)(merge)
+    val ParUses    = ~@('parUses    ->> termUse)(merge)
+    val Assigns    = ~@('assigns    ->> termUse)(merge)
+    val DefCalls   = ~@('defCalls   ->> Map.empty[u.MethodSymbol, Int].withDefaultValue(0))(merge)
 
     /** Constructor that discards accumulated attributes. */
     def apply[I, S](tree: Tree, inh: I, syn: S): Attr[HNil, I, S] =

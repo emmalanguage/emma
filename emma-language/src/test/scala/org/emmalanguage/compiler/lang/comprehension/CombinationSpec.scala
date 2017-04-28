@@ -48,7 +48,7 @@ class CombinationSpec extends BaseCompilerSpec {
     ).compose(_.tree)
 
   def applyOnce(rule: (u.Symbol, u.Tree) => Option[u.Tree]): u.Expr[Any] => u.Tree = {
-    val transform = api.TopDown.withOwner.transformWith {
+    val transform = api.TopDown.withOwner().transformWith {
       case Attr.inh(tree, owner :: _) => rule(owner, tree).getOrElse(tree)
     }.andThen(_.tree)
 

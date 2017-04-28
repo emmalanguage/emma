@@ -58,7 +58,7 @@ private[comprehension] trait Combination extends Common {
      * - An ANF tree with no mock-comprehensions.
      */
     val transform: u.Tree => u.Tree =
-      api.TopDown.withOwner.transformWith {
+      api.TopDown.withOwner().transformWith {
         case Attr.inh(comp @ cs.Comprehension(_, _), owner :: _) =>
           combine(owner, comp)
       }.andThen(_.tree)

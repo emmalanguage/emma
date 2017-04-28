@@ -19,7 +19,7 @@ package util
 import cats.Eq
 import shapeless._
 
-import scala.collection.SortedSet
+import scala.collection.immutable.SortedSet
 
 /** Missing instances of [[cats.Eq]]. */
 trait Equivalences {

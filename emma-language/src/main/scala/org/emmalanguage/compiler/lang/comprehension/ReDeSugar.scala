@@ -65,7 +65,7 @@ private[comprehension] trait ReDeSugar extends Common {
         arg -> core.DefCall(tgt, app, argss = Seq(Seq(core.ValRef(arg))))
       }
 
-      api.TopDown.withOwner.accumulate(Attr.group {
+      api.TopDown.withOwner().accumulate(Attr.group {
         // Accumulate a LHS -> (arg, body) Map from lambdas
         case core.ValDef(lhs, core.Lambda(_, Seq(core.ParDef(arg, _)), body)) =>
           lhs -> (arg, body)
