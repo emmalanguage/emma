@@ -16,6 +16,7 @@
 package org.emmalanguage
 package api
 
+import alg.Alg
 import compiler.RuntimeCompiler
 import io.csv._
 import io.parquet._
@@ -46,10 +47,10 @@ class FlinkDataSet[A: Meta] private[api]
   // Structural recursion
   // -----------------------------------------------------
 
-  override def fold[B: Meta](z: B)(s: A => B, u: (B, B) => B): B = {
-    val collected = rep.map(x => s(x)).reduce(u).collect()
+  override def fold[B: Meta](alg: Alg[A, B]): B = {
+    val collected = rep.map(x => alg.init(x)).reduce(alg.plus).collect()
     assert(collected.size <= 1)
-    if (collected.isEmpty) z
+    if (collected.isEmpty) alg.zero
     else collected.head
   }
 
