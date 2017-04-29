@@ -37,11 +37,7 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkA
   override lazy val env = flinkEnv
 
   override lazy val backendPipeline: u.Tree => u.Tree =
-    Function.chain(Seq(
-      Comprehension.desugar(API.DataBag.sym),
-      Backend.specialize(FlinkAPI),
-      addContext
-    ))
+    Backend.specialize(FlinkAPI)
 
   // --------------------------------------------------------------------------
   // Distributed collection conversion

@@ -55,8 +55,10 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
     compiler.pipeline(typeCheck = true)(
       checkValid,
       Core.lift,
+      Optimizations.foldFusion,
       Comprehension.combine,
-      backendPipeline
+      backendPipeline,
+      addContext
     ).compose(_.tree)
 
   lazy val addContext: u.Tree => u.Tree = tree => {

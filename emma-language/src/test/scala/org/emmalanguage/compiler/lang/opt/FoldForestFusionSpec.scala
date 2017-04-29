@@ -18,6 +18,7 @@ package compiler.lang.opt
 
 import api._
 import compiler.BaseCompilerSpec
+import compiler.ir.ComprehensionSyntax._
 
 import scala.util.Random
 
@@ -44,6 +45,7 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
   //@formatter:off
   val rand               = new Random()
   val rands              = DataBag(Seq.fill(100)(rand.nextInt()))
+  val edges              = rands.map(x => (x, x + 1))
 
   val `square`           = (x: Int) => x * x
   val `is prime`         = (_: Int) => rand.nextBoolean()
@@ -58,6 +60,8 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
   val `_ > 0.5`          = (x: Double) => x > 0.5
   val `_ <= 0.5`         = (x: Double) => x <= 0.5
   val `_.abs min _.abs`  = (x: Int, y: Int) => x.abs min y.abs
+  val `_ < _`            = (x: Int, y: Int) => x < y
+  val `_ == _`           = (x: Int, y: Int) => x == y
   //@formatter:on
 
   "banana-fusion" - {
@@ -225,10 +229,105 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
 
       act shouldBe alphaEqTo(exp)
     }
+
+    "with preceding non-linear comprehension" in {
+      val act = testPipeline(Core.lift)(reify {
+        val triangles = for {
+          (x, u) <- edges
+          (y, v) <- edges
+          (z, w) <- edges
+          if `_ < _`(x, u)
+          if `_ < _`(y, v)
+          if `_ < _`(z, w)
+          if `_ == _`(u, y)
+          if `_ == _`(x, z)
+          if `_ == _`(v, w)
+        } yield (x, u, v)
+
+        val r1 = triangles.isEmpty
+        val r2 = triangles.size
+
+        (r1, r2)
+      }.tree)
+
+      val exp = anfPipeline(reify {
+        val alg$Alg2$r1 = alg.Alg2[(Int, Int, Int), Boolean, Long](alg.IsEmpty, alg.Size);
+        val edges$r1: this.edges.type = this.edges;
+        val edges$r2: this.edges.type = this.edges;
+        val edges$r3: this.edges.type = this.edges;
+        val triangles = comprehension[(Int, Int, Int), DataBag]({
+          val check$ifrefutable$1 = generator[(Int, Int), DataBag]({
+            edges$r1
+          });
+          val check$ifrefutable$2 = generator[(Int, Int), DataBag]({
+            edges$r2
+          });
+          val check$ifrefutable$3 = generator[(Int, Int), DataBag]({
+            edges$r3
+          });
+          guard({
+            val x$r1 = check$ifrefutable$1._1;
+            val u = check$ifrefutable$1._2;
+            val `_ < _$r1` : this.`_ < _`.type = this.`_ < _`;
+            val apply$r18 = `_ < _$r1`.apply(x$r1, u);
+            apply$r18
+          });
+          guard({
+            val y = check$ifrefutable$2._1;
+            val v$r1 = check$ifrefutable$2._2;
+            val `_ < _$r2` : this.`_ < _`.type = this.`_ < _`;
+            val apply$r19 = `_ < _$r2`.apply(y, v$r1);
+            apply$r19
+          });
+          guard({
+            val z = check$ifrefutable$3._1;
+            val w$r1 = check$ifrefutable$3._2;
+            val `_ < _$r3` : this.`_ < _`.type = this.`_ < _`;
+            val apply$r20 = `_ < _$r3`.apply(z, w$r1);
+            apply$r20
+          });
+          guard({
+            val u = check$ifrefutable$1._2;
+            val y = check$ifrefutable$2._1;
+            val `_ == _$r1` : this.`_ == _`.type = this.`_ == _`;
+            val apply$r21 = `_ == _$r1`.apply(u, y);
+            apply$r21
+          });
+          guard({
+            val x$r1 = check$ifrefutable$1._1;
+            val z$r1 = check$ifrefutable$3._1;
+            val `_ == _$r2` : this.`_ == _`.type = this.`_ == _`;
+            val apply$r22 = `_ == _$r2`.apply(x$r1, z$r1);
+            apply$r22
+          });
+          guard({
+            val v$r1 = check$ifrefutable$2._2;
+            val w = check$ifrefutable$3._2;
+            val `_ == _$r3` : this.`_ == _`.type = this.`_ == _`;
+            val apply$r23 = `_ == _$r3`.apply(v$r1, w);
+            apply$r23
+          });
+          head[(Int, Int, Int)]({
+            val x$r1 = check$ifrefutable$1._1;
+            val u = check$ifrefutable$1._2;
+            val v$r1 = check$ifrefutable$2._2;
+            val apply$r24 = (x$r1, u, v$r1);
+            apply$r24
+          })
+        });
+        val app$Alg2$r1 = triangles.fold(alg$Alg2$r1);
+        val r1 = app$Alg2$r1._1;
+        val r2 = app$Alg2$r1._2;
+        val apply$r25 = (r1, r2);
+        apply$r25
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
   }
 
   "cata-fusion" - {
-    "of depth one" in {
+    "of depth one" - {
       // Note that without CSE, `this.rands` is considered different in every instance.
       val src = u.reify {
         val rds1 = rands
@@ -241,53 +340,127 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
         res4
       }.tree
 
-      val exp = anfPipeline(reify {
-        val `+/- 5$r1`: this.`+/- 5`.type = this.`+/- 5`
-        val `_ > 0$r2`: this.`_ > 0`.type = this.`_ > 0`
-        val alg$Min$r2 = alg.Min(Ordering.Int)
-        val alg$Sum$r2 = alg.Sum(Numeric.IntIsIntegral)
-        val `is prime$r1`: this.`is prime`.type = this.`is prime`
-        val rds1 = this.rands
-        val rds2 = this.rands
-        val rds3 = this.rands
-        val square$r1: this.square.type = this.square
-        val alg$Count$r2 = alg.Count(`is prime$r1`)
-        val alg$FlatMap$r1 = alg.FlatMap(`+/- 5$r1`, alg$Sum$r2)
-        val alg$WithFilter$r1 = alg.WithFilter(`_ > 0$r2`, alg$Min$r2)
-        val alg$Map$r1 = alg.Map(square$r1, alg$Count$r2)
-        val app$Min$r2 = rds2 fold alg$WithFilter$r1
-        val res3 = rds3 fold alg$FlatMap$r1
-        val res1 = rds1 fold alg$Map$r1
-        val res2 = app$Min$r2.get
-        val res4 = (res1, res2, res3)
-        res4
-      })
+      "in Emma LNF" in {
+        val exp = anfPipeline(reify {
+          val `+/- 5$r1`: this.`+/- 5`.type = this.`+/- 5`
+          val `_ > 0$r2`: this.`_ > 0`.type = this.`_ > 0`
+          val alg$Min$r2 = alg.Min(Ordering.Int)
+          val alg$Sum$r2 = alg.Sum(Numeric.IntIsIntegral)
+          val `is prime$r1`: this.`is prime`.type = this.`is prime`
+          val rds1 = this.rands
+          val rds2 = this.rands
+          val rds3 = this.rands
+          val square$r1: this.square.type = this.square
+          val alg$Count$r2 = alg.Count(`is prime$r1`)
+          val alg$FlatMap$r1 = alg.FlatMap(`+/- 5$r1`, alg$Sum$r2)
+          val alg$WithFilter$r1 = alg.WithFilter(`_ > 0$r2`, alg$Min$r2)
+          val alg$Map$r1 = alg.Map(square$r1, alg$Count$r2)
+          val app$Min$r2 = rds2 fold alg$WithFilter$r1
+          val res3 = rds3 fold alg$FlatMap$r1
+          val res1 = rds1 fold alg$Map$r1
+          val res2 = app$Min$r2.get
+          val res4 = (res1, res2, res3)
+          res4
+        })
 
-      testPipeline(Core.anf)(src) shouldBe alphaEqTo(exp)
+        testPipeline(Core.anf)(src) shouldBe alphaEqTo(exp)
+      }
+
+      "in Emma Core" in {
+        val exp = anfPipeline(reify {
+          val `+/- 5$r3` : this.`+/- 5`.type = this.`+/- 5`
+          val `_ > 0$r4` : this.`_ > 0`.type = this.`_ > 0`
+          val alg$Min$r3 = alg.Min(scala.math.Ordering.Int)
+          val alg$Sum$r3 = alg.Sum(scala.math.Numeric.IntIsIntegral)
+          val `is prime$r3` : this.`is prime`.type = this.`is prime`
+          val rds1 = this.rands
+          val rds2 = this.rands
+          val rds3 = this.rands
+          val square$r3: this.square.type = this.square
+          val alg$Count$r3 = alg.Count(`is prime$r3`)
+          val alg$WithFilter$r2 = alg.WithFilter(`_ > 0$r4`, alg$Min$r3)
+          val fun$FlatMap$r1 = (x$r6: scala.Int) => {
+            val xs$r1 = comprehension[scala.Int, DataBag]({
+              val x$r12 = generator[scala.Int, DataBag]({
+                val x$r13 = `+/- 5$r3`(x$r6)
+                x$r13
+              })
+              head[scala.Int]({
+                x$r12
+              })
+            })
+            xs$r1
+          }
+          val alg$FlatMap$r2 = alg.FlatMap(fun$FlatMap$r1, alg$Sum$r3)
+          val alg$Map$r2 = alg.Map(square$r3, alg$Count$r3)
+          val app$Min$r3 = rds2.fold(alg$WithFilter$r2)
+          val res1 = rds1.fold(alg$Map$r2)
+          val res2 = app$Min$r3.get
+          val res3 = rds3.fold(alg$FlatMap$r2)
+          val res4 = (res1, res2, res3)
+          res4
+        })
+
+        testPipeline(Core.lift)(src) shouldBe alphaEqTo(exp)
+      }
     }
 
-    "of depth two" in {
+    "of depth two" - {
       val src = u.reify {
         rands.withFilter(`_ > 0`).map(`x => x * x`).sum
       }.tree
 
-      val exp = anfPipeline(reify {
-        val `_ > 0$r3`: this.`_ > 0`.type = this.`_ > 0`
-        val alg$Sum$r3 = alg.Sum(Numeric.IntIsIntegral)
-        val rands$r5: this.rands.type = this.rands
-        val `x => x * x$r1`: this.`x => x * x`.type = this.`x => x * x`
-        val alg$Map$r2 = alg.Map(`x => x * x$r1`, alg$Sum$r3)
-        val alg$WithFilter$r2 = alg.WithFilter(`_ > 0$r3`, alg$Map$r2)
-        val sum$r3 = rands$r5 fold alg$WithFilter$r2
-        sum$r3
-      })
+      "in Emma LNF" in {
+        val exp = anfPipeline(reify {
+          val `_ > 0$r3`: this.`_ > 0`.type = this.`_ > 0`
+          val alg$Sum$r3 = alg.Sum(Numeric.IntIsIntegral)
+          val rands$r5: this.rands.type = this.rands
+          val `x => x * x$r1`: this.`x => x * x`.type = this.`x => x * x`
+          val alg$Map$r2 = alg.Map(`x => x * x$r1`, alg$Sum$r3)
+          val alg$WithFilter$r2 = alg.WithFilter(`_ > 0$r3`, alg$Map$r2)
+          val sum$r3 = rands$r5 fold alg$WithFilter$r2
+          sum$r3
+        })
 
-      testPipeline(Core.anf)(src) shouldBe alphaEqTo(exp)
+        testPipeline(Core.anf)(src) shouldBe alphaEqTo(exp)
+      }
+
+      "in Emma Core" in {
+        val exp = anfPipeline(reify {
+          val `_ > 0$r1` : this.`_ > 0`.type = this.`_ > 0`
+          val alg$Sum$r1 = alg.Sum(Numeric.IntIsIntegral)
+          val rands$r1: this.rands.type = this.rands
+          val `x => x * x$r1` : this.`x => x * x`.type = this.`x => x * x`
+          val fun$FlatMap$r1 = (x$r1: scala.Int) => {
+            val ss$1 = Seq(x$r1)
+            val xs$1 = DataBag(ss$1)
+            val xs$r1 = comprehension[scala.Int, DataBag]({
+              val x$r2 = generator[Int, DataBag]({
+                xs$1
+              })
+              guard({
+                val x$r3 = `_ > 0$r1`.apply(x$r2)
+                x$r3
+              })
+              head[scala.Int]({
+                val x$r4 = `x => x * x$r1`.apply(x$r2)
+                x$r4
+              })
+            })
+            xs$r1
+          }
+          val alg$FlatMap$r1 = alg.FlatMap(fun$FlatMap$r1, alg$Sum$r1)
+          val sum$r1 = rands$r1.fold[scala.Int](alg$FlatMap$r1)
+          sum$r1
+        })
+
+        testPipeline(Core.lift)(src) shouldBe alphaEqTo(exp)
+      }
     }
   }
 
   "multi-layer fusion" - {
-    "without data dependencies" in {
+    "without data dependencies" - {
       val src = u.reify {
         /* -- */ val rands = this.rands
         /*  `-- */ val squares = rands.map(`x => x * x`)
@@ -321,10 +494,11 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
         apply$r47
       })
 
-      testPipeline(Core.anf)(src) shouldBe alphaEqTo(exp)
+      "in Emma LNF" in (testPipeline(Core.anf)(src) shouldBe alphaEqTo(exp))
+      "in Emma Core" in (testPipeline(Core.lift)(src) shouldBe alphaEqTo(exp))
     }
 
-    "with data dependencies" in {
+    "with data dependencies" - {
       // Note that only `min` and `max` were fused,
       // resp. `map` and the two `counts` were squashed below.
       val src = u.reify {
@@ -367,7 +541,8 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
         apply$r49
       })
 
-      testPipeline(Core.anf)(src) shouldBe alphaEqTo(exp)
+      "in Emma LNF" in (testPipeline(Core.anf)(src) shouldBe alphaEqTo(exp))
+      "in Emma Core" in (testPipeline(Core.lift)(src) shouldBe alphaEqTo(exp))
     }
   }
 }
