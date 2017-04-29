@@ -31,6 +31,7 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
     pipeline()(
       LibSupport.expand,
       Core.lift,
+      Optimizations.foldFusion,
       Backend.addCacheCalls,
       Comprehension.combine,
       Backend.specialize(FlinkAPI),

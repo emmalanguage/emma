@@ -31,6 +31,7 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler with SparkCompil
     pipeline()(
       LibSupport.expand,
       Core.lift,
+      Optimizations.foldFusion,
       Backend.addCacheCalls,
       Comprehension.combine,
       Backend.specialize(SparkAPI),
