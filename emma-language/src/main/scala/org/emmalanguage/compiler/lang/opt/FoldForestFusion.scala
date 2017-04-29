@@ -26,6 +26,7 @@ import util.Graphs._
 import shapeless._
 
 import scala.collection.Map
+import scala.collection.SortedMap
 import scala.collection.breakOut
 import scalaz.Tree
 
@@ -103,13 +104,15 @@ private[compiler] trait FoldForestFusion extends Common {
       //@formatter:on
     )
 
+    private val ordTermSymbol = Ordering.by((s: u.TermSymbol) => s.name.toString)
+
     /** Constructs an index from a sequence of key-value pairs. */
     private def mkIndex(elems: (u.TermSymbol, u.Tree)*): Index =
-      Map(elems: _*)
+      SortedMap(elems: _*)(ordTermSymbol)
 
     /** Turns a sequence of values into an index (i.e., a Map from LHS to RHS). */
     private def lhs2rhs(vals: Seq[u.ValDef]): Index =
-      vals.collect { case core.ValDef(lhs, rhs) => lhs -> rhs } (breakOut)
+      mkIndex(vals.collect { case core.ValDef(lhs, rhs) => lhs -> rhs }: _*)
 
     /** Constructs a `xs.fold(alg)`. */
     @inline private def foldAlg(xs: Option[u.Tree], B: u.Type, alg: u.TermSymbol): u.Tree =
@@ -518,7 +521,7 @@ private[compiler] trait FoldForestFusion extends Common {
             // ...
             // val x$N = app$AlgN$j._N
             case _ =>
-              val cs = children
+              val cs = children.sortBy(_._1)(ordTermSymbol) // order the children sequence
               val n = cs.size
 
               val mod = productAlgs(n)

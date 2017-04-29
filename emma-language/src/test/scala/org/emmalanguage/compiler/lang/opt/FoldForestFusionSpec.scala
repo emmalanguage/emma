@@ -27,28 +27,42 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
   import compiler._
   import universe.reify
   import UniverseImplicits._
-  import Core.{Lang => core}
 
-  val testPipeline: u.Tree => u.Tree =
+  def testPipeline(prefix: u.Tree => u.Tree): u.Tree => u.Tree =
     pipeline(typeCheck = true)(
-      Core.anf,
+      prefix,
       tree => {
         val cfg = CFG.graph(tree)
         time(FoldFusion.foldForestFusion(cfg)(tree), "foldForestFusion")
       },
-      Core.dce)
+      Core.dce
+    )
 
-  def defCalls(tree: u.Tree) = tree.collect {
-    case core.DefCall(_, method, _, _) => method
-  }
+  val anfPipeline: u.Expr[Any] => u.Tree =
+    pipeline(typeCheck = true)(Core.anf).compose(_.tree)
 
-  val rand    = new Random()
-  val rands   = DataBag(Seq.fill(100)(rand.nextInt()))
-  val isPrime = (_: Int) => rand.nextBoolean() // Dummy function
+  //@formatter:off
+  val rand               = new Random()
+  val rands              = DataBag(Seq.fill(100)(rand.nextInt()))
 
-  "fusion of fold trees" - {
-    "one-layer banana-fusion" in {
-      val fused = testPipeline(reify {
+  val `square`           = (x: Int) => x * x
+  val `is prime`         = (_: Int) => rand.nextBoolean()
+  val `_ > 0`            = (x: Int) => x > 0
+  val `_ < 0`            = (x: Int) => x < 0
+  val `_ != 0`           = (x: Int) => x != 0
+  val `+/- 5`            = (x: Int) => DataBag(x - 5 to x + 5)
+  val `x => x * x`       = (x: Int) => x * x
+  val `_ + 1`            = (x: Int) => x + 1
+  val `_ % 2 == 0`       = (x: Int) => x % 2 == 0
+  val `_ * _ % 5`        = (x: Int, y: Int) => x * y % 5
+  val `_ > 0.5`          = (x: Double) => x > 0.5
+  val `_ <= 0.5`         = (x: Double) => x <= 0.5
+  val `_.abs min _.abs`  = (x: Int, y: Int) => x.abs min y.abs
+  //@formatter:on
+
+  "banana-fusion" - {
+    "of all algebra types" in {
+      val act = testPipeline(Core.anf)(reify {
         val rands = this.rands
         (
           rands.isEmpty,
@@ -58,99 +72,302 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
           rands.max,
           rands.sum,
           rands.product,
-          rands.count(_ % 2 == 0),
-          rands.exists(_ < 0),
-          rands.forall(_ != 0),
-          rands.find(_ > 0),
+          rands.count(`_ % 2 == 0`),
+          rands.exists(`_ < 0`),
+          rands.forall(`_ != 0`),
+          rands.find(`_ > 0`),
           rands.bottom(10),
           rands.top(10),
           rands.sample(10),
-          rands.reduce(0)(_ * _ % 5),
-          rands.reduceOption(_.abs min _.abs)
+          rands.reduce(0)(`_ * _ % 5`),
+          rands.reduceOption(`_.abs min _.abs`)
         )
       }.tree)
 
-      val calls = defCalls(fused)
-      calls.count(API.DataBag.foldOps) should be (1)
-      calls.count(API.DataBag.monadOps) should be (0)
-      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold1
-    }
-
-    "one-layer cata-fusion" in {
-      // Note that without CSE, `this.rands` is considered different in every instance.
-      val fused = testPipeline(reify {
-        val sqSum = rands.map(x => x * x).sum
-        val minPos = rands.withFilter(_ > 0).min
-        val nearPrimes = rands.flatMap(x => DataBag(x - 5 to x + 5)).count(isPrime)
-        (sqSum, minPos, nearPrimes)
-        sqSum
-      }.tree)
-
-      val calls = defCalls(fused)
-      calls.count(API.DataBag.foldOps) should be (1)
-      calls.count(API.DataBag.monadOps) should be (0)
-      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold1
-    }
-
-    "two-layer banana-fusion" in {
-      val fused = testPipeline(reify {
+      val exp = anfPipeline(reify {
+        val `_ != 0$r1`: this.`_ != 0`.type = this.`_ != 0`
+        val `_ > 0$r1`: this.`_ > 0`.type = this.`_ > 0`
+        val `_ < 0$r1`: this.`_ < 0`.type = this.`_ < 0`
+        val `_ % 2 == 0$r1`: this.`_ % 2 == 0`.type = this.`_ % 2 == 0`
+        val `_ * _ % 5$r1`: this.`_ * _ % 5`.type = this.`_ * _ % 5`
+        val `_.abs min _.abs$r1`: this.`_.abs min _.abs`.type = this.`_.abs min _.abs`
+        val alg$Bottom$r1 = alg.Bottom(10, Ordering.Int)
+        val alg$Max$r1 = alg.Max(Ordering.Int)
+        val alg$Min$r1 = alg.Min(Ordering.Int)
+        val alg$Product$r1 = alg.Product(Numeric.IntIsIntegral)
+        val alg$Sample$r1 = alg.Sample[Int](10)
+        val alg$Sum$r1 = alg.Sum(Numeric.IntIsIntegral)
+        val alg$Top$r1 = alg.Top(10, Ordering.Int)
         val rands = this.rands
-        val squares = rands.map(x => x * x)
-        val sqSum = squares.sum
-        val sqPrimes = squares.map(_ + 1).count(isPrime)
-        val minPos = rands.withFilter(_ > 0).min
-        (sqSum, sqPrimes, minPos)
-      }.tree)
+        val alg$Count$r1 = alg.Count(`_ % 2 == 0$r1`)
+        val alg$Exists$r1 = alg.Exists(`_ < 0$r1`)
+        val alg$Find$r1 = alg.Find(`_ > 0$r1`)
+        val alg$Forall$r1 = alg.Forall(`_ != 0$r1`)
+        val alg$Reduce$r1 = alg.Reduce(0, `_ * _ % 5$r1`)
+        val alg$ReduceOpt$r1 = alg.ReduceOpt(`_.abs min _.abs$r1`)
+        val alg$Alg16$r1 = alg.Alg16(
+          alg$Max$r1, alg$Min$r1, alg$Sample$r1, alg$Bottom$r1, alg$Count$r1, alg$Exists$r1, alg$Find$r1,
+          alg$Forall$r1, alg.IsEmpty, alg.NonEmpty, alg$Product$r1, alg$Reduce$r1, alg$ReduceOpt$r1, alg.Size,
+          alg$Sum$r1, alg$Top$r1)
+        val app$Alg16$r1 = rands fold alg$Alg16$r1
+        val app$Max$r1 = app$Alg16$r1._1
+        val app$Min$r1 = app$Alg16$r1._2
+        val app$Sample$r1 = app$Alg16$r1._3
+        val bottom$r1 = app$Alg16$r1._4
+        val count$r1 = app$Alg16$r1._5
+        val exists$r1 = app$Alg16$r1._6
+        val find$r1 = app$Alg16$r1._7
+        val forall$r1 = app$Alg16$r1._8
+        val isEmpty$r1 = app$Alg16$r1._9
+        val nonEmpty$r1 = app$Alg16$r1._10
+        val product$r1 = app$Alg16$r1._11
+        val reduce$r1 = app$Alg16$r1._12
+        val reduceOption$r1 = app$Alg16$r1._13
+        val size$r1 = app$Alg16$r1._14
+        val sum$r1 = app$Alg16$r1._15
+        val top$r1 = app$Alg16$r1._16
+        val max$r1 = app$Max$r1.get
+        val min$r1 = app$Min$r1.get
+        val sample$r1 = app$Sample$r1._2
+        val apply$r1 = (
+          isEmpty$r1, nonEmpty$r1, size$r1, min$r1, max$r1, sum$r1, product$r1, count$r1, exists$r1,
+          forall$r1, find$r1, bottom$r1, top$r1, sample$r1, reduce$r1, reduceOption$r1)
+        apply$r1
+      })
 
-      val calls = defCalls(fused)
-      calls.count(API.DataBag.foldOps) should be (1)
-      calls.count(API.DataBag.monadOps) should be (0)
-      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold1
+      act shouldBe alphaEqTo(exp)
     }
 
-    "two-layer cata-fusion" in {
-      val fused = testPipeline(reify {
-        rands.withFilter(_ > 0).map(x => x * x).sum
-      }.tree)
-
-      val calls = defCalls(fused)
-      calls.count(API.DataBag.foldOps) should be (1)
-      calls.count(API.DataBag.monadOps) should be (0)
-      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold1
-    }
-
-    "preserving data dependencies" in {
-      // Note that only `min` and `max` were fused,
-      // resp. `map` and `count` were squashed below.
-      val fused = testPipeline(reify {
-        val rands = this.rands
-        val min = rands.min
-        val max = rands.max
-        val range = (max - min).toDouble
-        val scaled = rands.map(x => (x - min) / range)
-        scaled.count(_ <= 0.5)
-      }.tree)
-
-      val calls = defCalls(fused)
-      calls.count(API.DataBag.foldOps) should be (2)
-      calls.count(API.DataBag.monadOps) should be (0)
-      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold1
-    }
-
-    "more than 22 independent folds" in {
+    "of more than 22 independent folds" in {
       import universe._
       // More than 22 folds can still be fused via nested tuples.
-      val fused = testPipeline(q"""
+      val act = testPipeline(Core.anf)(q"""
+        val id = (x: Int) => x
+        val sum  = (x: Int, y: Int) => scala.math.Numeric.IntIsIntegral.plus(x, y)
         val nums = org.emmalanguage.api.DataBag(1 to 100)
-        val id   = identity[Int] _
-        val sum  = implicitly[Numeric[Int]].plus _
-        Seq(..${for (i <- 1 to 25) yield q"nums.fold($i)(id, sum)"})
+        ..${for (i <- 1 to 25) yield q"val ${u.TermName(f"res$i%02d")} = nums.fold($i)(id, sum)"}
+        Seq(..${for (i <- 1 to 25) yield u.Ident(f"res$i%02d")})
       """)
 
-      val calls = defCalls(fused)
-      calls.count(API.DataBag.foldOps) should be (1)
-      calls.count(API.DataBag.monadOps) should be (0)
-      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold1
+      val exp = anfPipeline(reify {
+        val id = (x: Int) => {
+          x
+        }
+        val intWrapper$r1 = Predef intWrapper 1
+        val sum = (x$r1: Int, y: Int) => {
+          val plus$r1 = Numeric.IntIsIntegral.plus(x$r1, y)
+          plus$r1
+        }
+        val alg$fold$r1 = alg.Fold(1, id, sum)
+        val alg$fold$r10 = alg.Fold(10, id, sum)
+        val alg$fold$r11 = alg.Fold(11, id, sum)
+        val alg$fold$r12 = alg.Fold(12, id, sum)
+        val alg$fold$r13 = alg.Fold(13, id, sum)
+        val alg$fold$r14 = alg.Fold(14, id, sum)
+        val alg$fold$r15 = alg.Fold(15, id, sum)
+        val alg$fold$r16 = alg.Fold(16, id, sum)
+        val alg$fold$r17 = alg.Fold(17, id, sum)
+        val alg$fold$r18 = alg.Fold(18, id, sum)
+        val alg$fold$r19 = alg.Fold(19, id, sum)
+        val alg$fold$r2 = alg.Fold(2, id, sum)
+        val alg$fold$r20 = alg.Fold(20, id, sum)
+        val alg$fold$r21 = alg.Fold(21, id, sum)
+        val alg$fold$r22 = alg.Fold(22, id, sum)
+        val alg$fold$r23 = alg.Fold(23, id, sum)
+        val alg$fold$r24 = alg.Fold(24, id, sum)
+        val alg$fold$r25 = alg.Fold(25, id, sum)
+        val alg$fold$r3 = alg.Fold(3, id, sum)
+        val alg$fold$r4 = alg.Fold(4, id, sum)
+        val alg$fold$r5 = alg.Fold(5, id, sum)
+        val alg$fold$r6 = alg.Fold(6, id, sum)
+        val alg$fold$r7 = alg.Fold(7, id, sum)
+        val alg$fold$r8 = alg.Fold(8, id, sum)
+        val alg$fold$r9 = alg.Fold(9, id, sum)
+        val to$r1 = intWrapper$r1 to 100
+        val alg$Alg22$r1 = alg.Alg22(
+          alg$fold$r1, alg$fold$r2, alg$fold$r3, alg$fold$r4, alg$fold$r5, alg$fold$r6, alg$fold$r7, alg$fold$r8,
+          alg$fold$r9, alg$fold$r10, alg$fold$r11, alg$fold$r12, alg$fold$r13, alg$fold$r14, alg$fold$r15,
+          alg$fold$r16, alg$fold$r17, alg$fold$r18, alg$fold$r19, alg$fold$r20, alg$fold$r21, alg$fold$r22)
+        val nums = DataBag(to$r1)
+        val alg$Alg4$r1 = alg.Alg4(alg$Alg22$r1, alg$fold$r23, alg$fold$r24, alg$fold$r25)
+        val app$Alg4$r1 = nums fold alg$Alg4$r1
+        val app$Alg22$r1 = app$Alg4$r1._1
+        val res23 = app$Alg4$r1._2
+        val res24 = app$Alg4$r1._3
+        val res25 = app$Alg4$r1._4
+        val res01 = app$Alg22$r1._1
+        val res02 = app$Alg22$r1._2
+        val res03 = app$Alg22$r1._3
+        val res04 = app$Alg22$r1._4
+        val res05 = app$Alg22$r1._5
+        val res06 = app$Alg22$r1._6
+        val res07 = app$Alg22$r1._7
+        val res08 = app$Alg22$r1._8
+        val res09 = app$Alg22$r1._9
+        val res10 = app$Alg22$r1._10
+        val res11 = app$Alg22$r1._11
+        val res12 = app$Alg22$r1._12
+        val res13 = app$Alg22$r1._13
+        val res14 = app$Alg22$r1._14
+        val res15 = app$Alg22$r1._15
+        val res16 = app$Alg22$r1._16
+        val res17 = app$Alg22$r1._17
+        val res18 = app$Alg22$r1._18
+        val res19 = app$Alg22$r1._19
+        val res20 = app$Alg22$r1._20
+        val res21 = app$Alg22$r1._21
+        val res22 = app$Alg22$r1._22
+        val apply$r3 = Seq(
+          res01, res02, res03, res04, res05, res06, res07, res08, res09, res10, res11, res12, res13, res14, res15,
+          res16, res17, res18, res19, res20, res21, res22, res23, res24, res25)
+        apply$r3
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+  }
+
+  "cata-fusion" - {
+    "of depth one" in {
+      // Note that without CSE, `this.rands` is considered different in every instance.
+      val src = u.reify {
+        val rds1 = rands
+        val rds2 = rands
+        val rds3 = rands
+        val res1 = rds1.map(`square`).count(`is prime`)
+        val res2 = rds2.withFilter(`_ > 0`).min
+        val res3 = rds3.flatMap(`+/- 5`).sum
+        val res4 = (res1, res2, res3)
+        res4
+      }.tree
+
+      val exp = anfPipeline(reify {
+        val `+/- 5$r1`: this.`+/- 5`.type = this.`+/- 5`
+        val `_ > 0$r2`: this.`_ > 0`.type = this.`_ > 0`
+        val alg$Min$r2 = alg.Min(Ordering.Int)
+        val alg$Sum$r2 = alg.Sum(Numeric.IntIsIntegral)
+        val `is prime$r1`: this.`is prime`.type = this.`is prime`
+        val rds1 = this.rands
+        val rds2 = this.rands
+        val rds3 = this.rands
+        val square$r1: this.square.type = this.square
+        val alg$Count$r2 = alg.Count(`is prime$r1`)
+        val alg$FlatMap$r1 = alg.FlatMap(`+/- 5$r1`, alg$Sum$r2)
+        val alg$WithFilter$r1 = alg.WithFilter(`_ > 0$r2`, alg$Min$r2)
+        val alg$Map$r1 = alg.Map(square$r1, alg$Count$r2)
+        val app$Min$r2 = rds2 fold alg$WithFilter$r1
+        val res3 = rds3 fold alg$FlatMap$r1
+        val res1 = rds1 fold alg$Map$r1
+        val res2 = app$Min$r2.get
+        val res4 = (res1, res2, res3)
+        res4
+      })
+
+      testPipeline(Core.anf)(src) shouldBe alphaEqTo(exp)
+    }
+
+    "of depth two" in {
+      val src = u.reify {
+        rands.withFilter(`_ > 0`).map(`x => x * x`).sum
+      }.tree
+
+      val exp = anfPipeline(reify {
+        val `_ > 0$r3`: this.`_ > 0`.type = this.`_ > 0`
+        val alg$Sum$r3 = alg.Sum(Numeric.IntIsIntegral)
+        val rands$r5: this.rands.type = this.rands
+        val `x => x * x$r1`: this.`x => x * x`.type = this.`x => x * x`
+        val alg$Map$r2 = alg.Map(`x => x * x$r1`, alg$Sum$r3)
+        val alg$WithFilter$r2 = alg.WithFilter(`_ > 0$r3`, alg$Map$r2)
+        val sum$r3 = rands$r5 fold alg$WithFilter$r2
+        sum$r3
+      })
+
+      testPipeline(Core.anf)(src) shouldBe alphaEqTo(exp)
+    }
+  }
+
+  "multi-layer fusion" - {
+    "without data dependencies" in {
+      val src = u.reify {
+        /* -- */ val rands = this.rands
+        /*  `-- */ val squares = rands.map(`x => x * x`)
+        /*    `-- */ val sqSum = squares.sum
+        /*    `-- */ val sqPrimes = squares.map(`_ + 1`).count(`is prime`)
+        /*  `-- */ val minPos = rands.withFilter(`_ > 0`).min
+        (sqSum, sqPrimes, minPos)
+      }.tree
+
+      val exp = anfPipeline(reify {
+        val `_ > 0$r8` : this.`_ > 0`.type = this.`_ > 0`
+        val `_ + 1$r1` : this.`_ + 1`.type = this.`_ + 1`
+        val alg$Min$r4 = alg.Min(Ordering.Int)
+        val alg$Sum$r6 = alg.Sum(Numeric.IntIsIntegral)
+        val `is prime$r4` : this.`is prime`.type = this.`is prime`
+        val rands = this.rands
+        val `x => x * x$r4` : this.`x => x * x`.type = this.`x => x * x`
+        val alg$Count$r4 = alg.Count(`is prime$r4`)
+        val alg$WithFilter$r4 = alg.WithFilter(`_ > 0$r8`, alg$Min$r4)
+        val alg$Map$r4 = alg.Map(`_ + 1$r1`, alg$Count$r4)
+        val alg$Alg2$r1 = alg.Alg2(alg$Map$r4, alg$Sum$r6)
+        val alg$Map$r5 = alg.Map(`x => x * x$r4`, alg$Alg2$r1)
+        val alg$Alg2$r2 = alg.Alg2(alg$Map$r5, alg$WithFilter$r4)
+        val app$Alg2$r2 = rands.fold(alg$Alg2$r2)
+        val app$Alg2$r1 = app$Alg2$r2._1
+        val app$Min$r4 = app$Alg2$r2._2
+        val minPos = app$Min$r4.get
+        val sqPrimes = app$Alg2$r1._1
+        val sqSum = app$Alg2$r1._2
+        val apply$r47 = (sqSum, sqPrimes, minPos)
+        apply$r47
+      })
+
+      testPipeline(Core.anf)(src) shouldBe alphaEqTo(exp)
+    }
+
+    "with data dependencies" in {
+      // Note that only `min` and `max` were fused,
+      // resp. `map` and the two `counts` were squashed below.
+      val src = u.reify {
+        /* -- */ val rands: this.rands.type = this.rands
+        /*  `-- */ val min = rands.min
+        /*  `-- */ val max = rands.max
+        /*  `-- */ val scaled = rands.map(x => (x - min) / (max - min).toDouble)
+        /*    `-- */ val c1 = scaled.count(`_ <= 0.5`)
+        /*    `-- */ val c2 = scaled.count(`_ > 0.5`)
+        (c1, c2)
+      }.tree
+
+      val exp = anfPipeline(reify {
+        val `_ > 0.5$r1` : this.`_ > 0.5`.type = this.`_ > 0.5`
+        val `_ <= 0.5$r1` : this.`_ <= 0.5`.type = this.`_ <= 0.5`
+        val alg$Max$r2 = alg.Max(Ordering.Int)
+        val alg$Min$r6 = alg.Min(Ordering.Int)
+        val rands: this.rands.type = this.rands
+        val alg$Alg2$r6 = alg.Alg2(alg$Max$r2, alg$Min$r6)
+        val alg$Count$r6 = alg.Count(`_ <= 0.5$r1`)
+        val alg$Count$r7 = alg.Count(`_ > 0.5$r1`)
+        val alg$Alg2$r5 = alg.Alg2(alg$Count$r6, alg$Count$r7)
+        val app$Alg2$r6 = rands.fold(alg$Alg2$r6)
+        val app$Max$r2 = app$Alg2$r6._1
+        val app$Min$r6 = app$Alg2$r6._2
+        val max = app$Max$r2.get
+        val min = app$Min$r6.get
+        val anonfun$r7 = (x: scala.Int) => {
+          val `-$r1` = x - min
+          val `-$r2` = max - min
+          val toDouble$r1 = `-$r2`.toDouble
+          val `/$r1` = `-$r1` / toDouble$r1
+          `/$r1`
+        }
+        val alg$Map$r8 = alg.Map(anonfun$r7, alg$Alg2$r5)
+        val app$Alg2$r5 = rands.fold(alg$Map$r8)
+        val c1 = app$Alg2$r5._1
+        val c2 = app$Alg2$r5._2
+        val apply$r49 = scala.Tuple2(c1, c2)
+        apply$r49
+      })
+
+      testPipeline(Core.anf)(src) shouldBe alphaEqTo(exp)
     }
   }
 }
