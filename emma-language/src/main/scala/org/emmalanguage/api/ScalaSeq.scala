@@ -16,6 +16,7 @@
 package org.emmalanguage
 package api
 
+import alg.Alg
 import io.csv._
 import io.parquet._
 import io.text._
@@ -41,8 +42,8 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
   // Structural recursion
   // -----------------------------------------------------
 
-  override def fold[B: Meta](z: B)(s: A => B, p: (B, B) => B): B =
-    rep.foldLeft(z)((acc, x) => p(s(x), acc))
+  override def fold[B: Meta](alg: Alg[A, B]): B =
+    rep.foldLeft(alg.zero)((acc, x) => alg.plus(alg.init(x), acc))
 
   // -----------------------------------------------------
   // Monad Ops

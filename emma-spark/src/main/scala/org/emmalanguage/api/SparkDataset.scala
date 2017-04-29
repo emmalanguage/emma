@@ -16,6 +16,7 @@
 package org.emmalanguage
 package api
 
+import alg.Alg
 import io.csv._
 import io.parquet._
 
@@ -45,11 +46,11 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
   // Structural recursion
   // -----------------------------------------------------
 
-  override def fold[B: Meta](z: B)(s: A => B, u: (B, B) => B): B =
+  override def fold[B: Meta](alg: Alg[A, B]): B =
     try {
-      rep.map(x => s(x)).reduce(u)
+      rep.map(x => alg.init(x)).reduce(alg.plus)
     } catch {
-      case e: UnsupportedOperationException if e.getMessage == "empty collection" => z
+      case e: UnsupportedOperationException if e.getMessage == "empty collection" => alg.zero
       case e: Throwable => throw e
     }
 
@@ -135,6 +136,12 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
       case e: NoSuchElementException if e.getMessage == "next on empty iterator" => None
       case e: Throwable => throw e
     }
+
+  override def min(implicit o: Ordering[A]): A =
+    reduceOption(o.min).get
+
+  override def max(implicit o: Ordering[A]): A =
+    reduceOption(o.max).get
 
   // -----------------------------------------------------
   // equals and hashCode

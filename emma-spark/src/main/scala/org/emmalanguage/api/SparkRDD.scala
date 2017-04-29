@@ -16,6 +16,7 @@
 package org.emmalanguage
 package api
 
+import alg.Alg
 import io.csv._
 import io.parquet._
 
@@ -48,8 +49,8 @@ class SparkRDD[A: Meta] private[api]
   // Structural recursion
   // -----------------------------------------------------
 
-  override def fold[B: Meta](z: B)(s: A => B, u: (B, B) => B): B =
-    rep.map(x => s(x)).fold(z)(u)
+  override def fold[B: Meta](alg: Alg[A, B]): B =
+    rep.map(x => alg.init(x)).fold(alg.zero)(alg.plus)
 
   // -----------------------------------------------------
   // Monad Ops

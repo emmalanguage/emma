@@ -21,6 +21,8 @@ import ast.AST
 /** Common IR tools. */
 protected[emmalanguage] trait API extends AST {
 
+  import UniverseImplicits._
+
   trait ReflectedSymbol[Symbol <: u.Symbol] {
     def sym: Symbol
 
@@ -28,6 +30,11 @@ protected[emmalanguage] trait API extends AST {
 
     protected def op(name: String): u.MethodSymbol =
       sym.info.member(api.TermName(name)).asMethod
+
+    protected def op(name: String, arities: List[Int]): u.MethodSymbol =
+      sym.info.member(api.TermName(name)).alternatives.collectFirst({
+        case api.DefSym(m) if m.info.paramLists.map(_.size) == arities => m
+      }).get
 
     protected def ann(sym: u.ClassSymbol) =
       u.Annotation(api.Inst(sym.toType, argss = Seq(Seq.empty)))
@@ -75,7 +82,8 @@ protected[emmalanguage] trait API extends AST {
     val union                 = op("union")
     val distinct              = op("distinct")
     // Structural recursion & Folds
-    val fold                  = op("fold")
+    val fold1                 = op("fold", List(1 /*alg*/ , 1 /*meta*/))
+    val fold2                 = op("fold", List(1 /*zero*/ , 2 /*init, plus*/ , 1 /*meta*/))
     val isEmpty               = op("isEmpty")
     val nonEmpty              = op("nonEmpty")
     val reduce                = op("reduce")
@@ -98,7 +106,7 @@ protected[emmalanguage] trait API extends AST {
     val nestOps               = Set(groupBy)
     val boolAlgOps            = Set(union, distinct)
     val foldOps               = Set(
-      fold,
+      fold1, fold2,
       isEmpty, nonEmpty,
       reduce, reduceOption,
       min, max, sum, product,

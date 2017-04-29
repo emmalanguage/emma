@@ -22,18 +22,19 @@ import compiler.BaseCompilerSpec
 import scala.util.Random
 
 /** A spec for the fold-fusion optimization. */
-class FoldFusionSpec extends BaseCompilerSpec {
+class FoldForestFusionSpec extends BaseCompilerSpec {
 
   import compiler._
+  import universe.reify
   import UniverseImplicits._
   import Core.{Lang => core}
 
-  val collapsePipeline: u.Tree => u.Tree =
+  val testPipeline: u.Tree => u.Tree =
     pipeline(typeCheck = true)(
       Core.anf,
       tree => {
         val cfg = CFG.graph(tree)
-        time(Optimizations.foldFusion(cfg)(tree), "fold-fusion")
+        time(FoldFusion.foldForestFusion(cfg)(tree), "foldForestFusion")
       },
       Core.dce)
 
@@ -47,9 +48,10 @@ class FoldFusionSpec extends BaseCompilerSpec {
 
   "fusion of fold trees" - {
     "one-layer banana-fusion" in {
-      val fused = collapsePipeline(u.reify {
+      val fused = testPipeline(reify {
         val rands = this.rands
-        (rands.isEmpty,
+        (
+          rands.isEmpty,
           rands.nonEmpty,
           rands.size,
           rands.min,
@@ -64,79 +66,81 @@ class FoldFusionSpec extends BaseCompilerSpec {
           rands.top(10),
           rands.sample(10),
           rands.reduce(0)(_ * _ % 5),
-          rands.reduceOption(_.abs min _.abs))
-      }.tree.asInstanceOf[u.Tree])
+          rands.reduceOption(_.abs min _.abs)
+        )
+      }.tree)
 
       val calls = defCalls(fused)
       calls.count(API.DataBag.foldOps) should be (1)
       calls.count(API.DataBag.monadOps) should be (0)
-      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold
+      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold1
     }
 
     "one-layer cata-fusion" in {
       // Note that without CSE, `this.rands` is considered different in every instance.
-      val fused = collapsePipeline(u.reify {
+      val fused = testPipeline(reify {
         val sqSum = rands.map(x => x * x).sum
         val minPos = rands.withFilter(_ > 0).min
         val nearPrimes = rands.flatMap(x => DataBag(x - 5 to x + 5)).count(isPrime)
         (sqSum, minPos, nearPrimes)
-      }.tree.asInstanceOf[u.Tree])
+        sqSum
+      }.tree)
 
       val calls = defCalls(fused)
-      calls.count(API.DataBag.foldOps) should be (3)
+      calls.count(API.DataBag.foldOps) should be (1)
       calls.count(API.DataBag.monadOps) should be (0)
-      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold
+      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold1
     }
 
     "two-layer banana-fusion" in {
-      val fused = collapsePipeline(u.reify {
+      val fused = testPipeline(reify {
         val rands = this.rands
         val squares = rands.map(x => x * x)
         val sqSum = squares.sum
         val sqPrimes = squares.map(_ + 1).count(isPrime)
         val minPos = rands.withFilter(_ > 0).min
         (sqSum, sqPrimes, minPos)
-      }.tree.asInstanceOf[u.Tree])
+      }.tree)
 
       val calls = defCalls(fused)
       calls.count(API.DataBag.foldOps) should be (1)
       calls.count(API.DataBag.monadOps) should be (0)
-      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold
+      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold1
     }
 
     "two-layer cata-fusion" in {
-      val fused = collapsePipeline(u.reify {
+      val fused = testPipeline(reify {
         rands.withFilter(_ > 0).map(x => x * x).sum
-      }.tree.asInstanceOf[u.Tree])
+      }.tree)
 
       val calls = defCalls(fused)
       calls.count(API.DataBag.foldOps) should be (1)
       calls.count(API.DataBag.monadOps) should be (0)
-      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold
+      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold1
     }
 
     "preserving data dependencies" in {
       // Note that only `min` and `max` were fused,
       // resp. `map` and `count` were squashed below.
-      val fused = collapsePipeline(u.reify {
+      val fused = testPipeline(reify {
         val rands = this.rands
         val min = rands.min
         val max = rands.max
         val range = (max - min).toDouble
         val scaled = rands.map(x => (x - min) / range)
         scaled.count(_ <= 0.5)
-      }.tree.asInstanceOf[u.Tree])
+      }.tree)
 
       val calls = defCalls(fused)
       calls.count(API.DataBag.foldOps) should be (2)
       calls.count(API.DataBag.monadOps) should be (0)
-      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold
+      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold1
     }
 
     "more than 22 independent folds" in {
       import universe._
       // More than 22 folds can still be fused via nested tuples.
-      val fused = collapsePipeline(q"""
+      val fused = testPipeline(q"""
         val nums = org.emmalanguage.api.DataBag(1 to 100)
         val id   = identity[Int] _
         val sum  = implicitly[Numeric[Int]].plus _
@@ -146,7 +150,7 @@ class FoldFusionSpec extends BaseCompilerSpec {
       val calls = defCalls(fused)
       calls.count(API.DataBag.foldOps) should be (1)
       calls.count(API.DataBag.monadOps) should be (0)
-      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold
+      calls.filter(API.DataBag.foldOps) should contain only API.DataBag.fold1
     }
   }
 }
