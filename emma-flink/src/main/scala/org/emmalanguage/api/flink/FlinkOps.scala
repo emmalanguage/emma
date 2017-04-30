@@ -17,6 +17,7 @@ package org.emmalanguage
 package api.flink
 
 import api._
+import api.alg._
 import api.backend.ComprehensionCombinators
 import api.backend.Runtime
 
@@ -80,11 +81,11 @@ object FlinkOps extends ComprehensionCombinators[FlinkEnv] with Runtime[FlinkEnv
     }
 
   def foldGroup[A: Meta, B: Meta, K: Meta](
-    xs: DataBag[A], key: A => K, sng: A => B, uni: (B, B) => B
-  )(implicit flink: FlinkEnv): DataBag[(K, B)] = xs match {
+    xs: DataBag[A], key: A => K, alg: Alg[A, B]
+  )(implicit flink: FlinkEnv): DataBag[Group[K, B]] = xs match {
     case xs: FlinkDataSet[A] => xs.rep
-      .map(x => key(x) -> sng(x)).groupBy("_1")
-      .reduce((x, y) => x._1 -> uni(x._2, y._2))
+      .map(x => Group(key(x), alg.init(x))).groupBy("key")
+      .reduce((x, y) => Group(x.key, alg.plus(x.values, y.values)))
   }
 
   private def sink[A: Meta](xs: DataSet[A])(implicit flink: FlinkEnv): String = {
