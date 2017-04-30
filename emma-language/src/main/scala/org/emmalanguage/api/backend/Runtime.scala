@@ -16,8 +16,8 @@
 package org.emmalanguage
 package api.backend
 
-import api.DataBag
-import api.Meta
+import api._
+import api.alg._
 
 /** Runtime operators (backend-agnostic IR nodes API). */
 trait Runtime[E] {
@@ -27,6 +27,6 @@ trait Runtime[E] {
 
   /** Fuse a groupBy and a subsequent fold into a single operator. */
   def foldGroup[A: Meta, B: Meta, K: Meta](
-    xs: DataBag[A], key: A => K, sng: A => B, uni: (B, B) => B
-  )(implicit env: E): DataBag[(K, B)]
+    xs: DataBag[A], key: A => K, agg: Alg[A, B]
+  )(implicit env: E): DataBag[Group[K, B]]
 }

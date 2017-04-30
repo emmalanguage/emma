@@ -17,6 +17,7 @@ package org.emmalanguage
 package api.spark
 
 import api._
+import api.alg._
 import api.backend.ComprehensionCombinators
 import api.backend.Runtime
 
@@ -85,11 +86,22 @@ object SparkOps extends ComprehensionCombinators[SparkSession] with Runtime[Spar
 
   /** Fuse a groupBy and a subsequent fold into a single operator. */
   def foldGroup[A: Meta, B: Meta, K: Meta](
-    xs: DataBag[A], key: A => K, sng: A => B, uni: (B, B) => B
-  )(implicit spark: SparkSession): DataBag[(K, B)] = xs match {
-    case xs: SparkRDD[A] =>
-      SparkRDD.wrap(xs.rep.map(x => key(x) -> sng(x)).reduceByKey(uni))
-    case xs: SparkDataset[A] =>
-      SparkDataset.wrap(spark.createDataset(xs.rep.rdd.map(x => key(x) -> sng(x)).reduceByKey(uni)))
+    xs: DataBag[A], key: A => K, alg: Alg[A, B]
+  )(implicit spark: SparkSession): DataBag[Group[K, B]] = {
+    // extract rdd
+    val rdd = xs match {
+      case xs: SparkRDD[A] => xs.rep
+      case xs: SparkDataset[A] => xs.rep.rdd
+    }
+    // do computation
+    val res = rdd
+      .map(x => key(x) -> alg.init(x))
+      .reduceByKey(alg.plus)
+      .map(x => Group(x._1, x._2))
+    // wrap in DataBag subtype corresponding to the original value
+    xs match {
+      case _: SparkRDD[A] => SparkRDD.wrap(res)
+      case _: SparkDataset[A] => SparkDataset.wrap(spark.createDataset(res))
+    }
   }
 }

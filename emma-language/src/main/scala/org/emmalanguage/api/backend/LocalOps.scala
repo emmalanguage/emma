@@ -17,6 +17,9 @@ package org.emmalanguage
 package api.backend
 
 import api._
+import api.alg._
+
+import scala.collection.Map
 
 /**
  * Operators added by backend-agnostic transformations.
@@ -59,12 +62,12 @@ object LocalOps extends ComprehensionCombinators[LocalEnv] with Runtime[LocalEnv
 
   /** Fuse a groupBy and a subsequent fold into a single operator. */
   def foldGroup[A: Meta, B: Meta, K: Meta](
-    xs: DataBag[A], key: A => K, sng: A => B, uni: (B, B) => B
-  )(implicit env: LocalEnv): DataBag[(K, B)] = xs.fetch()
+    xs: DataBag[A], key: A => K, alg: Alg[A, B]
+  )(implicit env: LocalEnv): DataBag[Group[K, B]] = xs.fetch()
     .foldLeft(Map.empty[K, B]) { (acc, x) =>
       val k = key(x)
-      val s = sng(x)
-      val u = acc.get(k).fold(s)(uni(_, s))
+      val s = alg.init(x)
+      val u = acc.get(k).fold(s)(alg.plus(_, s))
       acc + (k -> u)
-    }.toSeq
+    }.map(x => Group(x._1, x._2)).toSeq
 }
