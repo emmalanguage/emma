@@ -22,5 +22,7 @@ import scala.language.experimental.macros
 
 object onFlink {
 
-  final def apply[T](e: T): T = macro FlinkMacro.parallelizeImpl[T]
+  final def apply[T](e: T): T = macro FlinkMacro.onFlinkImpl1[T]
+
+  final def apply[T](config: String)(e: T): T = macro FlinkMacro.onFlinkImpl2[T]
 }

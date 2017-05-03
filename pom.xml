@@ -155,6 +155,7 @@
         <spray-json.version>1.3.3</spray-json.version>
         <quiver.version>5.5.14-scalaz-7.2</quiver.version>
         <univocity-parsers.version>2.4.1</univocity-parsers.version>
+        <typesafe-config.version>1.3.1</typesafe-config.version>
 
         <!-- Test configuration -->
         <excludedSurefireGroups>org.emmalanguage.examples.ExampleTest</excludedSurefireGroups>
@@ -409,6 +410,13 @@
                 <artifactId>core_${scala.tools.version}</artifactId>
                 <version>${quiver.version}</version>
             </dependency>
+
+            <!-- Hocon configuration -->
+            <dependency>
+                <groupId>com.typesafe</groupId>
+                <artifactId>config</artifactId>
+                <version>${typesafe-config.version}</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
@@ -427,21 +435,17 @@
                 <artifactId>scala-maven-plugin</artifactId>
                 <version>${scala-maven-plugin.version}</version>
                 <executions>
-                    <!-- Run scala compiler in the process-resources phase, so that dependencies on -->
-                    <!-- scala classes can be resolved later in the Java compile phase -->
                     <execution>
                         <id>scala-compile-first</id>
-                        <phase>process-resources</phase>
+                        <phase>compile</phase>
                         <goals>
                             <goal>compile</goal>
                         </goals>
                     </execution>
 
-                    <!-- Run scala compiler in the process-test-resources phase, so that dependencies on -->
-                    <!-- scala classes can be resolved later in the Java test-compile phase -->
                     <execution>
                         <id>scala-test-compile</id>
-                        <phase>process-test-resources</phase>
+                        <phase>test-compile</phase>
                         <goals>
                             <goal>testCompile</goal>
                         </goals>

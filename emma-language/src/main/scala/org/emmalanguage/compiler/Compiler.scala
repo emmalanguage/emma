@@ -24,6 +24,10 @@ import lang.opt.Optimizations
 import lang.source.Source
 import tools.GraphTools
 
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
+import com.typesafe.config.ConfigParseOptions
+
 import scala.reflect.api.Universe
 
 /**
@@ -39,6 +43,8 @@ trait Compiler extends AlphaEq
   with Backend
   with GraphTools
   with Optimizations {
+
+  import UniverseImplicits._
 
   /** The underlying universe object. */
   override val universe: Universe
@@ -91,4 +97,37 @@ trait Compiler extends AlphaEq
       tree
     }
   }
+
+  /** Loads a sequence of resources (in decreasing priority). */
+  protected def loadConfig(paths: Seq[String]): Config = {
+    val opts = ConfigParseOptions.defaults().setClassLoader(getClass.getClassLoader)
+
+    val sPrp = ConfigFactory.systemProperties()
+    val sEnv = ConfigFactory.systemEnvironment()
+
+    val cfgs = for {
+      n <- paths.map(_.stripPrefix("/"))
+      _ <- Option(getClass.getResource(s"/$n"))
+    } yield ConfigFactory.parseResources(n, opts)
+
+    cfgs
+      .foldLeft(sEnv withFallback sPrp)((acc, cfg) => acc withFallback cfg)
+      .resolve()
+  }
+
+  /**
+   * Resolves a sequence of config paths to be used with [[loadConfig]]. The result
+   *
+   * - `path` :+ [[baseConfig]] if `tlPath` is some tree represenging a string literal `path`, or
+   * - [[baseConfig]] otherwise.
+   *
+   * Aborts execution with an error if `tlPath` is not a string literal.
+   */
+  protected def configPaths(tlPath: Option[u.Tree] = None): Seq[String] =
+    tlPath.fold(baseConfig)({
+      case api.Lit(path: String) => path +: baseConfig
+      case _ => abort("The provided `config` path is not a string literal.")
+    })
+
+  protected def baseConfig = Seq("reference.emma.conf")
 }
