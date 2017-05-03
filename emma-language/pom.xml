@@ -137,6 +137,12 @@
             <groupId>io.verizon.quiver</groupId>
             <artifactId>core_${scala.tools.version}</artifactId>
         </dependency>
+
+        <!-- Hocon configuration -->
+        <dependency>
+            <groupId>com.typesafe</groupId>
+            <artifactId>config</artifactId>
+        </dependency>
     </dependencies>
 
     <profiles>

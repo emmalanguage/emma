@@ -16,25 +16,54 @@
 package org.emmalanguage
 package compiler
 
+import com.typesafe.config.Config
+
 import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
 class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompiler {
 
-  def parallelizeImpl[T](e: c.Expr[T]): c.Expr[T] = {
-    val res = parallelizePipeline(e)
-    //c.warning(e.tree.pos, Core.prettyPrint(res))
+  override protected val baseConfig = "reference.emma.onFlink.conf" +: super.baseConfig
+
+  def onFlinkImpl1[T](e: c.Expr[T]): c.Expr[T] = {
+    val cfg = loadConfig(configPaths())
+    val res = pipeline(cfg)(e)
+    if (cfg.getBoolean("emma.compiler.printResult")) {
+      c.warning(e.tree.pos, Core.prettyPrint(res))
+    }
     c.Expr[T]((removeShadowedThis andThen unTypeCheck) (res))
   }
 
-  private lazy val parallelizePipeline: c.Expr[Any] => u.Tree =
-    pipeline()(
+  def onFlinkImpl2[T](config: c.Expr[String])(e: c.Expr[T]): c.Expr[T] = {
+    val cfg = loadConfig(configPaths(Some(config.tree)))
+    val res = pipeline(cfg)(e)
+    if (cfg.getBoolean("emma.compiler.printResult")) {
+      c.warning(e.tree.pos, Core.prettyPrint(res))
+    }
+    c.Expr[T]((removeShadowedThis andThen unTypeCheck) (res))
+  }
+
+  private def pipeline(cfg: Config): c.Expr[Any] => u.Tree = {
+    val xfms = Seq.newBuilder[u.Tree => u.Tree]
+    // standard prefix
+    xfms ++= Seq(
       LibSupport.expand,
-      Core.lift,
-      Optimizations.foldFusion,
-      Backend.addCacheCalls,
+      Core.lift
+    )
+    // optional optimizing rewrites
+    if (cfg.getBoolean("emma.compiler.foldFusion")) {
+      xfms += Optimizations.foldFusion
+    }
+    if (cfg.getBoolean("emma.compiler.addCacheCalls")) {
+      xfms += Backend.addCacheCalls
+    }
+    // standard suffix
+    xfms ++= Seq(
       Comprehension.combine,
       Backend.specialize(FlinkAPI),
       Core.trampoline
-    ).compose(_.tree)
+    )
+    // construct the compilation pipeline
+    pipeline()(xfms.result(): _*).compose(_.tree)
+  }
 }

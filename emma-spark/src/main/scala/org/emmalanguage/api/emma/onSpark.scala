@@ -22,5 +22,7 @@ import scala.language.experimental.macros
 
 object onSpark {
 
-  final def apply[T](e: T): T = macro SparkMacro.parallelizeImpl[T]
+  final def apply[T](e: T): T = macro SparkMacro.onSparkImpl1[T]
+
+  final def apply[T](config: String)(e: T): T = macro SparkMacro.onSparkImpl2[T]
 }
