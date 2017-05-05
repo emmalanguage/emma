@@ -106,9 +106,11 @@ trait Compiler extends AlphaEq
     val sEnv = ConfigFactory.systemEnvironment()
 
     val cfgs = for {
-      n <- paths.map(_.stripPrefix("/"))
-      _ <- Option(getClass.getResource(s"/$n"))
-    } yield ConfigFactory.parseResources(n, opts)
+      p <- paths.map(_.stripPrefix("/"))
+    } yield Option(getClass.getResource(s"/$p")) match {
+      case Some(_) => ConfigFactory.parseResources(p, opts)
+      case None => abort(s"Cannot find Emma config resource `/$p`")
+    }
 
     cfgs
       .foldLeft(sEnv withFallback sPrp)((acc, cfg) => acc withFallback cfg)
