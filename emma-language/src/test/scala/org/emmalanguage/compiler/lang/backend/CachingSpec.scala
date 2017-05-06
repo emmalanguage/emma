@@ -114,5 +114,21 @@ class CachingSpec extends BaseCompilerSpec {
 
       addCacheCalls(inp) shouldBe alphaEqTo(liftPipeline(exp))
     }
+
+    "not referenced once in the suffix of a loop method" in {
+      val inp = u.reify {
+        val xs = DataBag(1 to 100)
+        val ys = xs.map(x => x * x)
+        var i = 0
+        while (i < 100) {
+          println(i)
+          i *= i
+        }
+
+        ys
+      }
+
+      addCacheCalls(inp) shouldBe alphaEqTo(liftPipeline(inp))
+    }
   }
 }
