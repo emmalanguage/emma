@@ -155,7 +155,7 @@ private[core] trait ANF extends Common {
           }
 
           src.Block(stats ++ inner, expr)
-      }._tree
+      }._tree.andThen(api.Owner.atEncl)
 
     /**
      * Converts a tree into administrative normal form (ANF).
@@ -180,7 +180,7 @@ private[core] trait ANF extends Common {
      * == Postconditions ==
      * - An ANF tree where all nested blocks have been flattened.
      */
-    lazy val flatten: u.Tree => u.Tree =
+    lazy val unnest: u.Tree => u.Tree =
       api.BottomUp.transform {
         case parent @ core.Let(vals, defs, expr) if hasNestedLets(parent) =>
           // Flatten nested let expressions in value position without control flow.
@@ -208,7 +208,7 @@ private[core] trait ANF extends Common {
 
           val (trimmedVals, trimmedExpr) = trimVals(flatVals ++ exprVals, flatExpr)
           core.Let(trimmedVals, flatDefs, trimmedExpr)
-      }.andThen(_.tree)
+      }._tree.andThen(api.Owner.atEncl)
 
     // ---------------
     // Helper methods
