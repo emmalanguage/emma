@@ -303,8 +303,8 @@ trait Core extends Common
     /** Lifting. The canonical compiler frontend. */
     lazy val lift: u.Tree => u.Tree = Function.chain(Seq(
       lnf,
-      Comprehension.resugar(DataBag.sym),
-      Comprehension.normalize(DataBag.sym)
+      Comprehension.resugarDataBag,
+      Comprehension.normalizeDataBag
     ))
 
     /** Chains [[ANF.transform]], and [[DSCF.transform]]. */

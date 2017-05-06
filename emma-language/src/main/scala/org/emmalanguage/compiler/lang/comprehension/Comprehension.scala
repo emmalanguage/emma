@@ -258,6 +258,14 @@ trait Comprehension extends Common
     def desugar(monad: u.Symbol): u.Tree => u.Tree =
       ReDeSugar.desugar(monad)
 
+    /** `resugar` the default [[DataBag]] monad. */
+    lazy val resugarDataBag: u.Tree => u.Tree =
+      ReDeSugar.resugar(API.DataBag.sym)
+
+    /** `desugar` the default [[DataBag]] monad. */
+    lazy val desugarDataBag: u.Tree => u.Tree =
+      ReDeSugar.desugar(API.DataBag.sym)
+
     // -------------------------------------------------------------------------
     // Normalize API
     // -------------------------------------------------------------------------
@@ -265,6 +273,10 @@ trait Comprehension extends Common
     /** Delegates to [[Normalize.normalize()]]. */
     def normalize(monad: u.Symbol)(tree: u.Tree): u.Tree =
       Normalize.normalize(monad)(tree)
+
+    /** `normalize` the default [[DataBag]] monad. */
+    lazy val normalizeDataBag: u.Tree => u.Tree =
+      Normalize.normalize(API.DataBag.sym)
 
     // -------------------------------------------------------------------------
     // Combine API

@@ -36,21 +36,17 @@ class ReDeSugarSpec extends BaseCompilerSpec {
       Core.lnf
     ).compose(_.tree)
 
-  val resugarPipeline: u.Expr[Any] => u.Tree = {
-    val resugar = Comprehension.resugar(API.DataBag.sym)
+  val resugarPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lnf,
-      tree => time(resugar(tree), "resugar")
+      tree => time(Comprehension.resugarDataBag(tree), "resugar")
     ).compose(_.tree)
-  }
 
-  val desugarPipeline: u.Expr[Any] => u.Tree = {
-    val desugar = Comprehension.desugar(API.DataBag.sym)
+  val desugarPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lnf,
-      tree => time(desugar(tree), "desugar")
+      tree => time(Comprehension.desugarDataBag(tree), "desugar")
     ).compose(_.tree)
-  }
 
   // ---------------------------------------------------------------------------
   // Spec data: a collection of (desugared, resugared) trees
