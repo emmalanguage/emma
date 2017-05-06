@@ -174,7 +174,7 @@ private[comprehension] trait ReDeSugar extends Common {
           val gen = cs.Generator(genSym, hd)
           val hd1 = cs.Head(core.Let(expr = core.Ref(genSym)))
           core.Let(vals, defs, cs.Comprehension(qs :+ gen, hd1))
-      }._tree.andThen(Core.flatten)
+      }._tree.andThen(Core.unnest)
     }
   }
 }

@@ -316,8 +316,8 @@ trait Core extends Common
     /** Delegates to [[ANF.transform]]. */
     lazy val anf = ANF.transform
 
-    /** Delegates to [[ANF.flatten]]. */
-    lazy val flatten = ANF.flatten
+    /** Delegates to [[ANF.unnest]]. */
+    lazy val unnest = ANF.unnest
 
     /** Delegates to [[DSCF.stripAnnotations]]. */
     lazy val stripAnnotations = DSCF.stripAnnotations

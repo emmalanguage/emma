@@ -44,7 +44,7 @@ class CombinationSpec extends BaseCompilerSpec {
     pipeline(typeCheck = true)(
       Core.lnf,
       tree => time(Comprehension.combine(tree), "combine"),
-      Core.flatten
+      Core.unnest
     ).compose(_.tree)
 
   def applyOnce(rule: (u.Symbol, u.Tree) => Option[u.Tree]): u.Expr[Any] => u.Tree = {
@@ -55,7 +55,7 @@ class CombinationSpec extends BaseCompilerSpec {
     pipeline(typeCheck = true)(
       Core.lnf,
       tree => time(transform(tree), "match rule"),
-      Core.flatten
+      Core.unnest
     ).compose(_.tree)
   }
 
