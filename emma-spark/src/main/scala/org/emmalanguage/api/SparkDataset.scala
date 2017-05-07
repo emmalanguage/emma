@@ -72,7 +72,7 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
   // -----------------------------------------------------
 
   override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
-    SparkRDD.from(rep.rdd).groupBy(k)
+    DataBag.from(rep.rdd).groupBy(k)
 
   // -----------------------------------------------------
   // Set operations
@@ -86,6 +86,35 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
 
   override def distinct: DataBag[A] =
     rep.distinct
+
+  // -----------------------------------------------------
+  // Partition-based Ops
+  // -----------------------------------------------------
+
+  def sample(k: Int, seed: Long = 5394826801L): Vector[A] = {
+    // counts per partition, sorted by partition ID
+    val Seq(hd, tl@_*) = rep.rdd.zipWithIndex()
+      .mapPartitionsWithIndex({ (pid, it) =>
+        val sample = Array.fill(k)(Option.empty[A])
+        for ((e, i) <- it) {
+          if (i >= k) {
+            val j = util.RanHash(seed).at(i).nextLong(i + 1)
+            if (j < k) sample(j.toInt) = Some(e)
+          } else sample(i.toInt) = Some(e)
+        }
+        Seq(pid -> sample).toIterator
+      }).collect().sortBy(_._1).map(_._2).toSeq
+
+    // merge the sequence of samples and filter None values
+    val rs = for {
+      Some(v) <- tl.foldLeft(hd)((xs, ys) => for ((x, y) <- xs zip ys) yield y orElse x)
+    } yield v
+
+    rs.toVector
+  }
+
+  def zipWithIndex(): DataBag[(A, Long)] =
+    DataBag.from(rep.rdd.zipWithIndex())
 
   // -----------------------------------------------------
   // Sinks

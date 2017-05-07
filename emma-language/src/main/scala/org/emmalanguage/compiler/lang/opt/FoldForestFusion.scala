@@ -448,38 +448,6 @@ private[compiler] trait FoldForestFusion extends Common {
                 }
 
                 lhsOf(res) -> mkIndex(alg, res, prj)
-
-              // Γ ⊢ xs : DataBag[A]
-              // val root = xs.sample(n)
-              // =>
-              // val alg$Sample$i = alg.Sample(n)
-              // val app$Sample$j = xs.fold[A](alg$Sample$i)
-              // val root = app$Sample$j._2
-              case core.DefCall(xs@Some(bag), DataBag.sample, _, argss) =>
-                val A = api.Type.arg(1, bag.tpe)
-                val Pair = api.Type.tupleOf(Seq(api.Type.long, root.info))
-
-                val mod = api.Sym[algebra.Sample.type].asModule
-
-                val alg = { // val alg$Sample$i = alg.Sample(n)
-                  val rhs = core.DefCall(tgtOf(mod), appOf(mod), Seq(A), argss)
-                  val lhs = api.ValSym(owner, freshAlg(mod), rhs.tpe)
-                  lhs -> rhs
-                }
-
-                val res = { // val app$Sample$j = xs.fold[A](alg$Sample$i)
-                  val lhs = api.ValSym(owner, freshApp(mod), Pair)
-                  val rhs = foldAlg(xs, lhs.info, lhsOf(alg))
-                  lhs -> rhs
-                }
-
-                val prj = { // val root = app$Sample$j._2
-                  val met = Pair.member(api.TermName("_2")).asTerm
-                  val rhs = core.DefCall(tgtOf(res), met)
-                  root -> rhs
-                }
-
-                lhsOf(res) -> mkIndex(alg, res, prj)
             }
 
             // Case 2: One child - fold to be cata-fused.

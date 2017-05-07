@@ -86,6 +86,36 @@ class SparkRDD[A: Meta] private[api]
     rep.distinct
 
   // -----------------------------------------------------
+  // Partition-based Ops
+  // -----------------------------------------------------
+
+  def sample(k: Int, seed: Long = 5394826801L): Vector[A] = {
+    // sample per partition and sorted by partition ID
+    val Seq(hd, tl@_*) = rep.zipWithIndex()
+      .mapPartitionsWithIndex({ (pid, it) =>
+        val sample = Array.fill(k)(Option.empty[A])
+        for ((e, i) <- it) {
+          if (i >= k) {
+            val j = util.RanHash(seed).at(i).nextLong(i + 1)
+            if (j < k) sample(j.toInt) = Some(e)
+          } else sample(i.toInt) = Some(e)
+        }
+        Seq(pid -> sample).toIterator
+      }).collect().sortBy(_._1).map(_._2).toSeq
+
+    // merge the sequence of samples and filter None values
+    val rs = for {
+      Some(v) <- tl.foldLeft(hd)((xs, ys) => for ((x, y) <- xs zip ys) yield y orElse x)
+    } yield v
+
+    // convert result to vector
+    rs.toVector
+  }
+
+  def zipWithIndex(): DataBag[(A, Long)] =
+    rep.zipWithIndex()
+
+  // -----------------------------------------------------
   // Sinks
   // -----------------------------------------------------
 

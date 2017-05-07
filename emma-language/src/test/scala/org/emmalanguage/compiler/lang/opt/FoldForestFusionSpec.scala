@@ -79,7 +79,6 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
           rands.find(`_ > 0`),
           rands.bottom(10),
           rands.top(10),
-          rands.sample(10),
           rands.reduce(0)(`_ * _ % 5`),
           rands.reduceOption(`_.abs min _.abs`)
         )
@@ -96,7 +95,6 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
         val alg$Max$r1 = alg.Max(Ordering.Int)
         val alg$Min$r1 = alg.Min(Ordering.Int)
         val alg$Product$r1 = alg.Product(Numeric.IntIsIntegral)
-        val alg$Sample$r1 = alg.Sample[Int](10)
         val alg$Sum$r1 = alg.Sum(Numeric.IntIsIntegral)
         val alg$Top$r1 = alg.Top(10, Ordering.Int)
         val rands = this.rands
@@ -106,33 +104,31 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
         val alg$Forall$r1 = alg.Forall(`_ != 0$r1`)
         val alg$Reduce$r1 = alg.Reduce(0, `_ * _ % 5$r1`)
         val alg$ReduceOpt$r1 = alg.ReduceOpt(`_.abs min _.abs$r1`)
-        val alg$Alg16$r1 = alg.Alg16(
-          alg$Max$r1, alg$Min$r1, alg$Sample$r1, alg$Bottom$r1, alg$Count$r1, alg$Exists$r1, alg$Find$r1,
+        val alg$Alg15$r1 = alg.Alg15(
+          alg$Max$r1, alg$Min$r1, alg$Bottom$r1, alg$Count$r1, alg$Exists$r1, alg$Find$r1,
           alg$Forall$r1, alg.IsEmpty, alg.NonEmpty, alg$Product$r1, alg$Reduce$r1, alg$ReduceOpt$r1, alg.Size,
           alg$Sum$r1, alg$Top$r1)
-        val app$Alg16$r1 = rands fold alg$Alg16$r1
-        val app$Max$r1 = app$Alg16$r1._1
-        val app$Min$r1 = app$Alg16$r1._2
-        val app$Sample$r1 = app$Alg16$r1._3
-        val bottom$r1 = app$Alg16$r1._4
-        val count$r1 = app$Alg16$r1._5
-        val exists$r1 = app$Alg16$r1._6
-        val find$r1 = app$Alg16$r1._7
-        val forall$r1 = app$Alg16$r1._8
-        val isEmpty$r1 = app$Alg16$r1._9
-        val nonEmpty$r1 = app$Alg16$r1._10
-        val product$r1 = app$Alg16$r1._11
-        val reduce$r1 = app$Alg16$r1._12
-        val reduceOption$r1 = app$Alg16$r1._13
-        val size$r1 = app$Alg16$r1._14
-        val sum$r1 = app$Alg16$r1._15
-        val top$r1 = app$Alg16$r1._16
+        val app$Alg15$r1 = rands fold alg$Alg15$r1
+        val app$Max$r1 = app$Alg15$r1._1
+        val app$Min$r1 = app$Alg15$r1._2
+        val bottom$r1 = app$Alg15$r1._3
+        val count$r1 = app$Alg15$r1._4
+        val exists$r1 = app$Alg15$r1._5
+        val find$r1 = app$Alg15$r1._6
+        val forall$r1 = app$Alg15$r1._7
+        val isEmpty$r1 = app$Alg15$r1._8
+        val nonEmpty$r1 = app$Alg15$r1._9
+        val product$r1 = app$Alg15$r1._10
+        val reduce$r1 = app$Alg15$r1._11
+        val reduceOption$r1 = app$Alg15$r1._12
+        val size$r1 = app$Alg15$r1._13
+        val sum$r1 = app$Alg15$r1._14
+        val top$r1 = app$Alg15$r1._15
         val max$r1 = app$Max$r1.get
         val min$r1 = app$Min$r1.get
-        val sample$r1 = app$Sample$r1._2
         val apply$r1 = (
           isEmpty$r1, nonEmpty$r1, size$r1, min$r1, max$r1, sum$r1, product$r1, count$r1, exists$r1,
-          forall$r1, find$r1, bottom$r1, top$r1, sample$r1, reduce$r1, reduceOption$r1)
+          forall$r1, find$r1, bottom$r1, top$r1, reduce$r1, reduceOption$r1)
         apply$r1
       })
 

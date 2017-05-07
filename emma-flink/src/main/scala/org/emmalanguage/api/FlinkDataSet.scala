@@ -21,13 +21,19 @@ import compiler.RuntimeCompiler
 import io.csv._
 import io.parquet._
 
+import org.apache.flink.api.common.functions.RichMapPartitionFunction
 import org.apache.flink.api.scala.DataSet
+import org.apache.flink.api.scala.utils.DataSetUtils
 import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
+import org.apache.flink.configuration.Configuration
 import org.apache.flink.core.fs.FileSystem
+import org.apache.flink.util.Collector
 
 import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
+
+import java.lang
 
 /** A `DataBag` implementation backed by a Flink `DataSet`. */
 class FlinkDataSet[A: Meta] private[api]
@@ -89,6 +95,47 @@ class FlinkDataSet[A: Meta] private[api]
 
   override def distinct: DataBag[A] =
     rep.distinct
+
+  // -----------------------------------------------------
+  // Partition-based Ops
+  // -----------------------------------------------------
+
+  def sample(k: Int, seed: Long = 5394826801L): Vector[A] = {
+    // sample per partition and sorted by partition ID
+    val Seq(hd, tl@_*) = new DataSetUtils(rep).zipWithIndex
+      .mapPartition(new RichMapPartitionFunction[(Long, A), (Int, Array[Option[A]])] {
+        @transient private var pid = 0
+
+        override def open(parameters: Configuration) = {
+          super.open(parameters)
+          pid = getRuntimeContext.getIndexOfThisSubtask
+        }
+
+        import scala.collection.JavaConversions._
+
+        def mapPartition(it: lang.Iterable[(Long, A)], out: Collector[(Int, Array[Option[A]])]) = {
+          val sample = Array.fill(k)(Option.empty[A])
+          for ((i, e) <- it) {
+            if (i >= k) {
+              val j = util.RanHash(seed).at(i).nextLong(i + 1)
+              if (j < k) sample(j.toInt) = Some(e)
+            } else sample(i.toInt) = Some(e)
+          }
+          out.collect(pid -> sample)
+        }
+      }).collect().sortBy(_._1).map(_._2)
+
+    // merge the sequence of samples and filter None values
+    val rs = for {
+      Some(v) <- tl.foldLeft(hd)((xs, ys) => for ((x, y) <- xs zip ys) yield y orElse x)
+    } yield v
+
+    // convert result to vector
+    rs.toVector
+  }
+
+  def zipWithIndex(): DataBag[(A, Long)] =
+    wrap(new DataSetUtils(rep).zipWithIndex).map(_.swap)
 
   // -----------------------------------------------------
   // Sinks

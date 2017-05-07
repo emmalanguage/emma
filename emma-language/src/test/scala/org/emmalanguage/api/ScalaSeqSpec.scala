@@ -16,8 +16,6 @@
 package org.emmalanguage
 package api
 
-import io.csv.{CSV, CSVConverter}
-
 class ScalaSeqSpec extends DataBagSpec {
 
   override type TestBag[A] = ScalaSeq[A]
