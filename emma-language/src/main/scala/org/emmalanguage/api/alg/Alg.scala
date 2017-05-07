@@ -176,22 +176,6 @@ case class Top[A](n: Int, ord: Ordering[A]) extends Alg[A, List[A]] {
   val plus: (List[A], List[A]) => List[A] = bottom.plus
 }
 
-/** Constructed by `xs.sample(n)`. */
-case class Sample[A](n: Int) extends Alg[A, (Long, List[A])] {
-  private def now = System.nanoTime()
-
-  val zero: (Long, List[A]) = (now, Nil)
-  val init: A => (Long, List[A]) = x => (now ^ x.hashCode, x :: Nil)
-  val plus: ((Long, List[A]), (Long, List[A])) => (Long, List[A]) = {
-    case ((hx, xs), (hy, ys)) =>
-      val pair@(seed, xys) = (hx ^ hy, xs ++ ys)
-      if (xys.size <= n) pair else {
-        val rand = new Random(seed)
-        (rand.nextLong(), rand.shuffle(xys).take(n))
-      }
-  }
-}
-
 // -------------------------------------------------------
 // Algebras encoding fused MonadOps
 // -------------------------------------------------------

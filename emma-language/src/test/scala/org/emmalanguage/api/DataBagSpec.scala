@@ -65,191 +65,211 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
   // spec tests
   // ---------------------------------------------------------------------------
 
-  "structural recursion" in {
-    withBackendContext { implicit ctx =>
-      val act = {
-        val vs = TestBag(Seq((0, 0.0)))
-        val ws = TestBag(Seq(0))
-        val xs = TestBag(hhCrts)
-        val ys = TestBag(hhCrts.map(DataBagSpec.f))
-        val zs = TestBag(Seq.empty[Double])
+  "structural recursion" in withBackendContext { implicit ctx =>
+    val act = {
+      val vs = TestBag(Seq((0, 0.0)))
+      val ws = TestBag(Seq(0))
+      val xs = TestBag(hhCrts)
+      val ys = TestBag(hhCrts.map(DataBagSpec.f))
+      val zs = TestBag(Seq.empty[Double])
 
-        Seq(
-          //@formatter:off
-          "isEmpty"     -> xs.isEmpty,
-          "nonEmpty"    -> xs.nonEmpty,
-          "min (1)"     -> vs.min,
-          "min (2)"     -> ws.min,
-          "min (3)"     -> vs.min,
-          "max (1)"     -> vs.max,
-          "max (2)"     -> ws.max,
-          "max (3)"     -> ys.max,
-          "sum (1)"     -> ys.sum,
-          "sum (2)"     -> zs.sum,
-          "product (1)" -> ys.product,
-          "product (2)" -> zs.product,
-          "size (1)"    -> xs.size,
-          "size (2)"    -> zs.size,
-          "count (1)"   -> xs.count(_.name startsWith "Zaphod"),
-          "count (2)"   -> zs.count(_ < 42.0),
-          "existsP"     -> xs.exists(_.name startsWith "Arthur"),
-          "existsN"     -> xs.exists(_.name startsWith "Marvin"),
-          "forallP"     -> xs.forall(_.name startsWith "Arthur"),
-          "forallN"     -> xs.forall(_.name startsWith "Trillian"),
-          "findP"       -> xs.find(_.name startsWith "Ford"),
-          "findN"       -> xs.find(_.name startsWith "Marvin"),
-          "bottom"      -> ys.bottom(1),
-          "top"         -> ys.top(2)
-          //@formatter:on
-        )
-      }
-
-      val exp = {
-        val vs = TestBag(Seq((0, 0.0)))
-        val ws = Seq(0)
-        val xs = hhCrts
-        val ys = hhCrts.map(_.book.title.length)
-        val zs = Seq.empty[Double]
-
-        Seq(
-          //@formatter:off
-          "isEmpty"     -> xs.isEmpty,
-          "nonEmpty"    -> xs.nonEmpty,
-          "min (1)"     -> vs.min,
-          "min (2)"     -> ws.min,
-          "min (3)"     -> vs.min,
-          "max (1)"     -> vs.max,
-          "max (2)"     -> ws.max,
-          "max (3)"     -> ys.max,
-          "sum (1)"     -> ys.sum,
-          "sum (2)"     -> zs.sum,
-          "product (1)" -> ys.product,
-          "product (2)" -> zs.product,
-          "size (1)"    -> xs.size,
-          "size (2)"    -> zs.size,
-          "count (1)"   -> xs.count(_.name startsWith "Zaphod"),
-          "count (2)"   -> zs.count(_ < 42.0),
-          "existsP"     -> xs.exists(_.name startsWith "Arthur"),
-          "existsN"     -> xs.exists(_.name startsWith "Marvin"),
-          "forallP"     -> xs.forall(_.name startsWith "Arthur"),
-          "forallN"     -> xs.forall(_.name startsWith "Trillian"),
-          "findP"       -> xs.find(_.name startsWith "Ford"),
-          "findN"       -> xs.find(_.name startsWith "Marvin"),
-          "bottom"      -> ys.sorted.slice(ys.length - 1, ys.length),
-          "top"         -> ys.sorted.slice(0, 2)
-          //@formatter:on
-        )
-      }
-
-
-      withClue("Bag.empty[(Int, Double)].min throws `NoSuchElementException`") {
-        intercept[NoSuchElementException](TestBag.empty[(Int, Double)].min)
-      }
-      withClue("Bag.empty[Int].max throws `NoSuchElementException`") {
-        intercept[NoSuchElementException](TestBag.empty[Int].max)
-      }
-
-      act should have size exp.size
-
-      for ((k, v) <- exp)
-        act should contain(k, v)
+      Seq(
+        //@formatter:off
+        "isEmpty"     -> xs.isEmpty,
+        "nonEmpty"    -> xs.nonEmpty,
+        "min (1)"     -> vs.min,
+        "min (2)"     -> ws.min,
+        "min (3)"     -> vs.min,
+        "max (1)"     -> vs.max,
+        "max (2)"     -> ws.max,
+        "max (3)"     -> ys.max,
+        "sum (1)"     -> ys.sum,
+        "sum (2)"     -> zs.sum,
+        "product (1)" -> ys.product,
+        "product (2)" -> zs.product,
+        "size (1)"    -> xs.size,
+        "size (2)"    -> zs.size,
+        "count (1)"   -> xs.count(_.name startsWith "Zaphod"),
+        "count (2)"   -> zs.count(_ < 42.0),
+        "existsP"     -> xs.exists(_.name startsWith "Arthur"),
+        "existsN"     -> xs.exists(_.name startsWith "Marvin"),
+        "forallP"     -> xs.forall(_.name startsWith "Arthur"),
+        "forallN"     -> xs.forall(_.name startsWith "Trillian"),
+        "findP"       -> xs.find(_.name startsWith "Ford"),
+        "findN"       -> xs.find(_.name startsWith "Marvin"),
+        "bottom"      -> ys.bottom(1),
+        "top"         -> ys.top(2)
+        //@formatter:on
+      )
     }
+
+    val exp = {
+      val vs = TestBag(Seq((0, 0.0)))
+      val ws = Seq(0)
+      val xs = hhCrts
+      val ys = hhCrts.map(_.book.title.length)
+      val zs = Seq.empty[Double]
+
+      Seq(
+        //@formatter:off
+        "isEmpty"     -> xs.isEmpty,
+        "nonEmpty"    -> xs.nonEmpty,
+        "min (1)"     -> vs.min,
+        "min (2)"     -> ws.min,
+        "min (3)"     -> vs.min,
+        "max (1)"     -> vs.max,
+        "max (2)"     -> ws.max,
+        "max (3)"     -> ys.max,
+        "sum (1)"     -> ys.sum,
+        "sum (2)"     -> zs.sum,
+        "product (1)" -> ys.product,
+        "product (2)" -> zs.product,
+        "size (1)"    -> xs.size,
+        "size (2)"    -> zs.size,
+        "count (1)"   -> xs.count(_.name startsWith "Zaphod"),
+        "count (2)"   -> zs.count(_ < 42.0),
+        "existsP"     -> xs.exists(_.name startsWith "Arthur"),
+        "existsN"     -> xs.exists(_.name startsWith "Marvin"),
+        "forallP"     -> xs.forall(_.name startsWith "Arthur"),
+        "forallN"     -> xs.forall(_.name startsWith "Trillian"),
+        "findP"       -> xs.find(_.name startsWith "Ford"),
+        "findN"       -> xs.find(_.name startsWith "Marvin"),
+        "bottom"      -> ys.sorted.slice(ys.length - 1, ys.length),
+        "top"         -> ys.sorted.slice(0, 2)
+        //@formatter:on
+      )
+    }
+
+
+    withClue("Bag.empty[(Int, Double)].min throws `NoSuchElementException`") {
+      intercept[NoSuchElementException](TestBag.empty[(Int, Double)].min)
+    }
+    withClue("Bag.empty[Int].max throws `NoSuchElementException`") {
+      intercept[NoSuchElementException](TestBag.empty[Int].max)
+    }
+
+    act should have size exp.size
+
+    for ((k, v) <- exp)
+      act should contain(k, v)
   }
 
   "monad ops" - {
+    "map" in withBackendContext { implicit ctx =>
+      val act = TestBag(hhCrts)
+        .map(c => c.name)
 
-    "map" in {
-      withBackendContext { implicit ctx =>
-        val act = TestBag(hhCrts)
-          .map(c => c.name)
+      val exp = hhCrts
+        .map(c => c.name)
 
-        val exp = hhCrts
-          .map(c => c.name)
-
-        act shouldEqual DataBag(exp)
-      }
+      act shouldEqual DataBag(exp)
     }
 
-    "flatMap" in {
-      withBackendContext { implicit ctx =>
-        val act = TestBag(Seq((hhBook, hhCrts)))
-          .flatMap { case (b, cs) => DataBag(cs) }
+    "flatMap" in withBackendContext { implicit ctx =>
+      val act = TestBag(Seq((hhBook, hhCrts)))
+        .flatMap { case (b, cs) => DataBag(cs) }
 
-        val exp = Seq((hhBook, hhCrts))
-          .flatMap { case (b, cs) => cs }
+      val exp = Seq((hhBook, hhCrts))
+        .flatMap { case (b, cs) => cs }
 
-        act shouldEqual DataBag(exp)
-      }
+      act shouldEqual DataBag(exp)
     }
 
-    "withFilter" in {
-      withBackendContext { implicit spark =>
-        val act = TestBag(Seq(hhBook))
-          .withFilter(_.title == "The Hitchhiker's Guide to the Galaxy")
+    "withFilter" in withBackendContext { implicit spark =>
+      val act = TestBag(Seq(hhBook))
+        .withFilter(_.title == "The Hitchhiker's Guide to the Galaxy")
 
-        val exp = Seq(hhBook)
-          .filter(_.title == "The Hitchhiker's Guide to the Galaxy")
+      val exp = Seq(hhBook)
+        .filter(_.title == "The Hitchhiker's Guide to the Galaxy")
 
-        act shouldEqual DataBag(exp)
-      }
+      act shouldEqual DataBag(exp)
     }
 
-    "for-comprehensions" in {
-      withBackendContext { implicit ctx =>
-        val act = for {
-          b <- TestBag(Seq(hhBook))
-          c <- ScalaSeq(hhCrts) // nested DataBag cannot be RDDDataBag, as those are not serializable
-          if b.title == c.book.title
-          if b.title == "The Hitchhiker's Guide to the Galaxy"
-        } yield (b.title, c.name)
+    "for-comprehensions" in withBackendContext { implicit ctx =>
+      val act = for {
+        b <- TestBag(Seq(hhBook))
+        c <- ScalaSeq(hhCrts) // nested DataBag cannot be RDDDataBag, as those are not serializable
+        if b.title == c.book.title
+        if b.title == "The Hitchhiker's Guide to the Galaxy"
+      } yield (b.title, c.name)
 
-        val exp = for {
-          b <- Seq(hhBook)
-          c <- hhCrts
-          if b.title == c.book.title
-          if b.title == "The Hitchhiker's Guide to the Galaxy"
-        } yield (b.title, c.name)
-
-        act shouldEqual DataBag(exp)
-      }
-    }
-  }
-
-  "grouping" in {
-    withBackendContext { implicit ctx =>
-      val act = TestBag(hhCrts).groupBy(_.book)
-
-      val exp = hhCrts.groupBy(_.book).toSeq.map {
-        case (k, vs) => Group(k, DataBag(vs))
-      }
+      val exp = for {
+        b <- Seq(hhBook)
+        c <- hhCrts
+        if b.title == c.book.title
+        if b.title == "The Hitchhiker's Guide to the Galaxy"
+      } yield (b.title, c.name)
 
       act shouldEqual DataBag(exp)
     }
   }
 
-  "set operations" - {
+  "grouping" in withBackendContext { implicit ctx =>
+    val act = TestBag(hhCrts).groupBy(_.book)
 
+    val exp = hhCrts.groupBy(_.book).toSeq.map {
+      case (k, vs) => Group(k, DataBag(vs))
+    }
+
+    act shouldEqual DataBag(exp)
+  }
+
+  "set operations" - {
     val xs = Seq("foo", "bar", "baz", "boo", "buz", "baz", "bag")
     val ys = Seq("fuu", "bin", "bar", "bur", "lez", "liz", "lag")
 
-    "union" in {
-      withBackendContext { implicit ctx =>
-        val act = TestBag(xs) union TestBag(ys)
-        val exp = xs union ys
+    "union" in withBackendContext { implicit ctx =>
+      val act = TestBag(xs) union TestBag(ys)
+      val exp = xs union ys
 
-        act shouldEqual DataBag(exp)
-      }
+      act shouldEqual DataBag(exp)
     }
 
-    "distinct" in {
-      withBackendContext { implicit ctx =>
-        val acts = Seq(TestBag(xs).distinct, TestBag(ys).distinct)
-        val exps = Seq(xs.distinct, ys.distinct)
+    "distinct" in withBackendContext { implicit ctx =>
+      val acts = Seq(TestBag(xs).distinct, TestBag(ys).distinct)
+      val exps = Seq(xs.distinct, ys.distinct)
 
-        for ((act, exp) <- acts zip exps)
-          act shouldEqual TestBag(exp)
-      }
+      for ((act, exp) <- acts zip exps)
+        act shouldEqual TestBag(exp)
     }
+  }
+
+  "sample" - {
+    val s1 = 54326427L
+    val s2 = 23546473L
+
+    "with k >= bag.size" in withBackendContext { implicit ctx =>
+      val xs = TestBag(0 to 7)
+      xs.sample(8) should contain theSameElementsAs (0 to 7)
+      xs.sample(9) should contain theSameElementsAs (0 to 7)
+    }
+
+    "with k < bag.size" in withBackendContext { implicit ctx =>
+      val xs = TestBag(0 to 7)
+      xs.sample(1) shouldEqual xs.sample(1)
+      xs.sample(7) shouldEqual xs.sample(7)
+    }
+
+    "with matching explicit seeds" in withBackendContext { implicit ctx =>
+      val xs = TestBag(0 to 7)
+      xs.sample(1, s1) shouldEqual xs.sample(1, s1)
+      xs.sample(7, s1) shouldEqual xs.sample(7, s1)
+    }
+
+    "with non-matching explicit seeds" in withBackendContext { implicit ctx =>
+      val xs = TestBag(0 to 7)
+      xs.sample(1, s1) shouldNot equal(xs.sample(1, s2))
+      xs.sample(4, s1) shouldNot equal(xs.sample(4, s2))
+    }
+  }
+
+  "zipWithIndex" in withBackendContext { implicit ctx =>
+    val xs = (('a' to 'z') ++ ('A' to 'Z')).map(_.toString)
+
+    val act = TestBag(xs).zipWithIndex().map(_._2)
+    val exp = 0L to 51L
+
+    act shouldEqual DataBag(exp)
   }
 
   "empty" in withBackendContext(implicit ctx =>
@@ -268,12 +288,12 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
 
     "Book" - {
       val exp = Seq(hhBook)
-      s"can read native output" ifSupportsCSV withBackendContext { implicit ctx =>
+      "can read native output" ifSupportsCSV withBackendContext { implicit ctx =>
         val pat = path(s"books.native.csv")
         DataBag(exp).writeCSV(pat, format)
         TestBag.readCSV[Book](pat, format) shouldEqual DataBag(exp)
       }
-      s"can read backend output" ifSupportsCSV withBackendContext { implicit ctx =>
+      "can read backend output" ifSupportsCSV withBackendContext { implicit ctx =>
         val pat = path(s"books.$suffix.csv")
         TestBag(exp).writeCSV(pat, format)
         TestBag.readCSV[Book](pat, format) shouldEqual DataBag(exp)
@@ -282,12 +302,12 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
 
     "Record" - {
       val exp = csvRecords()
-      s"can read native output" ifSupportsCSV withBackendContext { implicit ctx =>
+      "can read native output" ifSupportsCSV withBackendContext { implicit ctx =>
         val pat = path(s"records.native.csv")
         DataBag(exp).writeCSV(pat, format)
         TestBag.readCSV[CSVRecord](pat, format) shouldEqual DataBag(exp)
       }
-      s"can read backend output" ifSupportsCSV withBackendContext { implicit ctx =>
+      "can read backend output" ifSupportsCSV withBackendContext { implicit ctx =>
         val pat = path(s"records.$suffix.csv")
         TestBag(exp).writeCSV(pat, format)
         TestBag.readCSV[CSVRecord](pat, format) shouldEqual DataBag(exp)
@@ -304,12 +324,12 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
 
     "Book" - {
       val exp = Seq(hhBook)
-      s"can read native output" ifSupportsParquet withBackendContext { implicit ctx =>
+      "can read native output" ifSupportsParquet withBackendContext { implicit ctx =>
         val pat = path(s"books.native.parquet")
         DataBag(exp).writeParquet(pat, format)
         TestBag.readParquet[Book](pat, format) shouldEqual DataBag(exp)
       }
-      s"can read backend output" ifSupportsParquet withBackendContext { implicit ctx =>
+      "can read backend output" ifSupportsParquet withBackendContext { implicit ctx =>
         val pat = path(s"books.$suffix.parquet")
         TestBag(exp).writeParquet(pat, format)
         TestBag.readParquet[Book](pat, format) shouldEqual DataBag(exp)
@@ -318,12 +338,12 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
 
     "Record" - {
       val exp = parquetRecords()
-      s"can read native output" ifSupportsParquet withBackendContext { implicit ctx =>
+      "can read native output" ifSupportsParquet withBackendContext { implicit ctx =>
         val pat = path(s"records.native.parquet")
         DataBag(exp).writeParquet(pat, format)
         TestBag.readParquet[ParquetRecord](pat, format).fetch() should contain theSameElementsAs exp
       }
-      s"can read backend output" ifSupportsParquet withBackendContext { implicit ctx =>
+      "can read backend output" ifSupportsParquet withBackendContext { implicit ctx =>
         val pat = path(s"records.$suffix.parquet")
         TestBag(exp).writeParquet(pat, format)
         TestBag.readParquet[ParquetRecord](pat, format).fetch() should contain theSameElementsAs exp

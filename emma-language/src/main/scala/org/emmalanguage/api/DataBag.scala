@@ -106,7 +106,7 @@ trait DataBag[A] extends Serializable {
   def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]]
 
   // -----------------------------------------------------
-  // Set operations
+  // Set Ops
   // -----------------------------------------------------
 
   /**
@@ -131,6 +131,33 @@ trait DataBag[A] extends Serializable {
    * @return A version of this DataBag without duplicate entries.
    */
   def distinct: DataBag[A]
+
+  // -----------------------------------------------------
+  // Partition-based Ops
+  // -----------------------------------------------------
+
+  /**
+   * Creates a sample of up to `k` elements using reservoir sampling initialized with the given `seed`.
+   *
+   * If the collection represented by the [[DataBag]] instance contains less then `n` elements,
+   * the resulting collection is trimmed to a smaller size.
+   *
+   * The method should be deterministic for a fixed [[DataBag]] instance with a materialized result.
+   * In other words, calling `xs.sample(n)(seed)` two times in succession will return the same result.
+   *
+   * The result, however, might vary between program runs and [[DataBag]] implementations.
+   */
+  def sample(k: Int, seed: Long = 5394826801L): Vector[A]
+
+  /**
+   * Zips the elements of this collection with a unique dense index.
+   *
+   * The method should be deterministic for a fixed [[DataBag]] instance with a materialized result.
+   * In other words, calling `xs.zipWithIndex()` two times in succession will return the same result.
+   *
+   * The result, however, might vary between program runs and [[DataBag]] implementations.
+   */
+  def zipWithIndex(): DataBag[(A, Long)]
 
   // -----------------------------------------------------
   // Sinks
@@ -317,17 +344,6 @@ trait DataBag[A] extends Serializable {
    */
   def top(n: Int)(implicit o: Ordering[A]): List[A] =
     fold(Top(n, o))
-
-  /**
-   * Take a random sample of specified size.
-   *
-   * @param n number of elements to return
-   * @return a [[List]] of `n` random elements
-   */
-  def sample(n: Int): List[A] = {
-    if (n <= 0) List.empty[A]
-    else fold(Sample[A](n))._2
-  }
 
   // -----------------------------------------------------
   // equals and hashCode

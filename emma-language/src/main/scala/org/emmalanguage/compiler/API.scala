@@ -78,9 +78,12 @@ protected[emmalanguage] trait API extends AST {
     val withFilter            = op("withFilter")
     // Grouping
     val groupBy               = op("groupBy")
-    // Set operations
+    // Set ops
     val union                 = op("union")
     val distinct              = op("distinct")
+    // Partition-based ops
+    val sample                = op("sample")
+    val zipWithIndex          = op("zipWithIndex")
     // Structural recursion & Folds
     val fold1                 = op("fold", List(1 /*alg*/ , 1 /*meta*/))
     val fold2                 = op("fold", List(1 /*zero*/ , 2 /*init, plus*/ , 1 /*meta*/))
@@ -99,12 +102,12 @@ protected[emmalanguage] trait API extends AST {
     val find                  = op("find")
     val bottom                = op("bottom")
     val top                   = op("top")
-    val sample                = op("sample")
 
     val sinkOps               = Set(fetch, as, writeCSV, writeParquet, writeText)
     val monadOps              = Set(map, flatMap, withFilter)
     val nestOps               = Set(groupBy)
     val boolAlgOps            = Set(union, distinct)
+    val partOps               = Set(sample, zipWithIndex)
     val foldOps               = Set(
       fold1, fold2,
       isEmpty, nonEmpty,
@@ -112,11 +115,10 @@ protected[emmalanguage] trait API extends AST {
       min, max, sum, product,
       size, count,
       exists, forall,
-      find, top, bottom,
-      sample
+      find, top, bottom
     )
 
-    val ops = sinkOps | monadOps | nestOps | boolAlgOps | foldOps
+    val ops = sinkOps | monadOps | nestOps | boolAlgOps | partOps | foldOps
     //@formatter:on
   }
 
