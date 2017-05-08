@@ -39,4 +39,9 @@
         <version>0.1</version>
         <license>Apache License, Version 2.0</license>
     </artifact>
+    <artifact>
+        <groupId>org.scala-tools.testing</groupId>
+        <artifactId>test-interface</artifactId>
+        <license>MIT</license>
+    </artifact>
 </license-lookup>

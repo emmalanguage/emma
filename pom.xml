@@ -888,6 +888,7 @@
         <module>emma-examples</module>
         <module>emma-gui</module>
         <module>emma-quickstart</module>
+        <module>emma-benchmarks</module>
     </modules>
 
 </project>
