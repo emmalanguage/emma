@@ -31,7 +31,10 @@ object KMeans {
   )(
     points: DataBag[Point[PID]] // data-parameters
   ): DataBag[Solution[PID]] = {
-
+    // Required for expanding at runtime.
+    // FIXME: Come up with a better Meta scheme.
+    implicit val pidCTag = ctagFor[PID]
+    implicit val pidTTag = ttagFor[PID]
     val dimensions = points.map(_.vector.length).distinct.fetch()
     assert(dimensions.size == 1,
       "Multiple dimensions in input data. All vectors should have the same length.")

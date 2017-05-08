@@ -49,7 +49,7 @@ This project includes:
   Apache XBean :: ASM 5 shaded (repackaged) under null or null
   ApacheDS I18n under The Apache Software License, Version 2.0
   ApacheDS Protocol Kerberos Codec under The Apache Software License, Version 2.0
-  ASM Core under Apache License, Version 2.0
+  ASM Core under BSD
   Bean Validation API under The Apache Software License, Version 2.0
   breeze under Apache 2
   breeze-macros under Apache 2
@@ -90,6 +90,7 @@ This project includes:
   discipline under MIT
   EL under The Apache Software License, Version 2.0
   emma under The Apache License, Version 2.0
+  emma-benchmarks under The Apache License, Version 2.0
   emma-examples under The Apache License, Version 2.0
   emma-examples-flink under The Apache License, Version 2.0
   emma-examples-library under The Apache License, Version 2.0
@@ -220,6 +221,8 @@ This project includes:
   scala-xml under BSD 3-clause
   scalacheck under BSD-style
   scalactic under the Apache License, ASL Version 2.0
+  scalameter under BSD-style
+  scalameter-core under BSD-style
   Scalap under BSD 3-Clause
   scalatest under the Apache License, ASL Version 2.0
   scalaz-core under BSD-style
@@ -244,7 +247,7 @@ This project includes:
   spray-json under Apache 2
   stream-lib under Apache License, Version 2.0
   Streaming API for XML under Sun Binary Code License
-  test-interface under BSD
+  test-interface under MIT
   The Netty Project under Apache License, Version 2.0
   Uncommons Maths under Apache License, Version 2.0
   univocity-parsers under Apache 2
