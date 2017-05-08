@@ -384,10 +384,14 @@ trait Types { this: AST =>
     }
 
     /** By-name types (`=> T`), legal only in parameter declarations. */
-    // TODO: Define a constructor?
-    object ByNameType {
+    object ByNameType extends Node {
 
       lazy val sym: u.ClassSymbol = ByNameParamClass
+
+      def apply(arg: u.Type): u.Type = {
+        assert(is.defined(arg), s"$this type argument is not defined")
+        typeRef(u.NoPrefix, sym, arg :: Nil)
+      }
 
       def unapply(tpe: u.TypeRef): Option[u.Type] = tpe match {
         case u.TypeRef(_, `sym`, Seq(arg)) => Some(arg)
@@ -396,11 +400,15 @@ trait Types { this: AST =>
     }
 
     /** Vararg types (`T*`), legal only in parameter declarations. */
-    // TODO: Define a constructor?
-    object VarArgType {
+    object VarArgType extends Node {
 
       lazy val scalaSym: u.ClassSymbol = RepeatedParamClass
       lazy val javaSym:  u.ClassSymbol = JavaRepeatedParamClass
+
+      def apply(arg: u.Type): u.Type = {
+        assert(is.defined(arg), s"$this type argument is not defined")
+        typeRef(u.NoPrefix, scalaSym, arg :: Nil)
+      }
 
       def unapply(tpe: u.TypeRef): Option[u.Type] = tpe match {
         case u.TypeRef(_, `scalaSym`, Seq(arg)) => Some(arg)

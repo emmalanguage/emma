@@ -252,30 +252,24 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       } yield (x, y, z)
     })
 
-    //todo: After we have parallelize on newir, move this to a test where we test parallelize
-    // (it doesn't work here because of the closure)
-    //    "multi-way on case classes with local input" in {
-    //      val imdbMovies = imdb
-    //      val cannesWinners = cannes
-    //      val berlinWinnera = berlin
-    //
-    //      // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
-    //      verify(u.reify {
-    //        val cannesTop100 = for {
-    //          movie <- DataBag(imdbMovies)
-    //          winner <- DataBag(cannesWinners)
-    //          if (winner.title, winner.year) == (movie.title, movie.year)
-    //        } yield (movie.year, winner.title)
-    //
-    //        val berlinTop100 = for {
-    //          movie <- DataBag(imdbMovies)
-    //          winner <- DataBag(berlinWinnera)
-    //          if (winner.title, winner.year) == (movie.title, movie.year)
-    //        } yield (movie.year, winner.title)
-    //
-    //        cannesTop100 plus berlinTop100
-    //      })
-    //    }
+    "multi-way on case classes with local input" in {
+      // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
+      verify(u.reify {
+        val cannesTop100 = for {
+          movie <- DataBag(imdb)
+          winner <- DataBag(cannes)
+          if (winner.title, winner.year) == (movie.title, movie.year)
+        } yield (movie.year, winner.title)
+
+        val berlinTop100 = for {
+          movie <- DataBag(imdb)
+          winner <- DataBag(berlin)
+          if (winner.title, winner.year) == (movie.title, movie.year)
+        } yield (movie.year, winner.title)
+
+        cannesTop100 union berlinTop100
+      })
+    }
   }
 
   "Cross" in verify(u.reify {
@@ -298,7 +292,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       val semiFinal = 8
       val bag = DataBag(new Random shuffle 0.until(100).toList)
       val top = for (g <- bag groupBy { _ % semiFinal })
-        yield g.values.fetch().toSeq.sorted.take(semiFinal / 2).sum
+        yield g.values.fetch().sorted.take(semiFinal / 2).sum
 
       top.max
     })
@@ -473,26 +467,8 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
     "of names of case classes" in verify(u.reify {
       val movies = DataBag(imdb)
       val years = for (mov <- movies) yield ImdbYear(mov.year)
-      years forall { case iy @ ImdbYear(y) => iy == ImdbYear(y) }
+      years forall { case iy @ ImdbYear(yr) => iy == ImdbYear(yr) }
     })
-
-    //todo: After we have parallelize on newir, move this to a test where we test parallelize
-    // (it doesn't work here because of the closure)
-    //    "of enclosing class parameters" in {
-    //      // a class that wraps an Emma program and a parameter used within the `parallelize` call
-    //      case class MoviesWithinPeriodQuery(minYear: Int, period: Int) {
-    //        lazy val algorithm = verify(u.reify {
-    //          for {
-    //            movie <- DataBag(imdb)
-    //            if movie.year >= minYear && movie.year < minYear + period
-    //          } yield movie
-    //        }
-    //      }
-    //
-    //      // run the algorithm
-    //      MoviesWithinPeriodQuery(1990, 10)
-    //        .algorithm)
-    //    }
 
     "of local functions" in verify(u.reify {
       val double = (x: Int) => 2 * x
@@ -527,13 +503,13 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   "Miscellaneous" - {
     "Pattern matching in `yield`" in verify(u.reify {
       val range = DataBag(zipWithIndex(0 to 100))
-      val squares = for (xy <- range) yield xy match { case (x, y) => x + y }
+      val squares = for (xy <- range) yield xy match { case (i, j) => i + j }
       squares.sum
     })
 
     "Map with partial function" in verify(u.reify {
       val range = DataBag(zipWithIndex(0 to 100))
-      val squares = range map { case (x, y) => x + y }
+      val squares = range map { case (i, j) => i + j }
       squares.sum
     })
 
@@ -549,6 +525,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       squares.sum
     })
 
+    //noinspection ScalaUnusedSymbol
     "Root package capture" in verify(u.reify {
       val eu = "eu"
       val com = "com"
@@ -559,9 +536,9 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
     })
 
     "Constant expressions" in verify(u.reify {
-      val as = for { x <- DataBag(1 to 100) } yield 1 // map
+      val as = for { _ <- DataBag(1 to 100) } yield 1 // map
       val bs = DataBag(101 to 200) flatMap { _ => DataBag(2 to 4) } // flatMap
-      val cs = for { x <- DataBag(201 to 300) if 5 == 1 } yield 5 // filter
+      val cs = for { _ <- DataBag(201 to 300) if 5 == 1 } yield 5 // filter
       val ds = DataBag(301 to 400) withFilter { _ => true } // filter
       as union bs union cs union ds
     })
