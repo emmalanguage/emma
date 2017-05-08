@@ -167,10 +167,10 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
 
     "flatMap" in withBackendContext { implicit ctx =>
       val act = TestBag(Seq((hhBook, hhCrts)))
-        .flatMap { case (b, cs) => DataBag(cs) }
+        .flatMap { case (_, cs) => DataBag(cs) }
 
       val exp = Seq((hhBook, hhCrts))
-        .flatMap { case (b, cs) => cs }
+        .flatMap { case (_, cs) => cs }
 
       act shouldEqual DataBag(exp)
     }
@@ -273,10 +273,7 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
   }
 
   "empty" in withBackendContext(implicit ctx =>
-    // TODO: Why doesn't this work without an explicit type argument?
-    // Note: It also doesn't work with [Nothing], and the reason for this is probably this:
-    //   https://github.com/emmalanguage/emma/issues/245
-    DataBag.empty[Int].isEmpty shouldBe true
+    DataBag.empty[Nothing].isEmpty shouldBe true
   )
 
   "csv support" - {

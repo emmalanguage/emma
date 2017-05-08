@@ -149,12 +149,23 @@ trait Patterns { this: AST =>
     }
 
     /** Extractor patterns (case class destructors and `unapply` calls). */
-    // TODO: Implement `apply()` constructor
     object PatExtr extends Node {
-      def unapply(extr: u.Tree): Option[(u.Tree, Seq[u.Tree])] = extr match {
-        case app @ u.Apply(tpt @ TypeQuote(_), args)
-          if is.caseClass(app.tpe) => Some(tpt, args)
-        case u.UnApply(unApp, args) => Some(unApp, args)
+
+      def apply(cls: u.Type, args: Seq[u.Tree]): u.Tree = {
+        assert(is.defined(cls),         s"$this constructor is not defined")
+        assert(is.caseClass(cls),       s"$this constructor is not a case class")
+        assert(args.forall(is.defined), s"Not all $this arguments are defined")
+        assert(args.forall(is.pattern), s"Not all $this arguments are valid patterns")
+        val tpt = api.Type.tree(cls)
+        val app = u.Apply(tpt, args.toList)
+        setSymbol(app, cls.typeSymbol)
+        setType(app, cls)
+      }
+
+      def unapply(extr: u.Tree): Option[(u.Type, Seq[u.Tree])] = extr match {
+        case extr @ u.Apply(TypeQuote(_), args)
+          if is.caseClass(extr.tpe) => Some(extr.tpe, args)
+        case extr @ u.UnApply(_, args) => Some(extr.tpe, args)
         case _ => None
       }
     }
