@@ -18,30 +18,23 @@ package compiler
 
 import ast.JavaAST
 
-import java.net.URLClassLoader
-import java.nio.file.{Files, Paths}
-
 import scala.tools.reflect.ToolBoxFactory
 
+import java.io._
+import java.net.URLClassLoader
+import java.nio.file._
+
 /** A reflection-based [[Compiler]]. */
-class RuntimeCompiler extends Compiler with JavaAST {
+class RuntimeCompiler(private var cgd: String = RuntimeCompiler.codeGenDir)
+  extends Compiler with JavaAST with Serializable {
 
-  import RuntimeCompiler._
-  import universe._
-
-  /** The directory where the toolbox will store runtime-generated code. */
-  val codeGenDir = {
-    val path = Paths.get(sys.props.getOrElse("emma.codegen.dir", default.codeGenDir))
-    // Make sure that generated class directory exists
-    Files.createDirectories(path)
-    path.toAbsolutePath.toString
-  }
+  def codeGenDir: String = cgd
 
   /** The generating Scala toolbox. */
-  override val tb = {
+  override lazy val tb = {
     val cl = getClass.getClassLoader
     val factory = new ToolBoxFactory[universe.type](universe) {
-      val mirror = runtimeMirror(cl)
+      val mirror = universe.runtimeMirror(cl)
     }
 
     cl match {
@@ -55,6 +48,16 @@ class RuntimeCompiler extends Compiler with JavaAST {
         factory.mkToolBox(options = s"-d $codeGenDir")
     }
   }
+
+  //noinspection ScalaUnusedSymbol
+  @throws(classOf[IOException])
+  private def writeObject(out: ObjectOutputStream): Unit =
+    out.writeUTF(codeGenDir)
+
+  //noinspection ScalaUnusedSymbol
+  @throws(classOf[IOException])
+  private def readObject(in: ObjectInputStream): Unit =
+    cgd = in.readUTF()
 }
 
 object RuntimeCompiler {
@@ -64,10 +67,18 @@ object RuntimeCompiler {
 
     val runMethod = "run"
 
-    lazy val codeGenDir = Paths
+    val codeGenDir = Paths
       .get(sys.props("java.io.tmpdir"), "emma", "codegen")
       .toAbsolutePath.toString
 
     lazy val instance = new RuntimeCompiler()
+  }
+
+  /** Get the code-gen dir from system properties. */
+  def codeGenDir: String = {
+    val path = Paths.get(sys.props.getOrElse("emma.codegen.dir", default.codeGenDir))
+    // Make sure that generated class directory exists
+    Files.createDirectories(path)
+    path.toAbsolutePath.toString
   }
 }
