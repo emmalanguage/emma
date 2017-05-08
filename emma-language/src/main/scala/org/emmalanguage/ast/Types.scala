@@ -30,7 +30,7 @@ trait Types { this: AST =>
     /** Type names. */
     object TypeName extends Node {
 
-      private val regex = s"(.*)\\$$$freshNameSuffix.*".r
+      private val regex = s"(.*)\\$$$freshNameSuffix(\\d+)".r
 
       // Predefined type names
       lazy val empty    = u.typeNames.EMPTY
@@ -71,9 +71,9 @@ trait Types { this: AST =>
         if (is.defined(prefix)) fresh(prefix.name) else fresh()
 
       /** Tries to return the original name used to create this `fresh` name. */
-      def original(fresh: u.Name): u.TypeName = fresh match {
-        case u.TypeName(regex(original)) => u.TypeName(original)
-        case _ => fresh.toTypeName
+      def original(fresh: u.Name): (u.TypeName, Int) = fresh match {
+        case u.TypeName(regex(original, i)) => u.TypeName(original) -> i.toInt
+        case _ => fresh.toTypeName -> 0
       }
 
       def unapply(name: u.TypeName): Option[String] =

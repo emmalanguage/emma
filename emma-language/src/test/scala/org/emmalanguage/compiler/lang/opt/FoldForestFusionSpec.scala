@@ -155,6 +155,14 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
           plus$r1
         }
         val alg$fold$r1 = alg.Fold(1, id, sum)
+        val alg$fold$r2 = alg.Fold(2, id, sum)
+        val alg$fold$r3 = alg.Fold(3, id, sum)
+        val alg$fold$r4 = alg.Fold(4, id, sum)
+        val alg$fold$r5 = alg.Fold(5, id, sum)
+        val alg$fold$r6 = alg.Fold(6, id, sum)
+        val alg$fold$r7 = alg.Fold(7, id, sum)
+        val alg$fold$r8 = alg.Fold(8, id, sum)
+        val alg$fold$r9 = alg.Fold(9, id, sum)
         val alg$fold$r10 = alg.Fold(10, id, sum)
         val alg$fold$r11 = alg.Fold(11, id, sum)
         val alg$fold$r12 = alg.Fold(12, id, sum)
@@ -165,20 +173,12 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
         val alg$fold$r17 = alg.Fold(17, id, sum)
         val alg$fold$r18 = alg.Fold(18, id, sum)
         val alg$fold$r19 = alg.Fold(19, id, sum)
-        val alg$fold$r2 = alg.Fold(2, id, sum)
         val alg$fold$r20 = alg.Fold(20, id, sum)
         val alg$fold$r21 = alg.Fold(21, id, sum)
         val alg$fold$r22 = alg.Fold(22, id, sum)
         val alg$fold$r23 = alg.Fold(23, id, sum)
         val alg$fold$r24 = alg.Fold(24, id, sum)
         val alg$fold$r25 = alg.Fold(25, id, sum)
-        val alg$fold$r3 = alg.Fold(3, id, sum)
-        val alg$fold$r4 = alg.Fold(4, id, sum)
-        val alg$fold$r5 = alg.Fold(5, id, sum)
-        val alg$fold$r6 = alg.Fold(6, id, sum)
-        val alg$fold$r7 = alg.Fold(7, id, sum)
-        val alg$fold$r8 = alg.Fold(8, id, sum)
-        val alg$fold$r9 = alg.Fold(9, id, sum)
         val to$r1 = intWrapper$r1 to 100
         val alg$Alg22$r1 = alg.Alg22(
           alg$fold$r1, alg$fold$r2, alg$fold$r3, alg$fold$r4, alg$fold$r5, alg$fold$r6, alg$fold$r7, alg$fold$r8,
