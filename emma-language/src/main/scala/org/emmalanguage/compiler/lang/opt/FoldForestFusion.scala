@@ -106,7 +106,10 @@ private[compiler] trait FoldForestFusion extends Common {
 
     private lazy val cs = new Comprehension.Syntax(API.DataBag.sym)
 
-    private val ordTermSymbol = Ordering.by((s: u.TermSymbol) => s.name.toString)
+    private val ordTermSymbol = Ordering.by { (s: u.TermSymbol) =>
+      val (name, i) = api.TermName.original(s.name)
+      name.toString -> i
+    }
 
     /** Constructs an index from a sequence of key-value pairs. */
     private def mkIndex(elems: (u.TermSymbol, u.Tree)*): Index =

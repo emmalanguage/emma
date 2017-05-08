@@ -116,7 +116,7 @@ private[core] trait DSCF extends Common {
           }))
         case Attr.none(core.DefDef(method, _, paramss, _)) =>
           paramss.flatten.map { case core.ParDef(p, _) =>
-            (method, api.TermName.original(p.name)) -> core.Ref(p)
+            (method, api.TermName.original(p.name)._1) -> core.Ref(p)
           } (breakOut)
       } (overwrite).transformSyn {
         // Eliminate variables
