@@ -234,9 +234,8 @@ trait CommonAST {
 
     /** Is `tree` a term? */
     def term(tree: Tree): Boolean = tree match {
-      case Ident(termNames.WILDCARD) => false
-      case id: Ident       => id.symbol.isTerm && is.result(id.tpe)
-      case sel: Select     => sel.symbol.isTerm && is.result(sel.tpe)
+      case id: Ident       => is.defined(id.symbol) && id.symbol.isTerm && is.result(id.tpe)
+      case sel: Select     => is.defined(sel.symbol) && sel.symbol.isTerm && is.result(sel.tpe)
       case app: Apply      => is.result(app.tpe)
       case tapp: TypeApply => is.result(tapp.tpe)
       case _: Assign       => false
