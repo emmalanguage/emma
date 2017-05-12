@@ -28,7 +28,7 @@ class SparkConnectedComponentsIntegrationSpec extends BaseConnectedComponentsInt
 object SparkConnectedComponentsIntegrationSpec extends SparkAware {
 
   def apply(edges: Seq[Edge[Int]]): Seq[LVertex[Int, Int]] =
-    emma.onSpark {
+    withDefaultSparkSession(implicit spark => emma.onSpark {
       ConnectedComponents[Int](DataBag(edges)).fetch()
-    }
+    })
 }

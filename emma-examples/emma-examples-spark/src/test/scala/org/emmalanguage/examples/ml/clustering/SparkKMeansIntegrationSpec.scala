@@ -27,7 +27,7 @@ import breeze.linalg.{Vector => Vec}
 class SparkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec with SparkAware {
 
   override def kMeans(k: Int, epsilon: Double, iterations: Int, input: String): Set[Solution[Long]] =
-    emma.onSpark {
+    withDefaultSparkSession(implicit spark => emma.onSpark {
       // read the input
       val points = for (line <- DataBag.readCSV[String](input, CSV())) yield {
         val record = line.split("\t")
@@ -37,5 +37,5 @@ class SparkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec with SparkAwa
       val result = KMeans(k, epsilon, iterations)(points)
       // return the solution as a local set
       result.fetch().toSet[Solution[Long]]
-    }
+    })
 }

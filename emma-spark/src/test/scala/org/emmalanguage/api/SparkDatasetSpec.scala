@@ -27,5 +27,5 @@ class SparkDatasetSpec extends DataBagSpec with SparkAware {
   override val suffix = "spark-dataset"
 
   override def withBackendContext[T](f: BackendContext => T): T =
-    f(sparkSession)
+    f(defaultSparkSession)
 }

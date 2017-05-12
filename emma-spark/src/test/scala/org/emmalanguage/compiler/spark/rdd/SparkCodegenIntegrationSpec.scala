@@ -34,7 +34,7 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkA
   type Env = SparkSession
 
   override lazy val Env = api.Type[org.apache.spark.sql.SparkSession]
-  override lazy val env = sparkSession
+  override lazy val env = defaultSparkSession
 
   override lazy val backendPipeline: u.Tree => u.Tree =
     Backend.specialize(SparkAPI)
@@ -43,10 +43,13 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkA
   // Distributed collection conversion
   // --------------------------------------------------------------------------
 
-  "Convert from/to a Spark RDD" in verify(reify {
-    val xs = DataBag(1 to 1000).withFilter(_ > 800)
-    val ys = xs.as[RDD].filter(_ < 200)
-    val zs = DataBag.from(ys)
-    zs.size
-  })
+  "Convert from/to a Spark RDD" in {
+    implicit val e: Env = env
+    verify(reify {
+      val xs = DataBag(1 to 1000).withFilter(_ > 800)
+      val ys = xs.as[RDD].filter(_ < 200)
+      val zs = DataBag.from(ys)
+      zs.size
+    })
+  }
 }

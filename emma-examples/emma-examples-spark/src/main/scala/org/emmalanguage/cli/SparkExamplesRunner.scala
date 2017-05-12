@@ -32,7 +32,7 @@ import org.apache.spark.sql.SparkSession
 
 import scala.reflect.ClassTag
 
-object SparkExamplesRunner {
+object SparkExamplesRunner extends SparkAware {
 
   // ---------------------------------------------------------------------------
   // Config and helper type aliases
@@ -42,19 +42,22 @@ object SparkExamplesRunner {
   case class Config
   (
     // general parameters
-    master      : String               = "local[*]",
-    command     : Option[String]       = None,
+    master       : String               = defaultSparkConfig.master,
+    warehouseDir : String               = defaultSparkConfig.warehouseDir,
+    command      : Option[String]       = None,
     // union of all parameters bound by a command option or argument
     // (in alphabetic order)
-    csv         : CSV                  = CSV(),
-    epsilon     : Double               = 0,
-    iterations  : Int                  = 0,
-    input       : String               = System.getProperty("java.io.tmpdir"),
-    k           : Int                  = 0,
-    lambda      : Double               = 0,
-    nbModelType : NaiveBayes.ModelType = NaiveBayes.ModelType.Bernoulli,
-    output      : String               = System.getProperty("java.io.tmpdir")
-  )
+    csv          : CSV                  = CSV(),
+    epsilon      : Double               = 0,
+    iterations   : Int                  = 0,
+    input        : String               = sys.props("java.io.tmpdir"),
+    k            : Int                  = 0,
+    lambda       : Double               = 0,
+    nbModelType  : NaiveBayes.ModelType = NaiveBayes.ModelType.Bernoulli,
+    output       : String               = sys.props("java.io.tmpdir")
+  ) extends SparkConfig {
+    lazy val appName = s"Emma example: ${command.getOrElse("unknown")}"
+  }
   //@formatter:on
 
   // ---------------------------------------------------------------------------
@@ -260,11 +263,6 @@ object SparkExamplesRunner {
   // ---------------------------------------------------------------------------
   // Helper methods
   // ---------------------------------------------------------------------------
-
-  private def sparkSession(c: Config): SparkSession = SparkSession.builder()
-    .master(c.master)
-    .appName(s"Emma example: ${c.command.get}")
-    .getOrCreate()
 
   class Parser extends scopt.OptionParser[Config]("emma-examples") {
 

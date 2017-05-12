@@ -18,12 +18,33 @@ package org.emmalanguage
 import org.apache.log4j.Logger
 import org.apache.spark.sql.SparkSession
 
+import java.nio.file.Paths
+
 trait SparkAware {
 
   Logger.getLogger("org.apache.spark").setLevel(org.apache.log4j.Level.WARN)
 
-  implicit lazy val sparkSession = SparkSession.builder()
-    .master("local[*]")
-    .appName(this.getClass.getSimpleName)
+  protected trait SparkConfig {
+    val appName: String
+    val master: String
+    val warehouseDir: String
+  }
+
+  protected val defaultSparkConfig = new SparkConfig {
+    val appName = this.getClass.getSimpleName
+    val master = "local[*]"
+    val warehouseDir = Paths.get(sys.props("java.io.tmpdir"), "spark-warehouse").toUri.toString
+  }
+
+  protected lazy val defaultSparkSession =
+    sparkSession(defaultSparkConfig)
+
+  protected def sparkSession(c: SparkConfig): SparkSession = SparkSession.builder()
+    .appName(c.appName)
+    .master(c.master)
+    .config("spark.sql.warehouse.dir", c.warehouseDir)
     .getOrCreate()
+
+  protected def withDefaultSparkSession[T](f: SparkSession => T): T =
+    f(defaultSparkSession)
 }

@@ -23,7 +23,7 @@ import model.Edge
 class SparkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec with SparkAware {
 
   override def triangleCount(input: String, csv: CSV): Long =
-    emma.onSpark {
+    withDefaultSparkSession(implicit spark => emma.onSpark {
       // read a bag of directed edges
       // and convert it into an undirected bag without duplicates
       val incoming = DataBag.readCSV[Edge[Long]](input, csv)
@@ -33,5 +33,5 @@ class SparkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec
       val triangles = EnumerateTriangles(edges)
       // count and return the number of enumerated triangles
       triangles.size
-    }
+    })
 }

@@ -23,12 +23,12 @@ import model.Edge
 class SparkTransitiveClosureIntegrationSpec extends BaseTransitiveClosureIntegrationSpec with SparkAware {
 
   override def transitiveClosure(input: String, csv: CSV): Set[Edge[Long]] =
-    emma.onSpark {
+    withDefaultSparkSession(implicit spark => emma.onSpark {
       // read in set of edges
       val edges = DataBag.readCSV[Edge[Long]](input, csv)
       // build the transitive closure
       val paths = TransitiveClosure(edges)
       // return the closure as local set
       paths.fetch().toSet
-    }
+    })
 }
