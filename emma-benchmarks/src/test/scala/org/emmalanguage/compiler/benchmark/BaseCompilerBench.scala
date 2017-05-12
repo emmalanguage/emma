@@ -101,7 +101,7 @@ trait BaseCompilerBench extends Bench.OnlineRegressionReport {
 
   val kMeans = reify {
     val points = DataBag.readCSV[Point[Long]](input, csv)
-    KMeans[Long](8, 1e-3, 10)(points)
+    KMeans[Long](2, 8, 1e-3, 10)(points)
   }
 
   val wordCount = reify {
