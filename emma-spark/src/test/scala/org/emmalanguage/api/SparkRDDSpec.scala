@@ -27,5 +27,5 @@ class SparkRDDSpec extends DataBagSpec with SparkAware {
   override val suffix = "spark-rdd"
 
   override def withBackendContext[T](f: BackendContext => T): T =
-    f(sparkSession)
+    withDefaultSparkSession(f)
 }

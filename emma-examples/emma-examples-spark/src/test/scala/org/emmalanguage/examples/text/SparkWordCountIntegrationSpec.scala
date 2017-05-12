@@ -22,12 +22,12 @@ import io.csv._
 class SparkWordCountIntegrationSpec extends BaseWordCountIntegrationSpec with SparkAware {
 
   override def wordCount(input: String, output: String, csv: CSV): Unit =
-    emma.onSpark {
+    withDefaultSparkSession(implicit spark => emma.onSpark {
       // read the input
       val docs = DataBag.readCSV[String](input, csv)
       // parse and count the words
       val counts = WordCount(docs)
       // write the results into a file
       counts.writeCSV(output, csv)
-    }
+    })
 }

@@ -26,7 +26,7 @@ import breeze.linalg.{Vector => Vec}
 class SparkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec with SparkAware {
 
   def naiveBayes(input: String, lambda: Double, modelType: MType): Set[Model] =
-    emma.onSpark {
+    withDefaultSparkSession(implicit spark => emma.onSpark {
       // read the input
       val data = for (line <- DataBag.readCSV[String](input, CSV())) yield {
         val record = line.split(",").map(_.toDouble)
@@ -36,5 +36,5 @@ class SparkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec with 
       val result = NaiveBayes(lambda, modelType)(data)
       // fetch the result locally
       result.fetch().toSet[Model]
-    }
+    })
 }
