@@ -34,7 +34,7 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkA
   type Env = ExecutionEnvironment
 
   override lazy val Env = api.Type[org.apache.flink.api.scala.ExecutionEnvironment]
-  override lazy val env = flinkEnv
+  override lazy val env = defaultFlinkEnv
 
   override lazy val backendPipeline: u.Tree => u.Tree =
     Backend.specialize(FlinkAPI)
@@ -43,10 +43,13 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkA
   // Distributed collection conversion
   // --------------------------------------------------------------------------
 
-  "Convert from/to a Flink DataSet" in verify(reify {
-    val xs = DataBag(1 to 1000).withFilter(_ > 800)
-    val ys = xs.as[DataSet].filter(_ < 200)
-    val zs = DataBag.from(ys)
-    zs.size
-  })
+  "Convert from/to a Flink DataSet" in {
+    implicit val e: Env = env
+    verify(reify {
+      val xs = DataBag(1 to 1000).withFilter(_ > 800)
+      val ys = xs.as[DataSet].filter(_ < 200)
+      val zs = DataBag.from(ys)
+      zs.size
+    })
+  }
 }

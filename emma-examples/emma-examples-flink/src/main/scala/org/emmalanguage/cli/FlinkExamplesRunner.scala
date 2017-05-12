@@ -32,7 +32,7 @@ import org.apache.flink.api.scala.ExecutionEnvironment
 
 import scala.reflect.ClassTag
 
-object FlinkExamplesRunner {
+object FlinkExamplesRunner extends FlinkAware {
 
   // ---------------------------------------------------------------------------
   // Config and helper type aliases
@@ -53,7 +53,7 @@ object FlinkExamplesRunner {
     lambda      : Double               = 0,
     nbModelType : NaiveBayes.ModelType = NaiveBayes.ModelType.Bernoulli,
     output      : String               = System.getProperty("java.io.tmpdir")
-  )
+  ) extends FlinkConfig
   //@formatter:on
 
   // ---------------------------------------------------------------------------
@@ -157,19 +157,19 @@ object FlinkExamplesRunner {
       res <- cmd match {
         // Graphs
         case "connected-components" =>
-          Some(connectedComponents(cfg)(flinkExecEnv(cfg)))
+          Some(connectedComponents(cfg)(flinkEnv(cfg)))
         case "transitive-closure" =>
-          Some(transitiveClosure(cfg)(flinkExecEnv(cfg)))
+          Some(transitiveClosure(cfg)(flinkEnv(cfg)))
         case "triangle-count" =>
-          Some(triangleCount(cfg)(flinkExecEnv(cfg)))
+          Some(triangleCount(cfg)(flinkEnv(cfg)))
         // Machine Learning
         case "naive-bayes" =>
-          Some(naiveBayes(cfg)(flinkExecEnv(cfg)))
+          Some(naiveBayes(cfg)(flinkEnv(cfg)))
         case "k-means" =>
-          Some(kMeans(cfg)(flinkExecEnv(cfg)))
+          Some(kMeans(cfg)(flinkEnv(cfg)))
         // Text
         case "word-count" =>
-          Some(wordCount(cfg)(flinkExecEnv(cfg)))
+          Some(wordCount(cfg)(flinkEnv(cfg)))
         case _ =>
           None
       }
@@ -261,9 +261,6 @@ object FlinkExamplesRunner {
   // ---------------------------------------------------------------------------
   // Helper methods
   // ---------------------------------------------------------------------------
-
-  private def flinkExecEnv(c: Config): ExecutionEnvironment =
-    ExecutionEnvironment.getExecutionEnvironment
 
   class Parser extends scopt.OptionParser[Config]("emma-examples") {
 

@@ -34,7 +34,7 @@ class FlinkDataSetSpec extends DataBagSpec with BeforeAndAfter with FlinkAware {
   override val suffix = "flink"
 
   override def withBackendContext[T](f: BackendContext => T): T =
-    f(flinkEnv)
+    withDefaultFlinkEnv(f)
 
   val codegenDir = new File(tempPath("codegen"))
 

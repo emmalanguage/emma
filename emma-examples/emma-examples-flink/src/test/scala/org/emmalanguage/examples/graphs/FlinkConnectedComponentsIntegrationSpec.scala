@@ -28,9 +28,9 @@ class FlinkConnectedComponentsIntegrationSpec extends BaseConnectedComponentsInt
 object FlinkConnectedComponentsIntegrationSpec extends FlinkAware {
 
   def apply(edges: Seq[Edge[Int]]): Seq[LVertex[Int, Int]] =
-    emma.onFlink {
+    withDefaultFlinkEnv(implicit flink => emma.onFlink {
       val es = DataBag(edges)
       val rs = ConnectedComponents[Int](es)
       rs.fetch()
-    }
+    })
 }
