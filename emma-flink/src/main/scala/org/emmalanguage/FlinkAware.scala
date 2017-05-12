@@ -21,10 +21,21 @@ import org.apache.log4j.Logger
 trait FlinkAware {
 
   Logger.getLogger("org.apache.flink").setLevel(org.apache.log4j.Level.WARN)
+  Logger.getLogger("org.apache.flink.api.common.io.BinaryInputFormat").setLevel(org.apache.log4j.Level.ERROR)
 
-  implicit lazy val flinkEnv = {
+  protected trait FlinkConfig
+
+  protected val defaultFlinkConfig = new FlinkConfig {}
+
+  protected lazy val defaultFlinkEnv =
+    flinkEnv(defaultFlinkConfig)
+
+  protected def flinkEnv(c: FlinkConfig): ExecutionEnvironment = {
     val env = ExecutionEnvironment.getExecutionEnvironment
     env.getConfig.disableSysoutLogging()
     env
   }
+
+  protected def withDefaultFlinkEnv[T](f: ExecutionEnvironment => T): T =
+    f(defaultFlinkEnv)
 }

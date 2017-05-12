@@ -23,7 +23,7 @@ import model.Edge
 class FlinkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec with FlinkAware {
 
   override def triangleCount(input: String, csv: CSV): Long =
-    emma.onFlink {
+    withDefaultFlinkEnv(implicit flink => emma.onFlink {
       // read a bag of directed edges
       // and convert it into an undirected bag without duplicates
       val incoming = DataBag.readCSV[Edge[Long]](input, csv)
@@ -33,5 +33,5 @@ class FlinkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec
       val triangles = EnumerateTriangles(edges)
       // count and return the number of enumerated triangles
       triangles.size
-    }
+    })
 }
