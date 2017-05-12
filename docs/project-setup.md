@@ -150,7 +150,7 @@ $FLINK run -C "file://$CODEGEN/" \
 {% highlight bash%}
 $FLINK run -C "file://$CODEGEN/" \
   emma-quickstart-flink/target/emma-quickstart-flink-0.1-SNAPSHOT.jar \
-  k-means 4 0.001 10 \
+  k-means 2 4 0.001 10 \
   hdfs://$HDFS_ADDR/tmp/input/ml/clustering/kmeans/points.tsv \
   hdfs://$HDFS_ADDR/tmp/output/kmeans-output.tsv \
   --codegen "$CODEGEN"
@@ -207,7 +207,7 @@ $SPARK --master "spark://$SPARK_ADDR" \
 {% highlight bash%}
 $SPARK --master "spark://$SPARK_ADDR" \
   emma-quickstart-spark/target/emma-quickstart-spark-0.1-SNAPSHOT.jar \
-  k-means 4 0.001 10 \
+  k-means 2 4 0.001 10 \
   hdfs://$HDFS_ADDR/tmp/input/ml/clustering/kmeans/points.tsv \
   hdfs://$HDFS_ADDR/tmp/output/kmeans-output.tsv \
   --master "spark://$SPARK_ADDR"

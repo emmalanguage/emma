@@ -10,16 +10,13 @@ import algorithms.ml.clustering._
 import algorithms.ml.model._
 import algorithms.text._
 
-import breeze.linalg.{Vector => Vec}
 import org.apache.flink.api.scala.ExecutionEnvironment
+import org.emmalanguage.FlinkAware
 import org.emmalanguage.api.Meta.Projections._
 import org.emmalanguage.api._
 import org.emmalanguage.io.csv._
-import org.emmalanguage.util.Iso
 
-import scala.reflect.ClassTag
-
-object FlinkRunner {
+object FlinkRunner extends FlinkAware {
 
   // ---------------------------------------------------------------------------
   // Config and helper type aliases
@@ -36,9 +33,10 @@ object FlinkRunner {
     epsilon     : Double               = 0,
     iterations  : Int                  = 0,
     input       : String               = System.getProperty("java.io.tmpdir"),
+    D           : Int                  = 0,
     k           : Int                  = 0,
     output      : String               = System.getProperty("java.io.tmpdir")
-  )
+  ) extends FlinkConfig
   //@formatter:on
 
   // ---------------------------------------------------------------------------
@@ -73,9 +71,14 @@ object FlinkRunner {
     cmd("k-means")
       .text("K-Means Clustering")
       .children(
+        arg[Int]("D")
+          .text("number of dimensions")
+          .action((x, c) => c.copy(D = x))
+          .validate(between("D", 0, Int.MaxValue)),
         arg[Int]("k")
           .text("number of clusters")
-          .action((x, c) => c.copy(k = x)),
+          .action((x, c) => c.copy(k = x))
+          .validate(between("k", 0, Int.MaxValue)),
         arg[Double]("epsilon")
           .text("termination threshold")
           .action((x, c) => c.copy(epsilon = x))
@@ -110,13 +113,13 @@ object FlinkRunner {
       res <- cmd match {
         // Graphs
         case "transitive-closure" =>
-          Some(transitiveClosure(cfg)(flinkExecEnv(cfg)))
+          Some(transitiveClosure(cfg)(flinkEnv(cfg)))
         // Machine Learning
         case "k-means" =>
-          Some(kMeans(cfg)(flinkExecEnv(cfg)))
+          Some(kMeans(cfg)(flinkEnv(cfg)))
         // Text
         case "word-count" =>
-          Some(wordCount(cfg)(flinkExecEnv(cfg)))
+          Some(wordCount(cfg)(flinkEnv(cfg)))
         case _ =>
           None
       }
@@ -125,9 +128,6 @@ object FlinkRunner {
   // ---------------------------------------------------------------------------
   // Parallelized algorithms
   // ---------------------------------------------------------------------------
-
-  implicit def breezeVectorCSVConverter[V: CSVColumn : ClassTag]: CSVConverter[Vec[V]] =
-    CSVConverter.iso[Array[V], Vec[V]](Iso.make(Vec.apply, _.toArray), implicitly)
 
   // Graphs
 
@@ -148,12 +148,12 @@ object FlinkRunner {
       // read the input
       val points = for (line <- DataBag.readText(c.input)) yield {
         val record = line.split("${symbol_escape}t")
-        Point(record.head.toLong, Vec(record.tail.map(_.toDouble)))
+        Point(record.head.toLong, record.tail.map(_.toDouble))
       }
       // do the clustering
-      val solution = KMeans(c.k, c.epsilon, c.iterations)(points)
+      val solution = KMeans(c.D, c.k, c.epsilon, c.iterations)(points)
       // write the (pointID, clusterID) pairs into a file
-      solution.map(s => (s.point.id, s.clusterID)).writeCSV(c.output, c.csv)
+      solution.map(s => (s.id, s.label.id)).writeCSV(c.output, c.csv)
     }
 
   // Text
@@ -171,9 +171,6 @@ object FlinkRunner {
   // ---------------------------------------------------------------------------
   // Helper methods
   // ---------------------------------------------------------------------------
-
-  private def flinkExecEnv(c: Config): ExecutionEnvironment =
-    ExecutionEnvironment.getExecutionEnvironment
 
   class Parser extends scopt.OptionParser[Config]("${parentArtifactId}") {
 
