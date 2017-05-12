@@ -10,16 +10,13 @@ import algorithms.ml.clustering._
 import algorithms.ml.model._
 import algorithms.text._
 
-import breeze.linalg.{Vector => Vec}
 import org.apache.spark.sql.SparkSession
+import org.emmalanguage.SparkAware
 import org.emmalanguage.api.Meta.Projections._
 import org.emmalanguage.api._
 import org.emmalanguage.io.csv._
-import org.emmalanguage.util.Iso
 
-import scala.reflect.ClassTag
-
-object SparkRunner {
+object SparkRunner extends SparkAware {
 
   // ---------------------------------------------------------------------------
   // Config and helper type aliases
@@ -29,17 +26,21 @@ object SparkRunner {
   case class Config
   (
     // general parameters
-    master      : String               = "local[*]",
-    command     : Option[String]       = None,
+    master       : String               = defaultSparkConfig.master,
+    warehouseDir : String               = defaultSparkConfig.warehouseDir,
+    command      : Option[String]       = None,
     // union of all parameters bound by a command option or argument
     // (in alphabetic order)
-    csv         : CSV                  = CSV(),
-    epsilon     : Double               = 0,
-    iterations  : Int                  = 0,
-    input       : String               = System.getProperty("java.io.tmpdir"),
-    k           : Int                  = 0,
-    output      : String               = System.getProperty("java.io.tmpdir")
-  )
+    csv          : CSV                  = CSV(),
+    epsilon      : Double               = 0,
+    iterations   : Int                  = 0,
+    input        : String               = sys.props("java.io.tmpdir"),
+    D            : Int                  = 0,
+    k            : Int                  = 0,
+    output       : String               = sys.props("java.io.tmpdir")
+  ) extends SparkConfig {
+    lazy val appName = s"Emma example: ${symbol_dollar}{command.getOrElse("unknown")}"
+  }
   //@formatter:on
 
   // ---------------------------------------------------------------------------
@@ -78,9 +79,14 @@ object SparkRunner {
     cmd("k-means")
       .text("K-Means Clustering")
       .children(
+        arg[Int]("D")
+          .text("number of dimensions")
+          .action((x, c) => c.copy(D = x))
+          .validate(between("D", 0, Int.MaxValue)),
         arg[Int]("k")
           .text("number of clusters")
-          .action((x, c) => c.copy(k = x)),
+          .action((x, c) => c.copy(k = x))
+          .validate(between("k", 0, Int.MaxValue)),
         arg[Double]("epsilon")
           .text("termination threshold")
           .action((x, c) => c.copy(epsilon = x))
@@ -131,10 +137,6 @@ object SparkRunner {
   // Parallelized algorithms
   // ---------------------------------------------------------------------------
 
-  implicit def breezeVectorCSVConverter[V](implicit V: CSVColumn[V], ctag: ClassTag[V])
-  : CSVConverter[Vec[V]] = CSVConverter.iso[Array[V], Vec[V]](
-    Iso.make(Vec.apply, _.toArray), implicitly)
-
   // Graphs
 
   def transitiveClosure(c: Config)(implicit spark: SparkSession): Unit =
@@ -154,12 +156,12 @@ object SparkRunner {
       // read the input
       val points = for (line <- DataBag.readText(c.input)) yield {
         val record = line.split("${symbol_escape}t")
-        Point(record.head.toLong, Vec(record.tail.map(_.toDouble)))
+        Point(record.head.toLong, record.tail.map(_.toDouble))
       }
       // do the clustering
-      val solution = KMeans(c.k, c.epsilon, c.iterations)(points)
+      val solution = KMeans(c.D, c.k, c.epsilon, c.iterations)(points)
       // write the (pointID, clusterID) pairs into a file
-      solution.map(s => (s.point.id, s.clusterID)).writeCSV(c.output, c.csv)
+      solution.map(s => (s.id, s.label.id)).writeCSV(c.output, c.csv)
     }
 
   // Text
@@ -177,11 +179,6 @@ object SparkRunner {
   // ---------------------------------------------------------------------------
   // Helper methods
   // ---------------------------------------------------------------------------
-
-  private def sparkSession(c: Config): SparkSession = SparkSession.builder()
-    .master(c.master)
-    .appName(s"Emma example: c.command")
-    .getOrCreate()
 
   class Parser extends scopt.OptionParser[Config]("${parentArtifactId}") {
 
