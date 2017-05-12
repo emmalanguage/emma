@@ -62,7 +62,7 @@ trait BaseKMeansIntegrationSpec extends FlatSpec with Matchers with BeforeAndAft
     val act =
       clusters(for {
         s <- kMeans(exp.size, epsilon, iterations, s"$path/points.tsv")
-      } yield (s.point.id, s.clusterID))
+      } yield (s.id, s.label.id))
 
     val correctClusters = for {
       act <- act

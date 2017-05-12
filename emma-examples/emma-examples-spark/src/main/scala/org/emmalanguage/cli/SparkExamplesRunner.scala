@@ -51,6 +51,7 @@ object SparkExamplesRunner extends SparkAware {
     epsilon      : Double               = 0,
     iterations   : Int                  = 0,
     input        : String               = sys.props("java.io.tmpdir"),
+    D            : Int                  = 0,
     k            : Int                  = 0,
     lambda       : Double               = 0,
     nbModelType  : NaiveBayes.ModelType = NaiveBayes.ModelType.Bernoulli,
@@ -121,13 +122,14 @@ object SparkExamplesRunner extends SparkAware {
     cmd("k-means")
       .text("K-Means Clustering")
       .children(
+        arg[Int]("D")
+          .text("number of dimensions")
+          .action((x, c) => c.copy(D = x))
+          .validate(between("D", 0, Int.MaxValue)),
         arg[Int]("k")
           .text("number of clusters")
-          .action((x, c) => c.copy(k = x)),
-        arg[Double]("epsilon")
-          .text("termination threshold")
-          .action((x, c) => c.copy(epsilon = x))
-          .validate(between("epsilon", 0, 1.0)),
+          .action((x, c) => c.copy(k = x))
+          .validate(between("k", 0, Int.MaxValue)),
         arg[Int]("iterations")
           .text("number of repeated iterations")
           .action((x, c) => c.copy(iterations = x))
@@ -240,12 +242,12 @@ object SparkExamplesRunner extends SparkAware {
       // read the input
       val points = for (line <- DataBag.readText(c.input)) yield {
         val record = line.split("\t")
-        Point(record.head.toLong, Vec(record.tail.map(_.toDouble)))
+        Point(record.head.toLong, record.tail.map(_.toDouble))
       }
       // do the clustering
-      val solution = KMeans(c.k, c.epsilon, c.iterations)(points)
+      val solution = KMeans(c.D, c.k, c.epsilon, c.iterations)(points)
       // write the (pointID, clusterID) pairs into a file
-      solution.map(s => (s.point.id, s.clusterID)).writeCSV(c.output, c.csv)
+      solution.map(s => (s.id, s.label.id)).writeCSV(c.output, c.csv)
     }
 
   // Text

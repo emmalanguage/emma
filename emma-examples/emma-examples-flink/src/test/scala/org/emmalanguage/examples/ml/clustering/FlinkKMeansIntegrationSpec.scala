@@ -21,8 +21,6 @@ import api.Meta.Projections._
 import api._
 import examples.ml.model._
 
-import breeze.linalg.{Vector => Vec}
-
 class FlinkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec with FlinkAware {
 
   override def kMeans(k: Int, epsilon: Double, iterations: Int, input: String): Set[Solution[Long]] =
@@ -30,10 +28,10 @@ class FlinkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec with FlinkAwa
       // read the input
       val points = for (line <- DataBag.readText(input)) yield {
         val record = line.split("\t")
-        Point(record.head.toLong, Vec(record.tail.map(_.toDouble)))
+        Point(record.head.toLong, record.tail.map(_.toDouble))
       }
       // do the clustering
-      val result = KMeans(k, epsilon, iterations)(points)
+      val result = KMeans(2, k, epsilon, iterations)(points)
       // return the solution as a local set
       result.fetch().toSet[Solution[Long]]
     })
