@@ -1,1 +1,2 @@
-$(document).foundation()
+$("#offCanvasLeft").css("display", "block");
+$(document).foundation();

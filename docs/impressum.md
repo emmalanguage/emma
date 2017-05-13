@@ -22,7 +22,7 @@ This project is partly funded by the [DFG](http://www.dfg.de/en/) as [FOR 1306 S
         <img style="height:50px;" src="{{ site.baseurl }}/img/logo/stratosphere_logo.png" alt="Stratosphere">
     </a>
     <a href="http://www.dfg.de/en/" target="_blank" style="margin: 0 2ex">
-        <img style="height:50px;" src="{{ site.baseurl }}/img/logo/dfg_logo_blau.jpg" alt="DFG">
+        <img style="height:50px;" src="{{ site.baseurl }}/img/logo/dfg_logo_blau.png" alt="DFG">
     </a>
     <a href="http://www.bmbf.de/en/" target="_blank" style="margin: 0 2ex">
         <img style="height:50px;" src="{{ site.baseurl }}/img/logo/bmbf-logo.png" alt="BMBF">

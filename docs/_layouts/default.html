@@ -4,15 +4,13 @@
     {% include head.html %}
 <body>
 
-<div class="off-canvas-wrapper" data-offcanvas>
-    {% include navigation.top.html nav=page.nav %}
+{% include navigation.top.html nav=page.nav %}
 
-    <section id="main-content" class="off-canvas-content" data-off-canvas-content>
-        {{ content }}
-    </section>
+<section id="main-content" class="off-canvas-content" data-off-canvas-content>
+    {{ content }}
+</section>
 
-    {% include footer.html nav=page.nav %}
-</div>
+{% include footer.html nav=page.nav %}
 
 {% include scripts.html %}
 </body>
