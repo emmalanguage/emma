@@ -38,9 +38,11 @@ section.content-container {
 }
 
 code, kbd {
-    border: 1px solid #073642;
-    background: #002b36;
-    color: #839496;
+    border: none;
+    background: transparent;
+    color: #b58900;
+    padding-left: 0;
+    padding-right: 0;
 }
 
 .tabs {
