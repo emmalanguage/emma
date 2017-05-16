@@ -16,24 +16,23 @@
 package org.emmalanguage
 package api
 
+import api.alg.Alg
 import cogadb.CoGaDB
 import compiler.lang.cogadb._
+import compiler.lang.cogadb.ast.MapUdf
 import io.csv._
 import io.parquet._
 import io.text._
 
-import scala.language.higherKinds
 import scala.language.implicitConversions
 
 /** A `DataBag` implementation backed by a Scala `Seq`. */
 class CoGaDBTable[A: Meta] private[emmalanguage]
 (
-  private[emmalanguage] val rep: ast.Op
+  private[emmalanguage] var rep: ast.Op
 )(
   @transient implicit val cogadb: CoGaDB
 ) extends DataBag[A] {
-
-  import Meta.Projections._
 
   @transient override val m = implicitly[Meta[A]]
 
@@ -41,17 +40,17 @@ class CoGaDBTable[A: Meta] private[emmalanguage]
   // Structural recursion
   // -----------------------------------------------------
 
-  override def fold[B: Meta](z: B)(s: A => B, p: (B, B) => B): B =
+  def fold[B: Meta](agg: Alg[A, B]): B =
     ???
 
   // -----------------------------------------------------
   // Monad Ops
   // -----------------------------------------------------
 
-  override def map[B: Meta](f: (A) => B): DataBag[B] =
+  def map[B: Meta](f: (A) => B): DataBag[B] =
     ???
 
-  override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
+  def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
     ???
 
   def withFilter(p: (A) => Boolean): DataBag[A] =
@@ -61,17 +60,28 @@ class CoGaDBTable[A: Meta] private[emmalanguage]
   // Grouping
   // -----------------------------------------------------
 
-  override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
+  def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
     ???
 
   // -----------------------------------------------------
   // Set operations
   // -----------------------------------------------------
 
-  override def union(that: DataBag[A]): DataBag[A] =
+  def union(that: DataBag[A]): DataBag[A] =
     ???
 
-  override def distinct: DataBag[A] =
+  def distinct: DataBag[A] =
+    ???
+
+
+  // -----------------------------------------------------
+  // Partition-based Ops
+  // -----------------------------------------------------
+
+  def sample(k: Int, seed: Long = 5394826801L): Vector[A] =
+    ???
+
+  def zipWithIndex(): DataBag[(A, Long)] =
     ???
 
   // -----------------------------------------------------
@@ -87,8 +97,81 @@ class CoGaDBTable[A: Meta] private[emmalanguage]
   def writeParquet(path: String, format: Parquet)(implicit converter: ParquetConverter[A]): Unit =
     ParquetScalaSupport(format).write(path)(fetch())
 
-  override def fetch(): Seq[A] =
+  def fetch(): Seq[A] =
     cogadb.exportSeq(rep)
+
+  // -----------------------------------------------------
+  // Helpers
+  // -----------------------------------------------------
+
+  private[emmalanguage] def ref(field: String): ast.AttrRef =
+    ref(field, field)
+
+  private[emmalanguage] def ref(field: String, alias: String): ast.AttrRef =
+    resolve(field, alias)(rep)
+
+  private def resolve(field: String, alias: String)(node: ast.Op): ast.AttrRef =
+    node match {
+      case ast.ImportFromCsv(tablename, _, _, schema) =>
+        schema.collectFirst({
+          case ast.SchemaAttr(_, `field`) =>
+            ast.AttrRef(tablename.toUpperCase, field, alias)
+        }).get
+      case ast.TableScan(tablename, version) =>
+        ast.AttrRef(tablename, field, alias, version)
+      case ast.Projection(attrRef, _) =>
+        attrRef.collectFirst({
+          case ref@ast.AttrRef(table, col, `field`, version) =>
+            ref
+        }).get
+      case ast.Root(child) =>
+        resolve(field, alias)(child)
+      case ast.Sort(_, child) =>
+        resolve(field, alias)(child)
+      case ast.GroupBy(_, _, child) =>
+        resolve(field, alias)(child)
+      case ast.Selection(_, child) =>
+        resolve(field, alias)(child)
+      case ast.ExportToCsv(_, _, child) =>
+        resolve(field, alias)(child)
+      case ast.MaterializeResult(_, _, child) =>
+        resolve(field, alias)(child)
+      case _ =>
+        throw new IllegalArgumentException
+    }
+
+  private[emmalanguage] def refTable(): String =
+    resolveTable()(rep)
+
+  private def resolveTable()(node: ast.Op): String =
+    node match {
+      case ast.TableScan(tablename, version) =>
+        tablename
+      case ast.Root(child) =>
+        resolveTable()(child)
+      case ast.Sort(_, child) =>
+        resolveTable()(child)
+      case ast.GroupBy(_, _, child) =>
+        resolveTable()(child)
+      case ast.Selection(_, child) =>
+        resolveTable()(child)
+      case ast.ExportToCsv(_, _, child) =>
+        resolveTable()(child)
+      case ast.MaterializeResult(_, _, child) =>
+        resolveTable()(child)
+      case ast.Projection(_, child) =>
+        resolveTable()(child)
+      case MapUdf(_, _, child) =>
+        resolveTable()(child)
+      case _ =>
+        print(node)
+        throw new IllegalArgumentException
+    }
+
+
+  private[emmalanguage] def fixMapped()(node: ast.Op): ast.Op =
+    node
+
 }
 
 object CoGaDBTable extends DataBagCompanion[CoGaDB] {

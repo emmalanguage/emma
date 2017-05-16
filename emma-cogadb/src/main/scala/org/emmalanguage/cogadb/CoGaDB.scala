@@ -66,7 +66,7 @@ class CoGaDB private(coGaDBPath: Path, configPath: Path) {
     // execute the dataflow
     execute(matDfl, dflName)
     // return a ast.TableScan for the imported table
-    ast.TableScan(dflName)
+    ast.TableScan(dflName.toUpperCase())
   }
 
   /**

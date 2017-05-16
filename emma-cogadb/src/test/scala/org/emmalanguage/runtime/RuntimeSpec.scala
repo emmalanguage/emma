@@ -194,7 +194,6 @@ class RuntimeSpec extends FreeSpec with Matchers with CoGaDBSpec {
             const = ast.VarCharConst("true"),
             cmp = ast.Equal
           )),
-
         ast.Projection(
           Seq(
             as.ref("_1", "_1"),
@@ -230,7 +229,6 @@ class RuntimeSpec extends FreeSpec with Matchers with CoGaDBSpec {
                       cmp = ast.GreaterThan
                     )),
                   as.rep), bs.rep)))))
-
     })
 
     val exp = for {
@@ -239,72 +237,11 @@ class RuntimeSpec extends FreeSpec with Matchers with CoGaDBSpec {
       c <- cs.fetch()
       if a._1 == b._1 && a._1 == c._1 && c._2 == "true"
     } yield (a._1, a._2, b._2)
-    /*
-        val exp = for {
-          e1 <- exp1
-          c <- cs.fetch()
-          if e1._1 == c._1 && c._2 == "true"
-        } yield (e1)*/
-
 
     act.fetch() should contain theSameElementsAs (exp)
   }
-  "simple loop" in withCoGaDB { implicit cogadb: CoGaDB =>
 
-
-    var as = new CoGaDBTable[(Int, String)](cogadb.importSeq(Seq((1, "Foo"), (2, "Hello"))))
-
-    var i = 0
-    var x = 0
-    while (i < 10) {
-
-
-      if (i > 9) {
-        //newSeq = tmp.map(x => (x._1 + 1, x._2))
-        as = new CoGaDBTable[(Int, String)](
-
-          ast.Selection(
-            Seq(
-              ast.ColConst(
-                attr = as.ref("_1"),
-                const = ast.IntConst(1),
-                cmp = ast.GreaterThan
-              )),
-            as.rep))
-
-      }
-      else {
-        as = new CoGaDBTable[(Int, String)](
-
-          ast.Selection(
-            Seq(
-              ast.ColConst(
-                attr = as.ref("_1"),
-                const = ast.IntConst(1),
-                cmp = ast.GreaterThan
-              )),
-            as.rep))
-      }
-
-      i += 1
-    }
-  }
-/*
-  "map example" ignore withCoGaDB { implicit cogadb: CoGaDB =>
-
-    val as = new CoGaDBTable[(Int, String)](cogadb.importSeq(Seq((1, "Foo"), (2, "Hello"))))
-
-    val mapped = new CoGaDBTable[(Int, Int, String)](
-
-    val mapAttr = Seq(ast.MapUdfOutAttr("INT", "_2", "internal_name"))
-    val mapUdfCode = ast.mapUdfCode("#<OUT>._2#=#DATAFLOW0000._1+1;")
-
-    ast.MapUdf(mapAttr, mapUdfCode, as.rep)
-
-    )
-  }
-*/
-  "test 3-way join" in withCoGaDB { implicit cogadb: CoGaDB =>
+  "test 3-way join" ignore withCoGaDB { implicit cogadb: CoGaDB =>
 
     val as = new CoGaDBTable[(Int, String)](cogadb.importSeq(Seq((1, "Foo"), (2, "Hello"))))
     val bs = new CoGaDBTable[(Int, String)](cogadb.importSeq(Seq((1, "Bar"), (2, "World"))))
@@ -324,7 +261,6 @@ class RuntimeSpec extends FreeSpec with Matchers with CoGaDBSpec {
         as.ref("_2", "_2"),
         bs.ref("_2", "_3")
       )
-
 
       ast.Projection(projectedFieldsAsBs,
         ast.Join("INNER_JOIN", joinPredAsBs, as.rep, bs.rep))

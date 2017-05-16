@@ -30,14 +30,14 @@ object ast {
   sealed trait Op extends Node
   case class Root(child: Op) extends Op
   case class Sort(sortCols: Seq[SortCol], child: Op) extends Op
-  case class GroupBy(groupCols: Seq[AttrRef], aggSpecs: Seq[AggSpec], child: Op) extends Op
+  case class GroupBy(groupCols: Seq[AttrRef], aggFuncs: Seq[AggFunc], child: Op) extends Op
   case class Selection(predicate: Seq[Predicate], child: Op) extends Op
-  case class TableScan(tableName: String, version: Int = 1) extends Op
-  // TODO: define basic operators
+  case class TableScan(tableName: String, version: Short = 1) extends Op
   case class Projection(attRef: Seq[AttrRef], child: Op) extends Op
   case class MapUdf(mapUdfOutAttr: Seq[MapUdfOutAttr], mapUdfCode: Seq[MapUdfCode], child: Op) extends Op
   case class Join(joinType: String, predicate: Seq[Predicate], lhs: Op, rhs: Op) extends Op
   case class CrossJoin(lhs: Op, rhs: Op) extends Op
+  case class Limit(take: Int, child: Op) extends Op
 
   case class ExportToCsv(filename: String, separator: String, child: Op) extends Op
   case class MaterializeResult(tableName: String, persistOnDisk: Boolean, child: Op) extends Op
@@ -59,18 +59,35 @@ object ast {
   // ---------------------------------------------------------------------------
   // Leafs
   // ---------------------------------------------------------------------------
-
+  case class SortCol(table: String, col: String, atype: String,
+    result: String, version: Short = 1, order: String) extends Node
   case class SchemaAttr(atype: String, aname: String) extends Node
   case class AttrRef(table: String, col: String, result: String, version: Short = 1) extends Node
-  //TODO
   case class MapUdfCode(code: String) extends Node
   case class MapUdfOutAttr(attType: String, attName: String, intVarName: String) extends Node
-  case class AggSpec(aggFunc: String, attrRef: AttrRef, result: String) extends Node
-  //case class GroupCol(attrRef: AttrRef) extends Node
-  case class SortCol(table: String, col: String, atype: String,
-                     result: String, version: Short = 1, order: String) extends Node
+  case class ReduceUdfOutAttr(attType: String, attName: String, intVarName: String) extends Node
+
+  //case class ReduceUdfAttr(attType: String, attName: String, attInitVal: Const) extends Node
 
   //@formatter:off
+
+  // ---------------------------------------------------------------------------
+  // Aggregation Functions
+  // ---------------------------------------------------------------------------
+  //TODO: Aggfunc should be Node
+  sealed trait AggFunc extends Op
+  case class AggFuncSimple(aggFunc: String, attrRef: AttrRef, result: String) extends AggFunc
+  case class AggFuncReduce(reduceUdf: AggFunc) extends AggFunc
+  case class AlgebraicReduceUdf(reduceUdfPayload: Seq[ReduceUdfPayAttrRef],
+    reduceUdfOutAttr: Seq[ReduceUdfOutAttr], reduceUdfCode: Seq[ReduceUdfCode], reduceUdfFinalCode: Seq[ReduceUdfCode])
+    extends AggFunc
+  //TODO: add other possible aggregation functions
+
+  //Ricky
+  case class ReduceUdfCode(code: String) extends Node
+  case class ReduceUdfOutAttrRef(attType: String, attName: String, intVarName: String) extends Node
+  case class ReduceUdfPayAttrRef(attType: String, attName: String, attInitVal: Const) extends Node
+
   sealed trait Const extends Node {
     type A
     val value: A
@@ -78,7 +95,6 @@ object ast {
   case class IntConst(value: Int) extends Const {
     override type A = Int
   }
-  // TODO (FloatConst, VarcharConst, ...)
   case class FloatConst(value: Float) extends Const {
     override type A = Float
   }

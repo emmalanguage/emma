@@ -42,8 +42,7 @@
         "REDUCE_UDF_OUTPUT_ATTRIBUTES": [
           {
             "ATTRIBUTE_TYPE": "OID",
-            "ATTRIBUTE_NAME": "CID",
-            "INTERNAL_VARIABLE_NAME": "TMP_CID"
+            "ATTRIBUTE_NAME": "CID"
           }
         ],
         "REDUCE_UDF_CODE": [

@@ -38,7 +38,6 @@ class KMeansSpec extends FreeSpec with Matchers with CoGaDBSpec {
 
   val csv = CSV(delimiter = '|', quote = Some(' '), skipRows = 1)
 
-
   "k means example" in withCoGaDB { implicit cogadb: CoGaDB =>
 
     val A = CSVScalaSupport[(Double, Double)](csv).read(getClass.getResource("/kmeans_points.csv").getPath).toStream
@@ -75,10 +74,12 @@ class KMeansSpec extends FreeSpec with Matchers with CoGaDBSpec {
 
     val sngAst = typecheck(reify {
       () => (p: (Double, Double, Int, Double, Double)) =>
-        if(p._1>0)
+        if (p._1 > 0) {
           p._2
-        else
+        }
+        else {
           p._1
+        }
     }.tree)
 
     val uniAst = typecheck(reify {
@@ -95,9 +96,7 @@ class KMeansSpec extends FreeSpec with Matchers with CoGaDBSpec {
       MapUDFClosure(distance, Map[String, String]("pcs" -> crossed.refTable), crossed.rep)).transform
     )*/
 
-
     //val act = new CoGaDBTable[]()
-
 
     actual.fetch().foreach(println)
     //val exp = Seq((1, "foo", 2), (2, "bar", 3))

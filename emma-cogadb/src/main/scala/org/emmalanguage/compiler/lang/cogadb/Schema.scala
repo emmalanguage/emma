@@ -18,13 +18,14 @@ package compiler.lang.cogadb
 
 import compiler.lang.cogadb.ast.SchemaAttr
 
-import net.liftweb.json.JsonAST.JObject
-
 trait CoGaDBType[T] {
   def tpe: String
 }
 
 object CoGaDBType {
+  implicit val BoolCoGaDBType = new CoGaDBType[Boolean] {
+    val tpe = "BOOLEAN"
+  }
   implicit val IntCoGaDBType = new CoGaDBType[Int] {
     val tpe = "INT"
   }

@@ -23,16 +23,17 @@ trait Algebra[A] {
   // Operators
   // -------------------------------------------------------------------------
 
-  // TODO ...
   def Root(child: A): A
   def Sort(sortCols: Seq[A], child: A): A
-  def GroupBy(groupCols: Seq[A], aggSpecs: Seq[A], child: A): A
+
+  def GroupBy(groupCols: Seq[A], aggFuncs: Seq[A], child: A): A
   def Selection(predicate: Seq[A], child: A): A
   def TableScan(tableName: String, version: Int = 1): A
   def Projection(attRef: Seq[A], child: A): A
   def MapUdf(mapUdfOutAttr: Seq[A], mapUdfCode: Seq[A], child: A): A
   def Join(joinType: String, predicate: Seq[A], lhs: A, rhs: A): A
   def CrossJoin(lhs: A, rhs: A): A
+  def Limit(take: Int, child: A): A
 
   //Operations
   def ExportToCsv(filename: String, separator: String, child: A): A
@@ -55,21 +56,26 @@ trait Algebra[A] {
   // Leafs
   // -------------------------------------------------------------------------
 
+  def SortCol(table: String, col: String, atype: String, result: String, version: Short = 1, order: String): A
   def SchemaAttr(atype: String, aname: String): A
-
   def AttrRef(table: String, col: String, result: String, version: Short): A
-
-  //TODO
   def MapUdfCode(code: String): A
   def MapUdfOutAttr(attType: String, attName: String, intVarName: String): A
-  def AggSpec(aggFunc: String, attrRef: A, result: String): A
-  //def GroupCol(attrRef: A): A
-  def SortCol(table: String, col: String, atype: String, result: String, version: Short = 1, order: String): A
 
+  def ReduceUdfOutAttr(attType: String, attName: String, intVarName: String): A
+  def ReduceUdfPayAttrRef(attType: String, attName: String, attInitVal: A): A
+
+  def AggFuncSimple(aggFunc: String, attrRef: A, result: String): A
+  def AggFuncReduce(reduceUdf: A): A
+  def AlgebraicReduceUdf(reduceUdfPayAttr: Seq[A], reduceUdfOutAttr: Seq[A],
+    reduceUdfCode: Seq[A], reduceUdfFinalCode: Seq[A]): A
+  def ReduceUdfCode(code: String): A
+
+  // -------------------------------------------------------------------------
+  // Constants
+  // -------------------------------------------------------------------------
 
   def IntConst(value: Int): A
-
-  //TODO
   def FloatConst(value: Float): A
   def VarCharConst(value: String): A
   def DoubleConst(value: Double): A

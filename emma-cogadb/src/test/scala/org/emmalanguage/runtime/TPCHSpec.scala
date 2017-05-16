@@ -26,7 +26,20 @@ import org.scalatest._
 import scala.reflect.runtime.universe._
 import scala.tools.reflect.ToolBox
 
-
+/**
+ * A spec for the TPC-H Queries for the CoGaDB backend
+ * In order to be able to run the tests, the
+ * 1) TPC-H reference databases must be installed,
+ * as described in the README
+ * The script is located in the CoGaDB directory:
+ * `utility_scripts/setup_reference_databases.sh`
+ * 2) The CoGaDB startup script e.g. `test/resources/cogadb/tpch.coga`
+ * must specify the correct path to the database files e.g.
+ * `set path_to_database=/home/user/cogadb_reference_dbs/cogadb_reference_databases_v1/tpch_sf1/`
+ * but also load the database from the path using following commands:
+ * `set table_loader_mode=disk`
+ * `loaddatabase`
+ */
 class TPCHSpec extends FreeSpec with Matchers with CoGaDBSpec {
 
   case class Lineitem(l_orderkey: Int, l_partkey: Int, l_suppkey: Int, l_linenumber: Int, l_quantity: Double,
@@ -46,7 +59,7 @@ class TPCHSpec extends FreeSpec with Matchers with CoGaDBSpec {
         (t.l_extendedprice * (1 - t.l_discount), t.l_extendedprice * (1 - t.l_discount) * (1 + t.l_tax))
     }.tree)
 
-    val res = new CoGaDBTable[(String, String, Double, Double, Double, Double, Double, Double, Double, Int)](
+    val act = new CoGaDBTable[(String, String, Double, Double, Double, Double, Double, Double, Double, Int)](
       ast.Sort(
         Seq(
           ast.SortCol("LINEITEM", "L_RETURNFLAG", "VARCHAR", "L_RETURNFLAG", 1, "ASCENDING"),
@@ -77,9 +90,23 @@ class TPCHSpec extends FreeSpec with Matchers with CoGaDBSpec {
               )
             )).transform
         )
-      )).fetch()
+      ))
 
-    res.foreach(println)
+
+    val exp = Seq(
+      ("A", "F", 3.7734107E7, 5.6586554402721E10, 5.3758257074361E10, 5.5909064533988E10, 25.522, 38273.13, 0.05,
+        1478493),
+      ("N", "F", 991417.0, 1.487504710632E9, 1.413082166525E9, 1.469649205431E9, 25.516, 38284.468, 0.05,
+        38854),
+      ("N", "O", 7.4429437E7, 1.11631834361214E11, 1.06051846454356E11, 1.10297935081582E11, 25.502, 38249.323, 0.05,
+        2918531),
+      ("R", "F", 3.7719753E7, 5.6568041383989E10, 5.3741292623516E10, 5.5889618430421E10, 25.506, 38250.855, 0.05,
+        1478870)
+    )
+
+    act.fetch() shouldBe exp
+
+    //act.fetch().foreach(println)
 
   }
 
@@ -90,7 +117,7 @@ class TPCHSpec extends FreeSpec with Matchers with CoGaDBSpec {
         t.l_extendedprice * (1 - t.l_discount)
     }.tree)
 
-    val res = new CoGaDBTable[(Int, String, Int, Double)](
+    val act = new CoGaDBTable[(Int, String, Int, Double)](
       ast.Projection(
         Seq(
           ast.AttrRef("LINEITEM", "L_ORDERKEY", "L_ORDERKEY"),
@@ -168,9 +195,21 @@ class TPCHSpec extends FreeSpec with Matchers with CoGaDBSpec {
           ))
       )
 
-    ).fetch
+    )
 
-    res.foreach(println)
+    val exp = Seq(
+      (2456423, "19950305", 0, 406181.016),
+      (3459808, "19950304", 0, 405838.711),
+      (492164, "19950219", 0, 390324.082),
+      (1188320, "19950309", 0, 384537.939),
+      (2435712, "19950226", 0, 378673.059),
+      (4878020, "19950312", 0, 378376.805),
+      (5521732, "19950313", 0, 375153.91),
+      (2628192, "19950222", 0, 373133.31),
+      (993600, "19950305", 0, 371407.447),
+      (2300070, "19950313", 0, 367371.148))
+
+    act.fetch() shouldBe exp
   }
 
   "TPCH-06" in withCoGaDB { implicit cogadb: CoGaDB =>
@@ -180,7 +219,7 @@ class TPCHSpec extends FreeSpec with Matchers with CoGaDBSpec {
         t.l_discount * t.l_extendedprice
     }.tree)
 
-    val res = new CoGaDBTable[(Double)](
+    val act = new CoGaDBTable[(Double)](
 
       ast.Projection(
         Seq(
@@ -215,14 +254,12 @@ class TPCHSpec extends FreeSpec with Matchers with CoGaDBSpec {
 
         )
       )
-    ).fetch
+    )
 
-    res.foreach(println)
-
-  }
-
-  "TPCH-03" in withCoGaDB { implicit cogadb: CoGaDB =>
-
+    val exp = Seq(1.2314107809E8)
+    act.fetch() shouldBe exp
 
   }
+
+
 }

@@ -27,7 +27,6 @@ package object cogadb {
     // Operators
     // -------------------------------------------------------------------------
 
-    // TODO ...
     case ast.Root(child) =>
       alg.Root(fold(alg)(child))
     case ast.Sort(sortCols, child) =>
@@ -43,6 +42,7 @@ package object cogadb {
     case ast.Join(joinType, predicate, lhs, rhs) =>
       alg.Join(joinType, predicate.map(fold(alg)), fold(alg)(lhs), fold(alg)(rhs))
     case ast.CrossJoin(lhs, rhs) => alg.CrossJoin(fold(alg)(lhs), fold(alg)(rhs))
+    case ast.Limit(take, child) => alg.Limit(take, fold(alg)(child))
     case ast.ExportToCsv(filename, separator, child) =>
       alg.ExportToCsv(filename, separator, fold(alg)(child))
     case ast.MaterializeResult(tableName, persistOnDisk, child) =>
@@ -64,19 +64,29 @@ package object cogadb {
     // -------------------------------------------------------------------------
 
     case ast.SchemaAttr(atype, aname) => alg.SchemaAttr(atype, aname)
-
     case ast.AttrRef(table, col, result, version) => alg.AttrRef(table, col, result, version)
-
-    case ast.IntConst(value) => alg.IntConst(value)
-    // TODO ...
     case ast.MapUdfCode(code) => alg.MapUdfCode(code)
     case ast.MapUdfOutAttr(attType, attName, intVarName) => alg.MapUdfOutAttr(attType, attName, intVarName)
-    case ast.AggSpec(aggFunc, attrRef, resultName) => alg.AggSpec(aggFunc, fold(alg)(attrRef), resultName)
-    //case ast.GroupCol(attrRef) => alg.GroupCol(fold(alg)(attrRef))
+    //case ast.AggSpec(aggFunc, attrRef, resultName) => alg.AggSpec(aggFunc, fold(alg)(attrRef), resultName)
+    case ast.AlgebraicReduceUdf(reduceUdfPayAttr, reduceUdfOutAttr,
+    reduceUdfCode, reduceUdfFinalCode) =>
+      alg.AlgebraicReduceUdf(reduceUdfPayAttr.map(fold(alg)), reduceUdfOutAttr.map(fold(alg)),
+        reduceUdfCode.map(fold(alg)), reduceUdfFinalCode.map(fold(alg)))
+    case ast.AggFuncReduce(reduceUdf) => alg.AggFuncReduce(fold(alg)(reduceUdf))
+    case ast.AggFuncSimple(aggFunc, attrRef, result) => alg.AggFuncSimple(aggFunc, fold(alg)(attrRef), result)
+    case ast.ReduceUdfCode(code) => alg.ReduceUdfCode(code)
+    case ast.ReduceUdfPayAttrRef(attType, attName, attInitVal) =>
+      alg.ReduceUdfPayAttrRef(attType, attName, fold(alg)(attInitVal))
+    case ast.ReduceUdfOutAttr(attType, attName, intVarName) => alg.ReduceUdfOutAttr(attType, attName, intVarName)
     case ast.SortCol(table, col, atype, result, version, order) =>
       alg.SortCol(table, col, atype, result, version, order)
 
 
+    // -------------------------------------------------------------------------
+    // Constants
+    // -------------------------------------------------------------------------
+
+    case ast.IntConst(value) => alg.IntConst(value)
     case ast.FloatConst(value) => alg.FloatConst(value)
     case ast.VarCharConst(value) => alg.VarCharConst(value)
     case ast.DoubleConst(value) => alg.DoubleConst(value)
@@ -84,16 +94,12 @@ package object cogadb {
     case ast.DateConst(value) => alg.DateConst(value)
     case ast.BoolConst(value) => alg.BoolConst(value)
 
-
-
     // -------------------------------------------------------------------------
     // Comparators
     // -------------------------------------------------------------------------
 
     case ast.Equal => alg.Equal
     case ast.Unequal => alg.Unequal
-
-    // TODO ...
     case ast.GreaterThan => alg.GreaterThan
     case ast.GreaterEqual => alg.GreaterEqual
     case ast.LessThan => alg.LessThan

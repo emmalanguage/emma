@@ -17,7 +17,6 @@ package org.emmalanguage
 package compiler.lang.cogadb
 
 import net.liftweb.json._
-import org.apache.jute.compiler.JFloat
 
 import scala.language.implicitConversions
 
@@ -38,11 +37,21 @@ object JSerializer extends Algebra[JValue] {
   implicit def floatToJFloat(v: Float): JDouble =
     JDouble(v)
 
-  implicit def floatToJDouble(v: Double): JDouble =
+  implicit def doubleToJDouble(v: Double): JDouble =
     JDouble(v)
 
   implicit def CharToJChar(v: Char): JString =
     JString(v.toString)
+
+  implicit class JValueExtended(value: JValue) {
+    def extractField(childString: String): JValue = {
+      if ((value \ childString) != JNothing) {
+        value.children.head
+      } else {
+        throw new IllegalArgumentException
+      }
+    }
+  }
 
 
   // -------------------------------------------------------------------------
@@ -62,20 +71,26 @@ object JSerializer extends Algebra[JValue] {
       JField("RIGHT_CHILD",JNull)
     )
 
-  override def GroupBy(groupCols: Seq[JValue],aggSpecs: Seq[JValue], child: JValue): JValue =
+  override def GroupBy(groupCols: Seq[JValue], aggFuncs: Seq[JValue], child: JValue): JValue =
     JObject(
       JField("OPERATOR_NAME", "GENERIC_GROUPBY"),
-      JField("GROUPING_COLUMNS", JArray(groupCols.toList.map(gc => JObject(JField("ATTRIBUTE_REFERENCE",gc)))) ),
-      JField("AGGREGATION_SPECIFICATION", JArray(aggSpecs.toList)),
+      JField("GROUPING_COLUMNS", JArray(groupCols.toList.map(x => JObject(
+        JField("ATTRIBUTE_REFERENCE", x)
+      )))),
+      JField("AGGREGATION_SPECIFICATION", JArray(aggFuncs.toList)),
       JField("LEFT_CHILD",child),
       JField("RIGHT_CHILD",JNull)
     )
 
-  //TODO: change predicate to JValue
   override def Selection(predicate: Seq[JValue], child: JValue): JValue =
     JObject(
       JField("OPERATOR_NAME", "GENERIC_SELECTION"),
-      JField("PREDICATE", JArray(predicate.toList.map(p => JObject(JField("PREDICATES",p))))),
+      JField("PREDICATE", JObject(
+        JField("PREDICATE_TYPE", "AND_PREDICATE"),
+        JField("PREDICATES", JArray(predicate.toList.map(x => JObject(
+          JField("PREDICATE", x)
+        ))))
+      )),
       JField("LEFT_CHILD",child),
       JField("RIGHT_CHILD",JNull)
     )
@@ -98,12 +113,12 @@ object JSerializer extends Algebra[JValue] {
       JField("LEFT_CHILD",child),
       JField("RIGHT_CHILD",JNull)
     )
+
   override def MapUdf(mapUdfOutAttr: Seq[JValue], mapUdfCode: Seq[JValue], child: JValue): JValue =
     JObject(
       JField("OPERATOR_NAME", "MAP_UDF"),
-      JField("MAP_UDF_OUTPUT_ATTRIBUTES", JArray(mapUdfOutAttr.toList.map(a => JObject(
-        JField("", a)
-      )))),
+      JField("MAP_UDF_OUTPUT_ATTRIBUTES", JArray(mapUdfOutAttr.toList)),
+      JField("MAP_UDF_CODE", JArray(mapUdfCode.toList)),
       JField("LEFT_CHILD",child),
       JField("RIGHT_CHILD",JNull)
     )
@@ -122,11 +137,20 @@ object JSerializer extends Algebra[JValue] {
       JField("LEFT_CHILD", lhs),
       JField("RIGHT_CHILD", rhs)
     )
+
   override def CrossJoin(lhs: JValue, rhs: JValue): JValue =
     JObject(
       JField("OPERATOR_NAME", "CROSS_JOIN"),
       JField("LEFT_CHILD", lhs),
       JField("RIGHT_CHILD", rhs)
+    )
+
+  override def Limit(take: Int, child: JValue): JValue =
+    JObject(
+      JField("OPERATOR_NAME", "LIMIT"),
+      JField("NUMBER_OF_ROWS", take),
+      JField("LEFT_CHILD", child),
+      JField("RIGHT_CHILD", JNull)
     )
 
   override def ExportToCsv(filename: String, separator: String, child: JValue): JValue =
@@ -195,11 +219,7 @@ object JSerializer extends Algebra[JValue] {
   // -------------------------------------------------------------------------
   // Leafs
   // -------------------------------------------------------------------------
-  //case class MapUdfCode(code: String) extends Node
-  //case class MapUdfOutAttr(attType: String, attName: String, intVarName: String) extends Node
-  /*case class AggSpecAggFunc: String, attrRef: AttrRef) extends Node
-  //case class GroupCol(attrRef: AttrRef) extends Node
-  case class SortCol(table: String, col: String, result: String, version: Short = 1, order: String) extends Node*/
+
 
   override def SchemaAttr(atype: String, aname: String): JValue =
     JObject(
@@ -207,11 +227,7 @@ object JSerializer extends Algebra[JValue] {
       JField("ATTRIBUTE_NAME", aname)
     )
   override def MapUdfCode(code: String): JValue =
-    JObject(
-      JField("MAP_UDF_CODE", JArray(code.toList.map( c => JObject(
-        JField("",c))
-      )))
-    )
+    code
 
   override def MapUdfOutAttr(attType: String, attName: String, intVarName: String): JValue =
     JObject(
@@ -219,14 +235,45 @@ object JSerializer extends Algebra[JValue] {
       JField("ATTRIBUTE_NAME", attName),
       JField("INTERNAL_VARIABLE_NAME", intVarName)
     )
-  override def AggSpec(aggFunc: String, attrRef: JValue,result: String): JValue =
+
+  override def AggFuncSimple(aggFunc: String, attrRef: JValue, result: String): JValue =
     JObject(
       JField("AGGREGATION_FUNCTION", aggFunc),
       JField("ATTRIBUTE_REFERENCE", attrRef),
       JField("RESULT_NAME", result)
     )
 
-  //def GroupCol(attrRef: JValue): JValue = ???
+  override def AggFuncReduce(reduceUdf: JValue): JValue =
+    JObject(
+      JField("AGGREGATION_FUNCTION", "UDF"),
+      JField("REDUCE_UDF", reduceUdf)
+    )
+
+  override def AlgebraicReduceUdf(reduceUdfPayAttr: Seq[JValue], reduceUdfOutAttr: Seq[JValue],
+    reduceUdfCode: Seq[JValue], reduceUdfFinalCode: Seq[JValue]): JValue =
+    JObject(
+      JField("REDUCE_UDF_TYPE", "ALGEBRAIC"),
+      JField("REDUCE_UDF_PAYLOAD_ATTRIBUTES", JArray(reduceUdfPayAttr.toList)),
+      JField("REDUCE_UDF_OUTPUT_ATTRIBUTES", JArray(reduceUdfOutAttr.toList)),
+      JField("REDUCE_UDF_CODE", JArray(reduceUdfCode.toList)),
+      JField("REDUCE_UDF_FINAL_CODE", JArray(reduceUdfFinalCode.toList))
+    )
+
+  override def ReduceUdfCode(code: String): JValue =
+    JString(code)
+
+  override def ReduceUdfPayAttrRef(attType: String, attName: String, attInitVal: JValue): JValue =
+    JObject(
+      JField("ATTRIBUTE_TYPE", attType),
+      JField("ATTRIBUTE_NAME", attName),
+      JField("ATTRIBUTE_INIT_VALUE", attInitVal.extractField("CONSTANT_VALUE"))
+    )
+
+  override def ReduceUdfOutAttr(attType: String, attName: String, attIntVarName: String): JValue =
+    JObject(
+      JField("ATTRIBUTE_TYPE", attType),
+      JField("ATTRIBUTE_NAME", attName)
+    )
   def SortCol(table: String, col: String, atype: String, result: String, version: Short, order: String): JValue =
     JObject(
       JField("TABLE_NAME", table),
@@ -242,32 +289,33 @@ object JSerializer extends Algebra[JValue] {
       JField("TABLE_NAME", table),
       JField("COLUMN_NAME", col),
       JField("VERSION", version),
-      JField("RESULT_NAME", result)
+      JField("RESULT_NAME", result),
+      JField("ATTRIBUTE_TYPE","INT")
     )
 
   def IntConst(value: Int): JValue =
     JObject(
-      JField("CONSTANT_VALUE", value),
+      JField("CONSTANT_VALUE", value.toString),
       JField("CONSTANT_TYPE", "INT")
     )
   def FloatConst(value: Float): JValue =
     JObject(
-      JField("CONSTANT_VALUE", value),
+      JField("CONSTANT_VALUE", value.toString),
       JField("CONSTANT_TYPE", "FLOAT")
     )
   def VarCharConst(value: String): JValue =
     JObject(
-      JField("CONSTANT_VALUE", value),
+      JField("CONSTANT_VALUE", value.toString),
       JField("CONSTANT_TYPE", "VARCHAR")
     )
   def DoubleConst(value: Double): JValue =
     JObject(
-      JField("CONSTANT_VALUE", value),
+      JField("CONSTANT_VALUE", value.toString),
       JField("CONSTANT_TYPE", "DOUBLE")
     )
   def CharConst(value: Char): JValue =
     JObject(
-      JField("CONSTANT_VALUE", value),
+      JField("CONSTANT_VALUE", value.toString),
       JField("CONSTANT_TYPE", "CHAR")
     )
   def DateConst(value: String): JValue =
@@ -286,7 +334,7 @@ object JSerializer extends Algebra[JValue] {
   // Comparators
   // -------------------------------------------------------------------------
 
-  override def Equal: JString =
+  override def Equal: JValue =
     JString("EQUAL")
 
   override def Unequal: JValue =

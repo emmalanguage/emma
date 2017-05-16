@@ -3,8 +3,9 @@
   "ATTRIBUTE_REFERENCE": {
     "TABLE_NAME": "ORDER",
     "COLUMN_NAME": "AMOUNT",
+    "VERSION": 1,
     "RESULT_NAME": "AMOUNT",
-    "VERSION": 1
+    "ATTRIBUTE_TYPE": "INT"
   },
   "RESULT_NAME": "REVENUE"
 }

@@ -13,14 +13,16 @@
               "COLUMN_NAME": "S_SUPPKEY",
               "TABLE_NAME": "SUPPLIER",
               "VERSION": 1,
-              "RESULT_NAME": "S_SUPPKEY"
+              "RESULT_NAME": "S_SUPPKEY",
+              "ATTRIBUTE_TYPE": "INT"
             },
             "PREDICATE_COMPARATOR": "EQUAL",
             "RIGHT_HAND_SIDE_ATTRIBUTE_REFERENCE": {
               "COLUMN_NAME": "PS_SUPPKEY",
               "TABLE_NAME": "PARTSUPP",
               "VERSION": 1,
-              "RESULT_NAME": "PS_SUPPKEY"
+              "RESULT_NAME": "PS_SUPPKEY",
+              "ATTRIBUTE_TYPE": "INT"
             }
           }
         }

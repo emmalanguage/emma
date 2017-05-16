@@ -33,7 +33,6 @@ class UDFCompilerSpec extends FreeSpec with Matchers with CoGaDBSpec {
 
   private def typecheck(ast: Tree): Tree = tb.typecheck(ast)
 
-
   "simple map udf"  in withCoGaDB { implicit cogadb: CoGaDB =>
     val A = Seq((1, "foo"), (2, "bar"))
 
@@ -46,7 +45,7 @@ class UDFCompilerSpec extends FreeSpec with Matchers with CoGaDBSpec {
     val act = new CoGaDBTable[(Int,String,Int)](new UDFTransformer(
       MapUDFClosure(astWithDouble, Map[String, String]("t" -> simpleA.refTable), simpleA.rep)).transform
     )
-    //val test = prettyRender(asJson(ast.Root(actual)))
+
     //val fun1 = "() => (t: (Int, String)) => t._1 + 1"
     //should not work with Node, works with Op
     //val tmp = cogadb.execute(UDFCompiler.compile(scanA, UDFType.Map, Map[String, String]("t" -> "SOURCE0000"), fun1))
@@ -58,17 +57,13 @@ class UDFCompilerSpec extends FreeSpec with Matchers with CoGaDBSpec {
 
   "simple iteration with map udf" in withCoGaDB { implicit cogadb: CoGaDB =>
 
-    //var simpleA = new CoGaDBTable[(String, Int)](cogadb.importSeq(Seq(( "foo",1), ( "bar",2))))
-
     var next = Seq(("foo", 1), ("bar", 2))
     val increment = typecheck(reify {
       () => (t: (String, Int)) => t._2 + 1
     }.tree)
 
-
-
     var i = 1
-    while (i < 10) {
+    while (i < 3) {
       var act = new CoGaDBTable[(String, Int)](cogadb.importSeq(next))
 
       act = new CoGaDBTable[(String, Int)]({
@@ -87,9 +82,6 @@ class UDFCompilerSpec extends FreeSpec with Matchers with CoGaDBSpec {
       })
 
       next = act.fetch()
-      println(s"iteration: $i")
-      next.foreach(println)
-
 
       i += 1
     }
@@ -99,31 +91,5 @@ class UDFCompilerSpec extends FreeSpec with Matchers with CoGaDBSpec {
     next should contain theSameElementsAs (exp)
 
   }
-/*
-  "simple map udf string editing" in {
-    val A = Seq((1, "foo"), (2, "bar"))
-
-    val scanA = cogadb.write(A)
-
-    val astWithString = typecheck(reify {
-      () => (t: (Int, String)) => t._2.concat("_edited")
-    }.tree)
-
-    val actual = new UDFTransformer(
-      MapUDFClosure(astWithString, Map[String, String]("t" -> "SOURCE0000"), scanA)).transform
-
-    //val test = prettyRender(asJson(ast.Root(actual)))
-    //val fun1 = "() => (t: (Int, String)) => t._1 + 1"
-    //should not work with Node, works with Op
-    //val tmp = cogadb.execute(UDFCompiler.compile(scanA, UDFType.Map, Map[String, String]("t" -> "SOURCE0000"), fun1))
-    val tmp = cogadb.execute(actual)
-    val res = cogadb.read[(Int, String, Int)](tmp)
-    val exp = Seq((1, "foo", 2), (2, "bar", 3))
-
-    res shouldBe exp
-
-  }*/
-
-
 
 }

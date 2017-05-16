@@ -16,25 +16,19 @@
 package org.emmalanguage
 package compiler.lang.cogadb
 
-import cogadb.CoGaDB
-
 import net.liftweb.json._
 import org.junit.runner.RunWith
 import org.scalatest.FreeSpec
 import org.scalatest.Matchers
 import org.scalatest.junit.JUnitRunner
 
-import scala.language.implicitConversions
-
 import java.io.FileNotFoundException
 
-/** A spec for the [[CoGaDB]] runtime. */
+/** A spec for the [[cogadb.CoGaDB]] runtime. */
 @RunWith(classOf[JUnitRunner])
 class JSerializerSpec extends FreeSpec with Matchers {
 
-  "TPC-H Q01" - {
-
-    // TODO: construct and issue TPC-H Query Q01 using CoGaDB AST nodes
+  "JSON Serializing" - {
 
     //predicate list
     val predicates = ast.And(Seq(
@@ -56,14 +50,14 @@ class JSerializerSpec extends FreeSpec with Matchers {
     val customerScanSimple = ast.TableScan("CUSTOMER")
 
     //Aggspec
-    val aggSpec = ast.AggSpec("SUM", ast.AttrRef("ORDER", "AMOUNT", "AMOUNT"), "REVENUE")
+    val aggFunc = ast.AggFuncSimple("SUM", ast.AttrRef("ORDER", "AMOUNT", "AMOUNT"), "REVENUE")
 
     //group by
     val attrRefSeq = Seq(ast.AttrRef("LINEITEM","L_ORDERKEY","L_ORDERKEY"),
                         ast.AttrRef("ORDERS","O_ORDERDATE","O_ORDERDATE"),
       ast.AttrRef("ORDERS","O_SHIPPRIORITY","O_SHIPPRIORITY"))
 
-    val groupBy = ast.GroupBy(attrRefSeq, Seq(aggSpec), customerScanSimple)
+    val groupBy = ast.GroupBy(attrRefSeq, Seq(aggFunc), customerScanSimple)
 
     //sort by
     val sortBy = ast.Root(ast.Sort(Seq(ast.SortCol("<COMPUTED>","REVENUE","DOUBLE","REVENUE",1,"DESCENDING"),
@@ -88,10 +82,10 @@ class JSerializerSpec extends FreeSpec with Matchers {
     val export = ast.Root(ast.ExportToCsv("filename.csv", ",", customerScanSimple))
 
     "predicates" in {
-      val exp = parse(readResourceFile("/test.json"))
+      val exp = parse(readResourceFile("/predicates.json"))
       val act = fold(JSerializer)(predicates)
-      println(exp)
-      println(act)
+      //println(exp)
+      //println(act)
       act shouldEqual exp
     }
 
@@ -100,18 +94,18 @@ class JSerializerSpec extends FreeSpec with Matchers {
       val exp = parse(readResourceFile("/tablescan.json"))
       val act = fold(JSerializer)(customerScan)
 
-      println(exp)
-      println(act)
+      //println(exp)
+      //println(act)
       act shouldEqual exp
     }
 
     "aggregation specification" in{
 
       val exp = parse(readResourceFile("/aggspec.json"))
-      val act = fold(JSerializer)(aggSpec)
+      val act = fold(JSerializer)(aggFunc)
 
-      println(exp)
-      println(act)
+      //println(exp)
+      //println(act)
       act shouldEqual exp
     }
 
@@ -119,8 +113,8 @@ class JSerializerSpec extends FreeSpec with Matchers {
       val exp = parse(readResourceFile("/groupby.json"))
       val act = fold(JSerializer)(groupBy)
 
-      println(exp)
-      println(act)
+      //println(exp)
+      //println(act)
       act shouldEqual exp
     }
 
@@ -128,27 +122,66 @@ class JSerializerSpec extends FreeSpec with Matchers {
       val exp = parse(readResourceFile("/sortby.json"))
       val act = fold(JSerializer)(sortBy)
 
-      println(exp)
-      println(act)
+      //println(exp)
+      //println(act)
       act shouldEqual exp
     }
 
     "join" in{
       val exp = parse(readResourceFile("/join.json"))
       val act = fold(JSerializer)(join)
-      println(exp)
-      println(act)
+      //println(exp)
+      //println(act)
       act shouldEqual exp
     }
 
     "export" in {
       val exp = parse(readResourceFile("/export.json"))
       val act = fold(JSerializer)(export)
-      println(exp)
-      println(act)
+      //println(exp)
+      //println(act)
       act shouldEqual exp
     }
 
+    "group by with sum and reduce udf" in {
+      val exp = parse(readResourceFile("/groupby_with_agg_funcs.json"))
+
+      val groupBy2 = ast.GroupBy(
+        Seq(
+          ast.AttrRef("LINEORDER", "LO_SHIPMODE", "SHIPMODE", 1)
+        ),
+        Seq(
+          ast.AggFuncSimple("SUM",
+            ast.AttrRef("LINEORDER", "LO_REVENUE", "SUM_REVENUE", 1), "SUM_REVENUE"),
+          ast.AggFuncReduce(
+            ast.AlgebraicReduceUdf(
+              Seq(
+                ast.ReduceUdfPayAttrRef("double", "min_value", ast.DoubleConst(400000)),
+                ast.ReduceUdfPayAttrRef("OID", "ID", ast.IntConst(0))
+              ),
+              Seq(
+                ast.ReduceUdfOutAttr("OID", "CID", "TMP_CID")
+              ),
+              Seq(
+                ast.ReduceUdfCode("if(#<hash_entry>.min_value#>#LINEORDER.LO_REVENUE#){"),
+                ast.ReduceUdfCode("   #<hash_entry>.min_value#=#LINEORDER.LO_REVENUE#;"),
+                ast.ReduceUdfCode("   #<hash_entry>.ID#=#LINEORDER.LO_LINENUMBER#;"),
+                ast.ReduceUdfCode("}")
+              ),
+              Seq(
+                ast.ReduceUdfCode("#<out>.CID# = #<hash_entry>.min_value#*#<hash_entry>.ID#;")
+              )
+            )
+          )
+        ),
+        ast.TableScan("LINEORDER", 1)
+      )
+      val act = fold(JSerializer)(groupBy2)
+
+      //println(act)
+      //println(exp)
+      act shouldEqual exp
+    }
 
   }
 

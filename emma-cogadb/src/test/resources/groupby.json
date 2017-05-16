@@ -6,7 +6,8 @@
         "TABLE_NAME": "LINEITEM",
         "COLUMN_NAME": "L_ORDERKEY",
         "VERSION": 1,
-        "RESULT_NAME": "L_ORDERKEY"
+        "RESULT_NAME": "L_ORDERKEY",
+        "ATTRIBUTE_TYPE": "INT"
       }
     },
     {
@@ -14,7 +15,8 @@
         "TABLE_NAME": "ORDERS",
         "COLUMN_NAME": "O_ORDERDATE",
         "VERSION": 1,
-        "RESULT_NAME": "O_ORDERDATE"
+        "RESULT_NAME": "O_ORDERDATE",
+        "ATTRIBUTE_TYPE": "INT"
       }
     },
     {
@@ -22,7 +24,8 @@
         "TABLE_NAME": "ORDERS",
         "COLUMN_NAME": "O_SHIPPRIORITY",
         "VERSION": 1,
-        "RESULT_NAME": "O_SHIPPRIORITY"
+        "RESULT_NAME": "O_SHIPPRIORITY",
+        "ATTRIBUTE_TYPE": "INT"
       }
     }
   ],
@@ -32,8 +35,9 @@
       "ATTRIBUTE_REFERENCE": {
         "TABLE_NAME": "ORDER",
         "COLUMN_NAME": "AMOUNT",
+        "VERSION": 1,
         "RESULT_NAME": "AMOUNT",
-        "VERSION": 1
+        "ATTRIBUTE_TYPE": "INT"
       },
       "RESULT_NAME": "REVENUE"
     }
