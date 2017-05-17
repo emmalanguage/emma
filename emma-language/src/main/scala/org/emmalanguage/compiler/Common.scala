@@ -24,7 +24,7 @@ import org.scalactic._
 /** Common IR tools. */
 trait Common extends AST with API {
 
-  import universe._
+  import u._
 
   // --------------------------------------------------------------------------
   // Transformation pipelines API

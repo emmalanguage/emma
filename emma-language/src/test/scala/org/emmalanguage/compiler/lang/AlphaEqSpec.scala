@@ -22,7 +22,7 @@ import compiler.BaseCompilerSpec
 class AlphaEqSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   "simple valdefs and expressions" in {
     val lhs = idPipeline(reify {

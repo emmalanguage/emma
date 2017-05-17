@@ -27,7 +27,7 @@ trait Symbols { this: AST =>
 
   trait SymbolAPI { this: API =>
 
-    import universe._
+    import u._
     import definitions._
     import internal._
     import reificationSupport._

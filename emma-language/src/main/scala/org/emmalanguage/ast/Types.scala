@@ -22,7 +22,7 @@ trait Types { this: AST =>
 
   trait TypeAPI { this: API =>
 
-    import universe._
+    import u._
     import definitions._
     import internal._
     import reificationSupport._

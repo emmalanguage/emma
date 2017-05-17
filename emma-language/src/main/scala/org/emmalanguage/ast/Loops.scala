@@ -22,7 +22,7 @@ trait Loops { this: AST =>
   /** Loops (while and do-while). */
   trait LoopAPI { this: API =>
 
-    import universe._
+    import u._
     import internal._
     import reificationSupport._
     import Flag._

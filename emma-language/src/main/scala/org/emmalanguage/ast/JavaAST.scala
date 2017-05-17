@@ -37,9 +37,9 @@ trait JavaAST extends AST {
     |The runtime compiler supports only JVM.
     |""".stripMargin.trim)
 
-  val universe = runtime.universe.asInstanceOf[JavaUniverse]
-  val tb: ToolBox[universe.type]
-  import universe._
+  val u = runtime.universe.asInstanceOf[JavaUniverse]
+  val tb: ToolBox[u.type]
+  import u._
 
   private val logger =
     Logger(LoggerFactory.getLogger(classOf[JavaAST]))

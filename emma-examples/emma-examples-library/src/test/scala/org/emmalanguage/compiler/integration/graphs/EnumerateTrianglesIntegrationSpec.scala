@@ -30,7 +30,7 @@ import scala.Ordering.Implicits._
 class EnumerateTrianglesIntegrationSpec extends BaseCompilerIntegrationSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   // ---------------------------------------------------------------------------
   // Program closure

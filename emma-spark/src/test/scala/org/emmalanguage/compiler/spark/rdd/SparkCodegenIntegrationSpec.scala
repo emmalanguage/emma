@@ -29,7 +29,7 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkA
   override val compiler = new RuntimeCompiler with SparkCompiler
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   type Env = SparkSession
 

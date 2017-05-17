@@ -25,7 +25,7 @@ import test.schema.Marketing._
 class ReDeSugarSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   // ---------------------------------------------------------------------------
   // Helper methods

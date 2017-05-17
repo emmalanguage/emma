@@ -29,8 +29,8 @@ import scala.util.control.NonFatal
 trait MacroAST extends AST {
 
   val c: blackbox.Context
-  val universe: c.universe.type = c.universe
-  import universe._
+  val u: c.universe.type = c.universe
+  import u._
   import internal._
 
   private[ast] def freshNameSuffix: Char = 'm'
@@ -91,7 +91,7 @@ trait MacroAST extends AST {
     c.eval[T](c.Expr[T](unTypeCheck(code)))
 
   /** Shows `tree` in a Swing AST browser. */
-  def browse(tree: Tree): Unit = universe match {
+  def browse(tree: Tree): Unit = u match {
     case global: Global =>
       val gt = tree.asInstanceOf[global.Tree]
       import global.treeBrowsers._

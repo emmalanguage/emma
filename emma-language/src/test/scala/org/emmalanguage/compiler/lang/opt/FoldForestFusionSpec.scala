@@ -26,7 +26,7 @@ import scala.util.Random
 class FoldForestFusionSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   def testPipeline(prefix: u.Tree => u.Tree): u.Tree => u.Tree =
     pipeline(typeCheck = true)(
@@ -135,7 +135,7 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
     }
 
     "of more than 22 independent folds" in {
-      import universe._
+      import u._
       // More than 22 folds can still be fused via nested tuples.
       val act = testPipeline(Core.anf)(q"""
         val id = (x: Int) => x

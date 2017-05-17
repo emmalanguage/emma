@@ -36,7 +36,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
 
   import BaseCodegenIntegrationSpec._
   import compiler._
-  import universe.reify
+  import u.reify
 
   val inputDir = new File(tempPath("test/input"))
   val outputDir = new File(tempPath("test/output"))

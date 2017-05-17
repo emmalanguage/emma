@@ -31,7 +31,7 @@ class CoreLangSpec extends BaseCompilerSpec {
   import Validation._
   import Core.valid
   import Core.{Lang => core}
-  import universe.reify
+  import u.reify
 
   // ---------------------------------------------------------------------------
   // Helper methods

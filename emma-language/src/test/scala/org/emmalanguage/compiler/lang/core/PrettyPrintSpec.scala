@@ -27,7 +27,7 @@ import java.time.Instant
 class PrettyPrintSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
   import Core.{Lang => core}
 
   val liftPipeline: u.Expr[Any] => u.Tree =

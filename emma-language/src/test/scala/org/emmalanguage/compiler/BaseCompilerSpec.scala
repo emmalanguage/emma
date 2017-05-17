@@ -89,7 +89,7 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
 
   /** Wraps the given tree in a class and a method whose params are the closure of the tree. */
   private def wrapInClass(tree: u.Tree): u.Tree = {
-    import universe._
+    import u._
     val params = api.Tree.closure(tree).map { sym =>
       val name = sym.name
       val tpt = sym.typeSignature

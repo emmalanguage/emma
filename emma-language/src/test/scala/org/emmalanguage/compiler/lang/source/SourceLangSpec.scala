@@ -31,7 +31,7 @@ class SourceLangSpec extends BaseCompilerSpec {
   import Validation._
   import Source.valid
   import Source.{Lang => src}
-  import universe.reify
+  import u.reify
 
   // ---------------------------------------------------------------------------
   // Helper methods

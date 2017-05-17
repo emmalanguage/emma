@@ -27,7 +27,7 @@ import java.time.Instant
 class NormalizeSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   val lnfPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(

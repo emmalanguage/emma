@@ -48,7 +48,7 @@ trait AST extends CommonAST
     with ValueAPI
     with VariableAPI
 
-  import universe._
+  import u._
   import internal._
   import reificationSupport._
 

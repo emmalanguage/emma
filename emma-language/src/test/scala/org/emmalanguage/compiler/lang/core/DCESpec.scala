@@ -22,7 +22,7 @@ import compiler.BaseCompilerSpec
 class DCESpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   val dcePipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(

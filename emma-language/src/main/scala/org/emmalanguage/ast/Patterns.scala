@@ -24,7 +24,7 @@ trait Patterns { this: AST =>
   /** Patterns (for pattern matching). */
   trait PatternAPI { this: API =>
 
-    import universe._
+    import u._
     import internal._
     import reificationSupport._
 

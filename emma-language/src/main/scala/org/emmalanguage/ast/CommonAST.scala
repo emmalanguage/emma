@@ -31,13 +31,12 @@ import scala.reflect.macros.Attachments
  */
 trait CommonAST {
 
-  val universe: Universe
-  lazy val u: universe.type = universe
+  val u: Universe
 
   /** Syntax sugar for partial functions. */
   type =?>[-A, +B] = PartialFunction[A, B]
 
-  import universe._
+  import u._
   import definitions._
   import internal._
   import Flag._
