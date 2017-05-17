@@ -25,7 +25,7 @@ import test.schema.Literature._
 class CSESpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   val csePipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(

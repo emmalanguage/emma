@@ -24,7 +24,7 @@ class PatternMatchingSpec extends BaseCompilerSpec {
 
   import PatternMatchingSpec._
   import compiler._
-  import universe.reify
+  import u.reify
 
   val destructPatternMatchesPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true, withPre = false)(

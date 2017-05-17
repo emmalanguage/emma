@@ -29,7 +29,7 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkA
   override val compiler = new RuntimeCompiler with FlinkCompiler
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   type Env = ExecutionEnvironment
 

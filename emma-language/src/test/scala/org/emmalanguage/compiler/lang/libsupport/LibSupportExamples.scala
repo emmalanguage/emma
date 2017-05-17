@@ -22,7 +22,7 @@ import compiler.BaseCompilerSpec
 trait LibSupportExamples extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   val liftPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(

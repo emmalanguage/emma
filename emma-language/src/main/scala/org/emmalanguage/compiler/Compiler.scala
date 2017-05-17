@@ -47,7 +47,7 @@ trait Compiler extends AlphaEq
   import UniverseImplicits._
 
   /** The underlying universe object. */
-  override val universe: Universe
+  override val u: Universe
 
   /** Implicit types to be removed */
   lazy val implicitTypes: Set[u.Type] = API.implicitTypes

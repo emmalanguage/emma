@@ -29,7 +29,7 @@ class CombinationSpec extends BaseCompilerSpec {
 
   import compiler._
   import Combination._
-  import universe.reify
+  import u.reify
 
   // ---------------------------------------------------------------------------
   // Transformation pipelines

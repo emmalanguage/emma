@@ -26,7 +26,7 @@ import test.schema.Math._
 class ANFSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   val anfPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(

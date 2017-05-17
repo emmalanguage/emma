@@ -19,7 +19,7 @@ package compiler
 class ASTSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   object Bal
 

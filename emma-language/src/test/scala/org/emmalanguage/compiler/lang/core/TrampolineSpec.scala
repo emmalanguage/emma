@@ -25,7 +25,7 @@ import scala.util.control.TailCalls._
 class TrampolineSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   val trampolinePipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(

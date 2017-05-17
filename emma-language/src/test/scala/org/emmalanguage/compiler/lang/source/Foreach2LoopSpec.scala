@@ -22,7 +22,7 @@ import compiler.BaseCompilerSpec
 class Foreach2LoopSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   val foreach2loopPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true, withPre = false)(

@@ -42,7 +42,7 @@ trait BaseCompilerBench extends Bench.OnlineRegressionReport {
 
   val compiler = RuntimeCompiler.default.instance
   import compiler._
-  import universe.reify
+  import u.reify
 
   val csv   = CSV()
   val input = "/tmp/dummy.csv"

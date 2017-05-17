@@ -34,7 +34,7 @@ import scala.language.higherKinds
 /** Utility for traversing and transforming trees. */
 trait Transversers { this: AST =>
 
-  import universe._
+  import u._
 
   /**
    * Placeholder for attribute grammars.

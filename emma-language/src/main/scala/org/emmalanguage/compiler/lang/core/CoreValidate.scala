@@ -22,7 +22,7 @@ import compiler.Common
 private[core] trait CoreValidate extends Common {
   self: Core =>
 
-  import universe._
+  import u._
   import Validation._
   import Core.{Lang => core}
 

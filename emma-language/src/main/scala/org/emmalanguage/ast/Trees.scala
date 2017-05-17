@@ -25,7 +25,7 @@ trait Trees { this: AST =>
 
   trait TreeAPI { this: API =>
 
-    import universe._
+    import u._
     import definitions._
     import internal._
     import reificationSupport._

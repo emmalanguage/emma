@@ -33,8 +33,8 @@ class RuntimeCompiler(private var cgd: String = RuntimeCompiler.codeGenDir)
   /** The generating Scala toolbox. */
   override lazy val tb = {
     val cl = getClass.getClassLoader
-    val factory = new ToolBoxFactory[universe.type](universe) {
-      val mirror = universe.runtimeMirror(cl)
+    val factory = new ToolBoxFactory[u.type](u) {
+      val mirror = u.runtimeMirror(cl)
     }
 
     cl match {

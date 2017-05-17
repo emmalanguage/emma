@@ -20,7 +20,7 @@ trait Terms { this: AST =>
 
   trait TermAPI { this: API =>
 
-    import universe._
+    import u._
     import internal._
     import reificationSupport._
 

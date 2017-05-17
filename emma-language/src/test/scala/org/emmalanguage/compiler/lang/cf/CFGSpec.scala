@@ -27,7 +27,7 @@ import test.schema.Graphs._
 class CFGSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   val anfPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(

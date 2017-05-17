@@ -32,7 +32,7 @@ trait Parameters { this: AST =>
    */
   trait ParameterAPI { this: API =>
 
-    import universe._
+    import u._
     import Flag._
 
     /** (method / lambda) Parameter symbols. */

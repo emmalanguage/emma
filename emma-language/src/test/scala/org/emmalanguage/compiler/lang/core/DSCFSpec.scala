@@ -23,7 +23,7 @@ import compiler.ir.DSCFAnnotations._
 class DSCFSpec extends BaseCompilerSpec {
 
   import compiler._
-  import universe.reify
+  import u.reify
 
   val dscfPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(

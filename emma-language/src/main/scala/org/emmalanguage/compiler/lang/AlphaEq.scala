@@ -25,7 +25,7 @@ import scala.collection.mutable
 /** Provides alpha equivalence for Scala ASTs. */
 trait AlphaEq extends Common {
 
-  import universe._
+  import u._
   import internal._
 
   // ---------------------------------------------------------------------------
