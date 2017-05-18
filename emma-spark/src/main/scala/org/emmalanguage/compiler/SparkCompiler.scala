@@ -22,10 +22,10 @@ trait SparkCompiler extends Compiler {
 
   object SparkAPI extends BackendAPI {
 
-    lazy val implicitTypes = Set(
-      api.Type[org.apache.spark.sql.Encoder[Any]].typeConstructor,
-      api.Type[org.apache.spark.sql.SparkSession]
-    )
+    lazy val Encoder = api.Type[org.apache.spark.sql.Encoder[Any]].typeConstructor
+    lazy val SparkSession = api.Type[org.apache.spark.sql.SparkSession]
+
+    lazy val implicitTypes = Set(Encoder, SparkSession)
 
     lazy val DataBag = new DataBagAPI(api.Sym[org.emmalanguage.api.SparkRDD[Any]].asClass)
 
