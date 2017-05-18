@@ -24,7 +24,7 @@ import org.scalatest.junit.JUnitRunner
 
 import java.io.FileNotFoundException
 
-/** A spec for the [[cogadb.CoGaDB]] runtime. */
+/** A spec for the [[runtime.CoGaDB]] runtime. */
 @RunWith(classOf[JUnitRunner])
 class JSerializerSpec extends FreeSpec with Matchers {
 

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package cogadb
+package runtime
 
 import api.Meta
 import compiler.RuntimeCompiler
@@ -112,7 +112,7 @@ class CoGaDB private(coGaDBPath: Path, configPath: Path) {
 
   def destroy(): Unit = {
     inst.destroy()
-    deleteRecursive(tempPath.toFile)
+    //deleteRecursive(tempPath.toFile)
   }
 
   /** Deletes a file recursively. */

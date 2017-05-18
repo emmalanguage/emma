@@ -16,27 +16,31 @@
 package org.emmalanguage
 package compiler.lang.cogadb
 
-import compiler.RuntimeCompiler
 import compiler.BaseCompilerSpec
+import compiler.CoGaDBCompiler
+import compiler.RuntimeCompiler
 
-class ProjectionUDFSpec extends BaseCompilerSpec {
+class ProjectionUDFSpec extends BaseCompilerSpec with CoGaDBAware {
 
-  override val compiler = new RuntimeCompiler with CoGaUDFSupport
+  override val compiler = new RuntimeCompiler with CoGaDBCompiler
 
   import compiler._
   import u.reify
 
   lazy val testPipeline: u.Expr[Any] => u.Tree =
-    pipeline(true)(Core.anf, collectFirstLambda, CoGaUDFSupport.apply).compose(_.tree)
+    pipeline(true)(Core.anf, collectFirstLambda, CoGaUDFSupport.specializeLambda
+    ).compose(_.tree)
+
 
   lazy val anfPipeline: u.Expr[Any] => u.Tree =
-    pipeline(true)(Core.anf).compose(_.tree)
+    pipeline(true)(Core.anf, collectFirstLambda).compose(_.tree)
 
   lazy val collectFirstLambda: u.Tree => u.Tree = tree => (tree collect {
     case t: u.Function => t
   }).head
 
-  "simple projection" in {
+
+  "simple projection" in withDefaultCoGaDBRuntime(implicit cogadb => {
     val act = testPipeline(reify {
       (x: (Int, Double, String)) => {
         val u: Int = x._1
@@ -45,30 +49,35 @@ class ProjectionUDFSpec extends BaseCompilerSpec {
     })
 
     val exp = anfPipeline(reify {
-      val u = ast.AttrRef("unknown", "_1", "_1", 1)
-      u
+      (x: String) => {
+        val u = ast.AttrRef(x, "_1", "_1", 1)
+        val r = Seq.apply(u)
+        r
+      }
     })
 
     act shouldBe alphaEqTo(exp)
-  }
+  })
 
-  "complex projection" in {
+  "complex projection" in withDefaultCoGaDBRuntime(implicit cogadb => {
     val act = testPipeline(reify {
       (x: (Int, Double, String)) => {
-        val u = x._1
-        val v = x._3
-        val r = Tuple2.apply(u, v)
+        val u: Int = x._1
+        val v: String = x._3
+        val r: Tuple2[Int, String] = Tuple2.apply(u, v)
         r
       }
     })
 
     val exp = anfPipeline(reify {
-      val u = ast.AttrRef("unknown", "_1", "_1", 1)
-      val v = ast.AttrRef("unknown", "_3", "_3", 1)
-      val r = Seq.apply(u, v)
-      r
+      (x: String) => {
+        val u = ast.AttrRef(x, "_1", "_1", 1)
+        val v = ast.AttrRef(x, "_3", "_3", 1)
+        val r = Seq.apply(u, v)
+        r
+      }
     })
 
     act shouldBe alphaEqTo(exp)
-  }
+  })
 }

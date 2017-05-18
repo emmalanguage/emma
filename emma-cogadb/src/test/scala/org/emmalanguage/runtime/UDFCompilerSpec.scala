@@ -17,7 +17,6 @@ package org.emmalanguage
 package runtime
 
 import org.emmalanguage.api.CoGaDBTable
-import org.emmalanguage.cogadb.CoGaDB
 import org.emmalanguage.compiler.lang.cogadb._
 import org.emmalanguage.compiler.udf.UDFTransformer
 import org.emmalanguage.compiler.udf.common.MapUDFClosure
@@ -51,7 +50,37 @@ class UDFCompilerSpec extends FreeSpec with Matchers with CoGaDBSpec {
     //val tmp = cogadb.execute(UDFCompiler.compile(scanA, UDFType.Map, Map[String, String]("t" -> "SOURCE0000"), fun1))
     val exp = Seq((1, "foo", 2), (2, "bar", 3))
 
-    act.fetch() should contain theSameElementsAs (exp)
+    act.collect() should contain theSameElementsAs (exp)
+
+  }
+
+  "simple map udf with projected attributes" in withCoGaDB { implicit cogadb: CoGaDB =>
+
+    val A = Seq((1, "foo"), (2, "bar"))
+
+    val simpleA = new CoGaDBTable[(Int,String)](cogadb.importSeq(A))
+
+    val astWithDouble = typecheck(reify {
+      () => (t: (Int, String)) => t._1 + 1
+    }.tree)
+
+    val act = new CoGaDBTable[(Int,String)](
+
+      ast.Projection(Seq(
+        ast.AttrRef("<COMPUTED>", "MAP_UDF_RES_1", "MAP_UDF_RES_1"),
+        simpleA.ref("_2","_2")
+      ),
+      new UDFTransformer(
+      MapUDFClosure(astWithDouble, Map[String, String]("t" -> simpleA.refTable), simpleA.rep)).transform
+      )
+    )
+
+    //val fun1 = "() => (t: (Int, String)) => t._1 + 1"
+    //should not work with Node, works with Op
+    //val tmp = cogadb.execute(UDFCompiler.compile(scanA, UDFType.Map, Map[String, String]("t" -> "SOURCE0000"), fun1))
+    val exp = Seq((2, "foo"), (3, "bar"))
+
+    act.collect() should contain theSameElementsAs (exp)
 
   }
 
@@ -81,7 +110,7 @@ class UDFCompilerSpec extends FreeSpec with Matchers with CoGaDBSpec {
 
       })
 
-      next = act.fetch()
+      next = act.collect()
 
       i += 1
     }

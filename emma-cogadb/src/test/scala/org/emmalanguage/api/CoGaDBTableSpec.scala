@@ -16,7 +16,7 @@
 package org.emmalanguage
 package api
 
-import cogadb.CoGaDB
+import runtime.CoGaDB
 import test.util._
 import test.schema.Literature._
 import api.Meta.Projections._

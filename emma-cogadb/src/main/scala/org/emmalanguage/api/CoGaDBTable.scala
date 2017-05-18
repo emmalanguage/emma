@@ -17,12 +17,10 @@ package org.emmalanguage
 package api
 
 import api.alg.Alg
-import cogadb.CoGaDB
 import compiler.lang.cogadb._
 import compiler.lang.cogadb.ast.MapUdf
-import io.csv._
-import io.parquet._
-import io.text._
+
+import runtime.CoGaDB
 
 import scala.language.implicitConversions
 
@@ -89,15 +87,15 @@ class CoGaDBTable[A: Meta] private[emmalanguage]
   // -----------------------------------------------------
 
   def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit =
-    CSVScalaSupport(format).write(path)(fetch())
+    CSVScalaSupport(format).write(path)(collect())
 
   def writeText(path: String): Unit =
-    TextSupport.write(path)(fetch() map (_.toString))
+    TextSupport.write(path)(collect() map (_.toString))
 
   def writeParquet(path: String, format: Parquet)(implicit converter: ParquetConverter[A]): Unit =
-    ParquetScalaSupport(format).write(path)(fetch())
+    ParquetScalaSupport(format).write(path)(collect())
 
-  def fetch(): Seq[A] =
+  def collect(): Seq[A] =
     cogadb.exportSeq(rep)
 
   // -----------------------------------------------------

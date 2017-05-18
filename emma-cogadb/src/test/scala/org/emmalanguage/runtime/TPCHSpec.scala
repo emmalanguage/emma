@@ -16,7 +16,7 @@
 package org.emmalanguage
 package api
 
-import cogadb.CoGaDB
+import runtime.CoGaDB
 import compiler.lang.cogadb.ast
 import org.emmalanguage.compiler.udf.UDFTransformer
 import org.emmalanguage.compiler.udf.common.MapUDFClosure
@@ -104,9 +104,9 @@ class TPCHSpec extends FreeSpec with Matchers with CoGaDBSpec {
         1478870)
     )
 
-    act.fetch() shouldBe exp
+    act.collect() shouldBe exp
 
-    //act.fetch().foreach(println)
+    //act.collect().foreach(println)
 
   }
 
@@ -209,7 +209,7 @@ class TPCHSpec extends FreeSpec with Matchers with CoGaDBSpec {
       (993600, "19950305", 0, 371407.447),
       (2300070, "19950313", 0, 367371.148))
 
-    act.fetch() shouldBe exp
+    act.collect() shouldBe exp
   }
 
   "TPCH-06" in withCoGaDB { implicit cogadb: CoGaDB =>
@@ -257,7 +257,7 @@ class TPCHSpec extends FreeSpec with Matchers with CoGaDBSpec {
     )
 
     val exp = Seq(1.2314107809E8)
-    act.fetch() shouldBe exp
+    act.collect() shouldBe exp
 
   }
 

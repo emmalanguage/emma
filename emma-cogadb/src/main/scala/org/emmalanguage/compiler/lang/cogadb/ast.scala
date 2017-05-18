@@ -19,6 +19,8 @@ package compiler.lang.cogadb
 /** An abstract syntax tree for CoGaDB plans. */
 object ast {
 
+  // scalastyle:off number.of.methods
+
   trait Result
 
   // ---------------------------------------------------------------------------
@@ -33,6 +35,7 @@ object ast {
   case class GroupBy(groupCols: Seq[AttrRef], aggFuncs: Seq[AggFunc], child: Op) extends Op
   case class Selection(predicate: Seq[Predicate], child: Op) extends Op
   case class TableScan(tableName: String, version: Short = 1) extends Op
+  //case class Projection(attRef: Ref, child: Op) extends Op
   case class Projection(attRef: Seq[AttrRef], child: Op) extends Op
   case class MapUdf(mapUdfOutAttr: Seq[MapUdfOutAttr], mapUdfCode: Seq[MapUdfCode], child: Op) extends Op
   case class Join(joinType: String, predicate: Seq[Predicate], lhs: Op, rhs: Op) extends Op
@@ -62,7 +65,12 @@ object ast {
   case class SortCol(table: String, col: String, atype: String,
     result: String, version: Short = 1, order: String) extends Node
   case class SchemaAttr(atype: String, aname: String) extends Node
-  case class AttrRef(table: String, col: String, result: String, version: Short = 1) extends Node
+
+  trait Ref extends Node
+  case class StructRef(fields: Seq[(String, Ref)]) extends Ref
+
+  case class AttrRef(table: String, col: String, result: String, version: Short = 1) extends Ref
+
   case class MapUdfCode(code: String) extends Node
   case class MapUdfOutAttr(attType: String, attName: String, intVarName: String) extends Node
   case class ReduceUdfOutAttr(attType: String, attName: String, intVarName: String) extends Node
@@ -128,4 +136,23 @@ object ast {
   case object LessThan extends Comparator
   case object LessEqual extends Comparator
   //@formatter:on
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  def flatten(refs: Seq[Ref]): Seq[AttrRef] = for {
+    r <- refs
+    f <- flatten(r)
+  } yield f
+
+
+  private def flatten(ref: Ref): Seq[AttrRef] = ref match {
+    case ref: AttrRef => Seq(ref)
+    case StructRef(fields) => flatten(fields.map(_._2))
+  }
+
+
+  // scalastyle:on number.of.methods
+
 }

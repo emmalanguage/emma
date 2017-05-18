@@ -18,7 +18,6 @@ package runtime
 
 import compiler.lang.cogadb.ast
 import org.emmalanguage.api.CoGaDBTable
-import org.emmalanguage.cogadb.CoGaDB
 import org.emmalanguage.compiler.udf.ReduceUDFGenerator
 import org.emmalanguage.compiler.udf.UDFTransformer
 import org.emmalanguage.compiler.udf.common.MapUDFClosure
@@ -55,13 +54,13 @@ class KMeansSpec extends FreeSpec with Matchers with CoGaDBSpec {
 
     val cross = new CoGaDBTable[(Double, Double, Int, Double, Double)]({
       ast.CrossJoin(points.rep, centroids.rep)
-    }).fetch
+    }).collect
 
     val crossed = new CoGaDBTable[(Double, Double, Int, Double, Double)](cogadb.importSeq(cross))
 
     val map = new CoGaDBTable[(Double, Double, Int, Double, Double)](new UDFTransformer(
       MapUDFClosure(distance, Map[String, String]("pcs" -> crossed.refTable), crossed.rep)).transform
-    ).fetch
+    ).collect
 
     val mapped = new CoGaDBTable[(Double,Double,Int,Double,Double)](cogadb.importSeq(map))
 
@@ -98,10 +97,10 @@ class KMeansSpec extends FreeSpec with Matchers with CoGaDBSpec {
 
     //val act = new CoGaDBTable[]()
 
-    actual.fetch().foreach(println)
+    actual.collect().foreach(println)
     //val exp = Seq((1, "foo", 2), (2, "bar", 3))
 
-    //act.fetch() should contain theSameElementsAs (exp)
+    //act.collect() should contain theSameElementsAs (exp)
 
   }
 

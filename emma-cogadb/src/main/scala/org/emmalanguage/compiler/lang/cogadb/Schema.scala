@@ -16,7 +16,7 @@
 package org.emmalanguage
 package compiler.lang.cogadb
 
-import compiler.lang.cogadb.ast.SchemaAttr
+import ast.SchemaAttr
 
 trait CoGaDBType[T] {
   def tpe: String
