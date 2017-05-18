@@ -23,8 +23,6 @@ class LibSupportSpec extends LibSupportExamples {
 
   import compiler._
   import compiler.api._
-  import LibSupport.CG
-  import LibSupport.LibDefRegistry
 
   val prePipeline: u.Expr[Any] => u.Tree = compiler
     .pipeline(typeCheck = true, withPost = false)(

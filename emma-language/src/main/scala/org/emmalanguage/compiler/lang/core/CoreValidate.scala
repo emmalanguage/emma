@@ -22,9 +22,9 @@ import compiler.Common
 private[core] trait CoreValidate extends Common {
   self: Core =>
 
-  import u._
-  import Validation._
   import Core.{Lang => core}
+  import UniverseImplicits._
+  import Validation._
 
   /** Validation for the [[Core]] language. */
   private[core] object CoreValidate {
@@ -45,7 +45,7 @@ private[core] trait CoreValidate extends Common {
     object valid {
 
       /** Validates that a Scala AST belongs to the supported [[Core]] language. */
-      def apply(tree: Tree): Verdict = {
+      def apply(tree: u.Tree): Verdict = {
         assert(has.tpe(tree), "Core.validate can only be used on typechecked trees.")
         tree is Let otherwise "Unexpected tree (expected let-in block)"
       }

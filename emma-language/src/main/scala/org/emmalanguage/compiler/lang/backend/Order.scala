@@ -16,10 +16,11 @@
 package org.emmalanguage
 package compiler.lang.backend
 
-import cats.instances.all._
 import compiler.Common
 import compiler.lang.core.Core
 import util.Monoids
+
+import cats.instances.all._
 import shapeless._
 
 /**
@@ -30,7 +31,7 @@ import shapeless._
  * Note: This code assumes that DataBags don't contain functions. (E.g. it handles a DataBag[Int => Int] incorrectly.)
  */
 private[backend] trait Order extends Common {
-  self: Backend with Core =>
+  self: Core =>
 
   import API._
   import Core.{Lang => core}

@@ -25,7 +25,7 @@ import scala.annotation.tailrec
 import scala.collection.breakOut
 
 private[comprehension] trait Combination extends Common {
-  self: Core with Comprehension =>
+  self: Core =>
 
   private[comprehension] object Combination {
 
@@ -35,7 +35,7 @@ private[comprehension] trait Combination extends Common {
     import UniverseImplicits._
 
     private type Rule = (u.Symbol, u.Tree) => Option[u.Tree]
-    private val cs = new Comprehension.Syntax(DataBag.sym)
+    private val cs = Comprehension.Syntax(DataBag.sym)
     private val tuple2 = core.Ref(api.Sym.tuple(2).companion.asModule)
     private val tuple2App = tuple2.tpe.member(api.TermName.app).asMethod
     private val Seq(_1, _2) = {

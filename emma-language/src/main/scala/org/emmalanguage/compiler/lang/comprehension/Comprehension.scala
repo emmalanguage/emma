@@ -19,232 +19,25 @@ package compiler.lang.comprehension
 import compiler.Common
 import compiler.lang.core.Core
 
-trait Comprehension extends Common
-  with ReDeSugar
+private[compiler] trait Comprehension extends Common
+  with Combination
   with Normalize
-  with Combination {
+  with ReDeSugar {
   self: Core =>
 
   import API._
-  import UniverseImplicits._
   import Core.{Lang => core}
+  import UniverseImplicits._
 
-  private[compiler] object Comprehension {
+  object Comprehension {
 
     // -------------------------------------------------------------------------
-    // Mock comprehension syntax language
+    // Data Model
     // -------------------------------------------------------------------------
 
-    trait MonadOp {
-      val symbol: u.TermSymbol
+    def Syntax(monad: u.Symbol) = new ComprehensionSyntax(monad)
 
-      def apply(xs: u.Tree)(fn: u.Tree): u.Tree
-
-      def unapply(tree: u.Tree): Option[(u.Tree, u.Tree)]
-    }
-
-    /**
-     * Contains objects that can be used to model comprehension syntax and monad operators as
-     * first class citizen.
-     */
-    class Syntax(val monad: u.Symbol) {
-
-      //@formatter:off
-      val Monad  = monad.asType.toType.typeConstructor
-      val module = Some(ComprehensionSyntax.ref)
-      //@formatter:on
-
-      // -----------------------------------------------------------------------
-      // Monad Ops
-      // -----------------------------------------------------------------------
-
-      object Map extends MonadOp {
-
-        override val symbol = monad.info
-          .member(api.TermName("map")).asMethod
-
-        override def apply(xs: u.Tree)(f: u.Tree): u.Tree = {
-          assert(xs.tpe.typeConstructor == DataBag.tpe)
-          core.DefCall(Some(xs), symbol, Seq(elemTpe(f)), Seq(Seq(f)))
-        }
-
-        override def unapply(apply: u.Tree): Option[(u.Tree, u.Tree)] = apply match {
-          case core.DefCall(Some(xs), `symbol`, _, Seq(Seq(f))) => Some(xs, f)
-          case _ => None
-        }
-
-        @inline
-        private def elemTpe(f: u.Tree): u.Type =
-          api.Type.arg(2, f.tpe)
-      }
-
-      object FlatMap extends MonadOp {
-
-        override val symbol = monad.info
-          .member(api.TermName("flatMap")).asMethod
-
-        override def apply(xs: u.Tree)(f: u.Tree): u.Tree = {
-          assert(api.Type.arg(2, f.tpe).typeConstructor == DataBag.tpe)
-          core.DefCall(Some(xs), symbol, Seq(elemTpe(f)), Seq(Seq(f)))
-        }
-
-        override def unapply(tree: u.Tree): Option[(u.Tree, u.Tree)] = tree match {
-          case core.DefCall(Some(xs), `symbol`, _, Seq(Seq(f))) => Some(xs, f)
-          case _ => None
-        }
-
-        @inline
-        private def elemTpe(f: u.Tree): u.Type =
-          api.Type.arg(1, api.Type.arg(2, f.tpe))
-      }
-
-      object WithFilter extends MonadOp {
-
-        override val symbol = monad.info
-          .member(api.TermName("withFilter")).asMethod
-
-        override def apply(xs: u.Tree)(p: u.Tree): u.Tree =
-          core.DefCall(Some(xs), symbol, Seq.empty, Seq(Seq(p)))
-
-        override def unapply(tree: u.Tree): Option[(u.Tree, u.Tree)] = tree match {
-          case core.DefCall(Some(xs), `symbol`, _, Seq(Seq(p))) => Some(xs, p)
-          case _ => None
-        }
-      }
-
-      // -----------------------------------------------------------------------
-      // Mock Comprehension Ops
-      // -----------------------------------------------------------------------
-
-      /** Con- and destructs a comprehension from/to a list of qualifiers `qs` and a head expression `hd`. */
-      object Comprehension {
-        val symbol = ComprehensionSyntax.comprehension
-
-        def apply(qs: Seq[u.Tree], hd: u.Tree): u.Tree = {
-          val args = Seq(api.Block(qs, hd))
-          core.DefCall(module, symbol, Seq(elemTpe(hd), Monad), Seq(args))
-        }
-
-        def unapply(tree: u.Tree): Option[(Seq[u.Tree], u.Tree)] = tree match {
-          case core.DefCall(_, `symbol`, _, Seq(Seq(api.Block(qs, hd)))) => Some(qs, hd)
-          case _ => None
-        }
-
-        @inline
-        private def elemTpe(expr: u.Tree): u.Type =
-          expr.tpe
-      }
-
-      /** Con- and destructs a generator from/to a tree. */
-      object Generator {
-        val symbol = ComprehensionSyntax.generator
-
-        def apply(lhs: u.TermSymbol, rhs: u.Block): u.Tree =
-          core.ValDef(lhs, core.DefCall(module, symbol, Seq(elemTpe(rhs), Monad), Seq(Seq(rhs))))
-
-        def unapply(tree: u.ValDef): Option[(u.TermSymbol, u.Block)] = tree match {
-          case core.ValDef(lhs, core.DefCall(_, `symbol`, _, Seq(Seq(arg: u.Block)))) =>
-            Some(lhs, arg)
-          case _ =>
-            None
-        }
-
-        @inline
-        private def elemTpe(expr: u.Tree): u.Type =
-          api.Type.arg(1, expr.tpe)
-      }
-
-      /** Con- and destructs a guard from/to a tree. */
-      object Guard {
-        val symbol = ComprehensionSyntax.guard
-
-        def apply(expr: u.Block): u.Tree =
-          core.DefCall(module, symbol, Seq.empty, Seq(Seq(expr)))
-
-        def unapply(tree: u.Tree): Option[u.Block] = tree match {
-          case core.DefCall(_, `symbol`, _, Seq(Seq(expr: u.Block))) => Some(expr)
-          case _ => None
-        }
-      }
-
-      /** Con- and destructs a head from/to a tree. */
-      object Head {
-        val symbol = ComprehensionSyntax.head
-
-        def apply(expr: u.Block): u.Tree =
-          core.DefCall(module, symbol, Seq(elemTpe(expr)), Seq(Seq(expr)))
-
-        def unapply(tree: u.Tree): Option[u.Block] = tree match {
-          case core.DefCall(_, `symbol`, _, Seq(Seq(expr: u.Block))) => Some(expr)
-          case _ => None
-        }
-
-        @inline
-        private def elemTpe(expr: u.Tree): u.Type =
-          expr.tpe
-      }
-
-      /** Con- and destructs a flatten from/to a tree. */
-      object Flatten {
-        val symbol = ComprehensionSyntax.flatten
-
-        def apply(expr: u.Block): u.Tree =
-          core.DefCall(module, symbol, Seq(elemTpe(expr), Monad), Seq(Seq(expr)))
-
-        def unapply(tree: u.Tree): Option[u.Block] = tree match {
-          case core.DefCall(_, `symbol`, _, Seq(Seq(expr: u.Block))) => Some(expr)
-          case _ => None
-        }
-
-        @inline
-        private def elemTpe(expr: u.Tree): u.Type =
-          api.Type.arg(1, api.Type.arg(1, expr.tpe))
-      }
-
-    }
-
-    // ---------------------------------------------------------------------------
-    // Combinators
-    // ---------------------------------------------------------------------------
-
-    private[compiler] object Combinators {
-
-      val module = Some(Ops.ref)
-
-      object Cross {
-
-        val symbol = Ops.cross
-
-        def apply(xs: u.Tree, ys: u.Tree): u.Tree =
-          core.DefCall(module, symbol, Seq(Core.bagElemTpe(xs), Core.bagElemTpe(ys)), Seq(Seq(xs, ys)))
-
-        def unapply(apply: u.Tree): Option[(u.Tree, u.Tree)] = apply match {
-          case core.DefCall(_, `symbol`, _, Seq(Seq(xs, ys))) => Some(xs, ys)
-          case _ => None
-        }
-      }
-
-      object EquiJoin {
-
-        val symbol = Ops.equiJoin
-
-        def apply(kx: u.Tree, ky: u.Tree)(xs: u.Tree, ys: u.Tree): u.Tree = {
-          val keyTpe = api.Type.lub(Seq(
-            api.Type.arg(2, kx.tpe),
-            api.Type.arg(2, ky.tpe)))
-
-          core.DefCall(module, symbol,
-            Seq(Core.bagElemTpe(xs), Core.bagElemTpe(ys), keyTpe),
-            Seq(Seq(kx, ky), Seq(xs, ys)))
-        }
-
-        def unapply(apply: u.Tree): Option[(u.Tree, u.Tree, u.Tree, u.Tree)] = apply match {
-          case core.DefCall(_, `symbol`, _, Seq(Seq(kx, ky), Seq(xs, ys))) => Some(kx, ky, xs, ys)
-          case _ => None
-        }
-      }
-
-    }
+    object Combinators extends ComprehensionCombinators
 
     // -------------------------------------------------------------------------
     // ReDeSugar API
@@ -309,7 +102,7 @@ trait Comprehension extends Common
 
     /** Prepends and binds free variables in `tree` to `vals`. */
     private[comprehension] def capture(
-      cs: Comprehension.Syntax, vals: Seq[u.ValDef]
+      cs: ComprehensionSyntax, vals: Seq[u.ValDef]
     )(tree: u.Tree): u.Tree = {
       val prefix = vals.foldRight(
         List.empty[u.ValDef], api.Tree.refs(tree)
@@ -332,5 +125,213 @@ trait Comprehension extends Common
         case _ => prepend(tree)
       }
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Mock comprehension syntax language
+  // ---------------------------------------------------------------------------
+
+  private[comprehension] trait MonadOp {
+    val symbol: u.TermSymbol
+
+    def apply(xs: u.Tree)(fn: u.Tree): u.Tree
+
+    def unapply(tree: u.Tree): Option[(u.Tree, u.Tree)]
+  }
+
+  /**
+   * Contains objects that can be used to model comprehension syntax and monad operators as
+   * first class citizen.
+   */
+  private[comprehension] class ComprehensionSyntax(val monad: u.Symbol) {
+    //@formatter:off
+    val Monad  = monad.asType.toType.typeConstructor
+    val module = Some(ComprehensionSyntax.ref)
+    //@formatter:on
+
+    // -------------------------------------------------------------------------
+    // Monad Ops
+    // -------------------------------------------------------------------------
+
+    object Map extends MonadOp {
+      override val symbol = monad.info
+        .member(api.TermName("map")).asMethod
+
+      override def apply(xs: u.Tree)(f: u.Tree): u.Tree = {
+        assert(xs.tpe.typeConstructor == DataBag.tpe)
+        core.DefCall(Some(xs), symbol, Seq(elemTpe(f)), Seq(Seq(f)))
+      }
+
+      override def unapply(apply: u.Tree): Option[(u.Tree, u.Tree)] = apply match {
+        case core.DefCall(Some(xs), `symbol`, _, Seq(Seq(f))) => Some(xs, f)
+        case _ => None
+      }
+
+      @inline
+      private def elemTpe(f: u.Tree): u.Type =
+        api.Type.arg(2, f.tpe)
+    }
+
+    object FlatMap extends MonadOp {
+      override val symbol = monad.info
+        .member(api.TermName("flatMap")).asMethod
+
+      override def apply(xs: u.Tree)(f: u.Tree): u.Tree = {
+        assert(api.Type.arg(2, f.tpe).typeConstructor == DataBag.tpe)
+        core.DefCall(Some(xs), symbol, Seq(elemTpe(f)), Seq(Seq(f)))
+      }
+
+      override def unapply(tree: u.Tree): Option[(u.Tree, u.Tree)] = tree match {
+        case core.DefCall(Some(xs), `symbol`, _, Seq(Seq(f))) => Some(xs, f)
+        case _ => None
+      }
+
+      @inline
+      private def elemTpe(f: u.Tree): u.Type =
+        api.Type.arg(1, api.Type.arg(2, f.tpe))
+    }
+
+    object WithFilter extends MonadOp {
+      override val symbol = monad.info
+        .member(api.TermName("withFilter")).asMethod
+
+      override def apply(xs: u.Tree)(p: u.Tree): u.Tree =
+        core.DefCall(Some(xs), symbol, Seq.empty, Seq(Seq(p)))
+
+      override def unapply(tree: u.Tree): Option[(u.Tree, u.Tree)] = tree match {
+        case core.DefCall(Some(xs), `symbol`, _, Seq(Seq(p))) => Some(xs, p)
+        case _ => None
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Mock Comprehension Ops
+    // -------------------------------------------------------------------------
+
+    /** Con- and destructs a comprehension from/to a list of qualifiers `qs` and a head expression `hd`. */
+    object Comprehension {
+      val symbol = ComprehensionSyntax.comprehension
+
+      def apply(qs: Seq[u.Tree], hd: u.Tree): u.Tree = {
+        val args = Seq(api.Block(qs, hd))
+        core.DefCall(module, symbol, Seq(elemTpe(hd), Monad), Seq(args))
+      }
+
+      def unapply(tree: u.Tree): Option[(Seq[u.Tree], u.Tree)] = tree match {
+        case core.DefCall(_, `symbol`, _, Seq(Seq(api.Block(qs, hd)))) => Some(qs, hd)
+        case _ => None
+      }
+
+      @inline
+      private def elemTpe(expr: u.Tree): u.Type =
+        expr.tpe
+    }
+
+    /** Con- and destructs a generator from/to a tree. */
+    object Generator {
+      val symbol = ComprehensionSyntax.generator
+
+      def apply(lhs: u.TermSymbol, rhs: u.Block): u.Tree =
+        core.ValDef(lhs, core.DefCall(module, symbol, Seq(elemTpe(rhs), Monad), Seq(Seq(rhs))))
+
+      def unapply(tree: u.ValDef): Option[(u.TermSymbol, u.Block)] = tree match {
+        case core.ValDef(lhs, core.DefCall(_, `symbol`, _, Seq(Seq(arg: u.Block)))) =>
+          Some(lhs, arg)
+        case _ =>
+          None
+      }
+
+      @inline
+      private def elemTpe(expr: u.Tree): u.Type =
+        api.Type.arg(1, expr.tpe)
+    }
+
+    /** Con- and destructs a guard from/to a tree. */
+    object Guard {
+      val symbol = ComprehensionSyntax.guard
+
+      def apply(expr: u.Block): u.Tree =
+        core.DefCall(module, symbol, Seq.empty, Seq(Seq(expr)))
+
+      def unapply(tree: u.Tree): Option[u.Block] = tree match {
+        case core.DefCall(_, `symbol`, _, Seq(Seq(expr: u.Block))) => Some(expr)
+        case _ => None
+      }
+    }
+
+    /** Con- and destructs a head from/to a tree. */
+    object Head {
+      val symbol = ComprehensionSyntax.head
+
+      def apply(expr: u.Block): u.Tree =
+        core.DefCall(module, symbol, Seq(elemTpe(expr)), Seq(Seq(expr)))
+
+      def unapply(tree: u.Tree): Option[u.Block] = tree match {
+        case core.DefCall(_, `symbol`, _, Seq(Seq(expr: u.Block))) => Some(expr)
+        case _ => None
+      }
+
+      @inline
+      private def elemTpe(expr: u.Tree): u.Type =
+        expr.tpe
+    }
+
+    /** Con- and destructs a flatten from/to a tree. */
+    object Flatten {
+      val symbol = ComprehensionSyntax.flatten
+
+      def apply(expr: u.Block): u.Tree =
+        core.DefCall(module, symbol, Seq(elemTpe(expr), Monad), Seq(Seq(expr)))
+
+      def unapply(tree: u.Tree): Option[u.Block] = tree match {
+        case core.DefCall(_, `symbol`, _, Seq(Seq(expr: u.Block))) => Some(expr)
+        case _ => None
+      }
+
+      @inline
+      private def elemTpe(expr: u.Tree): u.Type =
+        api.Type.arg(1, api.Type.arg(1, expr.tpe))
+    }
+
+  }
+
+  // ---------------------------------------------------------------------------
+  // Combinators
+  // ---------------------------------------------------------------------------
+
+  private[comprehension] trait ComprehensionCombinators {
+    val module = Some(Ops.ref)
+
+    object Cross {
+      val symbol = Ops.cross
+
+      def apply(xs: u.Tree, ys: u.Tree): u.Tree =
+        core.DefCall(module, symbol, Seq(Core.bagElemTpe(xs), Core.bagElemTpe(ys)), Seq(Seq(xs, ys)))
+
+      def unapply(apply: u.Tree): Option[(u.Tree, u.Tree)] = apply match {
+        case core.DefCall(_, `symbol`, _, Seq(Seq(xs, ys))) => Some(xs, ys)
+        case _ => None
+      }
+    }
+
+    object EquiJoin {
+      val symbol = Ops.equiJoin
+
+      def apply(kx: u.Tree, ky: u.Tree)(xs: u.Tree, ys: u.Tree): u.Tree = {
+        val keyTpe = api.Type.lub(Seq(
+          api.Type.arg(2, kx.tpe),
+          api.Type.arg(2, ky.tpe)))
+
+        core.DefCall(module, symbol,
+          Seq(Core.bagElemTpe(xs), Core.bagElemTpe(ys), keyTpe),
+          Seq(Seq(kx, ky), Seq(xs, ys)))
+      }
+
+      def unapply(apply: u.Tree): Option[(u.Tree, u.Tree, u.Tree, u.Tree)] = apply match {
+        case core.DefCall(_, `symbol`, _, Seq(Seq(kx, ky), Seq(xs, ys))) => Some(kx, ky, xs, ys)
+        case _ => None
+      }
+    }
+
   }
 }

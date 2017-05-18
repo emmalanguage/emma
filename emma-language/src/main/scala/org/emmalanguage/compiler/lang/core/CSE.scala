@@ -27,8 +27,8 @@ import scala.util.hashing.MurmurHash3
 private[core] trait CSE extends Common {
   self: AlphaEq with Core =>
 
-  import UniverseImplicits._
   import Core.{Lang => core}
+  import UniverseImplicits._
 
   /** Common subexpression elimination (CSE) for the Core language. */
   private[core] object CSE {

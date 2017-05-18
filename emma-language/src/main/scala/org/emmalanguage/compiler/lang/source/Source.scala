@@ -20,7 +20,7 @@ import compiler.Common
 
 
 /** Source language. */
-trait Source extends Common
+private[compiler] trait Source extends Common
   with Foreach2Loop
   with PatternMatching
   with SourceValidate {

@@ -18,8 +18,8 @@ package compiler.lang.opt
 
 import api.{alg => algebra}
 import compiler.Common
-import compiler.lang.comprehension.Comprehension
 import compiler.lang.cf.ControlFlow
+import compiler.lang.comprehension.Comprehension
 import compiler.lang.core.Core
 import util.Graphs._
 
@@ -32,7 +32,7 @@ import scalaz.Tree
 
 /** The fold-fusion optimization. */
 private[compiler] trait FoldForestFusion extends Common {
-  this: Core with ControlFlow with Comprehension =>
+  self: Core with Comprehension with ControlFlow =>
 
   /** The fold-fusion optimization. */
   object FoldForestFusion {
@@ -104,7 +104,7 @@ private[compiler] trait FoldForestFusion extends Common {
       //@formatter:on
     )
 
-    private lazy val cs = new Comprehension.Syntax(API.DataBag.sym)
+    private lazy val cs = Comprehension.Syntax(API.DataBag.sym)
 
     private val ordTermSymbol = Ordering.by { (s: u.TermSymbol) =>
       val (name, i) = api.TermName.original(s.name)
@@ -208,9 +208,9 @@ private[compiler] trait FoldForestFusion extends Common {
      */
     private def foldForest(
       valIndex: Index,
-      cfg: CFG.FlowGraph[u.TermSymbol]
+      cfg: FlowGraph[u.TermSymbol]
     ): Stream[Tree[u.TermSymbol]] = {
-      val CFG.FlowGraph(refCount, _, _, dataFlow) = cfg
+      val FlowGraph(refCount, _, _, dataFlow) = cfg
 
       // Initial fold forest - singleton trees of `xs` symbols in `xs.fold(...)` applications.
       var forest: Stream[Tree[u.TermSymbol]] = valIndex.collect {
@@ -327,7 +327,7 @@ private[compiler] trait FoldForestFusion extends Common {
      * }}}
      */
     lazy val foldForestFusion: u.Tree => u.Tree = tree => {
-      val cfg = CFG.graph(tree)
+      val cfg = ControlFlow.cfg(tree)
       api.BottomUp.withOwner.transformWith {
         // Fuse only folds within a single block.
         case Attr.inh(let@core.Let(vals, defs, expr), owner :: _) =>
