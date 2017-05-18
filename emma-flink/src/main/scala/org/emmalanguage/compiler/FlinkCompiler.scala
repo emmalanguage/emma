@@ -22,10 +22,10 @@ trait FlinkCompiler extends Compiler {
 
   object FlinkAPI extends BackendAPI {
 
-    lazy val implicitTypes = Set(
-      api.Type[org.apache.flink.api.common.typeinfo.TypeInformation[Any]].typeConstructor,
-      api.Type[org.apache.flink.api.scala.ExecutionEnvironment]
-    )
+    lazy val TypeInformation = api.Type[org.apache.flink.api.common.typeinfo.TypeInformation[Any]].typeConstructor
+    lazy val ExecutionEnvironment = api.Type[org.apache.flink.api.scala.ExecutionEnvironment]
+
+    lazy val implicitTypes = Set(TypeInformation, ExecutionEnvironment)
 
     lazy val DataBag = new DataBagAPI(api.Sym[org.emmalanguage.api.FlinkDataSet[Any]].asClass)
 
