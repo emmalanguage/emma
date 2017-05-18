@@ -66,7 +66,7 @@ object SparkOps extends ComprehensionCombinators[SparkSession] with Runtime[Spar
   private class RDDExtractor(spark: SparkSession) {
     def unapply[A: Meta](bag: DataBag[A]): Option[RDD[A]] = bag match {
       case bag: SparkRDD[A] => Some(bag.rep)
-      case _ => Some(spark.sparkContext.parallelize(bag.fetch()))
+      case _ => Some(spark.sparkContext.parallelize(bag.collect()))
     }
   }
 

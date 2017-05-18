@@ -76,6 +76,7 @@ class SparkRDD[A: Meta] private[api]
   override def union(that: DataBag[A]): DataBag[A] = that match {
     case dbag: ScalaSeq[A] => this union SparkRDD(dbag.rep)
     case dbag: SparkRDD[A] => this.rep union dbag.rep
+    case dbag: SparkDataset[A] => SparkDataset.wrap(this.rep.toDS() union dbag.rep)
     case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
 
