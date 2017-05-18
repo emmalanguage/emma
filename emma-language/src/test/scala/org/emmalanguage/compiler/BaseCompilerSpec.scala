@@ -56,7 +56,7 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
    * Combines a sequence of `transformations` into a pipeline with pre- and post-processing.
    * If the IT maven profile is set, then it also checks if the resulting code is valid by compiling it.
    */
-  def pipeline(
+  protected def pipeline(
     typeCheck: Boolean = false, withPre: Boolean = true, withPost: Boolean = true
   )(
     transformations: (u.Tree => u.Tree)*
@@ -80,26 +80,29 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
   // Utility functions
   // ---------------------------------------------------------------------------
 
-  def time[A](f: => A, name: String = "") = {
+  protected def time[A](f: => A, name: String = "") = {
     val s = System.nanoTime
-    val ret = f
-    println(s"$name time: ${(System.nanoTime - s) / 1e6}ms".trim)
-    ret
+    val r = f
+    val e = System.nanoTime
+    println(s"$name time: ${(e - s) / 1e6}ms".trim)
+    r
   }
 
   /** Wraps the given tree in a class and a method whose params are the closure of the tree. */
-  private def wrapInClass(tree: u.Tree): u.Tree = {
-    import u._
-    val params = api.Tree.closure(tree).map { sym =>
-      val name = sym.name
-      val tpt = sym.typeSignature
-      q"val $name: $tpt"
+  protected def wrapInClass(tree: u.Tree): u.Tree = {
+    import u.Quasiquote
+
+    val Cls = api.TypeName(UUID.randomUUID().toString)
+    val run = api.TermName(RuntimeCompiler.default.runMethod)
+    val prs = api.Tree.closure(tree).map { sym =>
+      val x = sym.name
+      val T = sym.info
+      q"val $x: $T"
     }
+
     q"""
-    class ${api.TypeName(UUID.randomUUID().toString)} {
-      def ${u.TermName(RuntimeCompiler.default.runMethod)}(..$params) = {
-        $tree
-      }
+    class $Cls {
+      def $run(..$prs) = $tree
     }
     """
   }
