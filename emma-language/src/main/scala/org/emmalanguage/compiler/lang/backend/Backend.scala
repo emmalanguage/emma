@@ -20,11 +20,11 @@ import compiler.Common
 import compiler.lang.core.Core
 
 /** Backend-related (but backend-agnostic) transformations. */
-trait Backend extends Common
+private[compiler] trait Backend extends Common
   with Caching
   with Order
   with Specialization {
-  this: Core =>
+  self: Core =>
 
   object Backend {
 

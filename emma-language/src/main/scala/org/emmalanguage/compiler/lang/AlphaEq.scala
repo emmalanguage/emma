@@ -18,7 +18,9 @@ package compiler.lang
 
 import compiler.Common
 
-import org.scalactic.{Bad, Good, Or}
+import org.scalactic.Bad
+import org.scalactic.Good
+import org.scalactic.Or
 
 import scala.collection.mutable
 

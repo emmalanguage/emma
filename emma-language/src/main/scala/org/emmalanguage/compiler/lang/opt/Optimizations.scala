@@ -24,7 +24,7 @@ import compiler.lang.core.Core
 trait Optimizations extends Common
   with FoldForestFusion
   with FoldGroupFusion {
-  this: Core with ControlFlow =>
+  self: Core with ControlFlow =>
 
   /** Static (compile-time) optimizations. */
   object Optimizations {

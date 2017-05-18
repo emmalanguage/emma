@@ -17,18 +17,18 @@ package org.emmalanguage
 package compiler.lang.core
 
 import compiler.Common
-import compiler.lang.source.Source
 import compiler.ir.DSCFAnnotations._
+import compiler.lang.source.Source
 import util.Monoids._
 
 import shapeless._
 
-import scala.collection.breakOut
 import scala.collection.SortedSet
+import scala.collection.breakOut
 
 /** Direct-style control-flow transformation. */
 private[core] trait DSCF extends Common {
-  this: Source with Core =>
+  self: Core with Source =>
 
   /**
    * Converts the control-flow in input tree in ANF in the direct-style.
@@ -88,11 +88,11 @@ private[core] trait DSCF extends Common {
    */
   private[core] object DSCF {
 
-    import API.DSCFAnnotations._
-    import UniverseImplicits._
     import ANF.AsBlock
+    import API.DSCFAnnotations._
     import Core.{Lang => core}
     import Source.{Lang => src}
+    import UniverseImplicits._
 
     private val noParams: Seq[Seq[u.TermSymbol]] = Seq(Seq.empty)
     private val noArgs:   Seq[Seq[u.Tree]]       = Seq(Seq.empty)

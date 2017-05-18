@@ -25,11 +25,11 @@ import scala.Function.const
 
 /** Administrative Normal Form (ANF) bypassing control-flow and for-comprehensions. */
 private[core] trait ANF extends Common {
-  this: Source with Core =>
+  self: Source with Core =>
 
-  import UniverseImplicits._
   import Core.{Lang => core}
   import Source.{Lang => src}
+  import UniverseImplicits._
 
   /** Administrative Normal Form (ANF) bypassing control-flow and for-comprehensions. */
   private[core] object ANF {

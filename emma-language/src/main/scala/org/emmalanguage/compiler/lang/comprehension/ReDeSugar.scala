@@ -24,12 +24,13 @@ import shapeless._
 
 /** Resugaring and desugaring of comprehension syntax. */
 private[comprehension] trait ReDeSugar extends Common {
-  self: Core with Comprehension =>
+  self: Core =>
 
   import Monoids._
-  import UniverseImplicits._
+
   import Comprehension.asLet
   import Core.{Lang => core}
+  import UniverseImplicits._
 
   private[comprehension] object ReDeSugar {
 
@@ -49,7 +50,7 @@ private[comprehension] trait ReDeSugar extends Common {
      */
     def resugar(monad: u.Symbol): u.Tree => u.Tree = {
       // Construct comprehension syntax helper for the given monad
-      val cs = new Comprehension.Syntax(monad)
+      val cs = Comprehension.Syntax(monad)
       // Handle the case when a lambda is defined externally
       def lookup(f: u.TermSymbol, owner: u.Symbol,
         lambdas: Map[u.TermSymbol, (u.TermSymbol, u.Tree)]
@@ -108,7 +109,7 @@ private[comprehension] trait ReDeSugar extends Common {
      */
     def desugar(monad: u.Symbol): u.Tree => u.Tree = {
       // construct comprehension syntax helper for the given monad
-      val cs = new Comprehension.Syntax(monad)
+      val cs = Comprehension.Syntax(monad)
       api.TopDown.withOwner.transformWith {
         // Match: `for { x <- { $vals; $rhs}; $qs*; } yield $expr`
         case Attr.inh(

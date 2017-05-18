@@ -23,7 +23,7 @@ import compiler.lang.comprehension.Comprehension
 import compiler.lang.source.Source
 
 /** Core language. */
-trait Core extends Common
+private[compiler] trait Core extends Common
   with ANF
   with Comprehension
   with CoreValidate
@@ -32,7 +32,7 @@ trait Core extends Common
   with DSCF
   with Pickling
   with Trampoline {
-  this: AlphaEq with Source =>
+  self: AlphaEq with Source =>
 
   import API._
   import UniverseImplicits._
@@ -224,7 +224,7 @@ trait Core extends Common
 
     def fold[A](a: Algebra[A])(tree: u.Tree): A = {
       // construct comprehension syntax helper for the given monad
-      val cs = new Comprehension.Syntax(DataBag.sym)
+      val cs = Comprehension.Syntax(DataBag.sym)
       def fold(tree: u.Tree): A = tree match {
         // Comprehensions
         case cs.Comprehension(qs, hd) =>

@@ -18,6 +18,7 @@ package compiler.lang.opt
 
 import compiler.Common
 import compiler.lang.cf.ControlFlow
+import compiler.lang.comprehension.Comprehension
 import compiler.lang.core.Core
 import util.Graphs.topoSort
 
@@ -28,7 +29,7 @@ import scala.collection.breakOut
 
 /** The fold-fusion optimization. */
 private[compiler] trait FoldGroupFusion extends Common {
-  this: Core with ControlFlow =>
+  self: Core with Comprehension with ControlFlow =>
 
   /** The fold-fusion optimization. */
   object FoldGroupFusion {
@@ -40,7 +41,7 @@ private[compiler] trait FoldGroupFusion extends Common {
     import Core.{Lang => core}
     import UniverseImplicits._
 
-    val cs = new Comprehension.Syntax(DataBag.sym)
+    val cs = Comprehension.Syntax(DataBag.sym)
 
     /**
      * Performs the fold-group-fusion optimization on `DataBag` expressions.
@@ -81,7 +82,7 @@ private[compiler] trait FoldGroupFusion extends Common {
      * }}}
      */
     lazy val foldGroupFusion: u.Tree => u.Tree = tree => {
-      val cfg = CFG.graph(tree)
+      val cfg = ControlFlow.cfg(tree)
 
       val ms = for {
         GroupBy(x, y, k) <- cfg.data.labNodes.map(_.label)

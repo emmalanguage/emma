@@ -17,8 +17,8 @@ package org.emmalanguage
 package compiler.lang.cf
 
 import compiler.Common
-import compiler.lang.core.Core
 import compiler.ir.DSCFAnnotations.continuation
+import compiler.lang.core.Core
 import util.Monoids._
 
 import cats.instances.all._
@@ -29,22 +29,16 @@ import scala.collection.breakOut
 
 /** Control-flow graph analysis (CFG). */
 private[compiler] trait CFG extends Common {
-  this: Core with ControlFlow =>
+  self: Core with ControlFlow =>
 
   /** Control-flow graph analysis (CFG). */
-  private[compiler] object CFG {
+  private[cf] object CFG {
 
-    import UniverseImplicits._
-    import Core.{Lang => core}
     import API.GraphRepresentation.phi
+    import Core.{Lang => core}
+    import UniverseImplicits._
 
     private val module = Some(API.GraphRepresentation.ref)
-
-    case class FlowGraph[V](
-        uses: Map[V, Int],
-        nest: Graph[V, Unit, Unit],
-        ctrl: Graph[V, u.DefDef, Unit],
-        data: Graph[V, u.ValDef, Unit])
 
     /**
      * Control-flow graph analysis (CFA) of a tree.

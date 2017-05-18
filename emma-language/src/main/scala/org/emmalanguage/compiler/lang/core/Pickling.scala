@@ -23,7 +23,7 @@ import scala.Function.const
 
 /** Core language pickling. */
 private[core] trait Pickling extends Common {
-  this: Source with Core =>
+  self: Core with Source =>
 
   private[core] object Pickle {
 

@@ -22,9 +22,9 @@ import compiler.Common
 private[source] trait SourceValidate extends Common {
   self: Source =>
 
-  import Validation._
-  import UniverseImplicits._
   import Source.{Lang => src}
+  import UniverseImplicits._
+  import Validation._
 
   /** Validation for the [[Source]] language. */
   private[source] object SourceValidate {

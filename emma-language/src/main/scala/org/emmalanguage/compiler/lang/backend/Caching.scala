@@ -17,8 +17,8 @@ package org.emmalanguage
 package compiler.lang.backend
 
 import compiler.Common
-import compiler.lang.core.Core
 import compiler.ir.DSCFAnnotations._
+import compiler.lang.core.Core
 import util.Monoids._
 
 import cats.instances.all._
@@ -28,7 +28,7 @@ import scala.collection.breakOut
 
 /** Translating to dataflows. */
 private[backend] trait Caching extends Common {
-  self: Backend with Core =>
+  self: Core =>
 
   private[backend] object Caching {
 

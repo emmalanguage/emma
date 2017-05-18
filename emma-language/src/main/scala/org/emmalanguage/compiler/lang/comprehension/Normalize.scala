@@ -16,19 +16,19 @@
 package org.emmalanguage
 package compiler.lang.comprehension
 
-import compiler.lang.core.Core
 import compiler.Common
+import compiler.lang.core.Core
 
 import shapeless._
 
 import scala.collection.breakOut
 
 private[comprehension] trait Normalize extends Common {
-  self: Core with Comprehension =>
+  self: Core =>
 
   import Comprehension._
-  import UniverseImplicits._
   import Core.{Lang => core}
+  import UniverseImplicits._
 
   private lazy val strategy = api.BottomUp.exhaust.withValUses
   private type Rule = Attr[strategy.Acc, strategy.Inh, strategy.Syn] => Option[u.Tree]
@@ -43,10 +43,11 @@ private[comprehension] trait Normalize extends Common {
      */
     def normalize(monad: u.Symbol): u.Tree => u.Tree = {
       // construct comprehension syntax helper for the given monad
-      val cs = new Syntax(monad) with NormalizationRules
+      val cs = Syntax(monad)
+      val nr = NormalizationRules(cs)
       // apply UnnestHead and UnnestGenerator rules exhaustively
       strategy.transformWith { case attr @ Attr.none(core.Let(_, _, _)) =>
-        cs.rules.foldLeft(Option.empty[u.Tree]) {
+        nr.rules.foldLeft(Option.empty[u.Tree]) {
           (done, rule) => done orElse rule(attr)
         }.getOrElse(attr.tree)
       }.andThen(_.tree).andThen {
@@ -61,8 +62,7 @@ private[comprehension] trait Normalize extends Common {
     }
   }
 
-  protected trait NormalizationRules {
-    self: Syntax =>
+  private case class NormalizationRules(cs: ComprehensionSyntax) {
 
     // -------------------------------------------------------------------------
     // Comprehension normalization rules
@@ -121,16 +121,16 @@ private[comprehension] trait Normalize extends Common {
     private[Normalize] val UnnestHead: Rule = {
       case Attr.none(core.Let(vals, defs, expr)) => {
         for {
-          xv @ core.ValDef(x, Flatten(
-            core.Let(xvs, Seq(), Comprehension(xqs, Head(
+          xv @ core.ValDef(x, cs.Flatten(
+            core.Let(xvs, Seq(), cs.Comprehension(xqs, cs.Head(
               core.Let(yvs :+ core.ValDef(y, AsComprehension(yqs, yhd)), Seq(), core.Ref(z))
           ))))) <- vals.view
           if y == z
           (dep, indep) = split(yvs, xqs)
-          qs = xqs ++ yqs.map(capture(self, dep))
-          hd = capture(self, dep)(yhd)
+          qs = xqs ++ yqs.map(capture(cs, dep))
+          hd = capture(cs, dep)(yhd)
           (pre, suf) = splitAt(xv)(vals)
-          unnested = Seq(core.ValDef(x, Comprehension(qs, hd)))
+          unnested = Seq(core.ValDef(x, cs.Comprehension(qs, hd)))
           flatVals = Seq.concat(pre, xvs, indep, unnested, suf)
         } yield core.Let(flatVals, defs, expr)
       }.headOption
@@ -144,13 +144,13 @@ private[comprehension] trait Normalize extends Common {
      */
     object AsComprehension {
       def unapply(tree: u.Tree): Option[(Seq[u.Tree], u.Tree)] = tree match {
-        case Comprehension(qs, hd) => Some(qs, hd)
-        case _ if tree.tpe.dealias.widen.typeConstructor =:= Monad =>
+        case cs.Comprehension(qs, hd) => Some(qs, hd)
+        case _ if tree.tpe.dealias.widen.typeConstructor =:= cs.Monad =>
           val tpe = api.Type.arg(1, tree.tpe.dealias.widen)
           val lhs = api.TermSym.free(api.TermName.fresh(), tpe)
           val rhs = asLet(tree)
           val ref = core.Let(expr = api.TermRef(lhs))
-          Some(Seq(Generator(lhs, rhs)), Head(ref))
+          Some(Seq(cs.Generator(lhs, rhs)), cs.Head(ref))
         case _ => None
       }
     }
@@ -162,7 +162,7 @@ private[comprehension] trait Normalize extends Common {
         yield lhs -> api.Tree.refs(rhs)
 
       var dependent: Set[u.TermSymbol] = qs.collect {
-        case Generator(lhs, _) => lhs
+        case cs.Generator(lhs, _) => lhs
       } (breakOut)
       var size = 0
       while (size != dependent.size) {
@@ -227,18 +227,18 @@ private[comprehension] trait Normalize extends Common {
     private[Normalize] val UnnestGenerator: Rule = {
       case Attr.syn(core.Let(vals, defs, expr), uses :: _) => {
         for {
-          xv @ core.ValDef(x, Comprehension(xqs, Head(
+          xv @ core.ValDef(x, cs.Comprehension(xqs, cs.Head(
             core.Let(xvs, Seq(), core.Ref(alias))
           ))) <- vals.view
           if uses(x) == 1
           (xpre, xsuf) = splitAt(xv)(vals)
-          yv @ core.ValDef(y, Comprehension(yqs, yhd)) <- xsuf
-          gen @ Generator(z, core.Let(Seq(), Seq(), core.Ref(`x`))) <- yqs.view
+          yv @ core.ValDef(y, cs.Comprehension(yqs, yhd)) <- xsuf
+          gen @ cs.Generator(z, core.Let(Seq(), Seq(), core.Ref(`x`))) <- yqs.view
           (ypre, ysuf) = splitAt(yv)(xsuf)
           (zpre, zsuf) = splitAt[u.Tree](gen)(yqs)
-          subst = api.Tree.rename(Seq(z -> alias)).andThen(capture(self, xvs))
+          subst = api.Tree.rename(Seq(z -> alias)).andThen(capture(cs, xvs))
           qs = Seq.concat(zpre, xqs, zsuf.map(subst))
-          unnested = Seq(core.ValDef(y, Comprehension(qs, subst(yhd))))
+          unnested = Seq(core.ValDef(y, cs.Comprehension(qs, subst(yhd))))
           flatVals = Seq.concat(xpre, ypre, unnested, ysuf)
         } yield core.Let(flatVals, defs, expr)
       }.headOption

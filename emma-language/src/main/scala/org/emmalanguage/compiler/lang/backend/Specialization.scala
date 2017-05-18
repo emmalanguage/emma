@@ -27,13 +27,17 @@ import scala.collection.breakOut
 
 /** Translating to dataflows. */
 private[backend] trait Specialization extends Common {
-  self: Backend with Core =>
+  self: Core with Order =>
 
   private[backend] object Specialization {
 
     import API._
-    import UniverseImplicits._
     import Core.{Lang => core}
+    import UniverseImplicits._
+
+    val foobar = (tree: u.Tree) => {
+      Core.validate(Order.disambiguate(tree)._1)
+    }
 
     private val scalaSeq = Some(ScalaSeq$.ref)
 

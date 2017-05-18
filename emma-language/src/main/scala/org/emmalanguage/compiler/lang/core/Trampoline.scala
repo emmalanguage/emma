@@ -30,8 +30,8 @@ private[core] trait Trampoline extends Common {
   /** Trampolining tail calls to avoid stack overflow. */
   private[core] object Trampoline {
 
-    import UniverseImplicits._
     import Core.{Lang => core}
+    import UniverseImplicits._
     import u.internal.flags
 
     private val module = u.rootMirror.staticModule("scala.util.control.TailCalls")
