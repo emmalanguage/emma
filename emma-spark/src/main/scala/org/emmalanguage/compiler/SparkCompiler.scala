@@ -74,16 +74,11 @@ trait SparkCompiler extends Compiler with SparkSpecializeSupport {
     //@formatter:on
   }
 
-  object SparkAPI extends BackendAPI {
-
+  trait SparkAPILike extends BackendAPI {
     lazy val Encoder = api.Type[org.apache.spark.sql.Encoder[Any]].typeConstructor
     lazy val SparkSession = api.Type[org.apache.spark.sql.SparkSession]
 
     lazy val implicitTypes = Set(Encoder, SparkSession)
-
-    lazy val DataBag = new DataBagAPI(api.Sym[org.emmalanguage.api.SparkRDD[Any]].asClass)
-
-    lazy val DataBag$ = new DataBag$API(api.Sym[org.emmalanguage.api.SparkRDD.type].asModule)
 
     lazy val MutableBag = new MutableBagAPI(api.Sym[org.emmalanguage.api.SparkMutableBag[Any, Any]].asClass)
 
@@ -94,6 +89,18 @@ trait SparkCompiler extends Compiler with SparkSpecializeSupport {
     lazy val Ntv = new NtvAPI {}
 
     lazy val Exp = new SparkExpAPI {}
+  }
+
+  object SparkAPI extends SparkAPILike {
+    lazy val DataBag = new DataBagAPI(api.Sym[org.emmalanguage.api.SparkRDD[Any]].asClass)
+
+    lazy val DataBag$ = new DataBag$API(api.Sym[org.emmalanguage.api.SparkRDD.type].asModule)
+  }
+
+  object SparkAPI2 extends SparkAPILike {
+    lazy val DataBag = new DataBagAPI(api.Sym[org.emmalanguage.api.SparkDataset[Any]].asClass)
+
+    lazy val DataBag$ = new DataBag$API(api.Sym[org.emmalanguage.api.SparkDataset.type].asModule)
   }
 
 }

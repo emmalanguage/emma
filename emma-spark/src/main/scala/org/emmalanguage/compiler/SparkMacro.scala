@@ -59,12 +59,21 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler with SparkCompil
     if (cfg.getBoolean("emma.compiler.opt.auto-cache")) {
       xfms += Backend.addCacheCalls
     }
-    // standard suffix
-    xfms ++= Seq(
-      Comprehension.combine,
-      Backend.specialize(SparkAPI),
-      Core.trampoline
-    )
+
+    xfms += Comprehension.combine
+
+    cfg.getString("emma.compiler.spark.api") match {
+      case "rdd" =>
+        xfms += Backend.specialize(SparkAPI)
+      case "dataset" =>
+        xfms += Backend.specialize(SparkAPI2)
+        if (cfg.getBoolean("emma.compiler.spark.native-ops")) {
+          xfms += SparkSpecializeSupport.specializeOps
+        }
+    }
+
+    xfms += Core.trampoline
+
     // construct the compilation pipeline
     pipeline()(xfms.result(): _*).compose(_.tree)
   }
