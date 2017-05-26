@@ -17,14 +17,17 @@ package org.emmalanguage
 package compiler.lang.backend
 
 import compiler.Common
+import compiler.lang.cf.ControlFlow
+import compiler.lang.comprehension.Comprehension
 import compiler.lang.core.Core
 
 /** Backend-related (but backend-agnostic) transformations. */
 private[compiler] trait Backend extends Common
   with Caching
   with Order
+  with Context
   with Specialization {
-  self: Core =>
+  self: Core with ControlFlow with Comprehension =>
 
   object Backend {
 
