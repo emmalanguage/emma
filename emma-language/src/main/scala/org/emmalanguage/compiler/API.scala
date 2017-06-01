@@ -210,13 +210,12 @@ protected[emmalanguage] trait API extends AST {
     //@formatter:off
     lazy val sym            = api.Sym[ir.ComprehensionSyntax.type].asModule
 
-    val flatten             = op("flatten")
     val generator           = op("generator")
     val comprehension       = op("comprehension")
     val guard               = op("guard")
     val head                = op("head")
 
-    lazy val ops            = Set(flatten, generator, comprehension, guard, head)
+    lazy val ops            = Set(generator, comprehension, guard, head)
     //@formatter:on
   }
 

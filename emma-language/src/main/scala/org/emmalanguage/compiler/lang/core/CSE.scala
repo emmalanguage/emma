@@ -152,7 +152,6 @@ private[core] trait CSE extends Common {
         val generator  = API.ComprehensionSyntax.generator.##
         val guard      = API.ComprehensionSyntax.guard.##
         val head       = API.ComprehensionSyntax.head.##
-        val flatten    = API.ComprehensionSyntax.flatten.##
         //@formatter:on
       }
 
@@ -255,10 +254,6 @@ private[core] trait CSE extends Common {
 
       def head(expr: Hash) = Hash() {
         tab => mix(seed.head, expr(tab))
-      }
-
-      def flatten(expr: Hash) = Hash() {
-        tab => mix(seed.flatten, expr(tab))
       }
 
       /** Deterministically combines a sequence of hash values. */

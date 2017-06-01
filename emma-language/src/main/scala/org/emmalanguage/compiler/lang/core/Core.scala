@@ -219,7 +219,6 @@ private[compiler] trait Core extends Common
       def generator(lhs: u.TermSymbol, rhs: A): A
       def guard(expr: A): A
       def head(expr: A): A
-      def flatten(expr: A): A
     }
 
     def fold[A](a: Algebra[A])(tree: u.Tree): A = {
@@ -235,8 +234,6 @@ private[compiler] trait Core extends Common
           a.guard(fold(expr))
         case cs.Head(expr) =>
           a.head(fold(expr))
-        case cs.Flatten(expr) =>
-          a.flatten(fold(expr))
 
         // Empty
         case Lang.Empty(_) =>

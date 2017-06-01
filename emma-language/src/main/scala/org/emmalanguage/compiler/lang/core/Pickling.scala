@@ -213,9 +213,6 @@ private[core] trait Pickling extends Common {
 
         def head(expr: D) = offset =>
           expr(offset)
-
-        def flatten(expr: D) = offset =>
-          s"(${expr(offset)}).flatten"
       }
 
       Core.fold(alg)(tree)(0)

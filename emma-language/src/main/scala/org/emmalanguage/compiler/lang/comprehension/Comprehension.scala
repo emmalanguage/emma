@@ -276,23 +276,6 @@ private[compiler] trait Comprehension extends Common
         expr.tpe
     }
 
-    /** Con- and destructs a flatten from/to a tree. */
-    object Flatten {
-      val symbol = ComprehensionSyntax.flatten
-
-      def apply(expr: u.Block): u.Tree =
-        core.DefCall(module, symbol, Seq(elemTpe(expr), Monad), Seq(Seq(expr)))
-
-      def unapply(tree: u.Tree): Option[u.Block] = tree match {
-        case core.DefCall(_, `symbol`, _, Seq(Seq(expr: u.Block))) => Some(expr)
-        case _ => None
-      }
-
-      @inline
-      private def elemTpe(expr: u.Tree): u.Type =
-        api.Type.arg(1, api.Type.arg(1, expr.tpe))
-    }
-
   }
 
   // ---------------------------------------------------------------------------
