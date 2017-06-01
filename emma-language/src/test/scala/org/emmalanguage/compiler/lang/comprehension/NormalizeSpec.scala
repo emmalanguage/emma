@@ -55,18 +55,17 @@ class NormalizeSpec extends BaseCompilerSpec {
   val (inp1, exp1) = {
     val inp = reify {
       val users$1 = users
-      val names = flatten[(User, Click), DataBag] {
-        comprehension[DataBag[(User, Click)], DataBag] {
-          val u = generator(users$1)
-          head {
-            val clicks$1 = clicks
-            val compr$1 = comprehension[(User, Click), DataBag] {
-              val c = generator(clicks$1)
-              head(u, c)
-            }
-            compr$1
+      val names = comprehension[(User, Click), DataBag] {
+        val u = generator(users$1)
+        val v = generator[(User, Click), DataBag] {
+          val clicks$1 = clicks
+          val compr$1 = comprehension[(User, Click), DataBag] {
+            val c = generator(clicks$1)
+            head(u, c)
           }
+          compr$1
         }
+        head(v)
       }
       names
     }
@@ -89,27 +88,25 @@ class NormalizeSpec extends BaseCompilerSpec {
   val (inp2, exp2) = {
     val inp = reify {
       val users$1 = users
-      val names = flatten[(Ad, User, Click), DataBag] {
-        comprehension[DataBag[(Ad, User, Click)], DataBag] {
-          val u = generator(users$1)
-          head {
-            val clicks$1 = clicks
-            val flatten$1 = flatten[(Ad, User, Click), DataBag] {
-              comprehension[DataBag[(Ad, User, Click)], DataBag] {
-                val c = generator(clicks$1)
-                head {
-                  val ads$1 = ads
-                  val compr$1 = comprehension[(Ad, User, Click), DataBag] {
-                    val a = generator(ads$1)
-                    head(a, u, c)
-                  }
-                  compr$1
-                }
+      val names = comprehension[(Ad, User, Click), DataBag] {
+        val u = generator(users$1)
+        val v = generator[(Ad, User, Click), DataBag] {
+          val clicks$1 = clicks
+          val flatten$1 = comprehension[(Ad, User, Click), DataBag] {
+            val c = generator(clicks$1)
+            val w = generator[(Ad, User, Click), DataBag] {
+              val ads$1 = ads
+              val compr$1 = comprehension[(Ad, User, Click), DataBag] {
+                val a = generator(ads$1)
+                head(a, u, c)
               }
+              compr$1
             }
-            flatten$1
+            head(w)
           }
+          flatten$1
         }
+        head(v)
       }
       names
     }
@@ -134,32 +131,30 @@ class NormalizeSpec extends BaseCompilerSpec {
   val (inp3, exp3) = {
     val inp = reify {
       val users$1 = users
-      val names = flatten[(Ad, User, Click), DataBag] {
-        comprehension[DataBag[(Ad, User, Click)], DataBag] {
-          val u = generator(users$1)
-          head {
-            val clicks$1 = clicks
-            val compr$1 = comprehension[Click, DataBag] {
-              val c = generator(clicks$1)
-              guard(c.userID == u.id)
-              head(c)
-            }
-            val flatten$1 = flatten[(Ad, User, Click), DataBag] {
-              comprehension[DataBag[(Ad, User, Click)], DataBag] {
-                val c = generator(compr$1)
-                head {
-                  val ads$1 = ads
-                  val compr$2 = comprehension[(Ad, User, Click), DataBag] {
-                    val a = generator(ads$1)
-                    head(a, u, c)
-                  }
-                  compr$2
-                }
-              }
-            }
-            flatten$1
+      val names = comprehension[(Ad, User, Click), DataBag] {
+        val u = generator(users$1)
+        val v = generator[(Ad, User, Click), DataBag] {
+          val clicks$1 = clicks
+          val compr$1 = comprehension[Click, DataBag] {
+            val c = generator(clicks$1)
+            guard(c.userID == u.id)
+            head(c)
           }
+          val flatten$1 = comprehension[(Ad, User, Click), DataBag] {
+            val c = generator(compr$1)
+            val w = generator[(Ad, User, Click), DataBag] {
+              val ads$1 = ads
+              val compr$2 = comprehension[(Ad, User, Click), DataBag] {
+                val a = generator(ads$1)
+                head(a, u, c)
+              }
+              compr$2
+            }
+            head(w)
+          }
+          flatten$1
         }
+        head(v)
       }
       names
     }

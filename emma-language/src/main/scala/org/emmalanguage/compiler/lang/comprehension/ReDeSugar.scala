@@ -78,11 +78,17 @@ private[comprehension] trait ReDeSugar extends Common {
             cs.Head(asLet(body)))
 
         case Attr(cs.FlatMap(xs, core.Ref(f)), lambdas :: _, owner :: _, _) =>
-          val (sym, body) = lookup(f, owner, lambdas)
-          cs.Flatten(core.Let(expr =
-            cs.Comprehension(Seq(
-              cs.Generator(sym, asLet(xs))),
-              cs.Head(asLet(body)))))
+          val (sym1, body1) = lookup(f, owner, lambdas)
+          val (sym2, body2) = {
+            val nme = api.TermName("g")
+            val tpe = api.Type.arg(1, body1.tpe)
+            val sym = api.TermSym(sym1.owner, nme, tpe)
+            sym -> core.Ref(sym)
+          }
+          cs.Comprehension(Seq(
+            cs.Generator(sym1, asLet(xs)),
+            cs.Generator(sym2, asLet(body1))),
+            cs.Head(asLet(body2)))
 
         case Attr(cs.WithFilter(xs, core.Ref(p)), lambdas :: _, owner :: _, _) =>
           val (sym, body) = lookup(p, owner, lambdas)
@@ -166,15 +172,6 @@ private[comprehension] trait ReDeSugar extends Common {
               val allVals = Seq.concat(vals, prefix, Seq(funVal, opVal))
               core.Let(allVals, Seq.empty, core.Ref(opSym))
           }
-
-        // Match: `flatten { $vals; $defs; for { $qs } yield $head }`
-        case Attr.inh(cs.Flatten(core.Let(vals, defs, cs.Comprehension(qs, cs.Head(hd)))), owner :: _) =>
-          val genNme = api.TermName.fresh()
-          val genSym = api.ValSym(owner, genNme, api.Type.arg(1, hd.tpe))
-          // Return: { $vals; $defs; for { $qs; x <- $head } yield x }
-          val gen = cs.Generator(genSym, hd)
-          val hd1 = cs.Head(core.Let(expr = core.Ref(genSym)))
-          core.Let(vals, defs, cs.Comprehension(qs :+ gen, hd1))
       }._tree.andThen(Core.unnest)
     }
   }
