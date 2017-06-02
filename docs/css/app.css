@@ -1,4 +1,5 @@
 body {
+    font-family: 'Ubuntu', sans-serif;
     background: #fdf6e3;
     color: #657b83;
 }
@@ -110,7 +111,7 @@ code, kbd {
 }
 
 .top-bar a.emma {
-    font-family: 'Pacifico', cursive;
+    font-family: 'Lobster', cursive;
     background: url("../img/silhouette.yellow.gif") no-repeat left center;
     background-size: contain;
     padding-left: 2em !important;
@@ -118,7 +119,7 @@ code, kbd {
 }
 
 h1 {
-    font-family: 'Pacifico', cursive;
+    font-family: 'Lobster', cursive;
     background: url("../img/silhouette.orange.gif") no-repeat left center;
     background-size: contain;
     padding: 0.2em 0 0.2em 1.5em;

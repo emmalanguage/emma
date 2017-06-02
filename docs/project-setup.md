@@ -82,7 +82,7 @@ mvn verify  # with tests
 
 ### HDFS Setup
 
-[Getting started with Hadoop](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SingleCluster.html)
+If you are not familiar with Hadoop, check the ["Getting started with Hadoop"](https://hadoop.apache.org/docs/stable/hadoop-project-dist/hadoop-common/SingleCluster.html) guide.
 
 To run the algorithms on a Flink or Spark cluster, copy the input files to HDFS.
 
@@ -103,7 +103,7 @@ $HDFS dfs -copyFromLocal emma-quickstart-library/src/test/resources/* /tmp/input
 
 ### Running the Examples on Flink
 
-[Getting started with Flink](https://ci.apache.org/projects/flink/flink-docs-release-1.2/quickstart/setup_quickstart.html)
+If you are not familiar with Flink, check the ["Getting started with Flink"](https://ci.apache.org/projects/flink/flink-docs-release-1.2/quickstart/setup_quickstart.html) guide.
 
 Assuming a variable to `bin/flink`
 
@@ -160,7 +160,7 @@ $FLINK run -C "file://$CODEGEN/" \
 
 ### Running the Examples on Spark
 
-[Getting started with Spark](http://spark.apache.org/docs/latest/quick-start.html)
+If you are not familiar with Spark, check the ["Getting started with Spark"](http://spark.apache.org/docs/latest/quick-start.html) guide.
 
 Assuming a variable to `bin/spark-submit`
 
