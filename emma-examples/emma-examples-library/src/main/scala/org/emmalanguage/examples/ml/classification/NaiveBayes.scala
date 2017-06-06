@@ -37,7 +37,7 @@ object NaiveBayes {
     // FIXME: Come up with a better Meta scheme.
     implicit val lCTag = ctagFor[L]
     implicit val lTTag = ttagFor[L]
-    val dimensions = data.map(_.vector.length).distinct.fetch()
+    val dimensions = data.map(_.vector.length).distinct.collect()
     assert(dimensions.size == 1, "Multiple dimensions in input data. All vectors should have the same length.")
     val N = dimensions.head
 

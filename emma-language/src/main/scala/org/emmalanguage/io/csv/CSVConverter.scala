@@ -148,7 +148,7 @@ object CSVConverter extends Serializable {
 
   /**
    * Creates a [[DataBag]] codec from an element column.
-   * Note: data must be fetched before encoding.
+   * Note: data must be collected before encoding.
    */
   implicit def dataBagCSVConverter[A: CSVColumn: Meta]: CSVConverter[DataBag[A]] =
     iso[Seq[A], DataBag[A]]

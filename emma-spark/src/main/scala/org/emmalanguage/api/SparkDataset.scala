@@ -61,7 +61,7 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
     rep.map(f)
 
   override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
-    rep.flatMap((x: A) => f(x).fetch())
+    rep.flatMap((x: A) => f(x).collect())
 
   def withFilter(p: (A) => Boolean): DataBag[A] =
     rep.filter(p)
@@ -140,9 +140,9 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
       .option("codec", format.codec.toString)
       .mode("overwrite").parquet(path)
 
-  def fetch(): Seq[A] = collect
+  def collect(): Seq[A] = collected
 
-  private lazy val collect: Seq[A] =
+  private lazy val collected: Seq[A] =
     rep.collect()
 
   // -----------------------------------------------------

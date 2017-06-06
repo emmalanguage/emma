@@ -85,7 +85,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   lazy val checkValid = (tree: u.Tree) => if (!Source.validate(tree)) fail else tree
 
   def show(x: Any): String = x match {
-    case _: DataBag[_] => x.asInstanceOf[DataBag[_]].fetch().toString
+    case _: DataBag[_] => x.asInstanceOf[DataBag[_]].collect().toString
     case _ => x.toString
   }
 
@@ -293,7 +293,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       val semiFinal = 8
       val bag = DataBag(new Random shuffle 0.until(100).toList)
       val top = for (g <- bag groupBy { _ % semiFinal })
-        yield g.values.fetch().sorted.take(semiFinal / 2).sum
+        yield g.values.collect().sorted.take(semiFinal / 2).sum
 
       top.max
     })
@@ -384,9 +384,9 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   // --------------------------------------------------------------------------
 
   "MutableBag" - {
-    "create and fetch" in {
+    "create and collect" in {
       val act = eval[Env => Seq[(Int, Long)]](codegenPipeline(reify(
-        MutableBag(DataBag((1 to 100).map(x => x -> x.toLong))).bag().fetch()
+        MutableBag(DataBag((1 to 100).map(x => x -> x.toLong))).bag().collect()
       )))(env)
 
       val exp = (1 to 100).map(x => x -> x.toLong)
@@ -413,17 +413,17 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
             inputs.withFilter(_._1 % 2 == 0).groupBy(_._1)
           )((_, vOld, m) => vOld.map(_ + m.map(_._2).sum))
 
-          val act1 = state1.bag().fetch()
-          val act2 = state2.bag().fetch()
-          val act3 = state3.bag().fetch()
+          val act1 = state1.bag().collect()
+          val act2 = state2.bag().collect()
+          val act3 = state3.bag().collect()
 
           state3.update(
             inputs.withFilter(_._1 % 2 != 0).groupBy(_._1)
           )((_, vOld, m) => vOld.map(_ + m.map(_._2).sum))
 
-          val act4 = state1.bag().fetch()
-          val act5 = state2.bag().fetch()
-          val act6 = state3.bag().fetch()
+          val act4 = state1.bag().collect()
+          val act5 = state2.bag().collect()
+          val act6 = state3.bag().collect()
 
           act1 :: act2 :: act3 :: act4 :: act5 :: act6 :: Nil
         }))(env)
@@ -597,13 +597,13 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
 object BaseCodegenIntegrationSpec {
   lazy val jabberwocky = fromPath(materializeResource("/lyrics/Jabberwocky.txt"))
 
-  lazy val imdb = DataBag.readCSV[ImdbMovie]("file://" + materializeResource("/cinema/imdb.csv"), CSV()).fetch()
+  lazy val imdb = DataBag.readCSV[ImdbMovie]("file://" + materializeResource("/cinema/imdb.csv"), CSV()).collect()
 
   lazy val cannes =
-    DataBag.readCSV[FilmFestWinner]("file://" + materializeResource("/cinema/canneswinners.csv"), CSV()).fetch()
+    DataBag.readCSV[FilmFestWinner]("file://" + materializeResource("/cinema/canneswinners.csv"), CSV()).collect()
 
   lazy val berlin =
-    DataBag.readCSV[FilmFestWinner]("file://" + materializeResource("/cinema/berlinalewinners.csv"), CSV()).fetch()
+    DataBag.readCSV[FilmFestWinner]("file://" + materializeResource("/cinema/berlinalewinners.csv"), CSV()).collect()
 
   val (jabberwockyEven, jabberwockyOdd) = jabberwocky
     .flatMap { _ split "\\W+" }

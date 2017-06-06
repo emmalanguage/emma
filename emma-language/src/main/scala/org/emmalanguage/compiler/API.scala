@@ -67,7 +67,7 @@ protected[emmalanguage] trait API extends AST {
     lazy val sym              = cls
 
     // Sinks
-    val fetch                 = op("fetch")
+    val collect               = op("collect")
     val as                    = op("as")
     val writeCSV              = op("writeCSV")
     val writeParquet          = op("writeParquet")
@@ -103,7 +103,7 @@ protected[emmalanguage] trait API extends AST {
     val bottom                = op("bottom")
     val top                   = op("top")
 
-    val sinkOps               = Set(fetch, as, writeCSV, writeParquet, writeText)
+    val sinkOps               = Set(collect, as, writeCSV, writeParquet, writeText)
     val monadOps              = Set(map, flatMap, withFilter)
     val nestOps               = Set(groupBy)
     val boolAlgOps            = Set(union, distinct)

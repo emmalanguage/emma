@@ -62,7 +62,7 @@ object FlinkOps extends ComprehensionCombinators[FlinkEnv] with Runtime[FlinkEnv
   private class DataSetExtractor(flink: FlinkEnv) {
     def unapply[A: Meta](bag: DataBag[A]): Option[DataSet[A]] = bag match {
       case bag: FlinkDataSet[A] => Some(bag.rep)
-      case _ => Some(flink.fromCollection(bag.fetch()))
+      case _ => Some(flink.fromCollection(bag.collect()))
     }
   }
 

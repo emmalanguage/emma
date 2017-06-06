@@ -22,5 +22,5 @@ import examples.graphs.model._
 class NaiveConnectedComponentsIntegrationSpec extends BaseConnectedComponentsIntegrationSpec {
 
   def connectedComponents(edges: Seq[Edge[Int]]): Seq[LVertex[Int, Int]] =
-    ConnectedComponents[Int](DataBag(edges)).fetch()
+    ConnectedComponents[Int](DataBag(edges)).collect()
 }

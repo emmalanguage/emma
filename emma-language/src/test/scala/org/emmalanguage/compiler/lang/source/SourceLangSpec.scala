@@ -186,7 +186,7 @@ class SourceLangSpec extends BaseCompilerSpec {
       y.substring(1),
       ((x: Int, y: Int) => x + y) (x, x),
       Seq(x, x),
-      DataBag(xs.fetch()),
+      DataBag(xs.collect()),
       List.canBuildFrom[Int],
       DataBag(Seq(1, 2, 3)).sum
     )).map(api.Tree.unAscribe)

@@ -31,6 +31,6 @@ object FlinkConnectedComponentsIntegrationSpec extends FlinkAware {
     withDefaultFlinkEnv(implicit flink => emma.onFlink {
       val es = DataBag(edges)
       val rs = ConnectedComponents[Int](es)
-      rs.fetch()
+      rs.collect()
     })
 }

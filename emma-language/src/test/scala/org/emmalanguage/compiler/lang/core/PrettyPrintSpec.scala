@@ -172,8 +172,8 @@ class PrettyPrintSpec extends BaseCompilerSpec {
     "DefCall" in {
       val n = 42
       implicit val pair = 3.14 -> "pi"
-      val c = clicks.fetch().head
-      val a = ads.fetch().head
+      val c = clicks.collect().head
+      val a = ads.collect().head
 
       val acts = (idPipeline(reify {
         def summon[A] = implicitly[(Double, String)]

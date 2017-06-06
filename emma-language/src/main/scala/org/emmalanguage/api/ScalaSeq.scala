@@ -52,7 +52,7 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
     rep.map(f)
 
   override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
-    rep.flatMap(x => f(x).fetch())
+    rep.flatMap(x => f(x).collect())
 
   def withFilter(p: (A) => Boolean): DataBag[A] =
     rep.filter(p)
@@ -108,7 +108,7 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
   def writeParquet(path: String, format: Parquet)(implicit converter: ParquetConverter[A]): Unit =
     ParquetScalaSupport(format).write(path)(rep)
 
-  override def fetch(): Seq[A] =
+  override def collect(): Seq[A] =
     rep
 }
 
@@ -138,9 +138,9 @@ object ScalaSeq extends DataBagCompanion[LocalEnv] {
     implicit env: LocalEnv
   ): DataBag[A] = new ScalaSeq(ParquetScalaSupport(format).read(path).toStream)
 
-  // This is used in the code generation in TranslateToDataflows when inserting fetches
+  // This is used in the code generation in TranslateToDataflows when inserting `collect` calls
   def fromDataBag[A](bag: DataBag[A]): DataBag[A] =
-    new ScalaSeq(bag.fetch())
+    new ScalaSeq(bag.collect())
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion

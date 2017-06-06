@@ -75,7 +75,7 @@ object Iso {
     make(_.toArray, _.toBuffer)
 
   implicit def seqIsoDataBag[A: Meta]: Seq[A] <=> DataBag[A] =
-    make(DataBag(_), _.fetch())
+    make(DataBag(_), _.collect())
 
   implicit def intIsoEnum[E <: Enumeration](implicit enum: E): Int <=> enum.Value =
     make(enum(_), _.id)

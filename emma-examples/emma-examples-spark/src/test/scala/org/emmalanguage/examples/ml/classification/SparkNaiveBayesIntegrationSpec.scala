@@ -33,7 +33,7 @@ class SparkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec with 
       }
       // classification
       val result = NaiveBayes(lambda, modelType)(data)
-      // fetch the result locally
-      result.fetch().toSet[Model]
+      // collect the result locally
+      result.collect().toSet[Model]
     })
 }

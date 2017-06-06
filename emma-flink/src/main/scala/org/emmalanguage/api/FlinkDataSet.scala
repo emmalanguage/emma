@@ -67,7 +67,7 @@ class FlinkDataSet[A: Meta] private[api]
     rep.map(f)
 
   override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
-    rep.flatMap((x: A) => f(x).fetch())
+    rep.flatMap((x: A) => f(x).collect())
 
   def withFilter(p: (A) => Boolean): DataBag[A] =
     rep.filter(p)
@@ -165,9 +165,9 @@ class FlinkDataSet[A: Meta] private[api]
   def writeParquet(path: String, format: Parquet)(implicit converter: ParquetConverter[A]): Unit =
     ???
 
-  override def fetch(): Seq[A] = collect
+  override def collect(): Seq[A] = collected
 
-  private lazy val collect: Seq[A] =
+  private lazy val collected: Seq[A] =
     rep.collect()
 
   // -----------------------------------------------------

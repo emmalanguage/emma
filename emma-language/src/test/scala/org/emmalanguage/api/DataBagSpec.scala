@@ -338,12 +338,12 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
       "can read native output" ifSupportsParquet withBackendContext { implicit ctx =>
         val pat = path(s"records.native.parquet")
         DataBag(exp).writeParquet(pat, format)
-        TestBag.readParquet[ParquetRecord](pat, format).fetch() should contain theSameElementsAs exp
+        TestBag.readParquet[ParquetRecord](pat, format).collect() should contain theSameElementsAs exp
       }
       "can read backend output" ifSupportsParquet withBackendContext { implicit ctx =>
         val pat = path(s"records.$suffix.parquet")
         TestBag(exp).writeParquet(pat, format)
-        TestBag.readParquet[ParquetRecord](pat, format).fetch() should contain theSameElementsAs exp
+        TestBag.readParquet[ParquetRecord](pat, format).collect() should contain theSameElementsAs exp
       }
     }
   }
@@ -360,7 +360,7 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
       second      = r.nextDouble(),
       third_field = r.nextBoolean(),
       fourth      = (r.nextInt() % (2 * Short.MaxValue) + Short.MinValue).toShort,
-      Fifth       = r.nextPrintableChar(),
+      // Fifth    = r.nextPrintableChar(),
       sixth       = randString(quote),
       seventh     = if (r.nextBoolean()) Some(r.nextLong()) else None,
       nine        = r.nextFloat()
@@ -394,7 +394,7 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
       .map(c => if (c == '0') ' ' else c)
 
     val charsDirty = for {
-      q <- quote if suffix != "flink" // FIXME: Flink expects manually quoted strings
+      q <- quote
     } yield charsClean.map(c => if (c == 'q') q else c)
 
     (charsDirty getOrElse charsClean).mkString.trim
@@ -425,7 +425,8 @@ object DataBagSpec {
     second      : Double,
     third_field : Boolean,
     fourth      : Short,
-    Fifth       : Char,
+    // FIXME: Spark does not support `Char` type
+    // Fifth    = r.nextPrintableChar(),
     sixth       : String,
     seventh     : Option[Long],
     nine        : Float

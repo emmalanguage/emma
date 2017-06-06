@@ -58,11 +58,11 @@ object MutableBag {
     new MutableBag[K, V] {
 
       /* Local state - a (mutable) reference to an (immutable) map of type `(K, V)`. */
-      private var sm: Map[K, V] = init.fetch().map(identity[(K, V)])(breakOut)
+      private var sm: Map[K, V] = init.collect().map(identity[(K, V)])(breakOut)
 
       def update[M: Meta](ms: DataBag[Group[K, M]])(f: UpdateFunction[M]): DataBag[(K, V)] = {
         val delta = for {
-          m <- ms.fetch()
+          m <- ms.collect()
           v <- f(m.key, sm.get(m.key), m.values)
         } yield m.key -> v
 

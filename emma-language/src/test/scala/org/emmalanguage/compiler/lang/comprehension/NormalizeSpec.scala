@@ -300,7 +300,7 @@ class NormalizeSpec extends BaseCompilerSpec {
         Ad(id, _, _) <- ads
         if id == adID
       } yield time.toEpochMilli
-      xs.fetch()
+      xs.collect()
     }
 
     val exp = reify {
@@ -319,7 +319,7 @@ class NormalizeSpec extends BaseCompilerSpec {
           time.toEpochMilli
         }
       }
-      xs.fetch()
+      xs.collect()
     }
 
     (inp, exp)
@@ -331,7 +331,7 @@ class NormalizeSpec extends BaseCompilerSpec {
         Ad(_, name, _) <- ads
         token <- DataBag(name.split("\\s+"))
       } yield token
-      xs.fetch()
+      xs.collect()
     }
 
     val exp = reify {
@@ -344,7 +344,7 @@ class NormalizeSpec extends BaseCompilerSpec {
         }
         head(token)
       })
-      xs.fetch()
+      xs.collect()
     }
 
     (inp, exp)
@@ -362,8 +362,8 @@ class NormalizeSpec extends BaseCompilerSpec {
         (id2, name2) <- xs
         if id1 == id2
       } yield (name1, name2)
-      // fetch
-      ys.fetch()
+      // collect
+      ys.collect()
     }
 
     val exp = reify {
@@ -392,7 +392,7 @@ class NormalizeSpec extends BaseCompilerSpec {
           (name1, name2)
         }
       }
-      ys.fetch()
+      ys.collect()
     }
 
     (inp, exp)

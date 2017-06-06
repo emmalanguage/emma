@@ -81,10 +81,10 @@ private[backend] trait Specialization extends Common {
         })(breakOut)
 
       Order.disambiguate.andThen { case (disambiguated, highOrd) =>
-        val fetched = api.TopDown.break.withBindDefs.withBindUses
+        val collected = api.TopDown.break.withBindDefs.withBindUses
           .accumulateWith[Set[u.TermSymbol]] {
             // Build the closure of outermost lambdas wrt to bags used in higher-order context.
-            // Descending further is redundant since referenced bags have already been fetched.
+            // Descending further is redundant since referenced bags have already been collected.
             case Attr.syn(core.ValDef(lhs, _), uses :: defs :: _)
               if highOrd(lhs) => for {
                 bag <- uses.keySet diff defs.keySet
@@ -97,15 +97,15 @@ private[backend] trait Specialization extends Common {
             case Attr(_, highRef :: _, _, _ :: defs :: _) => highRef.map { lhs =>
               val alias = api.ValSym(lhs.owner, api.TermName.fresh(lhs), lhs.info)
               defs.get(lhs) match {
-                // DataBag(Seq(..elements)).fetch() == ScalaSeq(Seq(..elements))
-                // Instead of fetching build directly from the underlying Seq.
+                // DataBag(Seq(..elements)).collect() == ScalaSeq(Seq(..elements))
+                // Instead of collecting build directly from the underlying Seq.
                 case Some(core.ValDef(_, call @ core.DefCall(_, DataBag$.empty | DataBag$.apply, _, _))) =>
                   lhs -> core.ValDef(alias, call)
                 case _ =>
                   val targs = Seq(api.Type.arg(1, lhs.info))
                   val argss = Seq(Seq(core.Ref(lhs)))
-                  val fetch = core.DefCall(scalaSeq, ScalaSeq$.fromDataBag, targs, argss)
-                  lhs -> core.ValDef(alias, fetch)
+                  val dcall = core.DefCall(scalaSeq, ScalaSeq$.fromDataBag, targs, argss)
+                  lhs -> core.ValDef(alias, dcall)
               }
             } (breakOut)
           } (disambiguated)
@@ -119,23 +119,23 @@ private[backend] trait Specialization extends Common {
             if (tgs contains target) && (ops contains method) =>
             core.DefCall(Some(tgs(target)), ops(method), targs, argss)
 
-          // Insert fetch calls for method parameters (former variables).
+          // Insert collect calls for method parameters (former variables).
           case Attr.none(core.DefDef(method, tps, pss, core.Let(vals, defs, expr)))
-            if pss.exists(_.exists(p => fetched.contains(p.symbol.asTerm))) =>
+            if pss.exists(_.exists(p => collected.contains(p.symbol.asTerm))) =>
             val paramss = pss.map(_.map(_.symbol.asTerm))
-            val body = core.Let(paramss.flatten.collect(fetched) ++ vals, defs, expr)
+            val body = core.Let(paramss.flatten.collect(collected) ++ vals, defs, expr)
             core.DefDef(method, tps, paramss, body)
 
-          // Insert fetch calls for values.
+          // Insert collect calls for values.
           case Attr.none(core.Let(vals, defs, expr))
-            if vals.exists(v => fetched.contains(v.symbol.asTerm)) =>
+            if vals.exists(v => collected.contains(v.symbol.asTerm)) =>
             core.Let(vals.flatMap { case value @ core.ValDef (lhs, _) =>
-              fetched.get(lhs).fold(Seq(value))(Seq(value, _))
+              collected.get(lhs).fold(Seq(value))(Seq(value, _))
             }, defs, expr)
 
-          // Replace references in higher-order functions with fetched values.
-          case Attr.inh(core.Ref(target), true :: _) if fetched.contains(target) =>
-            core.Ref(fetched(target).symbol.asTerm)
+          // Replace references in higher-order functions with collected values.
+          case Attr.inh(core.Ref(target), true :: _) if collected.contains(target) =>
+            core.Ref(collected(target).symbol.asTerm)
         }._tree(disambiguated)
       }
     }

@@ -47,7 +47,7 @@ trait BaseWordCountIntegrationSpec extends FlatSpec with Matchers with BeforeAnd
       } yield s"${symbol_dollar}word${symbol_escape}t${symbol_dollar}{occs.length}"
     })
 
-    act.fetch() should contain theSameElementsAs exp.fetch()
+    act.collect() should contain theSameElementsAs exp.collect()
   }
 
   def wordCount(input: String, output: String, csv: CSV): Unit

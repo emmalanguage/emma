@@ -24,6 +24,6 @@ class FlinkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec with FlinkAwa
       // do the clustering
       val result = KMeans(2, k, epsilon, iterations)(points)
       // return the solution as a local set
-      result.fetch().toSet[Solution[Long]]
+      result.collect().toSet[Solution[Long]]
     })
 }

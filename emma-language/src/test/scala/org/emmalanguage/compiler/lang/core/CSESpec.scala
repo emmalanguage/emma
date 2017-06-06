@@ -73,13 +73,13 @@ class CSESpec extends BaseCompilerSpec {
     "package selections" in {
       val act = csePipeline(reify {
         val bag = DataBag(Seq(1, 2, 3))
-        scala.Predef.println(bag.fetch())
+        scala.Predef.println(bag.collect())
       })
 
       val exp = idPipeline(reify {
         val x$1 = Seq(1, 2, 3)
         val bag = DataBag(x$1)
-        val x$2 = bag.fetch()
+        val x$2 = bag.collect()
         val x$3 = scala.Predef.println(x$2)
         x$3
       })

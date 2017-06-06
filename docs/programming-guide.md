@@ -38,7 +38,7 @@ Conversely, a `DataBag[A]` can be converted back to a `Seq[A]`
 or written to a supported sink. 
 
 ```scala
-emails.fetch()                                            // Seq[Email]
+emails.collect()                                            // Seq[Email]
 movies.writeCSV("hdfs://movies.csv", CSV())               // Unit
 squares.writeParquet("hdfs://squares.parquet", Parquet()) // Unit
 ```

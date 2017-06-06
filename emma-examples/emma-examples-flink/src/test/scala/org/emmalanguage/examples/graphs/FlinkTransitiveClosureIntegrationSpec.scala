@@ -29,6 +29,6 @@ class FlinkTransitiveClosureIntegrationSpec extends BaseTransitiveClosureIntegra
       // build the transitive closure
       val paths = TransitiveClosure(edges)
       // return the closure as local set
-      paths.fetch().toSet
+      paths.collect().toSet
     })
 }
