@@ -36,7 +36,7 @@ import scala.reflect.ClassTag
  * Provided by default are codecs for Scala and Java primitives, enumerations, [[Option]],
  * [[Array]], [[Traversable]] collections, tuples and case classes.
  */
-trait CSVConverter[T] {
+trait CSVConverter[T] extends Serializable {
 
   /** Returns the number of columns in a record for type `T`. */
   def size: Int
@@ -53,7 +53,7 @@ trait CSVConverter[T] {
 }
 
 /** Factory methods and implicit instances of CSV converters. */
-object CSVConverter {
+object CSVConverter extends Serializable {
 
   /** Summons an implicit codec for type `T` available in scope. */
   def apply[T](implicit converter: CSVConverter[T]): CSVConverter[T] =

@@ -360,9 +360,9 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
       second      = r.nextDouble(),
       third_field = r.nextBoolean(),
       fourth      = (r.nextInt() % (2 * Short.MaxValue) + Short.MinValue).toShort,
-      // Fifth    = r.nextPrintableChar(),
+      Fifth       = r.nextPrintableChar(),
       sixth       = randString(quote),
-      // `7-th`   = if (r.nextBoolean()) Some(r.nextLong()) else None,
+      seventh     = if (r.nextBoolean()) Some(r.nextLong()) else None,
       nine        = r.nextFloat()
       //@formatter:on
     )
@@ -425,12 +425,9 @@ object DataBagSpec {
     second      : Double,
     third_field : Boolean,
     fourth      : Short,
-    // FIXME: Flink does not support `Char` type
-    // Fifth    : Char,
+    Fifth       : Char,
     sixth       : String,
-    // FIXME: Spark does not support fancy field names like `7-th`
-    // FIXME: Flink's CSV reader does not support Option[T] types
-    // `7-th`   : Option[Long],
+    seventh     : Option[Long],
     nine        : Float
   )
 

@@ -62,6 +62,12 @@ class CSVScalaSupport[A](val format: CSV)(implicit conv: CSVConverter[A])
     }
   }
 
+  private[emmalanguage] def parser(): CsvParser =
+    new CsvParser(parserSettings(format))
+
+  private[emmalanguage] def writer(): CsvWriter =
+    new CsvWriter(writerSettings(format))
+
   // ---------------------------------------------------------------------------
   // Helper functions for reading
   // ---------------------------------------------------------------------------

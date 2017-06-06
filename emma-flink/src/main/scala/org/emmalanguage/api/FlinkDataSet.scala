@@ -141,20 +141,17 @@ class FlinkDataSet[A: Meta] private[api]
   // -----------------------------------------------------
 
   override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit = {
-    require(format.charset == CSV.defaultCharset,
-      s"""Unsupported `charset` value: `${format.charset}`""")
-    require(format.escape == CSV.defaultEscape,
-      s"""Unsupported `escape` character: '${format.escape.fold("")(_.toString)}'""")
-    require(format.comment == CSV.defaultComment,
-      s"""Unsupported `comment` character: '${format.comment.fold("")(_.toString)}'""")
-    require(format.nullValue == CSV.defaultNullValue,
-      s"""Unsupported `nullValue` string: "${format.nullValue}"""")
-
-    rep.writeAsCsv(
-      filePath = path,
-      fieldDelimiter = format.delimiter.toString,
-      writeMode = FileSystem.WriteMode.OVERWRITE
-    )
+    rep.mapPartition((it: Iterator[A]) => new Traversable[String] {
+      def foreach[U](f: (String) => U): Unit = {
+        val csv = CSVScalaSupport[A](format).writer()
+        val con = CSVConverter[A]
+        val rec = Array.ofDim[String](con.size)
+        for (x <- it) {
+          con.write(x, rec, 0)(format)
+          f(csv.writeRowToString(rec))
+        }
+      }
+    }).writeAsText(path, FileSystem.WriteMode.OVERWRITE)
 
     rep.getExecutionEnvironment.execute()
   }
@@ -248,21 +245,15 @@ object FlinkDataSet extends DataBagCompanion[FlinkEnv] {
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(
     implicit flink: FlinkEnv
-  ): DataBag[A] = {
-    require(format.charset == CSV.defaultCharset,
-      s"""Unsupported `charset` value: `${format.charset}`""")
-    require(format.escape == CSV.defaultEscape,
-      s"""Unsupported `escape` character: '${format.escape.fold("")(_.toString)}'""")
-    require(format.nullValue == CSV.defaultNullValue,
-      s"""Unsupported `nullValue` string: "${format.nullValue}"""")
-
-    flink.readCsvFile[A](
-      filePath = path,
-      ignoreFirstLine = format.header,
-      fieldDelimiter = s"${format.delimiter}",
-      quoteCharacter = format.quote.getOrElse[Char]('"')
-    )
-  }
+  ): DataBag[A] = flink
+    .readTextFile(path, format.charset)
+    .mapPartition((it: Iterator[String]) => new Traversable[A] {
+      def foreach[U](f: (A) => U): Unit = {
+        val csv = CSVScalaSupport[A](format).parser()
+        val con = CSVConverter[A]
+        for (line <- it) f(con.read(csv.parseLine(line), 0)(format))
+      }
+    })
 
   def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(
     implicit flink: FlinkEnv

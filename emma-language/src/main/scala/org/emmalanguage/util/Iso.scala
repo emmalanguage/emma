@@ -27,7 +27,7 @@ import scala.collection.mutable
 import scala.reflect.ClassTag
 
 /** Type class proving an isomorphism between types `A` and `B`. */
-trait Iso[A, B] {
+trait Iso[A, B] extends Serializable {
   def from(a: A): B
   def to(b: B): A
 

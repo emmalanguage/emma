@@ -18,9 +18,6 @@ package io.csv
 
 import io.Format
 
-import java.nio.charset.Charset
-import java.nio.charset.StandardCharsets
-
 import CSV._
 
 /**
@@ -40,7 +37,7 @@ case class CSV(
     header     : Boolean      = defaultHeader,
     delimiter  : Char         = defaultDelimiter,
     delimitSeq : Char         = defaultDelimitSeq,
-    charset    : Charset      = defaultCharset,
+    charset    : String       = defaultCharset,
     quote      : Option[Char] = defaultQuote,
     escape     : Option[Char] = defaultEscape,
     comment    : Option[Char] = defaultComment,
@@ -59,7 +56,7 @@ object CSV {
   val defaultHeader       = false
   val defaultDelimiter    = '\t'
   val defaultDelimitSeq   = ';'
-  val defaultCharset      = StandardCharsets.UTF_8
+  val defaultCharset      = "UTF-8"
   val defaultQuote        = Some('"')
   val defaultEscape       = Some('\\')
   val defaultComment      = None
