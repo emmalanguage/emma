@@ -116,6 +116,19 @@
                 <!-- Deployment configuration -->
                 <nexus.skipStaging>true</nexus.skipStaging>
             </properties>
+            <build>
+                <plugins>
+                    <!-- Nexus Staging -->
+                    <plugin>
+                        <groupId>org.sonatype.plugins</groupId>
+                        <artifactId>nexus-staging-maven-plugin</artifactId>
+                        <version>${nexus-staging-maven-plugin.version}</version>
+                        <configuration>
+                            <skipStaging>true</skipStaging>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
         </profile>
     </profiles>
 </project>
