@@ -29,7 +29,7 @@ import java.lang.annotation.Target;
  * {@code
  * object foo {
  *   // ...
- *   @src("applyQ$01")
+ *   {@literal @}src("applyQ$01")
  *   def apply(...) = { ... }
  * }
  * }
