@@ -164,9 +164,6 @@
         <spark.scope>provided</spark.scope>
         <flink.scope>provided</flink.scope>
         <hadoop.scope>provided</hadoop.scope>
-
-        <!-- Deployment configuration -->
-        <nexus.skipStaging>true</nexus.skipStaging>
     </properties>
 
     <!-- Sonatype distribution management -->
@@ -486,7 +483,7 @@
                         <arg>-Xmax-classfile-name</arg>
                         <arg>140</arg>
                         <arg>-Xlint:-adapted-args,_</arg>
-                        <arg>-Xfatal-warnings</arg>
+                        <!--<arg>-Xfatal-warnings</arg>-->
                         <!--<arg>-Xdisable-assertions</arg>-->
                     </args>
                 </configuration>
@@ -773,7 +770,6 @@
                         <serverId>ossrh</serverId>
                         <nexusUrl>https://oss.sonatype.org/</nexusUrl>
                         <autoReleaseAfterClose>false</autoReleaseAfterClose>
-                        <skipStaging>${nexus.skipStaging}</skipStaging>
                     </configuration>
                 </plugin>
 
@@ -811,10 +807,6 @@
         <!-- profile for Sonatype releases -->
         <profile>
             <id>release</id>
-            <properties>
-                <!-- Deployment configuration -->
-                <nexus.skipStaging>false</nexus.skipStaging>
-            </properties>
             <build>
                 <plugins>
                     <plugin>
