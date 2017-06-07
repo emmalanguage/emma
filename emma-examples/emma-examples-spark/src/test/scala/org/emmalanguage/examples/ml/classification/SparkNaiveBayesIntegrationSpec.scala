@@ -19,7 +19,6 @@ package examples.ml.classification
 import api.Meta.Projections._
 import api._
 import examples.ml.model._
-import io.csv._
 
 import breeze.linalg.{Vector => Vec}
 
@@ -28,7 +27,7 @@ class SparkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec with 
   def naiveBayes(input: String, lambda: Double, modelType: MType): Set[Model] =
     withDefaultSparkSession(implicit spark => emma.onSpark {
       // read the input
-      val data = for (line <- DataBag.readCSV[String](input, CSV())) yield {
+      val data = for (line <- DataBag.readText(input)) yield {
         val record = line.split(",").map(_.toDouble)
         LVector(record.head, Vec(record.slice(1, record.length)))
       }

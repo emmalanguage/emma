@@ -20,14 +20,13 @@ import KMeans.Solution
 import api.Meta.Projections._
 import api._
 import examples.ml.model._
-import io.csv._
 
 class SparkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec with SparkAware {
 
   override def kMeans(k: Int, epsilon: Double, iterations: Int, input: String): Set[Solution[Long]] =
     withDefaultSparkSession(implicit spark => emma.onSpark {
       // read the input
-      val points = for (line <- DataBag.readCSV[String](input, CSV())) yield {
+      val points = for (line <- DataBag.readText(input)) yield {
         val record = line.split("\t")
         Point(record.head.toLong, record.tail.map(_.toDouble))
       }
