@@ -17,8 +17,6 @@ package org.emmalanguage
 package api
 
 import alg._
-import io.csv._
-import io.parquet._
 
 import scala.language.higherKinds
 

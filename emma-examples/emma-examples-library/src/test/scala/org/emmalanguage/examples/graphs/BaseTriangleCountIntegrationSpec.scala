@@ -16,7 +16,7 @@
 package org.emmalanguage
 package examples.graphs
 
-import io.csv.CSV
+import api._
 import test.util._
 
 import org.scalatest.BeforeAndAfter

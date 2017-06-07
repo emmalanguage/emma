@@ -16,8 +16,6 @@
 package org.emmalanguage
 package api
 
-import io.csv._
-import io.parquet._
 import test.schema.Literature._
 import test.util.tempPath
 

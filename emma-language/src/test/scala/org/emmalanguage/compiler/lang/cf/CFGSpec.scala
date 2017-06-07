@@ -20,7 +20,6 @@ import api._
 import compiler.BaseCompilerSpec
 import compiler.ir.ComprehensionSyntax._
 import compiler.ir.DSCFAnnotations._
-import io.csv._
 import test.schema.Graphs._
 
 /** A spec for comprehension normalization. */

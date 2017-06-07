@@ -26,7 +26,6 @@ import examples.ml.classification._
 import examples.ml.clustering._
 import examples.ml.model._
 import examples.text._
-import io.csv._
 import util.Iso
 
 import breeze.linalg._

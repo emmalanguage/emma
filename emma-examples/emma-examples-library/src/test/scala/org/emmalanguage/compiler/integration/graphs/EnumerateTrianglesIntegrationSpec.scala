@@ -22,7 +22,6 @@ import compiler.integration.BaseCompilerIntegrationSpec
 import compiler.ir.ComprehensionSyntax._
 import examples.graphs._
 import examples.graphs.model._
-import io.csv._
 
 import scala.Ordering.Implicits._
 

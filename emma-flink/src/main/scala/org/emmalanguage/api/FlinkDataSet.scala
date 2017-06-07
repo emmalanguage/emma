@@ -18,8 +18,6 @@ package api
 
 import alg.Alg
 import compiler.RuntimeCompiler
-import io.csv._
-import io.parquet._
 
 import org.apache.flink.api.common.functions.RichMapPartitionFunction
 import org.apache.flink.api.scala.DataSet

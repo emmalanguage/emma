@@ -17,7 +17,6 @@ package org.emmalanguage
 package examples.graphs
 
 import api._
-import io.csv.CSV
 import model.Edge
 
 class FlinkTriangleCountIntegrationSpec extends BaseTriangleCountIntegrationSpec with FlinkAware {

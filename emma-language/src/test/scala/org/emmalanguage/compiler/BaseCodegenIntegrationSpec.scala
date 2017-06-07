@@ -17,7 +17,6 @@ package org.emmalanguage
 package compiler
 
 import api._
-import io.csv._
 import test.schema.Graphs._
 import test.schema.Math._
 import test.schema.Movies._

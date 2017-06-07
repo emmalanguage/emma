@@ -16,16 +16,14 @@
 package org.emmalanguage
 package examples.graphs
 
+import api._
 import examples.graphs.model.Edge
-import io.csv.CSV
 import test.util._
 
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
 import resource._
-
-import scala.io.Source
 
 import java.io.File
 import java.io.PrintWriter
@@ -49,13 +47,6 @@ trait BaseTransitiveClosureIntegrationSpec extends FlatSpec with Matchers with B
   }
 
   it should "compute the transitive closure of a directed graph" in {
-    val graph = (for {
-      line <- Source.fromFile(s"$path/edges.tsv").getLines
-    } yield {
-      val record = line.split('\t').map(_.toLong)
-      Edge(record(0), record(1))
-    }).toSet
-
     val act = transitiveClosure(s"$path/edges.tsv", CSV())
     val exp = expectedClosure()
 

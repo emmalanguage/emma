@@ -18,7 +18,6 @@ package examples.imdb
 
 import api._
 import examples.graphs.model._
-import io.csv.CSV
 import model._
 
 @emma.lib

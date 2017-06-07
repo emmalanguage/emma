@@ -17,9 +17,6 @@ package org.emmalanguage
 package api
 
 import alg.Alg
-import io.csv._
-import io.parquet._
-import io.text._
 
 import scala.language.implicitConversions
 import scala.reflect.ClassTag

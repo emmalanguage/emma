@@ -17,7 +17,6 @@ package org.emmalanguage
 package examples.graphs
 
 import api._
-import io.csv._
 import model.Edge
 
 class SparkTransitiveClosureIntegrationSpec extends BaseTransitiveClosureIntegrationSpec with SparkAware {

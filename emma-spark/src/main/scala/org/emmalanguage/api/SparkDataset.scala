@@ -17,8 +17,6 @@ package org.emmalanguage
 package api
 
 import alg.Alg
-import io.csv._
-import io.parquet._
 
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.Encoder

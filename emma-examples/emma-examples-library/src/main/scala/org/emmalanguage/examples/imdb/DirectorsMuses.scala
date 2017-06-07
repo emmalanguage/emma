@@ -18,7 +18,6 @@ package examples.imdb
 
 import api._
 import model._
-import io.csv.CSV
 
 @emma.lib
 object DirectorsMuses {

@@ -16,10 +16,8 @@
 package org.emmalanguage
 package compiler.lang.core
 
+import api._
 import compiler.BaseCompilerSpec
-import io.csv.CSV
-import io.csv.CSVConverter
-import io.csv.CSVScalaSupport
 import test.schema.Marketing._
 
 import scala.collection.mutable
@@ -410,7 +408,7 @@ class CoreLangSpec extends BaseCompilerSpec {
       new Array[Int](10), // explicit type-args
       new mutable.ListBuffer[String], // type-args only
       new Object, // no-args
-      new CSVScalaSupport[(Int, String, Int)](csv)
+      new io.csv.CSVScalaSupport[(Int, String, Int)](csv)
     ))
 
     val negatives = extractFrom(reify(

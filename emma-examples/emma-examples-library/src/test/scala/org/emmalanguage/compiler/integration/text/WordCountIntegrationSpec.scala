@@ -16,12 +16,10 @@
 package org.emmalanguage
 package compiler.integration.text
 
-import api.DataBag
-import api.Group
+import api._
 import compiler.integration.BaseCompilerIntegrationSpec
 import compiler.ir.ComprehensionSyntax._
 import examples.text.WordCount
-import io.csv._
 
 class WordCountIntegrationSpec extends BaseCompilerIntegrationSpec {
 

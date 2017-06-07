@@ -23,7 +23,6 @@ import compiler.ir.ComprehensionSyntax._
 import compiler.ir.DSCFAnnotations._
 import examples.graphs._
 import examples.graphs.model._
-import io.csv._
 
 class TransitiveClosureIntegrationSpec extends BaseCompilerIntegrationSpec {
 
