@@ -7,7 +7,6 @@ package algorithms.ml.clustering
 import KMeans.Solution
 import algorithms.ml.model._
 
-import breeze.linalg.{Vector => Vec}
 import org.emmalanguage.SparkAware
 import org.emmalanguage.api.Meta.Projections._
 import org.emmalanguage.api._

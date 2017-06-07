@@ -14,7 +14,7 @@ import org.apache.spark.sql.SparkSession
 import org.emmalanguage.SparkAware
 import org.emmalanguage.api.Meta.Projections._
 import org.emmalanguage.api._
-import org.emmalanguage.io.csv._
+
 
 object SparkRunner extends SparkAware {
 

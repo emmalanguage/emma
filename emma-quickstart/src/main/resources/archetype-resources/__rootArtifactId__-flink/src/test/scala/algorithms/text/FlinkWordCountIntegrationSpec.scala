@@ -6,7 +6,6 @@ package algorithms.text
 
 import org.emmalanguage.FlinkAware
 import org.emmalanguage.api._
-import org.emmalanguage.io.csv.CSV
 
 class FlinkWordCountIntegrationSpec extends BaseWordCountIntegrationSpec with FlinkAware {
 

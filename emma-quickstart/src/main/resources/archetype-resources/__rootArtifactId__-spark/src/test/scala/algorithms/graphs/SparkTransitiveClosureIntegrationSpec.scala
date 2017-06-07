@@ -8,7 +8,6 @@ import model.Edge
 
 import org.emmalanguage.SparkAware
 import org.emmalanguage.api._
-import org.emmalanguage.io.csv._
 
 class SparkTransitiveClosureIntegrationSpec extends BaseTransitiveClosureIntegrationSpec with SparkAware {
 

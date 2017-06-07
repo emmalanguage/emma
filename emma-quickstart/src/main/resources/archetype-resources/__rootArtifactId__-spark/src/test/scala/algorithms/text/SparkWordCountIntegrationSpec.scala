@@ -6,7 +6,7 @@ package algorithms.text
 
 import org.emmalanguage.SparkAware
 import org.emmalanguage.api._
-import org.emmalanguage.io.csv._
+
 
 class SparkWordCountIntegrationSpec extends BaseWordCountIntegrationSpec with SparkAware {
 

@@ -4,7 +4,6 @@
 package ${package}
 package algorithms.ml
 
-import breeze.linalg.{Vector => Vec}
 import org.emmalanguage.api._
 
 /** Machine learning model objects. */

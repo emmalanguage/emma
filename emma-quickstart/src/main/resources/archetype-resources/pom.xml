@@ -333,18 +333,20 @@
                         <jvmArg>-Xss16m</jvmArg>
                         <jvmArg>-XX:+UseConcMarkSweepGC</jvmArg>
                         <jvmArg>-XX:+CMSClassUnloadingEnabled</jvmArg>
+                    </jvmArgs>
+                    <javacArgs>
                         <javacArg>-Xlint:unchecked</javacArg>
                         <javacArg>-Xlint:deprecation</javacArg>
-                    </jvmArgs>
+                    </javacArgs>
                     <args>
                         <arg>-unchecked</arg>
                         <arg>-deprecation</arg>
                         <arg>-feature</arg>
                         <arg>-Yrangepos</arg>
+                        <arg>-Ywarn-unused-import</arg>
                         <arg>-Xmax-classfile-name</arg>
                         <arg>140</arg>
-                        <arg>-Xlint:package-object-classes</arg>
-                        <arg>-Xfatal-warnings</arg>
+                        <arg>-Xlint:-adapted-args,_</arg>
                         <!--<arg>-Xdisable-assertions</arg>-->
                     </args>
                 </configuration>

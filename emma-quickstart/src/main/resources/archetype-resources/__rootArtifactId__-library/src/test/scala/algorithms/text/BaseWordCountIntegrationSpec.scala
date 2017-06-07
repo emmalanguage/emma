@@ -5,7 +5,6 @@ package ${package}
 package algorithms.text
 
 import org.emmalanguage.api._
-import org.emmalanguage.io.csv.CSV
 import org.emmalanguage.test.util._
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FlatSpec

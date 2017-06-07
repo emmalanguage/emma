@@ -14,7 +14,6 @@ import org.apache.flink.api.scala.ExecutionEnvironment
 import org.emmalanguage.FlinkAware
 import org.emmalanguage.api.Meta.Projections._
 import org.emmalanguage.api._
-import org.emmalanguage.io.csv._
 
 object FlinkRunner extends FlinkAware {
 

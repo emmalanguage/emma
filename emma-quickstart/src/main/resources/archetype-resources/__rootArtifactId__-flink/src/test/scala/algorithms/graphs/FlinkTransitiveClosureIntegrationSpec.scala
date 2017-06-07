@@ -8,7 +8,6 @@ import model._
 
 import org.emmalanguage.FlinkAware
 import org.emmalanguage.api._
-import org.emmalanguage.io.csv._
 
 class FlinkTransitiveClosureIntegrationSpec extends BaseTransitiveClosureIntegrationSpec with FlinkAware {
 
