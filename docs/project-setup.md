@@ -5,26 +5,6 @@ title: Project Setup
 
 # {{ page.title }}
 
-Make sure that Sonatype snapshots are enabled in your `~/.m2/settings.xml`.
-
-```xml
-<profiles>
-  <profile>
-    <id>allow-snapshots</id>
-    <activation><activeByDefault>true</activeByDefault></activation>
-    <repositories>
-      <repository>
-        <id>sonatype.snapshots</id>
-        <url>https://oss.sonatype.org/content/repositories/snapshots</url>
-        <releases><enabled>false</enabled></releases>
-        <snapshots><enabled>true</enabled></snapshots>
-      </repository>
-      <!-- more repositories here -->
-    </repositories>
-  </profile>
-</profiles>
-```
-
 ## Configure an Existing Project
 
 To add Emma to an existing project, add the `emma-language` dependency
