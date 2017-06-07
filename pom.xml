@@ -105,11 +105,11 @@
         <maven-site-plugin.version>3.5.1</maven-site-plugin.version>
         <maven-shade-plugin.version>2.4.1</maven-shade-plugin.version>
         <maven-surefire-plugin.version>2.18.1</maven-surefire-plugin.version>
-        <maven-source-plugin.version>2.4</maven-source-plugin.version>
+        <maven-source-plugin.version>3.0.1</maven-source-plugin.version>
         <scala-maven-plugin.version>3.2.2</scala-maven-plugin.version>
         <scalastyle-maven-plugin.version>0.8.0</scalastyle-maven-plugin.version>
         <scalatest-maven-plugin.version>1.0</scalatest-maven-plugin.version>
-        <nexus-staging-maven-plugin.version>1.6.7</nexus-staging-maven-plugin.version>
+        <nexus-staging-maven-plugin.version>1.6.8</nexus-staging-maven-plugin.version>
 
         <!-- Predicates -->
         <skipTests>false</skipTests>
@@ -164,9 +164,6 @@
         <spark.scope>provided</spark.scope>
         <flink.scope>provided</flink.scope>
         <hadoop.scope>provided</hadoop.scope>
-
-        <!-- Deployment configuration -->
-        <nexus.skipStaging>true</nexus.skipStaging>
     </properties>
 
     <!-- Sonatype distribution management -->
@@ -175,10 +172,6 @@
             <id>ossrh</id>
             <url>https://oss.sonatype.org/content/repositories/snapshots</url>
         </snapshotRepository>
-        <repository>
-            <id>ossrh</id>
-            <url>https://oss.sonatype.org/service/local/staging/deploy/maven2/</url>
-        </repository>
     </distributionManagement>
 
     <repositories>
@@ -428,6 +421,35 @@
     </dependencies>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <!-- Maven Install -->
+                <plugin>
+                    <artifactId>maven-install-plugin</artifactId>
+                    <version>${maven-install-plugin.version}</version>
+                </plugin>
+
+                <!-- Shade Package (Create package with dependencies) -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>${maven-shade-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>shade-package</id>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>shade</goal>
+                            </goals>
+                            <configuration>
+                                <minimizeJar>false</minimizeJar>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+
         <plugins>
             <!-- Scala compiler -->
             <plugin>
@@ -442,7 +464,6 @@
                             <goal>compile</goal>
                         </goals>
                     </execution>
-
                     <execution>
                         <id>scala-test-compile</id>
                         <phase>test-compile</phase>
@@ -562,9 +583,9 @@
                         <id>generate-sources</id>
                         <phase>generate-sources</phase>
                         <configuration>
-                            <tasks>
+                            <target>
                                 <mkdir dir="${java.io.tmpdir}/emma/codegen"/>
-                            </tasks>
+                            </target>
                         </configuration>
                         <goals>
                             <goal>run</goal>
@@ -723,80 +744,25 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-deploy-plugin</artifactId>
+                <version>${maven-deploy-plugin.version}</version>
+                <configuration>
+                    <skip>true</skip>
+                </configuration>
             </plugin>
 
-            <!-- Deploy via Nexus Staging -->
+            <!-- Nexus Staging -->
             <plugin>
                 <groupId>org.sonatype.plugins</groupId>
                 <artifactId>nexus-staging-maven-plugin</artifactId>
+                <version>${nexus-staging-maven-plugin.version}</version>
+                <extensions>true</extensions>
+                <configuration>
+                    <serverId>ossrh</serverId>
+                    <nexusUrl>https://oss.sonatype.org/</nexusUrl>
+                    <autoReleaseAfterClose>false</autoReleaseAfterClose>
+                </configuration>
             </plugin>
         </plugins>
-
-        <pluginManagement>
-            <plugins>
-                <!-- Maven Deploy (disabled) -->
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-deploy-plugin</artifactId>
-                    <version>${maven-deploy-plugin.version}</version>
-                    <configuration>
-                        <skip>true</skip>
-                    </configuration>
-                </plugin>
-
-                <!-- Maven Archetype -->
-                <plugin>
-                    <artifactId>maven-archetype-plugin</artifactId>
-                    <version>${maven-archetype-plugin.version}</version><!--$NO-MVN-MAN-VER$-->
-                </plugin>
-
-                <!-- Maven Install -->
-                <plugin>
-                    <artifactId>maven-install-plugin</artifactId>
-                    <version>${maven-install-plugin.version}</version>
-                </plugin>
-
-                <!-- Maven Site Plugin -->
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-site-plugin</artifactId>
-                    <version>${maven-site-plugin.version}</version>
-                </plugin>
-
-                <!-- Nexus Staging -->
-                <plugin>
-                    <groupId>org.sonatype.plugins</groupId>
-                    <artifactId>nexus-staging-maven-plugin</artifactId>
-                    <version>${nexus-staging-maven-plugin.version}</version>
-                    <extensions>true</extensions>
-                    <configuration>
-                        <serverId>ossrh</serverId>
-                        <nexusUrl>https://oss.sonatype.org/</nexusUrl>
-                        <autoReleaseAfterClose>false</autoReleaseAfterClose>
-                        <skipStaging>${nexus.skipStaging}</skipStaging>
-                    </configuration>
-                </plugin>
-
-                <!-- Shade Package (Create package with dependencies) -->
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-shade-plugin</artifactId>
-                    <version>${maven-shade-plugin.version}</version>
-                    <executions>
-                        <execution>
-                            <id>shade-package</id>
-                            <phase>package</phase>
-                            <goals>
-                                <goal>shade</goal>
-                            </goals>
-                            <configuration>
-                                <minimizeJar>false</minimizeJar>
-                            </configuration>
-                        </execution>
-                    </executions>
-                </plugin>
-            </plugins>
-        </pluginManagement>
     </build>
 
     <profiles>
@@ -811,10 +777,6 @@
         <!-- profile for Sonatype releases -->
         <profile>
             <id>release</id>
-            <properties>
-                <!-- Deployment configuration -->
-                <nexus.skipStaging>false</nexus.skipStaging>
-            </properties>
             <build>
                 <plugins>
                     <plugin>
@@ -825,7 +787,7 @@
                             <execution>
                                 <id>attach-sources</id>
                                 <goals>
-                                    <goal>jar</goal>
+                                    <goal>jar-no-fork</goal>
                                 </goals>
                             </execution>
                         </executions>
@@ -834,16 +796,18 @@
                         <groupId>net.alchim31.maven</groupId>
                         <artifactId>scala-maven-plugin</artifactId>
                         <version>${scala-maven-plugin.version}</version>
-                        <configuration>
-                            <finalName>${project.build.finalName}-scaladoc</finalName>
-                            <displayCmd>true</displayCmd>
-                        </configuration>
                         <executions>
                             <execution>
                                 <id>attach-javadocs</id>
                                 <goals>
                                     <goal>doc-jar</goal>
                                 </goals>
+                                <configuration>
+                                    <displayCmd>true</displayCmd>
+                                    <args>
+                                        <arg>-no-link-warnings</arg>
+                                    </args>
+                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
@@ -855,14 +819,6 @@
                             <quiet>true</quiet>
                             <skip>false</skip>
                         </configuration>
-                        <executions>
-                            <execution>
-                                <id>attach-javadocs</id>
-                                <goals>
-                                    <goal>jar</goal>
-                                </goals>
-                            </execution>
-                        </executions>
                     </plugin>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>

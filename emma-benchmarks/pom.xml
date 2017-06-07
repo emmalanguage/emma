@@ -108,14 +108,4 @@
             </plugin>
         </plugins>
     </build>
-
-    <profiles>
-        <profile>
-            <id>release</id>
-            <properties>
-                <!-- Deployment configuration -->
-                <nexus.skipStaging>true</nexus.skipStaging>
-            </properties>
-        </profile>
-    </profiles>
 </project>
