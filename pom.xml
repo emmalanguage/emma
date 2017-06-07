@@ -472,9 +472,11 @@
                         <jvmArg>-Xss16m</jvmArg>
                         <jvmArg>-XX:+UseConcMarkSweepGC</jvmArg>
                         <jvmArg>-XX:+CMSClassUnloadingEnabled</jvmArg>
+                    </jvmArgs>
+                    <javacArgs>
                         <javacArg>-Xlint:unchecked</javacArg>
                         <javacArg>-Xlint:deprecation</javacArg>
-                    </jvmArgs>
+                    </javacArgs>
                     <args>
                         <arg>-unchecked</arg>
                         <arg>-deprecation</arg>
