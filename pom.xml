@@ -23,7 +23,7 @@
 
     <groupId>org.emmalanguage</groupId>
     <artifactId>emma</artifactId>
-    <version>0.2-SNAPSHOT</version>
+    <version>0.2-rc1</version>
     <packaging>pom</packaging>
 
     <name>emma</name>
@@ -483,7 +483,7 @@
                         <arg>-Xmax-classfile-name</arg>
                         <arg>140</arg>
                         <arg>-Xlint:-adapted-args,_</arg>
-                        <arg>-Xfatal-warnings</arg>
+                        <!--<arg>-Xfatal-warnings</arg>-->
                         <!--<arg>-Xdisable-assertions</arg>-->
                     </args>
                 </configuration>
