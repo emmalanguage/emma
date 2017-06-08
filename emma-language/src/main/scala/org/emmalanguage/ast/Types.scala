@@ -281,11 +281,11 @@ trait Types { this: AST =>
 
       /** Returns the original type-tree corresponding to `tpe`. */
       def tree(tpe: u.Type): u.Tree = {
-        /** Resolve if static, otherwise reference. */
+        /* Resolve if static, otherwise reference. */
         def resolve(sym: u.Symbol) =
           if (sym.isStatic) api.Tree.resolveStatic(sym) else Id(sym)
 
-        /** Converts stable path-dependent types to a selection chain. */
+        /* Converts stable path-dependent types to a selection chain. */
         def stable(tpe: u.Type): u.Tree = tpe match {
           // Qualified this type: `T.this`.
           case u.ThisType(encl) =>
@@ -312,7 +312,7 @@ trait Types { this: AST =>
             abort(s"Unstable path-dependent $tpe")
         }
 
-        /** Creates the original field of the type-tree. */
+        /* Creates the original field of the type-tree. */
         def original(tpe: u.Type): u.Tree = setType(tpe match {
           // This / super type
           case ThisType(_) | SuperType(_, _) =>

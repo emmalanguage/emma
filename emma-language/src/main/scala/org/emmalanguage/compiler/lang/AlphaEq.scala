@@ -71,7 +71,7 @@ trait AlphaEq extends Common {
     var vals = freeTerms(rhs) ::: freeTypes(rhs)
     val dict = mutable.Map(keys zip vals: _*)
 
-    /** Updates the dictionary with a alias. */
+    /* Updates the dictionary with a alias. */
     def alias(original: Symbol, alias: Symbol): Unit = {
       dict += original -> alias
       keys ::= original

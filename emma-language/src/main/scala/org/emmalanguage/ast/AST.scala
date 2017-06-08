@@ -209,8 +209,8 @@ trait AST extends CommonAST
    * {{{
    * import UniverseImplicits._
    *
-   * u.$Type
-   * u.$method
+   * u.Type
+   * u.method
    * }}}
    *
    * as opposed to
@@ -218,8 +218,8 @@ trait AST extends CommonAST
    * {{{
    * import universe._ // or import u._
    *
-   * $Type
-   * $method
+   * Type
+   * method
    * }}}
    *
    * in order to make the parts of the Emma compiler which depend on the Scala metaprogramming API explicit.

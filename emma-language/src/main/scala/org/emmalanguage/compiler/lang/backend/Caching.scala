@@ -87,13 +87,13 @@ private[backend] trait Caching extends Common {
           } (breakOut)
       } (merge(catsKernelStdMonoidForTuple2(disj, implicitly))).traverseAny._acc(tree).head
 
-      /** Cache when referenced in a loop or more than once. */
+      /* Cache when referenced in a loop or more than once. */
       def shouldCache(x: u.Symbol) = {
         val (inLoop, refCount) = refs(x)
         inLoop || refCount > 1
       }
 
-      /** Creates cached values for parameters of methods and lambdas. */
+      /* Creates cached values for parameters of methods and lambdas. */
       def cacheBindings(binds: Seq[u.ValDef]): CacheStore =
         binds.collect { case core.BindingDef(x, _) if shouldCache(x) =>
           val y = api.ValSym(x.owner, api.TermName.fresh(x), x.info.widen)
