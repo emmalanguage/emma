@@ -41,8 +41,8 @@ object GraphPreprocessing {
       if mv.id == cd.movieID
       if mv.id == ca.movieID
       if pa.id == ca.personID
-      if cd.creditType == CreditType.Director.toString
-      if ca.creditType == CreditType.Actor.toString
+      if cd.creditType == "director" // CreditType.Director.toString
+      if ca.creditType == "actor" // CreditType.Actor.toString
     } yield Collaboration(pd, cd, mv, ca, pa)
 
     for {
