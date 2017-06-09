@@ -40,12 +40,24 @@ class ANFSpec extends BaseCompilerSpec {
       val C = new C
       class C {
         val x = "42"
+
+        case object D extends Enumeration {
+          val C = Value("club")
+          val D = Value("diamond")
+          val H = Value("heart")
+          val S = Value("spade")
+        }
       }
     }
   }
 
   def abcx(x: A.B.C.x.type) =
     x.trim.toInt
+
+  def abcd(x: A.B.C.D.Value) =
+    x.toString
+
+  val X = ("club", "heart")
 
   "field selections" - {
     "as argument" in {
@@ -399,4 +411,61 @@ class ANFSpec extends BaseCompilerSpec {
 
     act shouldBe alphaEqTo(exp)
   }
+
+  "enum types" - {
+    "static" in {
+      val act = anfPipeline(reify {
+        val p1 = X._1 == ANFSpec.Enum.C.toString
+        val p2 = X._1 == ANFSpec.Enum.S.toString
+        val p3 = p1 && p2
+        p3
+      })
+
+      val exp = idPipeline(reify {
+        val X$r1: this.X.type = this.X;
+        val _1$r1: X$r1._1.type = X$r1._1;
+        val C$r1: ANFSpec.Enum.C.type = ANFSpec.Enum.C;
+        val toString$r1 = C$r1.toString;
+        val p1 = _1$r1.==(toString$r1);
+        val X$r2: this.X.type = this.X;
+        val _1$r2: X$r2._1.type = X$r2._1;
+        val S$r1: ANFSpec.Enum.S.type = ANFSpec.Enum.S;
+        val toString$r2 = S$r1.toString;
+        val p2 = _1$r2.==(toString$r2);
+        val p3 = p1.&&(p2);
+        p3
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+
+    "path-dependent" in {
+      val act = anfPipeline(reify {
+        abcd(A.B.C.D.C)
+      })
+
+      val exp = idPipeline(reify {
+        val A$r1: this.A.type = this.A;
+        val B$r1: A$r1.B.type = A$r1.B;
+        val C$r1: B$r1.C.type = B$r1.C;
+        val D$r1 = C$r1.D;
+        val C$r2: D$r1.C.type = D$r1.C;
+        val abcd$r1 = abcd(C$r2);
+        abcd$r1
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+  }
+}
+
+object ANFSpec {
+
+  case object Enum extends Enumeration {
+    val C = Value("club")
+    val D = Value("diamond")
+    val H = Value("heart")
+    val S = Value("spade")
+  }
+
 }
