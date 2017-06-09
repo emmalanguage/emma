@@ -106,6 +106,10 @@ private[compiler] trait LibSupport extends Common {
 
     private[libsupport] lazy val inline: (CG.Callee, CG.Snippet) => CG.Snippet = (callee, snippet) => {
       val result = callee match {
+        case CG.FunPar(_) =>
+          // handled while inlining the parent Lambda / LibDef
+          snippet.tree
+
         case CG.Lambda(sym, Lambda(_, _, _)) =>
           val result = BottomUp.withDefs.transformWith({
             case Attr.none(call@DefCall(Some(TermRef(`sym`)), _, Seq(), _)) =>
