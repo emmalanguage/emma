@@ -94,7 +94,7 @@ trait BaseTransitiveClosureIntegrationSpec extends FlatSpec with Matchers with B
       val j = r.nextInt(i + 1)
       val t = xs(i)
       xs(i) = xs(j)
-      xs(j) = xs(i)
+      xs(j) = t
     }
     xs
   }
