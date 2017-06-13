@@ -31,6 +31,8 @@ Subterms of type `DataBag[A]` are thereby transformed and off-loaded to a parall
 
 ## Learn More
 
+For **a discussion of the benefits of Emma vs Flink and Spark APIs**, check the [Meet Emma](https://docs.google.com/presentation/d/1IM6VhGGg--dx5dEnCJtWkD0JXCl9Sw-wzTgr3Cj6uig/edit?usp=sharing) presentation and the [emma-tutorial](https://github.com/emmalanguage/emma-tutorial).
+
 For **a brief introduction to the core API** and its most distinctive features, check the [Programming Guide]({{ site.baseurl }}/programming-guide.html).
 
 For **instructions on setting up an Emma-based project**, check the [Project Setup]({{ site.baseurl }}/project-setup.html).

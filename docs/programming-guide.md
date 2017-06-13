@@ -3,60 +3,128 @@ layout: simple
 title: Programming Guide
 ---
 
-# {{ page.title }}
+# Emma Programming Guide
+
+This guide is based on [the OpenFlights.org data](openflights.org/data.html) as described in the [Meet Emma](https://docs.google.com/presentation/d/1IM6VhGGg--dx5dEnCJtWkD0JXCl9Sw-wzTgr3Cj6uig/edit?usp=sharing) presentation.
+For an interactive version of this document, checkout the the [emma-tutorial](https://github.com/emmalanguage/emma-tutorial) project and run the [Programming Guide](https://github.com/emmalanguage/emma-tutorial/blob/v{{ site.current_version }}/notebooks/programming-guide.ipynb) Jupyter notebook.
+
+## Basic API
 
 Emma programs require the following import.
+
 
 ```scala
 import org.emmalanguage.api._
 ```
 
-The examples below assume the following domain schema: 
+### DataBag Basics
+
+Parallel computation in Emma is represented by expressions over a generic type `DataBag[A]`. 
+The type represents a distributed collection of elements of type `A` that do not have particular order and may contain duplicates.
+
+`DataBag` instances are constructed in two ways, either from a Scala `Seq`
+
 
 ```scala
-case class Person(id: Long, email: String, name: String)
-case class Email(id: Long, from: String, to: String, msg: String)
-case class Movie(id: Long, year: Int, title: String)
+val squaresSeq = 1 to 42 map { x => (x, x * x) }
+val squaresBag = DataBag(squaresSeq)
 ```
 
-## Primitive Type: DataBag
+or by reading from a supported source, e.g. `CSV` or `Parquet`.
 
-Parallel computation in Emma is represented by expressions over a core type `DataBag[A]`
-which models a distributed collection of elements of type `A`
-that do not have particular order and may contain duplicates.
-
-`DataBag[A]` instances are created directly from a Scala `Seq[A]`
-or by reading from a supported source, e.g. CSV or Parquet.
 
 ```scala
-val squares = DataBag(1 to 42 map { x => (x, x * x) })                       // DataBag[(Int, Int)]
-val emails  = DataBag.readCSV[Email]("hdfs://emails.csv", CSV())             // DataBag[Email]
-val movies  = DataBag.readParquet[Movie]("hdfs://movies.parquet", Parquet()) // DataBag[Movie]
+val csv = CSV(delimiter = ',')
+val airports = DataBag.readCSV[Airport](file("airports.dat").toString, csv)
+val airlines = DataBag.readCSV[Airline](file("airlines.dat").toString, csv)
+val routes = DataBag.readCSV[Route](file("routes.dat").toString, csv)
 ```
 
-Conversely, a `DataBag[A]` can be converted back to a `Seq[A]`
-or written to a supported sink. 
+Conversely, a `DataBag` can be converted to a `Seq`
+
 
 ```scala
-emails.collect()                                            // Seq[Email]
-movies.writeCSV("hdfs://movies.csv", CSV())               // Unit
-squares.writeParquet("hdfs://squares.parquet", Parquet()) // Unit
+val squaresSeq = squaresBag.collect()
 ```
 
-## Primitive Computations: fold
+or written to a supported file system.
 
-The core processing abstraction provided by `DataBag[A]` is a generic pattern for parallel
-collection processing called *structural recursion*.
 
-Assume for a moment that `DataBag[A]` instances can be constructed in one of three ways:
-the `Empty` bag, a singleton bag `Singleton(x)`, or the union of two existing bags `Union(xs, ys)`.
-*Structural recursion* works on bags by
+```scala
+airports.writeCSV(file("airports.copy.dat").toString, csv)
+airlines.writeCSV(file("airlines.copy.dat").toString, csv)
+routes.writeCSV(file("routes.copy.dat").toString, csv)
+```
+
+### Declarative Dataflows
+
+In contrast to other distributed collection types such as Spark's `RDD` and Flink's `DataSet`, Emma's `DataBag` type is a proper monad. 
+This means that joins and cross products in Emma can be declared using `for`-comprehension syntax in a manner akin to *Select-From-Where* expressions known from SQL.
+
+
+```scala
+val flightsFromBerlin = for {
+  ap <- airports 
+  if ap.city == Some("Berlin")
+  rt <- routes
+  if rt.srcID == Some(ap.id)
+  al <- airlines
+  if rt.airlineID == Some(al.id)
+} yield (rt.src, rt.dst, al.name)
+```
+
+In addition to comprehension syntax, the `DataBag` interface offers some combinators.
+
+You can `sample` `N` elemens using [reservoir sampling](https://en.wikipedia.org/wiki/Reservoir_sampling).
+
+
+```scala
+val samples = routes.map(_.src).sample(3)
+```
+
+You can combine two `DataBag[A]` instances by taking their (duplicate preserving) `union`, which corresponds to `UNION ALL` clause in SQL.
+
+
+```scala
+val srcs = routes.map(_.src) 
+val dsts = routes.map(_.dst)
+val locs = srcs union dsts
+```
+
+You can eliminate duplicates with `distinct`, corresponds to the `DISTINCT` clause in SQL.
+
+
+```scala
+val dupls = locs.collect().size
+val dists = locs.distinct.collect().size
+```
+
+You can extend all elements in a `DataBag` with a unique index.
+
+
+```scala
+val iroutes = routes.map(_.src).zipWithIndex
+```
+
+### Structural Recursion (Folds)
+
+In addition to the API illustrated above, the core processing primitive provided by `DataBag[A]` is a generic pattern for parallel collection processing called *structural recursion* on bags in *union representation*.
+
+To decode the meaning behind these terms, assume that instances of `DataBag[A]` are constructed exclusively by the following constructors: 
+
+1. `Empty` denotes the empty bag, 
+2. `Singleton(x)` denotes a singleton bag with exactly one element `x`,
+3. `Union(xs, ys)` denotes the union of two existing bags `xs` and `ys`.
+
+The assumption implies that each bag `xs` can be represented as a binary tree of constructor applications. The inner nodes of the tree are applications of the `Union` constructor, while the leafs are applications of `Empty` or `Singleton`.
+
+*Structural recursion* on bags in *union representation* works by
 
 1. systematically deconstructing the input `DataBag[A]` instance, 
 2. replacing the constructors with corresponding user-defined functions, and 
 3. evaluating the resulting expression.
 
-Formally, the above procedure can be specified as the following second-order function called `fold`.
+Formally, the above procedure can be specified second-order function called `fold` as follows.
 
 ```scala
 def fold[B](zero: B)(init: A => B, plus: (B, B) => B): B = this match {
@@ -66,127 +134,272 @@ def fold[B](zero: B)(init: A => B, plus: (B, B) => B): B = this match {
 }
 ```
 
-In the above signature, `zero` substitutes `Empty`,
-`init(x)` substitutes `Singleton(x)`,
-and `plus(xs, ys)`substitutes `Union(xs, ys)`.
+Note how
 
-Various collection processing primitives can be specified as a `fold`. 
+1. `Empty` constructors are substituted by `zero` applications, 
+2. `Singleton(x)` constructors are substituted by `init(x)` applications, and 
+3. `Union(xs, ys)` constructors are substituted by `plus(xs, ys)` applications.
 
-```scala
-val size = xs.fold(0L)(const(1L), _ + _)
-val min  = xs.fold(None)(Some(_), lift(_ min _))
-val sum  = xs.fold(0)(identity, _ + _)
-```
+A particular combination of `zero`, `init`, and `plus` function therefore defines a specific function. For example,
 
-Emma offers pre-defined aliases for common `fold` operators:
-
-Fold Alias                          | Purpose
-------------------------------------|-----------------------------
-`reduce`, `reduceOption`            | General
-`isEmpty`, `nonEmpty`, `size`       | Cardinality
-`min`, `max`, `top`, `bottom`       | Order-based aggregation
-`sum`, `product`                    | Numeric aggregation
-`exists`, `forall`, `count`, `find` | Predicate testing
-`sample`                            | Random sampling
-
-## Declarative Dataflows
-
-Joins and cross products in Emma can be declared using `for`-comprehension syntax
-in a manner akin to *Select-From-Where* expressions known from SQL. 
 
 ```scala
-for {
-  email    <- emails
-  sender   <- people
-  receiver <- people
-  if email.from == sender.email
-  if email.to   == receiver.email
-} yield (email, sender, receiver)
-// DataBag[(Email, Person, Person)]
+val dupls = locs.fold(0L)(_ => 1L, _ + _)
 ```
 
-In addition Emma offers the following bag combinators:
+is another way to compute the number of elements of `dupls`. Note that this expression will be evaluated **in parallel**, while the version we used above
+
 
 ```scala
-val csx = DataBag(Seq("Meijer", "Beckmann", "Wadler")) // computer scientists
-val fbx = DataBag(Seq("Meijer", "Pelé", "Meijer"))     // footballers
-
-// union (with bag semantics)
-csx union fbx
-// res: DataBag(Seq("Meijer", "Beckmann", "Pelé", "Wadler", "Meijer", "Meijer"))
-
-// duplicate elimination
-fbx.distinct
-// res: DataBag(Seq("Meijer", "Pelé"))
+val dupls = locs.collect().size
 ```
 
-## Nesting
+first converts the `DataBag` **dupls** into a local `Seq[String]` and then counts the number of elements on the local machine.
 
-In addition to the collection manipulation primitives presented above,
-Emma offers a `groupBy` combinator, which (conceptually) groups bag elements by key
-and introduces a level of nesting. 
+A convenient way to bundle a specific combination of functions passed to a `fold` is through a dedicated trait.
 
-To compute the average size of email messages by sender, for example,
-one can write the following straight-forward expression. 
-
-```scala 
-for {
-  Group(sender, mails) <- emails.groupBy(_.from) 
-} yield {
-  val sum = mails.map(_.msg.length).sum
-  val cnt = mails.size
-  sum / cnt
+```scala
+// defined in `org.emmalanguage.api.alg`
+trait Alg[-A, B] extends Serializable {
+  val zero: B
+  val init: A => B
+  val plus: (B, B) => B
 }
 ```
 
-If the above computation were expressed in a similar way in Flink's or Spark's APIs
-it would result in dataflow graphs that do not scale well with the size of the input.
-Emma takes a holistic optimization approach which allows to transparently rewrite the program
-into scalable Flink/Spark dataflows.
-
-## Quotations
-
-The presented API is not abstract. The semantics of each operator are given directly by the
-default implementation in
-[`ScalaSeq[A]`](emma-language/src/main/scala/org/emmalanguage/api/ScalaSeq.scala).
-This allows you to incrementally develop, test, and debug data analysis algorithms
-at small scale locally as a pure Scala programs.
-
-For example, the following code-snippet that counts words runs out-of-the-box
-as a normal Scala program. 
+and overload `fold` as follows:
 
 ```scala
-val words = for {
-  line <- DataBag.readText(input)
-  word <- DataBag(line.toLowerCase.split("\\W+"))
-} yield word
-
-// group the words by their identity
-// and count the occurrences of each word
-val counts = for {
-  Group(word, occs) <- words.groupBy(identity)
-} yield word -> occs.size
-
-// write the results into a CSV file
-counts.writeCSV(output, CSV())
-```
-
-Once the algorithm is ready, simply quote it with one of the `emma.onSpark` or `emma.onFlink` macros
-depending on the desired co-processor engine for scalable data-parallel execution.
-
-```scala
-emma.onSpark {
-  // word count code from above goes here!
-}
-
-emma.onFlink {
-  // word count code from above goes here!
+def fold[B](zero: B)(init: A => B, plus: (B, B) => B): B = this match {
+  case Empty         => zero
+  case Singleton(x)  => init(x)
+  case Union(xs, ys) => plus(xs.fold(e)(s, u), ys.fold(e)(s, u))
 }
 ```
 
-The backend macros identify all `DataBag[A]` terms in the quoted code fragment
-and re-write them jointly in order to maximize the degree of parallelism.
-For example, the `groupBy` and the subsequent `fold`s from the [nesting](#nesting) example
-are executed using more efficient target-runtime primitives like `reduceByKey`.
-The holistic translation approach also allows us to transparently insert co-processor primitives
-such as `cache` and `broadcast` based on static analysis of the quoted code.
+With this extension, we can name commonly used triples as specific `Alg` instances.
+
+```scala
+object Size extends Alg[Any, Long] {
+  val zero: Long = 0
+  val init: Any => Long = const(1)
+  val plus: (Long, Long) => Long = _ + _
+}
+```
+
+and define corresponding aliases for the corresponding `fold(alg)` calls.
+
+```scala
+def size: Long = this.fold(Size)
+```
+
+The following methods `DataBag` are pre-defined in the `DataBag` trait and delegate to to a `fold` with a specific `Alg` instance.
+
+
+```scala
+// cardinality tests
+locs.size      // counts the number of elements
+locs.nonEmpty  // checks if empty
+locs.isEmpty   // checks if not empty
+```
+
+
+```scala
+// based on an implicit `Ordering`
+locs.min       // minimum
+locs.max       // maximum
+locs.top(3)    // top-K
+locs.bottom(3) // bottom-K
+```
+
+
+```scala
+// arithmetic operations
+routes.map(_.stops).sum
+DataBag(1 to 5).product
+```
+
+
+```scala
+// predicate testing
+routes.count(_.stops < 3)
+routes.forall(_.stops < 3)
+routes.exists(r => r.src == "FRA" && r.dst == "SFO")
+routes.find(r => r.src == "FRA" && r.dst == "SFO")
+```
+
+
+```scala
+// reducers
+DataBag(1 to 5).reduce(1)(_ * _)
+DataBag(1 to 5).reduceOption(_ * _)
+DataBag(Seq.empty[Int]).reduceOption(_ * _)
+```
+
+## Code Parallelisation
+
+To parallelise Emma code, you need to do two things
+
+1. Setup a parallel dataflow framework (Flink or Spark)
+2. Enclose the code fragment you want to parallelize in an `emma.onSpark` or `emma.onFlink` quote.
+
+### Parallel Dataflow Backend Setup
+
+Depending on the backend you want to use, run one of the two options below.
+
+#### Option 1: Spark
+
+
+```scala
+// `emma.onSpark` macro
+import $ivy.`org.emmalanguage:emma-spark:{{ site.current_version }}`
+// `provided` dependencies expected by `emma-spark`
+import $ivy.`org.apache.spark::spark-sql:2.1.0`
+```
+
+
+```scala
+// required spark imports
+import org.apache.spark.sql.SparkSession
+```
+
+
+```scala
+// implicit Spark environment
+implicit val backend = SparkSession.builder()
+    .appName("Emma Programming Guide")
+    .master("local[*]")
+    .config("spark.sql.warehouse.dir", Paths.get(sys.props("java.io.tmpdir"), "spark-warehouse").toUri.toString)
+    .getOrCreate()
+```
+
+#### Option 2: Flink
+
+
+```scala
+import $ivy.`org.emmalanguage:emma-flink:{{ site.current_version }}`
+import $ivy.`org.apache.flink::flink-scala:1.2.1`
+import $ivy.`org.apache.flink::flink-clients:1.2.1`
+```
+
+
+```scala
+import org.apache.flink.api.scala.ExecutionEnvironment
+implicit val backend = ExecutionEnvironment.getExecutionEnvironment
+backend.getConfig.disableSysoutLogging()
+```
+
+
+```scala
+// Include flink target classes in the classpath
+val codegenDir = org.emmalanguage.compiler.RuntimeCompiler.default.instance.codeGenDir
+interp.load.cp(ammonite.ops.Path(codegenDir))
+```
+
+### Quotations
+
+Once you have an implicit `SparkSession` or `ExecutionEnvironment` instance in scope, you can wrap code that you want to run in parallel in an `emma.onSpark` or `emma.onFlink` quote. 
+
+The wrapped is optimized holistically by the Emma compiler, and `DataBag` expressions are offloaded to the corresponding parallel exeuction engine.
+
+For convenience, we alias of the quote used in the examples below to `emma.onSpark`. Change the alias to `emma.onFlink` and re-evaluate the following code snippets to parallelize them on Flink.
+
+
+```scala
+val quote = emma.onSpark // or emma.onFlink
+```
+
+
+```scala
+// evaluates as map and filter
+val berlinAirports = quote {
+  for {
+    a <- airports
+    if a.latitude > 52.3
+    if a.latitude < 52.6
+    if a.longitude > 13.2
+    if a.longitude < 13.7
+  } yield Location(
+    a.name,
+    a.latitude,
+    a.longitude)
+}
+```
+
+
+```scala
+// evaluates as cascasde of joins
+val rs = quote {
+  for {
+    ap <- airports
+    rt <- routes
+    al <- airlines
+    if rt.srcID == Some(ap.id)
+    if rt.airlineID == Some(al.id)
+  } yield (al.name, ap.country)
+}
+```
+
+
+```scala
+// evaluates using partial aggregates (reduce / reduceByKey)
+val aggs = quote {
+  for {
+    Group(k, g) <- routes.groupBy(_.src)
+  } yield {
+    val x = g.count(_.airline == "AB")
+    val y = g.count(_.airline == "LH")
+    k -> (x, y)
+  }
+}
+```
+
+## Code Modularity
+
+To build domain-specific libraries based on Emma, enclose your function definitions in a top-level object and annotate this object with the `@emma.lib` annotation.
+
+
+```scala
+@emma.lib
+object hubs {
+  def apply(M: Int) = {
+    val rs = for {
+      Group(k, g) <- ({
+        routes.map(_.src)
+      } union {
+        routes.map(_.dst)
+      }).groupBy(x => x)
+      if g.size < M
+    } yield k
+
+    rs.collect().toSet
+  }
+}
+
+@emma.lib
+object reachable {
+  def apply(N: Int)(hubs: Set[String]) = {
+     val hubroutes = routes
+       .withFilter(r => hubs(r.src) && hubs(r.dst))
+
+     var paths = hubroutes
+       .map(r => Path(r.src, r.dst))
+     for (_ <- 0 until N) {
+       val delta = for {
+         r <- hubroutes; p <- paths if r.dst == p.src
+       } yield Path(r.src, p.dst)
+       paths = (paths union delta).distinct
+     }
+
+     paths
+  }
+}
+```
+
+
+```scala
+// evaluates as Spark RDD reduceByKey
+val rs = quote {
+  reachable(2)(hubs(50))
+}
+```
