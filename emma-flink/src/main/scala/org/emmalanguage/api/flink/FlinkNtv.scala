@@ -19,6 +19,7 @@ package api.flink
 import api._
 
 import org.apache.flink.api.common.functions._
+import org.apache.flink.api.scala.DataSet
 import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
 import org.apache.flink.configuration.Configuration
 import org.apache.flink.util.Collector
@@ -29,6 +30,18 @@ object FlinkNtv {
 
   import FlinkDataSet.typeInfoForType
   import Meta.Projections.ctagFor
+
+  //----------------------------------------------------------------------------
+  // Specialized combinators
+  //----------------------------------------------------------------------------
+
+  def iterate[A: Meta](xs: DataBag[A])(
+    N: Int, body: DataBag[A] => DataBag[A]
+  )(
+    implicit flink: FlinkEnv
+  ): DataBag[A] = xs match {
+    case FlinkDataSet(us) => FlinkDataSet(us.iterate(N)(unlift(body)))
+  }
 
   //----------------------------------------------------------------------------
   // Broadcast support
@@ -94,5 +107,15 @@ object FlinkNtv {
       def filter(x: A): Boolean =
         p(x)
     }))
+  }
+
+  //----------------------------------------------------------------------------
+  // Helper Objects and Methods
+  //----------------------------------------------------------------------------
+
+  private def unlift[A: Meta](f: DataBag[A] => DataBag[A])(
+    implicit flink: FlinkEnv
+  ): DataSet[A] => DataSet[A] = xs => f(FlinkDataSet(xs)) match {
+    case FlinkDataSet(ys) => ys
   }
 }

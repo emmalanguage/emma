@@ -14,31 +14,19 @@
  * limitations under the License.
  */
 package org.emmalanguage
+package compiler.opt
 
+import compiler.Compiler
 import compiler.FlinkCompiler
-import compiler.RuntimeCompiler
 
-trait FlinkCompilerAware extends RuntimeCompilerAware {
+/** Flink-specific optimizations. */
+private[compiler] trait FlinkOptimizations extends Compiler
+  with FlinkSpecializeLoops {
+  self: FlinkCompiler =>
 
-  val compiler = new RuntimeCompiler(codegenFile.toString) with FlinkCompiler
+  object FlinkOptimizations {
+    /** Delegates to [[FlinkSpecializeLoops.specializeLoops]]. */
+    lazy val specializeLoops = FlinkSpecializeLoops.specializeLoops
+  }
 
-  import compiler._
-
-  def Env: u.Type = FlinkAPI.ExecutionEnvironment
-
-  lazy val evaluate: u.Expr[Any] => u.Tree =
-    pipeline(typeCheck = true)(
-      Lib.expand,
-      Core.lift,
-      Core.cse,
-      FlinkOptimizations.specializeLoops,
-      Optimizations.foldFusion,
-      Backend.addCacheCalls,
-      Comprehension.combine,
-      FlinkBackend.transform,
-      Core.dscfInv,
-      removeShadowedThis,
-      prependMemoizeTypeInfoCalls,
-      addContext
-    ).compose(_.tree)
 }

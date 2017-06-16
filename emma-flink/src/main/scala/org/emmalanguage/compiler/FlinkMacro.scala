@@ -53,6 +53,9 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
     if (cfg.getBoolean("emma.compiler.opt.cse")) {
       xfms += Core.cse
     }
+    if (cfg.getBoolean("emma.compiler.flink.native-its")) {
+      xfms += FlinkOptimizations.specializeLoops
+    }
     if (cfg.getBoolean("emma.compiler.opt.fold-fusion")) {
       xfms += Optimizations.foldFusion
     }

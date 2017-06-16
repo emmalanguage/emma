@@ -17,10 +17,13 @@ package org.emmalanguage
 package compiler
 
 import compiler.backend.FlinkBackend
+import compiler.opt.FlinkOptimizations
 
 import cats.implicits._
 
-trait FlinkCompiler extends Compiler with FlinkBackend {
+trait FlinkCompiler extends Compiler
+  with FlinkBackend
+  with FlinkOptimizations {
 
   override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ FlinkAPI.implicitTypes
 
