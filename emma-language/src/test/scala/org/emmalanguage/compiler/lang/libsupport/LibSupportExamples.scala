@@ -137,7 +137,7 @@ trait LibSupportExamples extends BaseCompilerSpec {
     }
   }
 
-  lazy val `Example C(Emma Core)` =
+  lazy val `Example C (Emma Core)` =
     liftPipeline(`Example C (Original Expr)`)
 
   // ---------------------------------------------------------------------------
@@ -240,4 +240,43 @@ trait LibSupportExamples extends BaseCompilerSpec {
 
   lazy val `Example F (Emma Core)` =
     liftPipeline(`Example F (Original Expr)`)
+
+  // ---------------------------------------------------------------------------
+  // Example G: Program representations
+  // ---------------------------------------------------------------------------
+
+  lazy val `Example G (Original Expr)` = {
+    import lib.example._
+    reify {
+      val r = xpfx(square[Double], μ)
+      r
+    }
+  }
+
+  lazy val `Example G (Emma Source)` = {
+    import lib.example._
+    reify {
+      val r = xpfx[Double]((x: Double) => square[Double](x), μ)
+      r
+    }
+  }
+
+  lazy val `Example G (normalized)` = {
+    reify {
+      val r = {
+        val x$r1 = this.μ
+        Predef.implicitly[Numeric[Double]](Numeric.DoubleIsFractional).plus(x$r1, {
+          val x$r2 = x$r1;
+          {
+            val n$r1 = Predef.implicitly[Numeric[Double]](Numeric.DoubleIsFractional)
+            n$r1.times(x$r2, x$r2)
+          }
+        })
+      }
+      r
+    }
+  }
+
+  lazy val `Example G (Emma Core)` =
+    liftPipeline(`Example G (Original Expr)`)
 }

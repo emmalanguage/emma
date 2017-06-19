@@ -339,6 +339,55 @@ class LibSupportSpec extends LibSupportExamples {
     }
   }
 
+  "Exampe G" - {
+
+    type Lib = lib.example.type
+    implicit val ltag = u.typeTag[lib.example.type]
+
+    val inp = prePipeline(`Example G (Emma Source)`)
+
+    val expGraph = {
+      //@formatter:off
+      val snippet = CG.Snippet(inp)
+      val libfuns = Seq(
+        'xpfx   -> libfunVertex[Lib]("xpfx"),
+        'square -> libfunVertex[Lib]("square"),
+        'times  -> libfunVertex[Lib]("times")
+      ).toMap
+      val funpars = Seq(
+        'f     -> funparVertex("f", libfunVertex[Lib]("xpfx").tree)
+      ).toMap
+
+      val edges = Set[CG.Edge](
+        CG.Calls(snippet          , libfuns('xpfx)),
+        CG.Calls(snippet          , libfuns('square)),
+        CG.Calls(libfuns('square) , libfuns('times)),
+        CG.Calls(libfuns('xpfx)   , funpars('f))
+      )
+      //@formatter:on
+
+      CG(Set(snippet) ++ (libfuns ++ funpars).values.toSet, edges)
+    }
+
+    val expSCCs = Set[Set[CG.Vertex]](
+      Set(CG.Snippet(inp)),
+      Set(libfunVertex[Lib]("xpfx")),
+      Set(libfunVertex[Lib]("square")),
+      Set(libfunVertex[Lib]("times")),
+      Set(funparVertex("f", libfunVertex[Lib]("xpfx").tree))
+    )
+
+    "call graph" in {
+      callGraph(inp) shouldEqual expGraph
+    }
+    "strongly connected components" in {
+      strongyConnComp(expGraph) shouldEqual expSCCs
+    }
+    "normalized" in {
+      normalize(inp) shouldBe alphaEqTo(prePipeline(`Example G (normalized)`))
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Helper functions
   // ---------------------------------------------------------------------------

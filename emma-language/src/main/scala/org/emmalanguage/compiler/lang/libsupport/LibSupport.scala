@@ -174,15 +174,17 @@ private[compiler] trait LibSupport extends Common {
                   Tree.rename(termsSeq ++ typesSeq)
                 } andThen {
                   Tree.subst(substSeq)
+                } andThen {
+                  etaCompact // FIXME: needs a unified normalization scheme
                 }) (body)
 
                 // prepend ValDefs prefix to the substitution result
                 val prefxBody =
-                if (prefxSeq.isEmpty) substBody
-                else substBody match {
-                  case Block(stats, expr) => Block(prefxSeq ++ stats, expr)
-                  case expr => Block(prefxSeq, expr)
-                }
+                  if (prefxSeq.isEmpty) substBody
+                  else substBody match {
+                    case Block(stats, expr) => Block(prefxSeq ++ stats, expr)
+                    case expr => Block(prefxSeq, expr)
+                  }
 
                 val anyEq = u.typeOf[Any].member(TermName("==")).asMethod
                 val fixEqBody = BottomUp.transform({
@@ -199,6 +201,13 @@ private[compiler] trait LibSupport extends Common {
 
       CG.Snippet(result)
     }
+
+    /** A bit hacky solution to beta-reduce eta-expanded methods bound to a parameter.  */
+    private[libsupport] lazy val etaCompact: u.Tree => u.Tree =
+      api.BottomUp.transform {
+        case t@api.DefCall(Some(api.Lambda(_, params, body)), m, Seq(), Seq(args))
+          if m.name == api.TermName.app => Tree.subst(params.map(_.symbol) zip args)(body)
+      }._tree
 
     private[libsupport] lazy val callGraph: u.Tree => CG = tree => {
       @tailrec
@@ -255,9 +264,9 @@ private[compiler] trait LibSupport extends Common {
               })(v.tree)
             val edges = edgBldr.result()
 
-            // all parameters occurring in a `binds` edge
-            val funpars = edges.collect {
-              case CG.Binds(src, _) => src
+            // all FunPar nodes collected in this round
+            val funpars = (edges.map(_.src) ++ edges.map(_.tgt)).collect {
+              case funpar@CG.FunPar(_) => funpar
             }
 
             // continue recursively

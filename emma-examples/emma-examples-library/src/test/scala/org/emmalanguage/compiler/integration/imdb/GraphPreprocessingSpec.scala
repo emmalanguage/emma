@@ -131,17 +131,13 @@ class GraphPreprocessingSpec extends BaseCompilerIntegrationSpec {
         val key$r2: check$ifrefutable$1$r1.key.type = check$ifrefutable$1$r1.key
         val pa$r6 = key$r2._2
         val cs$r1 = check$ifrefutable$1$r1.values
-        val anonfun$r15 = (x$1: DataBag[Collaboration]) => {
-          val anonfun$r14 = (c: Collaboration) => {
-            val director$r2: c.director.type = c.director
-            val actor$r2: c.actor.type = c.actor
-            val `==$r7` = director$r2.==(actor$r2)
-            `==$r7`
-          }
-          val count$r1 = x$1.count(anonfun$r14)
-          count$r1
+        val anonfun$r14 = (c: Collaboration) => {
+          val director$r2: c.director.type = c.director
+          val actor$r2: c.actor.type = c.actor
+          val `==$r7` = director$r2.==(actor$r2)
+          `==$r7`
         }
-        val apply$r6 = anonfun$r15.apply(cs$r1)
+        val apply$r6 = cs$r1.count(anonfun$r14)
         val apply$r7 = LEdge(pd$r1, pa$r6, apply$r6)
         apply$r7
       })

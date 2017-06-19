@@ -24,8 +24,12 @@ import org.example.Foo
 object example {
 
   // ---------------------------------------------------------------------------
-  // Examples A, E: acyclic call graphs
+  // Examples A, E, G: acyclic call graphs
   // ---------------------------------------------------------------------------
+
+  def xpfx[A: Numeric](f: A => A, x: A): A = {
+    implicitly[Numeric[A]].plus(x, f(x))
+  }
 
   def plus[A: Numeric](x: A, y: A): A = {
     val n = implicitly[Numeric[A]]
