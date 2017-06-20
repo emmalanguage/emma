@@ -31,6 +31,7 @@ private[compiler] trait Core extends Common
   with DCE
   with DSCF
   with Pickling
+  with Reduce
   with Trampoline {
   self: AlphaEq with Source =>
 
@@ -301,7 +302,8 @@ private[compiler] trait Core extends Common
     lazy val lift: u.Tree => u.Tree = Function.chain(Seq(
       lnf,
       Comprehension.resugarDataBag,
-      Comprehension.normalizeDataBag
+      Comprehension.normalizeDataBag,
+      Reduce.transform
     ))
 
     /** Chains [[ANF.transform]], and [[DSCF.transform]]. */
@@ -315,6 +317,10 @@ private[compiler] trait Core extends Common
 
     /** Delegates to [[ANF.unnest]]. */
     lazy val unnest = ANF.unnest
+
+    /** Reduce an Emma Core term. */
+    lazy val reduce: u.Tree => u.Tree =
+      Reduce.transform
 
     /** Delegates to [[DSCF.stripAnnotations]]. */
     lazy val stripAnnotations = DSCF.stripAnnotations

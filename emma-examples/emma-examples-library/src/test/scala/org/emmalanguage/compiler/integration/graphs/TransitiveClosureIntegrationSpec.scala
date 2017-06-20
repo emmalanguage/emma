@@ -74,10 +74,9 @@ class TransitiveClosureIntegrationSpec extends BaseCompilerIntegrationSpec {
       val count$2 = paths$2.size
       val isReady = added$2 > 0
       @suffix def suffix$1(): Unit = {
-        val closure = paths$2
         val output: this.output.type = this.output
         val csv$2:  this.csv.type    = this.csv
-        closure.writeCSV(output, csv$2)
+        paths$2.writeCSV(output, csv$2)
       }
 
       if (isReady) doWhile$1(added$2, count$2, paths$2)

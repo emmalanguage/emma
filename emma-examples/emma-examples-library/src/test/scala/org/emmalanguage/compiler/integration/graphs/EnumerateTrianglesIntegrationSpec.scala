@@ -67,29 +67,26 @@ class EnumerateTrianglesIntegrationSpec extends BaseCompilerIntegrationSpec {
       head(Edge(e.dst, e.src))
     }
     val edges$r1 = (incoming union outgoing).distinct
-    // compute all triangles
-    val edges$r2 = edges$r1
-    val o: Ordering[Long] = scala.math.Ordering.Long
     val triangles = comprehension[Triangle[Long], DataBag] {
-      val e1 = generator[Edge[Long], DataBag](edges$r2)
-      val e2 = generator[Edge[Long], DataBag](edges$r2)
-      val e3 = generator[Edge[Long], DataBag](edges$r2)
+      val e1 = generator[Edge[Long], DataBag](edges$r1)
+      val e2 = generator[Edge[Long], DataBag](edges$r1)
+      val e3 = generator[Edge[Long], DataBag](edges$r1)
       guard {
         val x$1 = e1.src
         val u$1 = e1.dst
-        val ops$1 = infixOrderingOps[Long](x$1)(o)
+        val ops$1 = infixOrderingOps[Long](x$1)(scala.math.Ordering.Long)
         ops$1 < u$1
       }
       guard {
         val y$1 = e2.src
         val v$1 = e2.dst
-        val ops$1 = infixOrderingOps[Long](y$1)(o)
+        val ops$1 = infixOrderingOps[Long](y$1)(scala.math.Ordering.Long)
         ops$1 < v$1
       }
       guard {
         val z$1 = e3.src
         val w$1 = e3.dst
-        val ops$1 = infixOrderingOps[Long](z$1)(o)
+        val ops$1 = infixOrderingOps[Long](z$1)(scala.math.Ordering.Long)
         ops$1 < w$1
       }
       guard {
