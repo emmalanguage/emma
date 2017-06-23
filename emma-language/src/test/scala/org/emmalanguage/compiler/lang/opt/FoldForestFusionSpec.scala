@@ -31,8 +31,7 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
   def testPipeline(prefix: u.Tree => u.Tree): u.Tree => u.Tree =
     pipeline(typeCheck = true)(
       prefix,
-      tree =>time(FoldForestFusion.foldForestFusion(tree), "foldForestFusion"),
-      Core.dce
+      tree =>time(FoldForestFusion.foldForestFusion(tree), "foldForestFusion")
     )
 
   val anfPipeline: u.Expr[Any] => u.Tree =

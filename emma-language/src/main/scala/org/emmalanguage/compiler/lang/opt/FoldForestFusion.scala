@@ -802,17 +802,29 @@ private[compiler] trait FoldForestFusion extends Common {
               fuse(root, Stream(lhsOf(res) -> newIndex))
           }
 
+          // build the original fold forest
+          val forest = foldForest(valIndex, cfg)
+
           // Fuse each tree in the forest. Each tree node holds
           // - an index of the current values rooted at that node, and
           // - the symbol of the fold represented by that node.
           // Finally, merge the indexes of the resulting singleton trees.
-          val fusedIndex = foldForest(valIndex, cfg).map(tree =>
+          val fusedIndex = forest.map(tree =>
             rhsOf(foldBottomUp[u.TermSymbol, Node](tree)(fuse).rootLabel)
           ).fold(Map.empty)(_ ++ _)
 
+          // collect monad ops nodes which were part of the fused tree
+          val fusedMonadOps = forest.map(tree =>
+            tree.foldRight(Set.empty[u.TermSymbol])((s, ops) => valIndex.get(s) match {
+              case Some(core.DefCall(_, m, _, _)) if DataBag.monadOps(m) => ops + s
+              case Some(cs.Comprehension(qs, _)) if isLinear(qs) => ops + s
+              case _ => ops
+            })
+          ).fold(Set.empty)(_ ++ _)
+
           // Build a new data-flow graph to determine the topological order of vals.
           if (fusedIndex.isEmpty) let else {
-            val index = valIndex ++ fusedIndex
+            val index = valIndex ++ fusedIndex -- fusedMonadOps
             val dataFlow = index.mapValues(_.collect {
               case core.Ref(x) if index.contains(x) => x
             }.toSet)
