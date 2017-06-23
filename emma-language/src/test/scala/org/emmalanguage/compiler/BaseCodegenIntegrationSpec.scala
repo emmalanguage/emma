@@ -71,8 +71,9 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
   } compose (_.tree)
 
   def verify(e: u.Expr[Any]): Unit = {
+    val act = codegenPipeline(e)
     val expected = eval[Env => Any](idPipeline(e))(env)
-    val actual = eval[Env => Any](codegenPipeline(e))(env)
+    val actual = eval[Env => Any](act)(env)
     assert(actual == expected,
       s"""
       |actual != expected
@@ -313,10 +314,11 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       val movies = DataBag(imdb)
 
       for (decade <- movies groupBy { _.year / 10 }) yield {
-        val total = decade.values.size
-        val avgRating = decade.values.map { _.rating.toInt * 10 }.sum / (total * 10.0)
-        val minRating = decade.values.map { _.rating }.min
-        val maxRating = decade.values.map { _.rating }.max
+        val values = decade.values
+        val total = values.size
+        val avgRating = values.map { _.rating.toInt * 10 }.sum / (total * 10.0)
+        val minRating = values.map { _.rating }.min
+        val maxRating = values.map { _.rating }.max
 
         (s"${decade.key * 10} - ${decade.key * 10 + 9}",
           total, avgRating, minRating, maxRating)
@@ -337,12 +339,12 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       val movies = DataBag(imdb)
 
       val leastPopular = for {
-        decade <- movies groupBy { _.year / 10 }
-      } yield (decade.key, decade.values.size, decade.values.map { _.rating }.min)
+        Group(decade, dmovies) <- movies groupBy { _.year / 10 }
+      } yield (decade, dmovies.size, dmovies.map { _.rating }.min)
 
       val mostPopular = for {
-        decade <- movies groupBy { _.year / 10 }
-      } yield (decade.key, decade.values.size, decade.values.map { _.rating }.max)
+        Group(decade, dmovies) <- movies groupBy { _.year / 10 }
+      } yield (decade, dmovies.size, dmovies.map { _.rating }.max)
 
       (leastPopular, mostPopular)
     })
