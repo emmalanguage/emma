@@ -844,9 +844,9 @@
         <module>emma-flink</module>
         <module>emma-spark</module>
         <module>emma-examples</module>
+        <module>emma-benchmarks</module>
         <module>emma-gui</module>
         <module>emma-quickstart</module>
-        <module>emma-benchmarks</module>
     </modules>
 
 </project>
