@@ -59,6 +59,42 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
   val `_ == _`           = (x: Int, y: Int) => x == y
   //@formatter:on
 
+  "inline trivial trees" - {
+    "size" in {
+      val act = testPipeline(Core.anf)(reify {
+        val rands = this.rands
+        val reslt = rands.size
+        reslt
+      }.tree)
+
+      val exp = anfPipeline(reify {
+        val rands = this.rands
+        val reslt = rands.fold(alg.Size)
+        reslt
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+
+    "min" in {
+      val act = testPipeline(Core.anf)(reify {
+        val rands = this.rands
+        val reslt = rands.min
+        reslt
+      }.tree)
+
+      val exp = anfPipeline(reify {
+        val algb1 = alg.Min(Ordering.Int)
+        val rands = this.rands
+        val fold1 = rands.fold(algb1)
+        val reslt = fold1.get
+        reslt
+      })
+
+      act shouldBe alphaEqTo(exp)
+    }
+  }
+
   "banana-fusion" - {
     "of all algebra types" in {
       val act = testPipeline(Core.anf)(reify {
