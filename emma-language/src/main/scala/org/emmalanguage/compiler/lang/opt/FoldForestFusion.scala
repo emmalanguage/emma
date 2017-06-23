@@ -271,7 +271,7 @@ private[compiler] trait FoldForestFusion extends Common {
         }.toStream
       }
 
-      forest.filter(_.subForest.nonEmpty)
+      forest
     }
 
     /** Folds a Scalaz Tree bottom-up. */
