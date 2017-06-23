@@ -49,9 +49,9 @@ private[compiler] trait FoldGroupFusion extends Common {
      * Looks for patterns of the following shape:
      *
      * {{{
-     *   //...
+     *   //... (vals1)
      *   val x = y.groupBy(k)
-     *   //...
+     *   //... (vals2)
      *   val c = for (g <- x) yield {
      *     //...
      *     // <dependencies of `a` inside `c`>
@@ -70,10 +70,10 @@ private[compiler] trait FoldGroupFusion extends Common {
      * Matches are rewritten as follows.
      *
      * {{{
-     *   //...
+     *   //... (vals1)
+     *   //... (vals2)
      *   // <dependencies of `a` inside `c`>
      *   val x = LocalOps.foldGroup(y, k, a)
-     *   //...
      *   val c = for (g <- x) yield {
      *     // ...
      *     val f = g.values
@@ -111,20 +111,24 @@ private[compiler] trait FoldGroupFusion extends Common {
         Match(x, y, k, c, g, v, f, a, ds)
       }
 
-      val xMap: MMap = ms.map(c => c.x -> c)(breakOut)
-      val gMap: MMap = ms.map(c => c.g -> c)(breakOut)
-      val vMap: MMap = ms.map(c => c.v -> c)(breakOut)
-      val fMap: MMap = ms.map(c => c.f -> c)(breakOut)
+      val xMap: MMap = ms.map(m => m.x -> m)(breakOut)
+      val gMap: MMap = ms.map(m => m.g -> m)(breakOut)
+      val vMap: MMap = ms.map(m => m.v -> m)(breakOut)
+      val fMap: MMap = ms.map(m => m.f -> m)(breakOut)
 
       // Unsafe transformation, as the type of fused `g` changes from
       // `Group[K, DataBag[A]]` to `Group[K, B]`.
       api.TopDown.unsafe.transform({
         case core.Let(vals, defs, expr) if containsSymbol(xMap.keySet, vals) =>
-          val vals1 = for {
-            v <- vals
-            w <- xMap.get(v.symbol.asTerm).fold(Seq(v))(_.d :+ v)
-          } yield w
-          core.Let(vals1, defs, expr)
+          val vSet = vals.map(_.symbol.asTerm)(breakOut): Set[u.TermSymbol]
+          // we could have more than one match in the same let block
+          val vals3 = ms.foldLeft(vals)((vals, m) => if (!vSet(m.x)) vals else {
+            val (vals1, res1) = vals.span(_.symbol != m.x)
+            val (vals2, res2) = res1.tail.span(_.symbol != m.c)
+            val xVal = res1.head
+            vals1 ++ vals2 ++ m.d ++ Seq(xVal) ++ res2
+          })
+          core.Let(vals3, defs, expr)
         case core.Let(vals, defs, expr) if containsSymbol(fMap.keySet, vals) =>
           val ds = for {
             v <- vals.map(_.symbol.asTerm).toSet[u.TermSymbol]

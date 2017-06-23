@@ -102,11 +102,10 @@ class FoldGroupFusionSpec extends BaseCompilerSpec {
         val _2: this._2.type = this._2
         val us: this.us.type = this.us
 
+        val gr1 = us.groupBy(_1)
         val pj1 = (x: (Int, Int, Int)) => x._1
         val pj2 = (x: (Int, Int, Int)) => x._2
         val pj3 = (x: (Int, Int, Int)) => x._3
-
-        val gr1 = us.groupBy(_1)
         val rs1 = for (g <- gr1) yield {
           val al11 = alg.Min(or)
           val al12 = alg.Min(or)
@@ -156,7 +155,6 @@ class FoldGroupFusionSpec extends BaseCompilerSpec {
         val pj1 = (x: (Int, Int, Int)) => x._1
         val pj2 = (x: (Int, Int, Int)) => x._2
         val pj3 = (x: (Int, Int, Int)) => x._3
-
         val al11 = alg.Min(or)
         val al12 = alg.Min(or)
         val al13 = alg.Min(or)
