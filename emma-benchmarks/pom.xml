@@ -35,6 +35,9 @@
         <scalastyle-maven-plugin.skip>false</scalastyle-maven-plugin.skip>
         <scalatest-maven-plugin.skip>${skipTests}</scalatest-maven-plugin.skip>
 
+        <!-- Skip Sonatype deployment -->
+        <skipNexusStagingDeployMojo>true</skipNexusStagingDeployMojo>
+
         <!-- Versions -->
         <scalameter.version>0.8.2</scalameter.version>
     </properties>
