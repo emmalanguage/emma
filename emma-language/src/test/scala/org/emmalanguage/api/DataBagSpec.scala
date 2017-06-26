@@ -264,6 +264,74 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
   "split" - {
     val s1 = 54326427L
     val s2 = 23546473L
+
+    "with only one fraction value returns the same bag" in withBackendContext { implicit ctx =>
+      val xs = TestBag(0 to 7)
+      val f = 0.7
+
+      xs.split(f)(s1)(0) shouldEqual xs
+      xs.split(f)(s2)(0) shouldEqual xs
+    }
+
+    "returns the correct number of DataBags" in withBackendContext { implicit ctx =>
+      val xs = TestBag(0 to 100)
+
+      val f1 = Seq(0.5, 0.5)
+      val a1 = xs.split(f1:_*)(s1)
+      val a2 = xs.split(f1:_*)(s2)
+
+      val f2 = Seq(0.25, 0.25, 0.25, 0.25)
+      val a3 = xs.split(f2:_*)(s1)
+      val a4 = xs.split(f2:_*)(s2)
+
+      a1.length shouldEqual f1.length
+      a2.length shouldEqual f1.length
+      a3.length shouldEqual f2.length
+      a4.length shouldEqual f2.length
+    }
+
+    "with matching explicit seeds" in withBackendContext { implicit ctx =>
+      val xs = TestBag(0 to 7)
+      val f = Seq(0.5, 0.5)
+
+      xs.split(f:_*)(s1)(0) shouldEqual xs.split(f:_*)(s1)(0)
+      xs.split(f:_*)(s1)(1) shouldEqual xs.split(f:_*)(s1)(1)
+      xs.split(f:_*)(s2)(0) shouldEqual xs.split(f:_*)(s2)(0)
+      xs.split(f:_*)(s2)(1) shouldEqual xs.split(f:_*)(s2)(1)
+    }
+
+    "with non-matching explicit seeds" in withBackendContext { implicit ctx =>
+      val xs = TestBag(0 to 7)
+      val f = Seq(0.5, 0.5)
+
+      xs.split(f:_*)(s1)(0) shouldNot equal(xs.split(f:_*)(s2)(0))
+      xs.split(f:_*)(s1)(1) shouldNot equal(xs.split(f:_*)(s2)(1))
+    }
+
+    "followed by union reconstructs the DataBag (exhaustive splits)" in withBackendContext { implicit ctx =>
+      val xs = TestBag(0 to 23)
+      val f = Seq(0.5, 0.3, 0.2)
+
+      val Array(xs1, xs2, xs3) = xs.split(f:_*)(s1)
+      val Array(xs4, xs5, xs6) = xs.split(f:_*)(s2)
+
+      xs1.union(xs2).union(xs3) shouldEqual xs
+      xs4.union(xs5).union(xs6) shouldEqual xs
+    }
+
+    "followed by intersection is empty (non-overlapping splits)" in withBackendContext { implicit ctx =>
+      val xs = TestBag(0 to 23)
+      val f = Seq(0.5, 0.5)
+
+      val Array(xs1, xs2) = xs.split(f: _*)(s1)
+      val Array(xs3, xs4) = xs.split(f: _*)(s2)
+
+      val i1 = for (x <- xs1; y <- xs2; if x == y) yield x
+      val i2 = for (x <- xs3; y <- xs4; if x == y) yield x
+
+      i1.isEmpty shouldBe true
+      i2.isEmpty shouldBe true
+    }
   }
 
   "zipWithIndex" in withBackendContext { implicit ctx =>

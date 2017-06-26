@@ -96,19 +96,20 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
     // normalize fractions
     val normalized = fractions.map(_ / fractions.sum)
     // compute cdf
-    val cdf = normalized.scanLeft(0.0)(_ + _)
+    val cdf = normalized.scanLeft(0.0)(_ + _).drop(1)
 
     // generate random assignment based on CDF
     val random = new Random(seed)
-    val sampleFromCdf: Int = cdf.search(random.nextInt(n)).insertionPoint
+    val p = random.nextDouble
+    val sampleFromCdf: Int = cdf.search(p).insertionPoint
 
     val assignments = for (x <- rep) yield (sampleFromCdf, x)
-    val splits = new collection.mutable.ArrayBuffer[DataBag[A]](n)
+    val splits: Array[Seq[A]] = Array.fill[Seq[A]](n)(Seq())
 
     for ((idx, values) <- assignments.groupBy(_._1)) {
-        splits(idx) = ScalaSeq(values.map(_._2))
+        splits(idx) = values.map(_._2)
     }
-    splits.toArray
+    splits.map(wrap(_))
   }
 
   def zipWithIndex(): DataBag[(A, Long)] =
