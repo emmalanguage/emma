@@ -261,6 +261,11 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
     }
   }
 
+  "split" - {
+    val s1 = 54326427L
+    val s2 = 23546473L
+  }
+
   "zipWithIndex" in withBackendContext { implicit ctx =>
     val xs = (('a' to 'z') ++ ('A' to 'Z')).map(_.toString)
 

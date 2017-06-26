@@ -148,6 +148,33 @@ trait DataBag[A] extends Serializable {
   def sample(k: Int, seed: Long = 5394826801L): Vector[A]
 
   /**
+   * Split a [[DataBag]] `D` into an `Array[DataBag[A]]` containing `k` splits of non-overlapping elements from `D`.
+   *
+   * Each resulting split will contain a number of elements that is calculated from the (normalized) fractions
+   * that were given as input parameters. Those fractions can be seen as weights for the sampling process. This also
+   * means that we can not guarantee a precise correspondence of weights to final size of the [[DataBag]]s, especially
+   * for small collections.
+   *
+   * Example:
+   *{{{
+   * val xs: DataBag[(Int, String]) = ???
+   * val splits: Array[DataBag[(Int, String)]] = xs.split(0.2, 0.2, 0.6)
+   * val n = splits.length // 3
+   * }}}
+   *
+   * `splits` will contain three [[DataBag]]s that each contain 20%, 20%, and 60% of the elements of `xs`.
+   * Furthermore, the fractions are normalized so that (splits(0) U splits(1) U splits(2)) == xs
+   *
+   * The sampling is done without replacement between splits so that in the end the union of all splits will contain
+   * the complete original [[DataBag]].
+   *
+   * @param fractions
+   * @param seed
+   * @return
+   */
+  def split(fractions: Double*)(seed: Long = 631431513L): Array[DataBag[A]]
+
+  /**
    * Zips the elements of this collection with a unique dense index.
    *
    * The method should be deterministic for a fixed [[DataBag]] instance with a materialized result.

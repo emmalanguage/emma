@@ -21,6 +21,8 @@ import alg.Alg
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
+import scala.util.Random
+import scala.collection.Searching._
 
 /** A `DataBag` implementation backed by a Scala `Seq`. */
 class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] {
@@ -87,6 +89,26 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
       } else sample += e
     }
     sample.toVector
+  }
+
+  def split(fractions: Double*)(seed: Long = 631431513L): Array[DataBag[A]] = {
+    val n = fractions.length
+    // normalize fractions
+    val normalized = fractions.map(_ / fractions.sum)
+    // compute cdf
+    val cdf = normalized.scanLeft(0.0)(_ + _)
+
+    // generate random assignment based on CDF
+    val random = new Random(seed)
+    val sampleFromCdf: Int = cdf.search(random.nextInt(n)).insertionPoint
+
+    val assignments = for (x <- rep) yield (sampleFromCdf, x)
+    val splits = new collection.mutable.ArrayBuffer[DataBag[A]](n)
+
+    for ((idx, values) <- assignments.groupBy(_._1)) {
+        splits(idx) = ScalaSeq(values.map(_._2))
+    }
+    splits.toArray
   }
 
   def zipWithIndex(): DataBag[(A, Long)] =

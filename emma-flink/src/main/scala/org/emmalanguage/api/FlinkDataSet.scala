@@ -29,6 +29,7 @@ import org.apache.flink.util.Collector
 
 import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
+import scala.collection.Searching._
 
 import java.lang
 
@@ -129,6 +130,38 @@ class FlinkDataSet[A: Meta] private[api]
 
     // convert result to vector
     rs.toVector
+  }
+
+  def split(fractions: Double*)(seed: Long = 631431513L): Array[DataBag[A]] = {
+    val n = fractions.length
+    // normalize fractions
+    val normalized = fractions.map(_ / fractions.sum)
+    // compute cdf
+    val cdf = normalized.scanLeft(0.0)(_ + _)
+
+    val ts = new DataSetUtils(rep).zipWithIndex
+      .mapPartition(new RichMapPartitionFunction[(Long, A), (Int, A)] {
+        @transient private var pid = 0
+
+        override def open(parameters: Configuration) = {
+          super.open(parameters)
+          pid = getRuntimeContext.getIndexOfThisSubtask
+        }
+
+        import scala.collection.JavaConversions._
+
+        def mapPartition(it: lang.Iterable[(Long, A)], out: Collector[(Int, A)]) = {
+          for ((i, e) <- it) {
+            val r = util.RanHash(seed).at(i)
+            val p = r.next() // get Double in [0, n]
+            val splitID = cdf.search(p).insertionPoint // find the index
+            out.collect(splitID -> e)
+          }
+        }
+
+      })
+    val splits = ts.groupBy(_._1).reduceGroup(x => DataBag(x.toIndexedSeq).map(_._2))
+    splits.collect().toArray
   }
 
   def zipWithIndex(): DataBag[(A, Long)] =
