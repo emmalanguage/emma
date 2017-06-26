@@ -103,12 +103,8 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
     val sampleFromCdf: Int = cdf.search(p).insertionPoint
 
     val assignments = for (x <- rep) yield (sampleFromCdf, x)
-    val splits: Array[Seq[A]] = Array.fill[Seq[A]](n)(Seq())
-
-    for ((idx, values) <- assignments.groupBy(_._1)) {
-        splits(idx) = values.map(_._2)
-    }
-    splits.map(wrap(_))
+    val splits = assignments.groupBy(_._1).values
+    splits.map(x => wrap(x.map(_._2))).toArray
   }
 
   def zipWithIndex(): DataBag[(A, Long)] =
