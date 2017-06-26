@@ -21,7 +21,6 @@ import alg.Alg
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-import scala.util.Random
 import scala.collection.Searching._
 
 /** A `DataBag` implementation backed by a Scala `Seq`. */
@@ -99,8 +98,8 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
     val cdf = normalized.scanLeft(0.0)(_ + _)
 
     // generate random assignment based on CDF
-    val random = new Random(seed)
-    val p = random.nextDouble
+    val random = util.RanHash(seed)
+    val p = random.next()
     val sampleFromCdf: Int = cdf.search(p).insertionPoint
 
     val assignments = for (x <- rep) yield (sampleFromCdf, x)
