@@ -96,7 +96,7 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
     // normalize fractions
     val normalized = fractions.map(_ / fractions.sum)
     // compute cdf
-    val cdf = normalized.scanLeft(0.0)(_ + _).drop(1)
+    val cdf = normalized.scanLeft(0.0)(_ + _)
 
     // generate random assignment based on CDF
     val random = new Random(seed)
