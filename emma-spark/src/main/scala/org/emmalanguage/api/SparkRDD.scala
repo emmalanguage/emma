@@ -25,6 +25,7 @@ import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
 import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
+import scala.collection.Searching._
 
 /** A `DataBag` implementation backed by a Spark `RDD`. */
 class SparkRDD[A: Meta] private[api]
@@ -108,6 +109,26 @@ class SparkRDD[A: Meta] private[api]
 
     // convert result to vector
     rs.toVector
+  }
+
+  def split(fractions: Double*)(seed: Long = 631431513L): Array[DataBag[A]] = {
+    val n = fractions.length
+    // normalize fractions
+    val normalized = fractions.map(_ / fractions.sum)
+    // compute cdf
+    val cdf = normalized.scanLeft(0.0)(_ + _)
+
+    val ts = rep.zipWithIndex().mapPartitionsWithIndex({ (pid, it) =>
+      for ((e, i) <- it) yield {
+        val r = util.RanHash(seed).at(i)
+        val p = r.next() // get Double in [0, n]
+        val splitID = cdf.search(p).insertionPoint // find the index
+        (splitID, e)
+      }
+    })
+
+    val splits = ts.groupBy(_._1).map { case (key, vals) => DataBag(vals.toSeq).map(_._2) }
+    splits.collect()
   }
 
   def zipWithIndex(): DataBag[(A, Long)] =
