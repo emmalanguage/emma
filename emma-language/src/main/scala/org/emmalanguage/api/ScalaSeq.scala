@@ -98,11 +98,12 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
     val cdf = normalized.scanLeft(0.0)(_ + _)
 
     // generate random assignment based on CDF
-    val random = util.RanHash(seed)
-    val p = random.next()
-    val sampleFromCdf: Int = cdf.search(p).insertionPoint
+    def sampleFromCdf(i: Int): Int = {
+      val p = util.RanHash(seed).at(i).next()
+      cdf.search(p).insertionPoint
+    }
 
-    val assignments = for (x <- rep) yield (sampleFromCdf, x)
+    val assignments = for ((x, i) <- rep.zipWithIndex) yield (sampleFromCdf(i), x)
     val splits = assignments.groupBy(_._1).values
     splits.map(x => wrap(x.map(_._2))).toArray
   }
