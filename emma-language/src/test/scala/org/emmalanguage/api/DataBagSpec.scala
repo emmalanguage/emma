@@ -269,8 +269,14 @@ trait DataBagSpec extends FreeSpec with Matchers with PropertyChecks with DataBa
       val xs = TestBag(0 to 7)
       val f = 0.7
 
-      xs.split(f)(s1)(0) shouldEqual xs
-      xs.split(f)(s2)(0) shouldEqual xs
+      val xs1 = xs.split(f)(s1)
+      val xs2 = xs.split(f)(s2)
+
+      xs1.length shouldEqual 1
+      xs2.length shouldEqual 1
+
+      xs1.head shouldEqual xs
+      xs2.head shouldEqual xs
     }
 
     "returns the correct number of DataBags" in withBackendContext { implicit ctx =>
