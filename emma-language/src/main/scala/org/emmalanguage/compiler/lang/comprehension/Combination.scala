@@ -187,7 +187,7 @@ private[comprehension] trait Combination extends Common {
      *   }
      * }}}
      */
-    val MatchFlatMap: Rule = {
+    val MatchFlatMap1: Rule = {
       case (_, cs.Comprehension(qs, hd)) => (for {
         xGen @ cs.Generator(x, xRhs) <- qs.view
         (qs1, qs23) = splitAt[u.Tree](xGen)(qs)
@@ -507,7 +507,7 @@ private[comprehension] trait Combination extends Common {
      *   $mapped
      * }}}
      */
-    val MatchResidual: Rule = {
+    val MatchMap: Rule = {
       case (owner, cs.Comprehension(Seq(cs.Generator(x, rhs)), cs.Head(hd))) =>
         val tpe = if (x.info =:= hd.tpe) None else Some(api.Type(DataBag.tpe, Seq(hd.tpe)))
         Some(Core.mapSuffix(rhs, tpe) { (vals, expr) =>
@@ -519,8 +519,8 @@ private[comprehension] trait Combination extends Common {
     }
 
     private val rules = Seq(
-      MatchFilter, MatchFlatMap, MatchFlatMap2,
-      MatchEquiJoin, MatchCross, MatchResidual)
+      MatchFilter, MatchFlatMap1, MatchFlatMap2,
+      MatchEquiJoin, MatchCross, MatchMap)
 
     /** Creates a ValDef, and returns its Ident on the left hand side. */
     private def valRefAndDef(own: u.Symbol, name: String, rhs: u.Tree): (u.Ident, u.ValDef) = {
