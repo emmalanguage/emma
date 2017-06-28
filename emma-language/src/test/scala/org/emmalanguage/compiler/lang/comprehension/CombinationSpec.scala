@@ -84,7 +84,7 @@ class CombinationSpec extends BaseCompilerSpec {
       applyOnce(MatchFilter)(inp) shouldBe alphaEqTo(liftPipeline(exp))
     }
 
-    "flatMap" in {
+    "flatMap1" in {
       val inp = reify(comprehension[Long, DataBag] {
         val x = generator[User, DataBag] { users }
         val y = generator[Long, DataBag] {
@@ -100,7 +100,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { y }
       })
 
-      applyOnce(MatchFlatMap)(inp) shouldBe alphaEqTo(liftPipeline(exp))
+      applyOnce(MatchFlatMap1)(inp) shouldBe alphaEqTo(liftPipeline(exp))
     }
 
     "flatMap2" in {
@@ -322,7 +322,7 @@ class CombinationSpec extends BaseCompilerSpec {
 
       val exp = reify(users map { x => x })
       val lifted = liftPipeline(exp)
-      applyOnce(MatchResidual)(inp) shouldBe alphaEqTo(lifted)
+      applyOnce(MatchMap)(inp) shouldBe alphaEqTo(lifted)
       combine(inp) shouldBe alphaEqTo(lifted)
     }
   }
@@ -489,7 +489,7 @@ class CombinationSpec extends BaseCompilerSpec {
       applyOnce(MatchFilter)(inp) shouldBe alphaEqTo(liftPipeline(exp))
     }
 
-    "flatMap" in {
+    "flatMap1" in {
       val inp = reify(comprehension[Long, DataBag] {
         val x = generator[User, DataBag] {
           var us = users
@@ -511,7 +511,7 @@ class CombinationSpec extends BaseCompilerSpec {
         head { y }
       })
 
-      applyOnce(MatchFlatMap)(inp) shouldBe alphaEqTo(liftPipeline(exp))
+      applyOnce(MatchFlatMap1)(inp) shouldBe alphaEqTo(liftPipeline(exp))
     }
 
     "flatMap2" in {
@@ -627,7 +627,7 @@ class CombinationSpec extends BaseCompilerSpec {
       applyOnce(MatchEquiJoin)(inp) shouldBe alphaEqTo(liftPipeline(exp))
     }
 
-    "residual" in {
+    "map" in {
       val inp = reify(comprehension[User, DataBag] {
         val x = generator[User, DataBag] {
           var us = users
@@ -644,7 +644,7 @@ class CombinationSpec extends BaseCompilerSpec {
       }
 
       val lifted = liftPipeline(exp)
-      applyOnce(MatchResidual)(inp) shouldBe alphaEqTo(lifted)
+      applyOnce(MatchMap)(inp) shouldBe alphaEqTo(lifted)
       combine(inp) shouldBe alphaEqTo(lifted)
     }
   }
