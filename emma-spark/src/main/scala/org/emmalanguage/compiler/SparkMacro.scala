@@ -72,7 +72,12 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler with SparkCompil
         }
     }
 
-    xfms += Core.trampoline
+    cfg.getString("emma.compiler.lower") match {
+      case "trampoline" =>
+        xfms += Core.trampoline
+      case "dscfInv" =>
+        xfms += Core.dscfInv
+    }
 
     // construct the compilation pipeline
     pipeline()(xfms.result(): _*).compose(_.tree)

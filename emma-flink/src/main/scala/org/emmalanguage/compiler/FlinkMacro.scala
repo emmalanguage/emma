@@ -59,12 +59,18 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
     if (cfg.getBoolean("emma.compiler.opt.auto-cache")) {
       xfms += Backend.addCacheCalls
     }
-    // standard suffix
-    xfms ++= Seq(
-      Comprehension.combine,
-      Backend.specialize(FlinkAPI),
-      Core.trampoline
-    )
+
+    xfms += Comprehension.combine
+
+    xfms += Backend.specialize(FlinkAPI)
+
+    cfg.getString("emma.compiler.lower") match {
+      case "trampoline" =>
+        xfms += Core.trampoline
+      case "dscfInv" =>
+        xfms += Core.dscfInv
+    }
+
     // construct the compilation pipeline
     pipeline()(xfms.result(): _*).compose(_.tree)
   }
