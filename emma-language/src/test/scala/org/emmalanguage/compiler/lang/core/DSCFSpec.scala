@@ -28,23 +28,141 @@ class DSCFSpec extends BaseCompilerSpec {
   val dscfPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.anf,
-      tree => time(DSCF.transform(tree), "dscf")
+      tree => time(DSCF.transform(tree), "dscf"),
+      Core.dce
+    ).compose(_.tree)
+
+  val dscfInvPipeline: u.Expr[Any] => u.Tree =
+    pipeline(typeCheck = true)(
+      Core.anf,
+      tree => time(DSCF.inverse(tree), "dscfInv"),
+      Core.dce
     ).compose(_.tree)
 
   val anfPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
-      Core.anf
+      Core.anf,
+      Core.dce
     ).compose(_.tree)
 
+  "If-Else" - {
+    "with two branches" - {
+      val src = reify {
+        val x = this.x
+        val c = x < 0
+        var y = null.asInstanceOf[Int]
+        if (c) y = x + 17
+        else y = -17
+        y
+      }
+
+      val tgt = reify {
+        val x = this.x
+        val c = x < 0
+
+        @suffix def suffix(y: Int): Int = {
+          y
+        }
+
+        @thenBranch def thn(): Int = {
+          val y$1 = x + 17
+          suffix(y$1)
+        }
+
+        @elseBranch def els(): Int = {
+          suffix(-17)
+        }
+
+        if (c) thn()
+        else els()
+      }
+
+      "dscf" in {
+        val act = dscfPipeline(src)
+        val exp = anfPipeline(tgt)
+        act shouldBe alphaEqTo(exp)
+      }
+      "dscf inverse" in {
+        val act = dscfInvPipeline(tgt)
+        val exp = anfPipeline(src)
+        act shouldBe alphaEqTo(exp)
+      }
+    }
+
+    "with three branches" - {
+      val src = reify {
+        val x = this.x
+        val a = x < 0
+        val b = x > 42
+        var y = null.asInstanceOf[Int]
+        if (a) y = x + 17
+        else {
+          val _ =
+            if (b) y = x * 17
+            else  y = -17
+        }
+        y
+      }
+
+      val tgt = reify {
+        val x = this.x
+        val a = x < 0
+        val b = x > 42
+
+        @suffix def suff$1(y: Int): Int = {
+          y
+        }
+
+        @thenBranch def then$1(): Int = {
+          val y$1 = x + 17
+          suff$1(y$1)
+        }
+
+        @elseBranch def else$1(): Int = {
+
+          @suffix def suff$2(y: Int): Int = {
+            suff$1(y)
+          }
+
+          @thenBranch def then$2(): Int = {
+            val y$1 = x * 17
+            suff$2(y$1)
+          }
+
+          @elseBranch def else$2(): Int = {
+            suff$2(-17)
+          }
+
+          if (b) then$2()
+          else else$2()
+        }
+
+        if (a) then$1()
+        else else$1()
+      }
+
+      "dscf" in {
+        val act = dscfPipeline(src)
+        val exp = anfPipeline(tgt)
+        act shouldBe alphaEqTo(exp)
+      }
+      "dscf inverse" in {
+        val act = dscfInvPipeline(tgt)
+        val exp = anfPipeline(src)
+        act shouldBe alphaEqTo(exp)
+      }
+    }
+  }
+
   "While Loop" - {
-    "with trivial body" in {
-      val act = dscfPipeline(reify {
+    "with trivial body" - {
+      val src = reify {
         var i = 0
         while (i < 100) i += 1
         println(i)
-      })
+      }
 
-      val exp = anfPipeline(reify {
+      val tgt = reify {
         @whileLoop def while$1(i: Int): Unit = {
           val x$1 = i < 100
           @loopBody def body$1(): Unit = {
@@ -58,21 +176,30 @@ class DSCFSpec extends BaseCompilerSpec {
           else suffix$1()
         }
         while$1(0)
-      })
+      }
 
-      act shouldBe alphaEqTo(exp)
+      "dscf" in {
+        val act = dscfPipeline(src)
+        val exp = anfPipeline(tgt)
+        act shouldBe alphaEqTo(exp)
+      }
+      "dscf inverse" in {
+        val act = dscfInvPipeline(tgt)
+        val exp = anfPipeline(src)
+        act shouldBe alphaEqTo(exp)
+      }
     }
 
-    "with non-trivial body" in {
-      val act = dscfPipeline(reify {
+    "with non-trivial body" - {
+      val src = reify {
         var i = 0
         while (i < 100)
           if (i % 2 == 0) i += 2
           else i *= 2
         println(i)
-      })
+      }
 
-      val exp = anfPipeline(reify {
+      val tgt = reify {
         @whileLoop def while$1(i: Int): Unit = {
           val x$1 = i < 100
           @loopBody def body$1(): Unit = {
@@ -99,21 +226,30 @@ class DSCFSpec extends BaseCompilerSpec {
           else suffix$1()
         }
         while$1(0)
-      })
+      }
 
-      act shouldBe alphaEqTo(exp)
+      "dscf" in {
+        val act = dscfPipeline(src)
+        val exp = anfPipeline(tgt)
+        act shouldBe alphaEqTo(exp)
+      }
+      "dscf inverse" in {
+        val act = dscfInvPipeline(tgt)
+        val exp = anfPipeline(src)
+        act shouldBe alphaEqTo(exp)
+      }
     }
   }
 
   "Do-While Loop" - {
-    "with trivial body" in {
-      val act = dscfPipeline(reify {
+    "with trivial body" - {
+      val src = reify {
         var i = 0
         do i += 1 while (i < 100)
         println(i)
-      })
+      }
 
-      val exp = anfPipeline(reify {
+      val tgt = reify {
         @doWhileLoop def doWhile$1(i$2: Int): Unit = {
           val i$3 = i$2 + 1
           val x$1 = i$3 < 100
@@ -124,23 +260,31 @@ class DSCFSpec extends BaseCompilerSpec {
           else suffix$1()
         }
         doWhile$1(0)
-      })
+      }
 
-      act shouldBe alphaEqTo(exp)
+      "dscf" in {
+        val act = dscfPipeline(src)
+        val exp = anfPipeline(tgt)
+        act shouldBe alphaEqTo(exp)
+      }
+      "dscf inverse" in {
+        val act = dscfInvPipeline(tgt)
+        val exp = anfPipeline(src)
+        act shouldBe alphaEqTo(exp)
+      }
     }
 
-    "with non-trivial body" in {
-
-      val act = dscfPipeline(reify {
+    "with non-trivial body" - {
+      val src = reify {
         var i = 0
         do {
           if (i % 2 == 0) i += 2
           else i *= 2
         } while (i < 100)
         println(i)
-      })
+      }
 
-      val exp = anfPipeline(reify {
+      val tgt = reify {
         @doWhileLoop def doWhile$1(i$2: Int): Unit = {
           val x$2 = i$2 % 2
           val x$3 = x$2 == 0
@@ -164,9 +308,18 @@ class DSCFSpec extends BaseCompilerSpec {
           else else$1()
         }
         doWhile$1(0)
-      })
+      }
 
-      act shouldBe alphaEqTo(exp)
+      "dscf" in {
+        val act = dscfPipeline(src)
+        val exp = anfPipeline(tgt)
+        act shouldBe alphaEqTo(exp)
+      }
+      "dscf inverse" in {
+        val act = dscfInvPipeline(tgt)
+        val exp = anfPipeline(src)
+        act shouldBe alphaEqTo(exp)
+      }
     }
   }
 

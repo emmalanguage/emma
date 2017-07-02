@@ -18,17 +18,19 @@ package compiler.lang.core
 
 import compiler.Common
 import compiler.ir.DSCFAnnotations._
+import compiler.lang.cf.ControlFlow
 import compiler.lang.source.Source
 import util.Monoids._
 
 import shapeless._
 
+import scala.annotation.tailrec
 import scala.collection.SortedSet
 import scala.collection.breakOut
 
 /** Direct-style control-flow transformation. */
 private[core] trait DSCF extends Common {
-  self: Core with Source =>
+  self: Core with Source with ControlFlow =>
 
   /**
    * Converts the control-flow in input tree in ANF in the direct-style.
@@ -230,6 +232,204 @@ private[core] trait DSCF extends Common {
           }
       }._tree
 
+    /** The Direct-Style Control-Flow (DSCF) inverse transformation. */
+    lazy val inverse: u.Tree => u.Tree = (tree: u.Tree) => {
+      // construct dataflow graph
+      val cfg = ControlFlow.cfg(tree)
+      // restrict dataflow to phi nodes only
+      val phi = cfg.data.labfilter({
+        case core.BindingDef(_, core.DefCall(_, API.GraphRepresentation.phi, _, _)) => true
+        case _ => false
+      })
+      // create a fresh variable `x` for each phi node `n` without successors in the phi graph
+      // and associate `x` with `n` and each each predecessor `p` of `x`
+      val varOf = (for {
+        n <- phi.nodes
+        if phi.successors(n).isEmpty
+        x = api.Sym.With(n)(own = n.owner.owner, nme = api.TermName.fresh(n), flg = u.Flag.MUTABLE)
+        p <- n +: phi.predecessors(n)
+      } yield p -> x) (breakOut): Map[u.Symbol, u.TermSymbol]
+
+      def mkVarDefsWithNulls(pars: Seq[u.ValDef], owner: u.Symbol) = for {
+        (core.ParDef(p, _), i) <- pars.zipWithIndex
+        if phi.outDegree(p) == 0 // exclude assignments `x = y` if `x` as a successor in the phi graph
+        bnddef <- {
+          val (x1, rhs1) = (
+            api.TermSym(owner, api.TermName.fresh("null"), p.info),
+            nullAsInstanceOf(p.info)
+          )
+          val (x2, rhs2) = (
+            varOf(p),
+            src.Ref(x1)
+          )
+          Seq(src.ValDef(x1, rhs1), src.VarDef(x2, rhs2))
+        }
+      } yield bnddef
+
+      def mkVarDefsWithDefaults(pars: Seq[u.ValDef], rhss: Seq[u.Tree]) = for {
+        (core.ParDef(p, _), default) <- pars zip rhss
+        if phi.outDegree(p) == 0 // exclude assignments `x = y` if `x` as a successor in the phi graph
+      } yield src.VarDef(varOf(p), default)
+
+      def mkMuts(lhss: Seq[u.Symbol], rhss: Seq[u.Tree]) = for {
+        (x, y) <- lhss zip rhss
+        // exclude assignments `x = y` if `x` and `y` are mapped to the same variable
+        if (y match {
+          case core.Ref(z) => varOf.getOrElse(x, x) != varOf.getOrElse(z, z)
+          case _ => true
+        })
+      } yield src.VarMut(varOf(x), y)
+
+      @tailrec
+      def split(indx: Map[u.TermSymbol, u.Symbol])(body: u.Block, cond: u.Block): (u.Block, u.Block) = {
+        val crefs = api.Tree.refs(cond) diff indx.keySet
+        val body1 = src.Block(
+          body.stats.filter({
+            case src.ValDef(lhs, _) => !crefs(lhs)
+            case _ => true
+          }),
+          body.expr
+        )
+        val cond1 = src.Block(
+          body.stats.filter({
+            case src.ValDef(lhs, _) => crefs(lhs)
+            case _ => false
+          }) ++ cond.stats,
+          cond.expr
+        )
+
+        if (body1.stats.size != body.stats.size) split(indx)(body1, cond1)
+        else (body, api.Tree.rename(indx.toSeq)(cond).asInstanceOf[u.Block])
+      }
+
+      api.BottomUp.unsafe.withOwner.transformWith {
+        // a let block with nested `while($cond) { $body }` control-flow
+        //@formatter:off
+        case Attr.none(
+          core.Let(
+            pre1,
+            Seq(
+              core.DefDef(w, _, Seq(pars), core.Let(
+                pre2,
+                Seq(
+                  core.DefDef(b, _, _,
+                    src.Block(sbod, core.DefCall(None, m2, _, Seq(ags2)))),
+                  core.DefDef(s, _, _,
+                    suff: u.Block)),
+                core.Branch(cond,
+                  core.DefCall(None, m3, _, _),
+                  core.DefCall(None, m4, _, _))
+              ))),
+            core.DefCall(None, m1, _, Seq(ags1)))
+          ) if w == m1
+            && w == m2
+            && b == m3
+            && s == m4
+            && is[whileLoop](w)
+            && is[loopBody](b)
+            && is[suffix](s) =>
+          //@formatter:on
+          val vars = mkVarDefsWithDefaults(pars, ags1)
+          val body = src.Block(sbod ++ mkMuts(pars.map(_.symbol), ags2), api.Term.unit)
+
+          src.Block(
+            Seq.concat(
+              pre1,
+              vars,
+              Seq(
+                src.While(
+                  src.Block(pre2, cond),
+                  body)),
+              suff.stats
+            ),
+            suff.expr)
+
+        // a let block with nested `do { $body } while($cond)` control-flow
+        //@formatter:off
+        case Attr.none(
+          core.Let(
+            pref,
+            Seq(
+              core.DefDef(d, _, Seq(pars), core.Let(
+                body,
+                Seq(
+                  core.DefDef(s, _, _,
+                    suff: u.Block)),
+                core.Branch(cond,
+                  core.DefCall(None, m2, _, Seq(ags2)),
+                  core.DefCall(None, m3, _, _))
+              ))),
+            core.DefCall(None, m1, _, Seq(ags1)))
+          ) if d == m1
+            && d == m2
+            && s == m3
+            && is[doWhileLoop](d)
+            && is[suffix](s) =>
+          //@formatter:on
+          val indx = (for {
+            (core.Ref(y), x) <- ags2 zip pars.map(_.symbol)
+          } yield y -> varOf(x)) (breakOut): Map[u.TermSymbol, u.Symbol]
+
+          val vars = mkVarDefsWithDefaults(pars, ags1)
+          val muts = mkMuts(pars.map(_.symbol), ags2)
+          val suf1 = api.Tree.rename(indx.toSeq)(suff).asInstanceOf[u.Block]
+          val blc1 = src.Block(body ++ muts, cond)
+          val (bod1, con1) = split(indx)(
+            src.Block(blc1.stats, api.Term.unit),
+            src.Block(Seq.empty, blc1.expr))
+
+          src.Block(
+            Seq.concat(
+              pref,
+              vars,
+              Seq(src.DoWhile(con1, bod1)),
+              suf1.stats
+            ),
+            suf1.expr)
+
+        // a let block with nested `if($cond) $thn else $els` control-flow
+        //@formatter:off
+        case Attr(
+          core.Let(
+            pref,
+            Seq(
+              core.DefDef(s, _, Seq(pars),
+                suff: u.Block),
+              core.DefDef(t, _, _,
+                src.Block(sthn, core.DefCall(None, m3, _, Seq(argsthn)))),
+              core.DefDef(e, _, _,
+                src.Block(sels, core.DefCall(None, m4, _, Seq(argsels))))),
+            core.Branch(cond,
+              core.DefCall(None, m1, _, _),
+              core.DefCall(None, m2, _, _))
+          ), _, owner :: _, _)
+            if t == m1
+            && e == m2
+            && s == m3
+            && s == m4
+            && is[thenBranch](t)
+            && is[elseBranch](e)
+            && is[continuation](s) =>
+          //@formatter:off
+          val vars = mkVarDefsWithNulls(pars, owner)
+          val thnb = src.Block(sthn ++ mkMuts(pars.map(_.symbol), argsthn), api.Term.unit)
+          val elsb = src.Block(sels ++ mkMuts(pars.map(_.symbol), argsels), api.Term.unit)
+
+          src.Block(
+            Seq.concat(
+              pref,
+              vars,
+              Seq(
+                src.ValDef(
+                  api.TermSym(owner, api.TermName.fresh("if"), api.Type.unit),
+                  src.Branch(cond, thnb, elsb))),
+              suff.stats
+            ),
+            suff.expr)
+
+      }._tree.andThen(api.Tree.rename(varOf.toSeq))(tree)
+    }
+
     /** Applies `f` to the deepest suffix (i.e. without control flow) in a let block. */
     def mapSuffix(let: u.Block, res: Option[u.Type] = None)
       (f: (Seq[u.ValDef], u.Tree) => u.Block): u.Block = (let, res) match {
@@ -302,5 +502,14 @@ private[core] trait DSCF extends Common {
         case _ => None
       }
     }
+
+    private def is[A: u.TypeTag](m: u.MethodSymbol): Boolean =
+      api.Sym.findAnn[A](m).isDefined
+
+    private def nullAsInstanceOf(tpe: u.Type): u.Tree =
+      src.DefCall(Some(src.Lit(null)), _asInstanceOf, Seq(tpe))
+
+    private lazy val _asInstanceOf =
+      api.Type[Any].member(api.TermName("asInstanceOf")).asMethod
   }
 }

@@ -20,6 +20,7 @@ import compiler.Common
 import compiler.ir.DSCFAnnotations._
 import compiler.lang.AlphaEq
 import compiler.lang.comprehension.Comprehension
+import compiler.lang.cf.ControlFlow
 import compiler.lang.source.Source
 
 /** Core language. */
@@ -33,7 +34,7 @@ private[compiler] trait Core extends Common
   with Pickling
   with Reduce
   with Trampoline {
-  self: AlphaEq with Source =>
+  self: AlphaEq with Source with ControlFlow =>
 
   import API._
   import UniverseImplicits._
@@ -311,6 +312,9 @@ private[compiler] trait Core extends Common
 
     /** Delegates to [[DSCF.transform]]. */
     lazy val dscf = DSCF.transform
+
+    /** Delegates to [[DSCF.inverse]] */
+    lazy val dscfInv = DSCF.inverse
 
     /** Delegates to [[ANF.transform]]. */
     lazy val anf = ANF.transform
