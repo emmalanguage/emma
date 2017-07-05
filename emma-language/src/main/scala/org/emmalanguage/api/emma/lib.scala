@@ -93,7 +93,7 @@ private class libMacro(val c: whitebox.Context) extends MacroCompiler {
       // create a fresh name for the associated `emma.quote { <defdef code> }` ValDef
       val nameQ = api.TermName.fresh(s"${name.encodedName}$$Q")
       // quote the method definition in a `val $nameQx = emma.quote { <defdef code> }
-      val quoteDef = q"val $nameQ = ${API.emmaModuleSymbol}.quote { $clrDefDef }"
+      val quoteDef = q"val $nameQ = ${API.emma.sym}.quote { $clrDefDef }"
       // annotate the DefDef with the name of its associated source
       val annDefDef = DefDef(mods mapAnnotations append(src(nameQ.toString)), name, tparams, vparamss, tpt, rhs)
       // emit `val $nameQx = emma.quote { <defdef code> }; @emma.src("$nameQx") def $name = ...`

@@ -16,36 +16,65 @@
 package org.emmalanguage
 package compiler
 
-import scala.language.experimental.macros
+import com.typesafe.config.Config
+
 import scala.reflect.macros.blackbox
 
-class SparkMacro(val c: blackbox.Context) extends MacroCompiler {
+class SparkMacro(val c: blackbox.Context) extends MacroCompiler with SparkCompiler {
 
-  def parallelizeImpl[T](e: c.Expr[T]): c.Expr[T] = {
-    val res = parallelizePipeline(e)
-    //c.warning(e.tree.pos, Core.prettyPrint(res))
+  override protected val baseConfig = "reference.emma.onSpark.conf" +: super.baseConfig
+
+  def onSparkImpl1[T](e: c.Expr[T]): c.Expr[T] = {
+    val cfg = loadConfig(configPaths())
+    val res = pipeline(cfg)(e)
+    if (cfg.getBoolean("emma.compiler.print-result")) {
+      c.warning(e.tree.pos, api.Tree.show(res))
+    }
     c.Expr[T]((removeShadowedThis andThen unTypeCheck) (res))
   }
 
-  override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ Set(
-    api.Type[org.apache.spark.sql.Encoder[Any]].typeConstructor
-  )
-
-  private lazy val parallelizePipeline: c.Expr[Any] => u.Tree =
-    pipeline()(
-      LibSupport.expand,
-      Core.lift,
-      Backend.addCacheCalls,
-      Comprehension.combine,
-      Backend.translateToDataflows(SparkAPI.rddModuleSymbol),
-      Core.inlineLetExprs,
-      Core.trampoline
-    ).compose(_.tree)
-
-  private object SparkAPI {
-    lazy val rddModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.SparkRDD")
-    lazy val sessionSymbol = universe.rootMirror.staticClass(s"org.apache.spark.sql.SparkSession")
-    lazy val sessionType = sessionSymbol.info
+  def onSparkImpl2[T](config: c.Expr[String])(e: c.Expr[T]): c.Expr[T] = {
+    val cfg = loadConfig(configPaths(Some(config.tree)))
+    val res = pipeline(cfg)(e)
+    if (cfg.getBoolean("emma.compiler.print-result")) {
+      c.warning(e.tree.pos, api.Tree.show(res))
+    }
+    c.Expr[T]((removeShadowedThis andThen unTypeCheck) (res))
   }
 
+  private def pipeline(cfg: Config): c.Expr[Any] => u.Tree = {
+    val xfms = Seq.newBuilder[u.Tree => u.Tree]
+    // standard prefix
+    xfms ++= Seq(
+      LibSupport.expand,
+      Core.lift
+    )
+    // optional optimizing rewrites
+    if (cfg.getBoolean("emma.compiler.opt.cse")) {
+      xfms += Core.cse
+    }
+    if (cfg.getBoolean("emma.compiler.opt.fold-fusion")) {
+      xfms += Optimizations.foldFusion
+    }
+    if (cfg.getBoolean("emma.compiler.opt.auto-cache")) {
+      xfms += Backend.addCacheCalls
+    }
+
+    xfms += Comprehension.combine
+
+    cfg.getString("emma.compiler.spark.api") match {
+      case "rdd" =>
+        xfms += Backend.specialize(SparkAPI)
+      case "dataset" =>
+        xfms += Backend.specialize(SparkAPI2)
+        if (cfg.getBoolean("emma.compiler.spark.native-ops")) {
+          xfms += SparkSpecializeSupport.specializeOps
+        }
+    }
+
+    xfms += Core.trampoline
+
+    // construct the compilation pipeline
+    pipeline()(xfms.result(): _*).compose(_.tree)
+  }
 }

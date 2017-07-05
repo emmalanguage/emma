@@ -20,9 +20,11 @@ import api.DataBag
 import compiler.BaseCompilerSpec
 
 /** A spec for order disambiguation. */
+//noinspection ScalaUnusedSymbol
 class OrderSpec extends BaseCompilerSpec {
 
   import compiler._
+  import u.reify
 
   val liftPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
@@ -41,7 +43,7 @@ class OrderSpec extends BaseCompilerSpec {
 
     "only driver" in {
 
-      val inp = u.reify {
+      val inp = reify {
         val f = (x: Int) => x + 1
         f(41)
       }
@@ -53,14 +55,14 @@ class OrderSpec extends BaseCompilerSpec {
 
     "ambiguous" in {
 
-      val inp = u.reify {
+      val inp = reify {
         val f = (x: Int) => x + 1
         val x = f(6)
         val b = DataBag(Seq(1))
         b.map(f)
       }
 
-      val exp = u.reify {
+      val exp = reify {
         val f = (x: Int) => x + 1
         val f$high = (x: Int) => x + 1
         val x = f(6)
@@ -73,7 +75,7 @@ class OrderSpec extends BaseCompilerSpec {
 
     "chain of lambda refs" in {
 
-      val inp = u.reify {
+      val inp = reify {
         val g = (x: Int) => x + 2
         val f = (x: Int) => x + g(4)
         val x = g(6)
@@ -81,7 +83,7 @@ class OrderSpec extends BaseCompilerSpec {
         b.map(f)
       }
 
-      val exp = u.reify {
+      val exp = reify {
         val g = (x: Int) => x + 2
         val g$high = (x: Int) => x + 2
         val f = (x: Int) => x + g$high(4)
@@ -95,7 +97,7 @@ class OrderSpec extends BaseCompilerSpec {
 
     "long chain of lambda refs" in {
 
-      val inp = u.reify {
+      val inp = reify {
         val h = (x: Int) => x + 3
         val g = (x: Int) => h(x)
         val f = (x: Int) => x + g(4)
@@ -105,7 +107,7 @@ class OrderSpec extends BaseCompilerSpec {
         b.map(f)
       }
 
-      val exp = u.reify {
+      val exp = reify {
         val h = (x: Int) => x + 3
         val h$high = (x: Int) => x + 3
         val g = (x: Int) => h(x)
@@ -122,7 +124,7 @@ class OrderSpec extends BaseCompilerSpec {
 
     "higher-order function executed in driver" in {
 
-      val inp = u.reify {
+      val inp = reify {
         val h = (l: Int => Int) => {
           val ir = (x: Int) => l(x)
           ir
@@ -134,7 +136,7 @@ class OrderSpec extends BaseCompilerSpec {
         b.map(f)
       }
 
-      val exp = u.reify {
+      val exp = reify {
         val h = (l: Int => Int) => {
           val ir = (x: Int) => l(x)
           val ir$high = (x: Int) => l(x)
@@ -157,7 +159,7 @@ class OrderSpec extends BaseCompilerSpec {
 
     "higher-order function called from high" in {
 
-      val inp = u.reify {
+      val inp = reify {
         val h = (l: Int => Int) => {
           val ir = (x: Int) => l(x)
           ir
@@ -170,7 +172,7 @@ class OrderSpec extends BaseCompilerSpec {
         b.map(f)
       }
 
-      val exp = u.reify {
+      val exp = reify {
         val h = (l: Int => Int) => {
           val ir = (x: Int) => l(x)
           val ir$high = (x: Int) => l(x)

@@ -16,10 +16,11 @@
 package org.emmalanguage
 package compiler.lang.backend
 
-import cats.std.all._
 import compiler.Common
 import compiler.lang.core.Core
 import util.Monoids
+
+import cats.instances.all._
 import shapeless._
 
 /**
@@ -30,8 +31,9 @@ import shapeless._
  * Note: This code assumes that DataBags don't contain functions. (E.g. it handles a DataBag[Int => Int] incorrectly.)
  */
 private[backend] trait Order extends Common {
-  self: Backend with Core =>
+  self: Core =>
 
+  import API._
   import Core.{Lang => core}
   import UniverseImplicits._
 
@@ -41,7 +43,11 @@ private[backend] trait Order extends Common {
      * If a lambda is given as an argument to one of these methods,
      * then that lambda will be called from higher-order context.
      */
-    val combinators = API.ops ++ ComprehensionCombinators.ops
+    val combinators = Seq(
+      DataBag.ops,
+      MutableBag.ops,
+      Ops.ops
+    ).flatten
 
     /**
      * Disambiguates order in a tree and gives information on which parts of the code might be executed

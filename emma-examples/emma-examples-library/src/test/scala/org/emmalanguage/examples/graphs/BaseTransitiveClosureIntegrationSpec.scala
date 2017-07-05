@@ -16,17 +16,17 @@
 package org.emmalanguage
 package examples.graphs
 
+import api._
 import examples.graphs.model.Edge
-import io.csv.CSV
 import test.util._
 
 import org.scalatest.BeforeAndAfter
 import org.scalatest.FlatSpec
 import org.scalatest.Matchers
-
-import scala.io.Source
+import resource._
 
 import java.io.File
+import java.io.PrintWriter
 
 trait BaseTransitiveClosureIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
@@ -38,7 +38,7 @@ trait BaseTransitiveClosureIntegrationSpec extends FlatSpec with Matchers with B
     new File(codegenDir).mkdirs()
     new File(path).mkdirs()
     addToClasspath(new File(codegenDir))
-    materializeResource(s"$dir/edges.tsv")
+    generateInput(s"$path/edges.tsv")
   }
 
   after {
@@ -46,18 +46,56 @@ trait BaseTransitiveClosureIntegrationSpec extends FlatSpec with Matchers with B
     deleteRecursive(new File(path))
   }
 
-  "TransitiveClosure" should "compute the transitive closure of a directed graph" in {
-    val graph = (for {
-      line <- Source.fromFile(s"$path/edges.tsv").getLines
-    } yield {
-      val record = line.split('\t').map(_.toLong)
-      Edge(record(0), record(1))
-    }).toSet
+  it should "compute the transitive closure of a directed graph" in {
+    val act = transitiveClosure(s"$path/edges.tsv", CSV())
+    val exp = expectedClosure()
 
-    val closure = transitiveClosure(s"$path/edges.tsv", CSV())
-
-    graph subsetOf closure should be(true)
+    act should contain theSameElementsAs exp
   }
 
   def transitiveClosure(input: String, csv: CSV): Set[Edge[Long]]
+
+  lazy val paths = {
+    val S = 3415434314L
+    val P = 5
+
+    val ws = shuffle(P)(util.RanHash(S, 0)).map(_.toLong)
+    val xs = shuffle(P)(util.RanHash(S, 1)).map(_.toLong + P)
+    val ys = shuffle(P)(util.RanHash(S, 2)).map(_.toLong + P * 2)
+    val zs = shuffle(P)(util.RanHash(S, 3)).map(_.toLong + P * 3)
+
+    ws zip xs zip ys zip zs
+  }
+
+  private def generateInput(path: String): Unit = {
+    val edges = {
+      for {
+        (((w, x), y), z) <- paths
+        e <- Seq(Edge(w, x), Edge(x, y), Edge(y, z))
+      } yield e
+    }.distinct
+
+    for (pw <- managed(new PrintWriter(new File(path))))
+      yield for (e <- edges.sortBy(_.src)) pw.write(s"${e.src}\t${e.dst}\n")
+  }.acquireAndGet(_ => ())
+
+  private def expectedClosure(): Set[Edge[Long]] = {
+    for {
+      (((w, x), y), z) <- paths
+      e <- Seq(Edge(w, x), Edge(x, y), Edge(y, z), Edge(w, y), Edge(x, z), Edge(w, z))
+    } yield e
+  }.toSet
+
+  private def shuffle(n: Int)(r: util.RanHash): Array[Int] = {
+    val xs = (1 to n).toArray
+    for {
+      i <- 0 to (n - 2)
+    } {
+      val j = r.nextInt(i + 1)
+      val t = xs(i)
+      xs(i) = xs(j)
+      xs(j) = t
+    }
+    xs
+  }
 }

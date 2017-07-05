@@ -20,18 +20,17 @@ import compiler.Common
 import compiler.lang.core.Core
 
 /** Backend-related (but backend-agnostic) transformations. */
-trait Backend extends Common
+private[compiler] trait Backend extends Common
   with Caching
   with Order
-  with TranslateToDataflows {
-  this: Core =>
-
-  import UniverseImplicits._
+  with Specialization {
+  self: Core =>
 
   object Backend {
 
-    /** Delegates to [[TranslateToDataflows.translateToDataflows]]. */
-    def translateToDataflows(to: u.ModuleSymbol) = TranslateToDataflows.translateToDataflows(to)
+    /** Delegates to [[Specialization.specialize]]. */
+    def specialize(backend: BackendAPI) =
+      Specialization.specialize(backend)
 
     /** Delegates to [[Caching.addCacheCalls]]. */
     lazy val addCacheCalls = Caching.addCacheCalls

@@ -16,7 +16,7 @@
 package org.emmalanguage
 package ast
 
-import cats.std.all._
+import cats.instances.all._
 import shapeless._
 
 import scala.annotation.tailrec
@@ -25,7 +25,7 @@ trait Trees { this: AST =>
 
   trait TreeAPI { this: API =>
 
-    import universe._
+    import u._
     import definitions._
     import internal._
     import reificationSupport._
@@ -180,8 +180,18 @@ trait Trees { this: AST =>
           printTypes  = true)
 
       /** Prints `tree` in parseable form. */
-      def show(tree: u.Tree): String =
-        u.showCode(tree, printRootPkg = true)
+      def show(tree: u.Tree, cleanup: Boolean = false): String = {
+        val result = u.showCode(tree, printRootPkg = true)
+        if (!cleanup) result else result
+          .replaceAll("(_root_.)?scala.", "")
+          .replaceAll("(_root_.)?org.emmalanguage.api.", "")
+          .replaceAll("(_root_.)?org.emmalanguage.compiler.ir.ComprehensionSyntax.", "")
+          .replaceAll("Tuple\\d{1,2}\\[([a-zA-Z0-9\\,\\,\\ ]+)\\]", "($1)")
+          .replaceAll("Tuple\\d{1,2}\\.apply\\[([a-zA-Z0-9\\,\\,\\ ]+)\\]", "")
+          .replaceAll("\\.apply\\[([a-zA-Z0-9\\,\\,\\ ]+)\\]", "")
+          .replaceAll("\\.([a-zA-Z0-9]+)\\[([a-zA-Z0-9\\,\\,\\ ]+)\\]", ".$1")
+          .replaceAll(";\n", "\n")
+      }
 
       /** Prints `tree` including owners as comments. */
       def showOwners(tree: u.Tree): String =

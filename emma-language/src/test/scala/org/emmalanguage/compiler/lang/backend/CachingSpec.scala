@@ -16,15 +16,15 @@
 package org.emmalanguage
 package compiler.lang.backend
 
-import compiler.ir
-
 import api.DataBag
+import api.backend.LocalOps._
 import compiler.BaseCompilerSpec
 
 /** A spec for order disambiguation. */
 class CachingSpec extends BaseCompilerSpec {
 
   import compiler._
+  import u.reify
 
   val liftPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
@@ -41,7 +41,7 @@ class CachingSpec extends BaseCompilerSpec {
 
     "used multiple times" in {
 
-      val inp = u.reify {
+      val inp = reify {
         val i = 2
         val xs = DataBag(1 to 5).withFilter(_ % 2 == 0)
         val ys = xs.map(_ + i)
@@ -49,9 +49,9 @@ class CachingSpec extends BaseCompilerSpec {
         ys union zs
       }
 
-      val exp = u.reify {
+      val exp = reify {
         val i = 2
-        val xs = ir.Runtime.cache {
+        val xs = cache {
           DataBag(1 to 5).withFilter(_ % 2 == 0)
         }
 
@@ -65,7 +65,7 @@ class CachingSpec extends BaseCompilerSpec {
 
     "passed as arguments to a loop method" in {
 
-      val inp = u.reify {
+      val inp = reify {
         val i = 2
         val N = 5
         var xs = DataBag(1 to 5)
@@ -73,11 +73,11 @@ class CachingSpec extends BaseCompilerSpec {
         xs
       }
 
-      val exp = u.reify {
+      val exp = reify {
         val i = 2
         val N = 5
         var xs = DataBag(1 to 5)
-        for (_ <- 0 to N) xs = ir.Runtime.cache {
+        for (_ <- 0 to N) xs = cache {
           xs.map(_ + i)
         }
 
@@ -89,8 +89,7 @@ class CachingSpec extends BaseCompilerSpec {
 
     "referenced in the closure of a loop method" in {
 
-      val inp = u.reify {
-        val i = 2
+      val inp = reify {
         val N = 5
         var xs = DataBag(1 to 5)
         val ys = DataBag(1 to 5).withFilter(_ % 2 == 0)
@@ -98,16 +97,15 @@ class CachingSpec extends BaseCompilerSpec {
         xs
       }
 
-      val exp = u.reify {
-        val i = 2
+      val exp = reify {
         val N = 5
         var xs = DataBag(1 to 5)
-        val ys = ir.Runtime.cache {
+        val ys = cache {
           DataBag(1 to 5).withFilter(_ % 2 == 0)
         }
 
         for (_ <- 0 to N)
-          xs = ir.Runtime.cache {
+          xs = cache {
             xs union ys
           }
 
@@ -115,6 +113,22 @@ class CachingSpec extends BaseCompilerSpec {
       }
 
       addCacheCalls(inp) shouldBe alphaEqTo(liftPipeline(exp))
+    }
+
+    "not referenced once in the suffix of a loop method" in {
+      val inp = u.reify {
+        val xs = DataBag(1 to 100)
+        val ys = xs.map(x => x * x)
+        var i = 0
+        while (i < 100) {
+          println(i)
+          i *= i
+        }
+
+        ys
+      }
+
+      addCacheCalls(inp) shouldBe alphaEqTo(liftPipeline(inp))
     }
   }
 }

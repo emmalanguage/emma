@@ -17,24 +17,16 @@ package org.emmalanguage
 package examples.text
 
 import api._
-import io.csv.CSV
 
-import org.apache.spark.sql.SparkSession
-
-class SparkWordCountIntegrationSpec extends BaseWordCountIntegrationSpec {
+class SparkWordCountIntegrationSpec extends BaseWordCountIntegrationSpec with SparkAware {
 
   override def wordCount(input: String, output: String, csv: CSV): Unit =
-    emma.onSpark {
+    withDefaultSparkSession(implicit spark => emma.onSpark {
       // read the input
       val docs = DataBag.readCSV[String](input, csv)
       // parse and count the words
       val counts = WordCount(docs)
       // write the results into a file
       counts.writeCSV(output, csv)
-    }
-
-  implicit lazy val sparkSession = SparkSession.builder()
-    .master("local[*]")
-    .appName(this.getClass.getSimpleName)
-    .getOrCreate()
+    })
 }

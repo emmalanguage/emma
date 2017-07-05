@@ -24,12 +24,13 @@ import shapeless._
 
 /** Resugaring and desugaring of comprehension syntax. */
 private[comprehension] trait ReDeSugar extends Common {
-  self: Core with Comprehension =>
+  self: Core =>
 
   import Monoids._
-  import UniverseImplicits._
+
   import Comprehension.asLet
   import Core.{Lang => core}
+  import UniverseImplicits._
 
   private[comprehension] object ReDeSugar {
 
@@ -49,7 +50,7 @@ private[comprehension] trait ReDeSugar extends Common {
      */
     def resugar(monad: u.Symbol): u.Tree => u.Tree = {
       // Construct comprehension syntax helper for the given monad
-      val cs = new Comprehension.Syntax(monad)
+      val cs = Comprehension.Syntax(monad)
       // Handle the case when a lambda is defined externally
       def lookup(f: u.TermSymbol, owner: u.Symbol,
         lambdas: Map[u.TermSymbol, (u.TermSymbol, u.Tree)]
@@ -57,8 +58,8 @@ private[comprehension] trait ReDeSugar extends Common {
         val sym = api.Sym.With(arg)(flg = u.NoFlags).asTerm
         sym -> api.Tree.rename(Seq(arg -> sym))(body)
       }.getOrElse {
-        val nme = api.TermName.fresh("x")
-        val tpe = f.info.dealias.widen.typeArgs.last
+        val nme = api.TermName.fresh()
+        val tpe = f.info.dealias.widen.typeArgs.head
         val arg = api.ValSym(owner, nme, tpe)
         val tgt = Some(core.ValRef(f))
         val app = f.info.member(api.TermName.app).asMethod
@@ -77,11 +78,17 @@ private[comprehension] trait ReDeSugar extends Common {
             cs.Head(asLet(body)))
 
         case Attr(cs.FlatMap(xs, core.Ref(f)), lambdas :: _, owner :: _, _) =>
-          val (sym, body) = lookup(f, owner, lambdas)
-          cs.Flatten(core.Let(expr =
-            cs.Comprehension(Seq(
-              cs.Generator(sym, asLet(xs))),
-              cs.Head(asLet(body)))))
+          val (sym1, body1) = lookup(f, owner, lambdas)
+          val (sym2, body2) = {
+            val nme = api.TermName("g")
+            val tpe = api.Type.arg(1, body1.tpe)
+            val sym = api.TermSym(sym1.owner, nme, tpe)
+            sym -> core.Ref(sym)
+          }
+          cs.Comprehension(Seq(
+            cs.Generator(sym1, asLet(xs)),
+            cs.Generator(sym2, asLet(body1))),
+            cs.Head(asLet(body2)))
 
         case Attr(cs.WithFilter(xs, core.Ref(p)), lambdas :: _, owner :: _, _) =>
           val (sym, body) = lookup(p, owner, lambdas)
@@ -108,17 +115,12 @@ private[comprehension] trait ReDeSugar extends Common {
      */
     def desugar(monad: u.Symbol): u.Tree => u.Tree = {
       // construct comprehension syntax helper for the given monad
-      val cs = new Comprehension.Syntax(monad)
-
-      val desugarTransform = api.TopDown.transform {
+      val cs = Comprehension.Syntax(monad)
+      api.TopDown.withOwner.transformWith {
         // Match: `for { x <- { $vals; $rhs}; $qs*; } yield $expr`
-        //@formatter:off
-        case cs.Comprehension(
-          Seq(
-            cs.Generator(x, core.Let(vals, Seq(), core.Ref(rhs))),
-            qs@_*),
-          cs.Head(expr)) =>
-          //@formatter:on
+        case Attr.inh(
+          cs.Comprehension(Seq(cs.Generator(x, core.Let(vals, Seq(), core.Ref(rhs))), qs@_*), cs.Head(expr)),
+          owner :: _) =>
 
           val (guards, rest) = qs.span {
             case cs.Guard(_) => true
@@ -127,17 +129,17 @@ private[comprehension] trait ReDeSugar extends Common {
 
           // Accumulate filters in a prefix of values and keep track of the tail value symbol
           val (tail, prefix) = guards.foldLeft(rhs, Vector.empty[u.ValDef]) {
-            case ((currSym, currPfx), cs.Guard(p)) =>
-              val currRef = core.Ref(currSym)
-              val funcRhs = core.Lambda(Seq(x), p)
-              val funcNme = api.TermName.fresh("guard")
-              val funcSym = api.TermSym.free(funcNme, funcRhs.tpe)
-              val funcRef = core.Ref(funcSym)
-              val funcVal = api.ValDef(funcSym, funcRhs)
-              val nextNme = api.TermName.fresh(cs.WithFilter.symbol)
-              val nextSym = api.TermSym.free(nextNme, currSym.info)
-              val nextVal = api.ValDef(nextSym, cs.WithFilter(currRef)(funcRef))
-              (nextSym, currPfx :+ funcVal :+ nextVal)
+            case ((curSym, curPre), cs.Guard(pred)) =>
+              val curRef = core.Ref(curSym)
+              val lambda = core.Lambda(Seq(x), pred)
+              val funNme = api.TermName.fresh("guard")
+              val funSym = api.ValSym(owner, funNme, lambda.tpe)
+              val funRef = core.Ref(funSym)
+              val funVal = api.ValDef(funSym, lambda)
+              val tmpNme = api.TermName.fresh(cs.WithFilter.symbol)
+              val tmpSym = api.ValSym(owner, tmpNme, curSym.info.widen)
+              val tmpVal = api.ValDef(tmpSym, cs.WithFilter(curRef)(funRef))
+              (tmpSym, curPre ++ Seq(funVal, tmpVal))
           }
 
           val tailRef = core.Ref(tail)
@@ -150,38 +152,27 @@ private[comprehension] trait ReDeSugar extends Common {
             case _ =>
               // Append a map or a flatMap to the result depending on
               // the size of the residual qualifier sequence 'qs'
-              val (op, body) =
-                if (rest.isEmpty) (cs.Map, expr)
+              val (op, body) = if (rest.isEmpty) (cs.Map, expr)
                 else (cs.FlatMap, cs.Comprehension(rest, cs.Head(expr)))
 
-              val fnRhs = core.Lambda(Seq(x), {
-                val bodyNme = api.TermName.fresh("x")
-                val bodySym = api.TermSym.free(bodyNme, body.tpe)
-                core.Let(Seq(core.ValDef(bodySym, body)), Seq.empty, core.Ref(bodySym))
-              })
-              val fnNme = api.TermName.fresh(api.TermName.lambda)
-              val fnSym = api.TermSym.free(fnNme, fnRhs.tpe)
-              val fnVal = core.ValDef(fnSym, fnRhs)
+              val funNme = api.TermName.fresh(api.TermName.lambda)
+              val funTpe = api.Type.fun(Seq(x.info), body.tpe.widen)
+              val funSym = api.ValSym(owner, funNme, funTpe)
+              val tmpNme = api.TermName.fresh()
+              val tmpSym = api.ValSym(funSym, tmpNme, body.tpe.widen)
+              val tmpRef = core.Ref(tmpSym)
+              val tmpVal = core.ValDef(tmpSym, body)
+              val lambda = core.Lambda(Seq(x), core.Let(Seq(tmpVal), Seq.empty, tmpRef))
+              val funVal = core.ValDef(funSym, lambda)
 
-              val opRhs = op(tailRef)(core.Ref(fnSym))
-              val opSym = api.TermSym.free(op.symbol.name, opRhs.tpe)
+              val opRhs = op(tailRef)(core.Ref(funSym))
+              val opSym = api.ValSym(owner, op.symbol.name, opRhs.tpe)
               val opVal = core.ValDef(opSym, opRhs)
 
-              core.Let(vals ++ prefix ++ Seq(fnVal, opVal), Seq.empty, core.Ref(opSym))
+              val allVals = Seq.concat(vals, prefix, Seq(funVal, opVal))
+              core.Let(allVals, Seq.empty, core.Ref(opSym))
           }
-
-        // Match: `flatten { $vals; $defs; for { $qs } yield $head }`
-        case cs.Flatten(core.Let(vals, defs, cs.Comprehension(qs, cs.Head(hd)))) =>
-          val genNme = api.TermName.fresh("x")
-          val genSym = api.TermSym.free(genNme, api.Type.arg(1, hd.tpe))
-          // Return: { $vals; $defs; for { $qs; x <- $head } yield x }
-          core.Let(vals, defs, cs.Comprehension(
-            qs :+ cs.Generator(genSym, hd),
-            cs.Head(core.Let(expr = core.Ref(genSym)))
-          ))
-      }
-
-      desugarTransform andThen (_.tree) andThen Core.flatten
+      }._tree.andThen(Core.unnest)
     }
   }
 }

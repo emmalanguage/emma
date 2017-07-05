@@ -19,14 +19,23 @@ package compiler.lang.cf
 import compiler.Common
 import compiler.lang.core.Core
 
+import quiver.Graph
+
 /** Backend-related (but backend-agnostic) transformations. */
-trait ControlFlow extends Common
-  with CFG {
-  this: Core =>
+private[compiler] trait ControlFlow extends Common with CFG {
+  self: Core =>
+
+  case class FlowGraph[V]
+  (
+    uses: Map[V, Int],
+    nest: Graph[V, Unit, Unit],
+    ctrl: Graph[V, u.DefDef, Unit],
+    data: Graph[V, u.ValDef, Unit]
+  )
 
   object ControlFlow {
 
     /** Delegates to [[CFG.graph]]. */
-    lazy val cfg: u.Tree => CFG.FlowGraph[u.TermSymbol] = CFG.graph
+    lazy val cfg: u.Tree => FlowGraph[u.TermSymbol] = CFG.graph
   }
 }

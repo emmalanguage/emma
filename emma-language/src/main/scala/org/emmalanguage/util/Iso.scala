@@ -27,7 +27,7 @@ import scala.collection.mutable
 import scala.reflect.ClassTag
 
 /** Type class proving an isomorphism between types `A` and `B`. */
-trait Iso[A, B] {
+trait Iso[A, B] extends Serializable {
   def from(a: A): B
   def to(b: B): A
 
@@ -75,7 +75,7 @@ object Iso {
     make(_.toArray, _.toBuffer)
 
   implicit def seqIsoDataBag[A: Meta]: Seq[A] <=> DataBag[A] =
-    make(DataBag(_), _.fetch())
+    make(DataBag(_), _.collect())
 
   implicit def intIsoEnum[E <: Enumeration](implicit enum: E): Int <=> enum.Value =
     make(enum(_), _.id)

@@ -36,7 +36,7 @@ import scala.reflect.ClassTag
  * better suited. Instances provided by default are Scala and Java primitives, enumerations and
  * [[Option]].
  */
-trait CSVColumn[T] {
+trait CSVColumn[T] extends Serializable {
 
   /**
    * Decodes an instance of `T` from a String.

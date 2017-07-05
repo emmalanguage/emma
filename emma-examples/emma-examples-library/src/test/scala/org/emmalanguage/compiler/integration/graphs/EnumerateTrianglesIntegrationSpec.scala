@@ -22,7 +22,6 @@ import compiler.integration.BaseCompilerIntegrationSpec
 import compiler.ir.ComprehensionSyntax._
 import examples.graphs._
 import examples.graphs.model._
-import io.csv._
 
 import scala.Ordering.Implicits._
 
@@ -30,6 +29,7 @@ import scala.Ordering.Implicits._
 class EnumerateTrianglesIntegrationSpec extends BaseCompilerIntegrationSpec {
 
   import compiler._
+  import u.reify
 
   // ---------------------------------------------------------------------------
   // Program closure
@@ -44,7 +44,7 @@ class EnumerateTrianglesIntegrationSpec extends BaseCompilerIntegrationSpec {
   // Program representations
   // ---------------------------------------------------------------------------
 
-  val sourceExpr = liftPipeline(u.reify {
+  val sourceExpr = liftPipeline(reify {
     // convert a list of directed edges
     val incoming = DataBag.readCSV[Edge[Long]](input, csv)
     val outgoing = incoming.map(e => Edge(e.dst, e.src))
@@ -57,39 +57,36 @@ class EnumerateTrianglesIntegrationSpec extends BaseCompilerIntegrationSpec {
     println(s"The number of triangles in the graph is $triangleCount")
   })
 
-  val coreExpr = anfPipeline(u.reify {
+  val coreExpr = anfPipeline(reify {
     // convert a list of directed edges
-    val input = this.input
-    val csv = this.csv
+    val input: this.input.type = this.input
+    val csv:   this.csv.type   = this.csv
     val incoming = DataBag.readCSV[Edge[Long]](input, csv)
     val outgoing = comprehension[Edge[Long], DataBag] {
       val e = generator[Edge[Long], DataBag](incoming)
       head(Edge(e.dst, e.src))
     }
     val edges$r1 = (incoming union outgoing).distinct
-    // compute all triangles
-    val edges$r2 = edges$r1
-    val o: Ordering[Long] = scala.math.Ordering.Long
     val triangles = comprehension[Triangle[Long], DataBag] {
-      val e1 = generator[Edge[Long], DataBag](edges$r2)
-      val e2 = generator[Edge[Long], DataBag](edges$r2)
-      val e3 = generator[Edge[Long], DataBag](edges$r2)
+      val e1 = generator[Edge[Long], DataBag](edges$r1)
+      val e2 = generator[Edge[Long], DataBag](edges$r1)
+      val e3 = generator[Edge[Long], DataBag](edges$r1)
       guard {
         val x$1 = e1.src
         val u$1 = e1.dst
-        val ops$1 = infixOrderingOps[Long](x$1)(o)
+        val ops$1 = infixOrderingOps[Long](x$1)(scala.math.Ordering.Long)
         ops$1 < u$1
       }
       guard {
         val y$1 = e2.src
         val v$1 = e2.dst
-        val ops$1 = infixOrderingOps[Long](y$1)(o)
+        val ops$1 = infixOrderingOps[Long](y$1)(scala.math.Ordering.Long)
         ops$1 < v$1
       }
       guard {
         val z$1 = e3.src
         val w$1 = e3.dst
-        val ops$1 = infixOrderingOps[Long](z$1)(o)
+        val ops$1 = infixOrderingOps[Long](z$1)(scala.math.Ordering.Long)
         ops$1 < w$1
       }
       guard {

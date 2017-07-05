@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <artifactId>${rootArtifactId}</artifactId>
+        <groupId>${groupId}</groupId>
+        <version>${version}</version>
+    </parent>
+
+    <artifactId>${artifactId}</artifactId>
+    <name>${project.artifactId}</name>
+
+    <properties>
+        <!-- Predicates -->
+        <scala-maven-plugin.skip>false</scala-maven-plugin.skip>
+        <scalastyle-maven-plugin.skip>false</scalastyle-maven-plugin.skip>
+        <scalatest-maven-plugin.skip>${skipTests}</scalatest-maven-plugin.skip>
+
+        <!-- Breeze -->
+        <breeze.version>0.12</breeze.version>
+    </properties>
+
+    <dependencies>
+        <!-- Emma -->
+        <dependency>
+            <groupId>org.emmalanguage</groupId>
+            <artifactId>emma-language</artifactId>
+        </dependency>
+        <!-- Emma (test jars) -->
+        <dependency>
+            <groupId>org.emmalanguage</groupId>
+            <artifactId>emma-language</artifactId>
+            <type>test-jar</type>
+        </dependency>
+
+        <!-- HDFS -->
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-common</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.hadoop</groupId>
+            <artifactId>hadoop-hdfs</artifactId>
+        </dependency>
+
+        <!-- Arguments parsing -->
+        <dependency>
+            <groupId>com.github.scopt</groupId>
+            <artifactId>scopt_${scala.tools.version}</artifactId>
+        </dependency>
+
+        <!-- Breeze -->
+        <dependency>
+            <groupId>org.scalanlp</groupId>
+            <artifactId>breeze_${scala.tools.version}</artifactId>
+            <version>${breeze.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!-- Build a test-jar -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>${maven-jar-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>test-jar</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

@@ -16,4 +16,4 @@
 package org.emmalanguage
 package api
 
-case class Group[K, +V](key: K, values: V)
+case class Group[K, +V](@emma.pk key: K, values: V)

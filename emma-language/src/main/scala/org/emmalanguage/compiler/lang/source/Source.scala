@@ -20,7 +20,7 @@ import compiler.Common
 
 
 /** Source language. */
-trait Source extends Common
+private[compiler] trait Source extends Common
   with Foreach2Loop
   with PatternMatching
   with SourceValidate {
@@ -131,10 +131,6 @@ trait Source extends Common
       val VarDef = api.VarDef
       val VarMut = api.VarMut
 
-      // Modules
-      val ModuleRef = api.ModuleRef
-      val ModuleAcc = api.ModuleAcc
-
       // Methods
       val DefCall = api.DefCall
 
@@ -150,6 +146,7 @@ trait Source extends Common
 
       // Terms
       val Term     = api.Term
+      val TermAcc  = api.TermAcc
       val Block    = api.Block
       val Branch   = api.Branch
       val Inst     = api.Inst
@@ -170,7 +167,6 @@ trait Source extends Common
       def ref(target: u.TermSymbol): A
 
       // References (with defaults)
-      def moduleRef(target: u.ModuleSymbol): A = ref(target)
       def bindingRef(target: u.TermSymbol): A = ref(target)
       def valRef(target: u.TermSymbol): A = bindingRef(target)
       def varRef(target: u.TermSymbol): A = bindingRef(target)
@@ -190,7 +186,7 @@ trait Source extends Common
       // Other
       def varMut(lhs: u.TermSymbol, rhs: A): A
       def typeAscr(target: A, tpe: u.Type): A
-      def moduleAcc(target: A, member: u.ModuleSymbol): A
+      def termAcc(target: A, member: u.TermSymbol): A
       def defCall(target: Option[A], method: u.MethodSymbol, targs: Seq[u.Type], argss: Seq[Seq[A]]): A
       def inst(target: u.Type, targs: Seq[u.Type], argss: Seq[Seq[A]]): A
       def lambda(sym: u.TermSymbol, params: Seq[A], body: A): A
@@ -209,14 +205,16 @@ trait Source extends Common
           a.lit(value)
         case Lang.This(encl) =>
           a.this_(encl)
-        case Lang.ModuleRef(target) =>
-          a.moduleRef(target)
         case Lang.ValRef(target) =>
           a.valRef(target)
         case Lang.VarRef(target) =>
           a.varRef(target)
         case Lang.ParRef(target) =>
           a.parRef(target)
+        case Lang.BindingRef(target) =>
+          a.bindingRef(target)
+        case Lang.Ref(target) =>
+          a.ref(target)
 
         // Definitions
         case Lang.ValDef(lhs, rhs) =>
@@ -225,20 +223,24 @@ trait Source extends Common
           a.varDef(lhs, fold(rhs))
         case Lang.ParDef(lhs, rhs) =>
           a.parDef(lhs, fold(rhs))
+        case Lang.BindingDef(lhs, rhs) =>
+          a.bindingDef(lhs, fold(rhs))
 
         // Loops
         case Lang.While(cond, body) =>
           a.while_(fold(cond), fold(body))
         case Lang.DoWhile(cond, body) =>
           a.doWhile(fold(cond), fold(body))
+        case Lang.Loop(cond, body) =>
+          a.loop(fold(cond), fold(body))
 
         // Other
         case Lang.VarMut(lhs, rhs) =>
           a.varMut(lhs, fold(rhs))
         case Lang.TypeAscr(target, tpe) =>
           a.typeAscr(fold(target), tpe)
-        case Lang.ModuleAcc(target, member) =>
-          a.moduleAcc(fold(target), member)
+        case Lang.TermAcc(target, member) =>
+          a.termAcc(fold(target), member)
         case Lang.DefCall(target, method, targs, argss) =>
           a.defCall(target.map(fold), method, targs, argss.map(_.map(fold)))
         case Lang.Inst(target, targs, argss) =>
@@ -295,7 +297,7 @@ trait Source extends Common
         }
 
         def unapply(tree: u.Tree): Option[u.Tree] = tree match {
-          case api.DefCall(target, method, targs, argss) =>
+          case api.DefCall(_, method, _, argss) =>
             argss.map(_.toList).toList zip method.paramLists match {
               case _ :+ Tuple2(args, params) if matchingImplicits(args, params) => Some(tree)
               case _ => None

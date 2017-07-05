@@ -18,8 +18,7 @@ package util
 
 import cats.implicits._
 import cats.kernel.laws.GroupLaws
-import org.scalacheck.Arbitrary
-import org.scalacheck.Gen
+import org.scalacheck._
 import org.scalatest._
 import org.scalatest.prop.Checkers
 import shapeless._
@@ -38,57 +37,57 @@ class MonoidSpec extends FreeSpec with Checkers with Equivalences with Arbitrari
     "forgetful" - {
 
       "with left bias" in {
-        check(GroupLaws[Int].monoid(first(0)).all)
+        for ((_, prop) <- GroupLaws[Int].monoid(first(0)).all.properties) check(prop)
       }
 
       "with right bias" in {
-        check(GroupLaws[String].monoid(last("")).all)
+        for ((_, prop) <- GroupLaws[String].monoid(last("")).all.properties) check(prop)
       }
     }
-    
+
     "for booleans" - {
-      
+
       "conjunctive" in {
-        check(GroupLaws[Boolean].monoid(conj).all)
+        for ((_, prop) <- GroupLaws[Boolean].monoid(conj).all.properties) check(prop)
       }
-      
+
       "disjunctive" in {
-        check(GroupLaws[Boolean].monoid(disj).all)
+        for ((_, prop) <- GroupLaws[Boolean].monoid(disj).all.properties) check(prop)
       }
     }
 
     "for maps" - {
 
       "with overwriting" in {
-        check(GroupLaws[Map[Char, Int]].monoid(overwrite).all)
+        for ((_, prop) <- GroupLaws[Map[Char, Int]].monoid(overwrite).all.properties) check(prop)
       }
 
       "with merging" in {
-        check(GroupLaws[Map[Char, Int]].monoid(merge).all)
+        for ((_, prop) <- GroupLaws[Map[Char, Int]].monoid(merge).all.properties) check(prop)
       }
     }
 
     "for generic products" in {
-      check(GroupLaws[HNil].monoid.all)
-      check(GroupLaws[Int :: String :: HNil].monoid.all)
+      for ((_, prop) <- GroupLaws[HNil].monoid.all.properties) check(prop)
+      for ((_, prop) <- GroupLaws[Int :: String :: HNil].monoid.all.properties) check(prop)
     }
 
     "for sliding collections" in {
       val n = 10
       implicit val vecOfN = Arbitrary(Gen.containerOfN[Vector, Int](n, arb[Int]))
       implicit val setOfN = Arbitrary(Gen.containerOfN[Set, String](n, arb[String]))
-      check(GroupLaws[Vector[Int]].monoid(sliding(n)).all)
-      check(GroupLaws[Set[String]].monoid(sliding(n)).all)
+      for ((_, prop) <- GroupLaws[Vector[Int]].monoid(sliding(n)).all.properties) check(prop)
+      for ((_, prop) <- GroupLaws[Set[String]].monoid(sliding(n)).all.properties) check(prop)
     }
 
     "for sorted sets" in {
-      check(GroupLaws[SortedSet[Int]].monoid.all)
-      check(GroupLaws[SortedSet[String]].monoid.all)
+      for ((_, prop) <- GroupLaws[SortedSet[Int]].monoid.all.properties) check(prop)
+      for ((_, prop) <- GroupLaws[SortedSet[String]].monoid.all.properties) check(prop)
     }
 
     "for reversed monoids (right to left)" in {
-      check(GroupLaws[String].monoid(reverse).all)
-      check(GroupLaws[List[Double]].monoid(reverse).all)
+      for ((_, prop) <- GroupLaws[String].monoid(reverse).all.properties) check(prop)
+      for ((_, prop) <- GroupLaws[List[Double]].monoid(reverse).all.properties) check(prop)
     }
   }
 }

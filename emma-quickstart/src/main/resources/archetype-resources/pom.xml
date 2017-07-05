@@ -1,15 +1,15 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>${groupId}</groupId>
     <artifactId>${artifactId}</artifactId>
+    <groupId>${groupId}</groupId>
     <version>${version}</version>
-    <packaging>jar</packaging>
+    <packaging>pom</packaging>
 
-    <name>Emma Quickstart</name>
-    <url>http://emma-language.org/</url>
+    <name>${artifactId}</name>
+    <description>A library of data analysis algorithms and pipelines based on Emma.</description>
+    <inceptionYear>2014</inceptionYear>
 
     <properties>
         <!-- Common -->
@@ -17,46 +17,214 @@
 
         <!-- Maven Plugins -->
         <build-helper-maven-plugin.version>1.7</build-helper-maven-plugin.version>
-        <maven-archetype-plugin.version>2.4</maven-archetype-plugin.version>
-        <maven-eclipse-plugin.version>2.9</maven-eclipse-plugin.version>
-        <maven-jar-plugin.version>2.5</maven-jar-plugin.version>
+        <maven-archetype-plugin.version>3.0.0</maven-archetype-plugin.version>
+        <maven-deploy-plugin.version>2.8.2</maven-deploy-plugin.version>
+        <maven-eclipse-plugin.version>2.10</maven-eclipse-plugin.version>
+        <maven-gpg-plugin.version>1.6</maven-gpg-plugin.version>
+        <maven-install-plugin.version>2.5.2</maven-install-plugin.version>
+        <maven-jar-plugin.version>3.0.2</maven-jar-plugin.version>
+        <maven-javadoc-plugin.version>2.10.3</maven-javadoc-plugin.version>
+        <maven-project-info-reports.version>2.9</maven-project-info-reports.version>
+        <maven-site-plugin.version>3.5.1</maven-site-plugin.version>
         <maven-shade-plugin.version>2.4.1</maven-shade-plugin.version>
         <maven-surefire-plugin.version>2.18.1</maven-surefire-plugin.version>
-        <scala-maven-plugin.version>3.2.0</scala-maven-plugin.version>
+        <maven-source-plugin.version>2.4</maven-source-plugin.version>
+        <scala-maven-plugin.version>3.2.2</scala-maven-plugin.version>
+        <scalastyle-maven-plugin.version>0.8.0</scalastyle-maven-plugin.version>
+        <scalatest-maven-plugin.version>1.0</scalatest-maven-plugin.version>
+
+        <!-- Predicates -->
+        <skipTests>false</skipTests>
+        <scala-maven-plugin.skip>true</scala-maven-plugin.skip>
+        <scalastyle-maven-plugin.skip>true</scalastyle-maven-plugin.skip>
+        <scalatest-maven-plugin.skip>true</scalatest-maven-plugin.skip>
 
         <!-- Java -->
-        <java.version>1.7</java.version>
+        <java.version>1.8</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
 
         <!-- Scala -->
-        <scala.version>2.11.7</scala.version>
+        <scala.version>2.11.11</scala.version>
         <scala.tools.version>2.11</scala.tools.version>
 
         <!-- Emma -->
-        <emma.version>1.0-SNAPSHOT</emma.version>
+        <emma.version>0.2-SNAPSHOT</emma.version>
         <!-- Hadoop -->
-        <hadoop.version>2.2.0</hadoop.version>
+        <hadoop.version>2.8.0</hadoop.version>
         <!-- Flink -->
-        <flink.version>0.9-SNAPSHOT</flink.version>
+        <flink.version>1.2.1</flink.version>
         <!-- Spark -->
-        <spark.version>1.3.1</spark.version>
+        <spark.version>2.1.0</spark.version>
+        <spark.indexedrdd.version>0.4.0</spark.indexedrdd.version>
+        <!-- Parquet -->
+        <parquet.version>1.9.0</parquet.version>
 
         <!-- Logging -->
         <log4j.version>1.2.17</log4j.version>
-        <slf4j.version>1.7.9</slf4j.version>
+        <slf4j.version>1.7.25</slf4j.version>
         <scala-logging.version>2.1.2</scala-logging.version>
 
         <!-- Testing -->
-        <junit.version>4.11</junit.version>
-        <scalacheck.version>1.12.5</scalacheck.version>
-        <scalatest.version>2.1.5</scalatest.version>
+        <junit.version>4.12</junit.version>
+        <scalatest.version>3.0.3</scalatest.version>
 
         <!-- Other dependencies -->
-        <argparse4j.version>0.4.4</argparse4j.version>
-        <reflections.version>0.9.9</reflections.version>
+        <scopt.version>3.5.0</scopt.version>
+        <scala-arm.version>2.0</scala-arm.version>
+
+        <!-- Test configuration -->
+        <scala.scope>provided</scala.scope>
+        <spark.scope>provided</spark.scope>
+        <flink.scope>provided</flink.scope>
+        <hadoop.scope>provided</hadoop.scope>
     </properties>
 
+    <repositories>
+        <!-- Spark Packages Repo -->
+        <repository>
+            <id>spark</id>
+            <url>http://dl.bintray.com/spark-packages/maven</url>
+        </repository>
+    </repositories>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Project -->
+            <dependency>
+                <groupId>${groupId}</groupId>
+                <artifactId>${rootArtifactId}-library</artifactId>
+                <version>${version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${groupId}</groupId>
+                <artifactId>${rootArtifactId}-flink</artifactId>
+                <version>${version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${groupId}</groupId>
+                <artifactId>${rootArtifactId}-spark</artifactId>
+                <version>${version}</version>
+            </dependency>
+            <!-- Project (test-jars) -->
+            <dependency>
+                <groupId>${groupId}</groupId>
+                <artifactId>${rootArtifactId}-library</artifactId>
+                <version>${version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
+
+            <!-- Emma -->
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-language</artifactId>
+                <version>${emma.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-flink</artifactId>
+                <version>${emma.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-spark</artifactId>
+                <version>${emma.version}</version>
+            </dependency>
+            <!-- Emma (test jars) -->
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-language</artifactId>
+                <version>${emma.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
+
+            <!-- Hadoop -->
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-common</artifactId>
+                <version>${hadoop.version}</version>
+                <scope>${hadoop.scope}</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-hdfs</artifactId>
+                <version>${hadoop.version}</version>
+                <scope>${hadoop.scope}</scope>
+            </dependency>
+
+            <!-- Flink -->
+            <dependency>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-scala_${scala.tools.version}</artifactId>
+                <version>${flink.version}</version>
+                <scope>${flink.scope}</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.flink</groupId>
+                <artifactId>flink-clients_${scala.tools.version}</artifactId>
+                <version>${flink.version}</version>
+                <scope>${flink.scope}</scope>
+            </dependency>
+
+            <!-- Spark -->
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-core_${scala.tools.version}</artifactId>
+                <version>${spark.version}</version>
+                <scope>${spark.scope}</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-sql_${scala.tools.version}</artifactId>
+                <version>${spark.version}</version>
+                <scope>${spark.scope}</scope>
+            </dependency>
+            <dependency>
+                <groupId>amplab</groupId>
+                <artifactId>spark-indexedrdd</artifactId>
+                <version>${spark.indexedrdd.version}</version>
+                <scope>${spark.scope}</scope>
+            </dependency>
+
+            <!-- Parquet -->
+            <dependency>
+                <groupId>org.apache.parquet</groupId>
+                <artifactId>parquet-common</artifactId>
+                <version>${parquet.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.parquet</groupId>
+                <artifactId>parquet-encoding</artifactId>
+                <version>${parquet.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.parquet</groupId>
+                <artifactId>parquet-column</artifactId>
+                <version>${parquet.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.parquet</groupId>
+                <artifactId>parquet-hadoop</artifactId>
+                <version>${parquet.version}</version>
+            </dependency>
+
+            <!-- Arguments parsing -->
+            <dependency>
+                <groupId>com.github.scopt</groupId>
+                <artifactId>scopt_${scala.tools.version}</artifactId>
+                <version>${scopt.version}</version>
+            </dependency>
+
+            <!-- Auto-Resource Management -->
+            <dependency>
+                <groupId>com.jsuereth</groupId>
+                <artifactId>scala-arm_${scala.tools.version}</artifactId>
+                <version>${scala-arm.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <dependencies>
         <!-- Scala -->
@@ -64,45 +232,19 @@
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-library</artifactId>
             <version>${scala.version}</version>
+            <scope>${scala.scope}</scope>
         </dependency>
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-compiler</artifactId>
             <version>${scala.version}</version>
+            <scope>${scala.scope}</scope>
         </dependency>
         <dependency>
             <groupId>org.scala-lang</groupId>
             <artifactId>scala-reflect</artifactId>
             <version>${scala.version}</version>
-        </dependency>
-
-        <!-- Emma -->
-        <dependency>
-            <groupId>org.emmalanguage</groupId>
-            <artifactId>emma-language</artifactId>
-            <version>${emma.version}</version>
-        </dependency>
-        <!-- Emma (test jars) -->
-        <dependency>
-            <groupId>org.emmalanguage</groupId>
-            <artifactId>emma-language</artifactId>
-            <version>${emma.version}</version>
-            <type>test-jar</type>
-            <scope>test</scope>
-        </dependency>
-
-        <!-- Hadoop -->
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-common</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.hadoop</groupId>
-            <artifactId>hadoop-hdfs</artifactId>
-            <version>${hadoop.version}</version>
-            <scope>provided</scope>
+            <scope>${scala.scope}</scope>
         </dependency>
 
         <!-- Logging -->
@@ -135,133 +277,15 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.scalacheck</groupId>
-            <artifactId>scalacheck_${scala.tools.version}</artifactId>
-            <version>${scalacheck.version}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.scalatest</groupId>
             <artifactId>scalatest_${scala.tools.version}</artifactId>
             <version>${scalatest.version}</version>
             <scope>test</scope>
         </dependency>
-
-        <!-- Arguments parsing -->
-        <dependency>
-            <groupId>net.sourceforge.argparse4j</groupId>
-            <artifactId>argparse4j</artifactId>
-            <version>${argparse4j.version}</version>
-        </dependency>
-
-        <!-- Dynamic loading -->
-        <dependency>
-            <groupId>org.reflections</groupId>
-            <artifactId>reflections</artifactId>
-            <version>${reflections.version}</version>
-        </dependency>
     </dependencies>
-
-    <!-- profiles are used to set dependencies to provided when building a jar -->
-    <profiles>
-        <profile>
-            <id>flink</id>
-            <activation>
-                <activeByDefault>false</activeByDefault>
-            </activation>
-            <dependencies>
-                <!-- Emma -->
-                <dependency>
-                    <groupId>org.emmalanguage</groupId>
-                    <artifactId>emma-flink</artifactId>
-                    <version>${emma.version}</version>
-                </dependency>
-                <!-- Flink -->
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-scala_${scala.tools.version}</artifactId>
-                    <version>${flink.version}</version>
-                    <scope>provided</scope>
-                </dependency>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-java_${scala.tools.version}</artifactId>
-                    <version>${flink.version}</version>
-                    <scope>provided</scope>
-                </dependency>
-                <dependency>
-                    <groupId>org.apache.flink</groupId>
-                    <artifactId>flink-clients_${scala.tools.version}</artifactId>
-                    <version>${flink.version}</version>
-                    <scope>provided</scope>
-                </dependency>
-            </dependencies>
-        </profile>
-        <profile>
-            <id>spark</id>
-            <activation>
-                <activeByDefault>false</activeByDefault>
-            </activation>
-            <dependencies>
-                <!-- Emma -->
-                <dependency>
-                    <groupId>org.emmalanguage</groupId>
-                    <artifactId>emma-spark</artifactId>
-                    <version>${emma.version}</version>
-                </dependency>
-                <!-- Spark -->
-                <dependency>
-                    <groupId>org.apache.spark</groupId>
-                    <artifactId>spark-core_${scala.tools.version}</artifactId>
-                    <version>${spark.version}</version>
-                    <scope>provided</scope>
-                </dependency>
-                <!-- Guava -->
-                <dependency>
-                    <groupId>com.google.guava</groupId>
-                    <artifactId>guava</artifactId>
-                    <version>18.0</version>
-                </dependency>
-            </dependencies>
-        </profile>
-    </profiles>
 
     <build>
         <plugins>
-            <!-- Shade Package (Create flink with dependencies) -->
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-shade-plugin</artifactId>
-                <version>${maven-shade-plugin.version}</version>
-                <executions>
-                    <execution>
-                        <id>shade-package</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>shade</goal>
-                        </goals>
-                        <configuration>
-                            <minimizeJar>false</minimizeJar>
-                            <transformers>
-                                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                                    <mainClass>eu.stratosphere.emma.examples.Application</mainClass>
-                                </transformer>
-                            </transformers>
-                            <artifactSet>
-                                <excludes>
-                                    <exclude>org.apache.hadoop:*</exclude>
-                                    <exclude>org.apache.spark:*</exclude>
-                                    <exclude>org.apache.flink:*</exclude>
-                                    <exclude>org.scala-lang:*</exclude>
-                                    <exclude>com.google.guava:*</exclude>
-                                    <exclude>org.slf4j:slf4j-log4j12</exclude>
-                                </excludes>
-                            </artifactSet>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
-
             <!-- Scala compiler -->
             <plugin>
                 <groupId>net.alchim31.maven</groupId>
@@ -289,18 +313,41 @@
                     </execution>
                 </executions>
                 <configuration>
+                    <!-- Predicated plugin -->
+                    <skip>${scala-maven-plugin.skip}</skip>
+                    <!-- Configuration -->
+                    <scalaCompatVersion>${scala.tools.version}</scalaCompatVersion>
+                    <scalaVersion>${scala.version}</scalaVersion>
                     <recompileMode>incremental</recompileMode>
                     <useZincServer>true</useZincServer>
+                    <compilerPlugins>
+                        <compilerPlugin>
+                            <groupId>org.scalamacros</groupId>
+                            <artifactId>paradise_${scala.version}</artifactId>
+                            <version>2.1.0</version>
+                        </compilerPlugin>
+                    </compilerPlugins>
                     <jvmArgs>
-                        <jvmArg>-Xms128m</jvmArg>
+                        <jvmArg>-Xms256m</jvmArg>
                         <jvmArg>-Xmx512m</jvmArg>
+                        <jvmArg>-Xss16m</jvmArg>
+                        <jvmArg>-XX:+UseConcMarkSweepGC</jvmArg>
+                        <jvmArg>-XX:+CMSClassUnloadingEnabled</jvmArg>
+                    </jvmArgs>
+                    <javacArgs>
                         <javacArg>-Xlint:unchecked</javacArg>
                         <javacArg>-Xlint:deprecation</javacArg>
-                    </jvmArgs>
+                    </javacArgs>
                     <args>
                         <arg>-unchecked</arg>
                         <arg>-deprecation</arg>
                         <arg>-feature</arg>
+                        <arg>-Yrangepos</arg>
+                        <arg>-Ywarn-unused-import</arg>
+                        <arg>-Xmax-classfile-name</arg>
+                        <arg>140</arg>
+                        <arg>-Xlint:-adapted-args,_</arg>
+                        <!--<arg>-Xdisable-assertions</arg>-->
                     </args>
                 </configuration>
             </plugin>
@@ -367,39 +414,153 @@
                 </executions>
             </plugin>
 
-            <!-- Creating code generation folder on the fly -->
-            <plugin>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>generate-sources</id>
-                        <phase>generate-sources</phase>
-                        <configuration>
-                            <tasks>
-                                <mkdir dir="${java.io.tmpdir}/emma/codegen"/>
-                            </tasks>
-                        </configuration>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
-            <!-- Adding code generation folder to JUnit tests -->
+            <!-- Disable surefire -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven-surefire-plugin.version}</version>
                 <configuration>
-                    <additionalClasspathElements>
-                        <additionalClasspathElement>${java.io.tmpdir}/emma/codegen</additionalClasspathElement>
-                    </additionalClasspathElements>
-                    <systemPropertyVariables>
-                        <emma.test.macro.toolboxcp>${project.basedir}/target/classes</emma.test.macro.toolboxcp>
-                    </systemPropertyVariables>
+                    <skipTests>true</skipTests>
                 </configuration>
             </plugin>
+
+            <!-- Enable scalatest -->
+            <plugin>
+                <groupId>org.scalatest</groupId>
+                <artifactId>scalatest-maven-plugin</artifactId>
+                <version>${scalatest-maven-plugin.version}</version>
+                <configuration>
+                    <!-- Predicated plugin -->
+                    <skipTests>${scalatest-maven-plugin.skip}</skipTests>
+                    <!-- Adding code generation folder to the classpath -->
+                    <runpath>${java.io.tmpdir}/emma/codegen/</runpath>
+                    <!-- Memory for the Travis build -->
+                    <argLine>-Xms3096m -Xms3096m -XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled</argLine>
+                    <!-- Reporters configuration -->
+                    <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+                    <junitxml>.</junitxml>
+                    <filereports>WDF TestSuite.txt</filereports>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>test</id>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <suffixes>(?&lt;!Integration)(Test|Spec)</suffixes>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>integration-test</id>
+                        <phase>integration-test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <suffixes>(?&lt;=Integration)(Test|Spec)</suffixes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Scala style check -->
+            <plugin>
+                <groupId>org.scalastyle</groupId>
+                <artifactId>scalastyle-maven-plugin</artifactId>
+                <version>${scalastyle-maven-plugin.version}</version>
+                <configuration>
+                    <!-- Predicated plugin -->
+                    <skip>${scalastyle-maven-plugin.skip}</skip>
+                    <!-- Configuration -->
+                    <verbose>false</verbose>
+                    <failOnViolation>true</failOnViolation>
+                    <failOnWarning>true</failOnWarning>
+                    <includeTestSourceDirectory>true</includeTestSourceDirectory>
+                    <sourceDirectory>${project.basedir}/src/main/scala</sourceDirectory>
+                    <testSourceDirectory>${project.basedir}/src/test/scala</testSourceDirectory>
+                    <detail>true</detail>
+                    <configLocation>${user.dir}/scalastyle_config.xml</configLocation>
+                    <outputFile>${project.build.directory}/scalastyle-output.xml</outputFile>
+                    <outputEncoding>UTF-8</outputEncoding>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Check for proper LICENSE header -->
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <version>3.0</version>
+                <executions>
+                    <execution>
+                        <id>check-license</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <skip>true</skip><!-- Remove this to enable plugin -->
+                        </configuration>
+                    </execution>
+                </executions>
+                <configuration>
+                    <header>com/mycila/maven/plugin/license/templates/APACHE-2.txt</header>
+                    <properties>
+                        <owner>TU Berlin</owner>
+                        <email>emma@dima.tu-berlin.de</email>
+                    </properties>
+                    <excludes>
+                        <exclude>**/LICENSE</exclude>
+                        <exclude>**/NOTICE*</exclude>
+                        <exclude>**/README.md</exclude>
+                        <exclude>**/**.ipynb</exclude>
+                        <exclude>**/scalastyle_config.xml</exclude>
+                        <exclude>src/test/resources/**</exclude>
+                        <exclude>src/main/resources/**</exclude>
+                    </excludes>
+                    <mapping>
+                        <scala>SLASHSTAR_STYLE</scala>
+                        <java>SLASHSTAR_STYLE</java>
+                    </mapping>
+                </configuration>
+            </plugin>
+
+            <!-- Maven Archetype -->
+            <plugin>
+                <artifactId>maven-archetype-plugin</artifactId>
+                <version>${maven-archetype-plugin.version}</version><!--$NO-MVN-MAN-VER$-->
+            </plugin>
         </plugins>
+
+        <pluginManagement>
+            <plugins>
+                <!-- Shade Package (Create package with dependencies) -->
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-shade-plugin</artifactId>
+                    <version>${maven-shade-plugin.version}</version>
+                    <executions>
+                        <execution>
+                            <id>shade-package</id>
+                            <phase>package</phase>
+                            <goals>
+                                <goal>shade</goal>
+                            </goals>
+                            <configuration>
+                                <minimizeJar>false</minimizeJar>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
+            </plugins>
+        </pluginManagement>
     </build>
+
 </project>

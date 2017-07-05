@@ -24,8 +24,8 @@ import scala.collection.breakOut
 private[core] trait DCE extends Common {
   self: Core =>
 
-  import UniverseImplicits._
   import Core.{Lang => core}
+  import UniverseImplicits._
 
   private[core] object DCE {
 
@@ -62,7 +62,7 @@ private[core] trait DCE extends Common {
           val liveRefs = vals.foldRight(refs(expr) | refsInDefs) {
             // When we have a DefCall that is returning a unit, then treat this val as used
             case (core.ValDef(lhs, rhs @ api.DefCall(_, method, _, _)), live)
-              if method.returnType =:= api.Type[Unit] => live | refs(rhs) + lhs
+              if maybeMutable(method) => live | refs(rhs) + lhs
             case (core.ValDef(lhs, rhs), live) =>
               if (live(lhs)) live | refs(rhs) else live
           }
@@ -72,5 +72,11 @@ private[core] trait DCE extends Common {
           if (liveVals.size == vals.size && liveDefs.size == defs.size) let
           else core.Let(liveVals, liveDefs, expr)
       }.andThen(_.tree)
+
+    private def maybeMutable(method: u.MethodSymbol): Boolean = {
+      method.returnType =:= api.Type[Unit]
+    } || {
+      API.MutableBag.update == method
+    }
   }
 }

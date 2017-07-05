@@ -1,0 +1,30 @@
+{
+  "QUERY_PLAN":
+  {
+    "OPERATOR_NAME": "SORT_BY",
+    "SORT_COLUMNS": [
+      {
+        "TABLE_NAME": "<COMPUTED>",
+        "COLUMN_NAME": "REVENUE",
+        "ATTRIBUTE_TYPE": "DOUBLE",
+        "VERSION": 1,
+        "RESULT_NAME": "REVENUE",
+        "ORDER": "DESCENDING"
+      },
+      {
+        "TABLE_NAME": "ORDERS",
+        "COLUMN_NAME": "O_ORDERDATE",
+        "ATTRIBUTE_TYPE": "DATE",
+        "VERSION": 1,
+        "RESULT_NAME": "O_ORDERDATE",
+        "ORDER": "ASCENDING"
+      }
+    ],
+    "LEFT_CHILD": {
+      "OPERATOR_NAME": "TABLE_SCAN",
+      "TABLE_NAME": "CUSTOMER",
+      "VERSION": 1
+    },
+    "RIGHT_CHILD": null
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "QUERY_PLAN":{
+    "OPERATOR_NAME":"EXPORT_INTO_FILE",
+    "PATH_TO_DATA_FILE": "filename.csv",
+    "FIELD_SEPARATOR": ",",
+    "LEFT_CHILD": {
+      "OPERATOR_NAME": "TABLE_SCAN",
+      "TABLE_NAME":  "CUSTOMER",
+      "VERSION": 1
+    },
+    "RIGHT_CHILD": null
+  }
+}

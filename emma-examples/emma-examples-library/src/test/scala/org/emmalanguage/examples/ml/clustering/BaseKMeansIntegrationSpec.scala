@@ -30,7 +30,7 @@ import java.io.File
 trait BaseKMeansIntegrationSpec extends FlatSpec with Matchers with BeforeAndAfter {
 
   val codegenDir = tempPath("codegen")
-  val dir = "/clustering/kmeans"
+  val dir = "/ml/clustering/kmeans"
   val path = tempPath(dir)
   val epsilon = 1e-3
   val iterations = 10
@@ -50,7 +50,7 @@ trait BaseKMeansIntegrationSpec extends FlatSpec with Matchers with BeforeAndAft
     deleteRecursive(new File(path))
   }
 
-  "KMeans" should "cluster points around the corners of a hypercube" in {
+  it should "cluster points around the corners of a hypercube" in {
     val exp =
       clusters(for {
         line <- Source.fromFile(s"$path/clusters.tsv").getLines().toSet[String]
@@ -62,7 +62,7 @@ trait BaseKMeansIntegrationSpec extends FlatSpec with Matchers with BeforeAndAft
     val act =
       clusters(for {
         s <- kMeans(exp.size, epsilon, iterations, s"$path/points.tsv")
-      } yield (s.point.id, s.clusterID))
+      } yield (s.id, s.label.id))
 
     val correctClusters = for {
       act <- act

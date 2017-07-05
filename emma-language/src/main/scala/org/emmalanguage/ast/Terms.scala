@@ -20,12 +20,14 @@ trait Terms { this: AST =>
 
   trait TermAPI { this: API =>
 
-    import universe._
+    import u._
     import internal._
     import reificationSupport._
 
     /** Term names. */
     object TermName extends Node {
+
+      private val regex = s"(.*)\\$$$freshNameSuffix(\\d+)".r
 
       // Predefined term names
       lazy val anon      = apply("anon")
@@ -61,22 +63,23 @@ trait Terms { this: AST =>
       }
 
       /** Creates a fresh term name with the given `prefix`. */
-      def fresh(prefix: String): u.TermName = apply {
+      def fresh(prefix: String = "x"): u.TermName = apply {
         assert(prefix.nonEmpty, "Cannot create a fresh name with empty prefix")
         freshTermName(s"$prefix$$$freshNameSuffix")
       }
 
       /** Creates a fresh term name with the given `prefix`. */
-      def fresh(prefix: u.Name): u.TermName = {
-        assert(is.defined(prefix), "Undefined prefix")
-        fresh(prefix.toString)
-      }
+      def fresh(prefix: u.Name): u.TermName =
+        if (is.defined(prefix)) fresh(prefix.toString) else fresh()
 
       /** Creates a fresh term name with the given symbol's name as `prefix`. */
-      def fresh(prefix: u.Symbol): u.TermName = {
-        assert(is.defined(prefix), "Undefined prefix")
-        assert(has.nme(prefix),   s"Prefix $prefix has no name")
-        fresh(prefix.name)
+      def fresh(prefix: u.Symbol): u.TermName =
+        if (is.defined(prefix)) fresh(prefix.name) else fresh()
+
+      /** Tries to return the original name used to create this `fresh` name. */
+      def original(fresh: u.Name): (u.TermName, Int) = fresh match {
+        case u.TermName(regex(original, i)) => u.TermName(original) -> i.toInt
+        case _ => fresh.toTermName -> 0
       }
 
       def unapply(name: u.TermName): Option[String] =
@@ -104,7 +107,7 @@ trait Terms { this: AST =>
         assert(is.defined(nme), s"$this name is not defined")
         assert(is.defined(tpe),  s"$this type is not defined")
         val sym = newTermSymbol(own, TermName(nme), pos, flg)
-        setInfo(sym, tpe.dealias.widen)
+        setInfo(sym, tpe.dealias)
         setAnnotations(sym, ans.toList)
       }
 
@@ -116,7 +119,7 @@ trait Terms { this: AST =>
         assert(is.defined(name), s"$this name is not defined")
         assert(is.defined(tpe),  s"$this type is not defined")
         val free = internal.newFreeTerm(TermName(name).toString, null, flg, null)
-        setInfo(free, tpe.dealias.widen)
+        setInfo(free, tpe.dealias)
         setAnnotations(free, ans.toList)
       }
 
@@ -228,13 +231,8 @@ trait Terms { this: AST =>
       }
     }
 
-    /**
-     * Term accesses (values, variables, parameters and modules).
-     *
-     * NOTE: All terms except fields with `private[this]` visibility and objects are accessed via
-     * getter methods (thus covered by [[DefCall]]).
-     */
-    private[ast] object TermAcc extends Node {
+    /** Term accesses (modules and private[this] values and variables). */
+    object TermAcc extends Node {
 
       /**
        * Creates a type-checked term access.

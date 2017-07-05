@@ -1,0 +1,52 @@
+{
+  "OPERATOR_NAME": "GENERIC_GROUPBY",
+  "GROUPING_COLUMNS": [
+    {
+      "ATTRIBUTE_REFERENCE": {
+        "TABLE_NAME": "LINEITEM",
+        "COLUMN_NAME": "L_ORDERKEY",
+        "VERSION": 1,
+        "RESULT_NAME": "L_ORDERKEY",
+        "ATTRIBUTE_TYPE": "INT"
+      }
+    },
+    {
+      "ATTRIBUTE_REFERENCE": {
+        "TABLE_NAME": "ORDERS",
+        "COLUMN_NAME": "O_ORDERDATE",
+        "VERSION": 1,
+        "RESULT_NAME": "O_ORDERDATE",
+        "ATTRIBUTE_TYPE": "INT"
+      }
+    },
+    {
+      "ATTRIBUTE_REFERENCE": {
+        "TABLE_NAME": "ORDERS",
+        "COLUMN_NAME": "O_SHIPPRIORITY",
+        "VERSION": 1,
+        "RESULT_NAME": "O_SHIPPRIORITY",
+        "ATTRIBUTE_TYPE": "INT"
+      }
+    }
+  ],
+  "AGGREGATION_SPECIFICATION": [
+    {
+      "AGGREGATION_FUNCTION": "SUM",
+      "ATTRIBUTE_REFERENCE": {
+        "TABLE_NAME": "ORDER",
+        "COLUMN_NAME": "AMOUNT",
+        "VERSION": 1,
+        "RESULT_NAME": "AMOUNT",
+        "ATTRIBUTE_TYPE": "INT"
+      },
+      "RESULT_NAME": "REVENUE"
+    }
+  ],
+  "LEFT_CHILD": {
+    "OPERATOR_NAME": "TABLE_SCAN",
+    "TABLE_NAME": "CUSTOMER",
+    "VERSION": 1
+  },
+  "RIGHT_CHILD": null
+
+}

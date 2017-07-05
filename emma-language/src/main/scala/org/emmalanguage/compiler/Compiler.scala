@@ -18,11 +18,15 @@ package compiler
 
 import lang.AlphaEq
 import lang.backend.Backend
-import lang.cf.ControlFlow
 import lang.core.Core
 import lang.libsupport.LibSupport
+import lang.opt.Optimizations
 import lang.source.Source
 import tools.GraphTools
+
+import com.typesafe.config.Config
+import com.typesafe.config.ConfigFactory
+import com.typesafe.config.ConfigParseOptions
 
 import scala.reflect.api.Universe
 
@@ -37,16 +41,17 @@ trait Compiler extends AlphaEq
   with Source
   with Core
   with Backend
-  with ControlFlow
-  with GraphTools {
+  with GraphTools
+  with Optimizations {
+
+  import UniverseImplicits._
 
   /** The underlying universe object. */
-  override val universe: Universe
+  override val u: Universe
 
   /** Implicit types to be removed */
   lazy val implicitTypes: Set[u.Type] = API.implicitTypes
 
-  /** Standard pipeline prefix. Brings a tree into a form convenient for transformation. */
   lazy val preProcess: Seq[u.Tree => u.Tree] = Seq(
     Source.removeImplicits(implicitTypes),
     fixSymbolTypes,
@@ -56,20 +61,17 @@ trait Compiler extends AlphaEq
     Source.normalize
   )
 
-  /** Standard pipeline suffix. Brings a tree into a form acceptable for `scalac` after being transformed. */
   lazy val postProcess: Seq[u.Tree => u.Tree] = Seq(
     api.Owner.atEncl,
     qualifyStatics,
     restoreTypeTrees
   )
 
-  /** The identity transformation with pre- and post-processing. */
-  def identity(typeCheck: Boolean = false): u.Tree => u.Tree =
-    pipeline(typeCheck)()
-
-  /** Combines a sequence of `transformations` into a pipeline with pre- and post-processing. */
-  def pipeline(typeCheck: Boolean = false, withPre: Boolean = true, withPost: Boolean = true)
-    (transformations: (u.Tree => u.Tree)*): u.Tree => u.Tree = {
+  def pipeline(
+    typeCheck: Boolean = false, withPre: Boolean = true, withPost: Boolean = true
+  )(
+    transformations: (u.Tree => u.Tree)*
+  ): u.Tree => u.Tree = {
 
     val bld = Seq.newBuilder[u.Tree => u.Tree]
     //@formatter:off
@@ -95,4 +97,39 @@ trait Compiler extends AlphaEq
       tree
     }
   }
+
+  /** Loads a sequence of resources (in decreasing priority). */
+  protected def loadConfig(paths: Seq[String]): Config = {
+    val opts = ConfigParseOptions.defaults().setClassLoader(getClass.getClassLoader)
+
+    val sPrp = ConfigFactory.systemProperties()
+    val sEnv = ConfigFactory.systemEnvironment()
+
+    val cfgs = for {
+      p <- paths.map(_.stripPrefix("/"))
+    } yield Option(getClass.getResource(s"/$p")) match {
+      case Some(_) => ConfigFactory.parseResources(p, opts)
+      case None => abort(s"Cannot find Emma config resource `/$p`")
+    }
+
+    cfgs
+      .foldLeft(sEnv withFallback sPrp)((acc, cfg) => acc withFallback cfg)
+      .resolve()
+  }
+
+  /**
+   * Resolves a sequence of config paths to be used with [[loadConfig]]. The result
+   *
+   * - `path` :+ [[baseConfig]] if `tlPath` is some tree represenging a string literal `path`, or
+   * - [[baseConfig]] otherwise.
+   *
+   * Aborts execution with an error if `tlPath` is not a string literal.
+   */
+  protected def configPaths(tlPath: Option[u.Tree] = None): Seq[String] =
+    tlPath.fold(baseConfig)({
+      case api.Lit(path: String) => path +: baseConfig
+      case _ => abort("The provided `config` path is not a string literal.")
+    })
+
+  protected def baseConfig = Seq("reference.emma.conf")
 }

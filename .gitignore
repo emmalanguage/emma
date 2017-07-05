@@ -1,7 +1,7 @@
 .cache
 .classpath
-.idea
 .idea/*
+.idea/fileTemplates/*
 .metadata/*
 .project
 .settings
@@ -11,6 +11,25 @@ target
 *.iml
 dependency-reduced-pom.xml
 
+# Jekyll
+.sass-cache
+.jekyll-metadata
+Gemfile.lock
+_site
+
 # Ensime specific
 .ensime
 .ensime_cache
+
+# Include some IntelliJ settings
+!.idea/codeStyleSettings.xml
+!.idea/copyright/
+!.idea/fileTemplates/
+!.idea/fileTemplates/internal/
+!.idea/inspectionProfiles/
+!.idea/fileTemplates/internal/
+
+#cogadb specific
+output
+cogascript_timings.log
+minimal_api_c.debug.h.pch

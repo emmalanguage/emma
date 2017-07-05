@@ -22,9 +22,9 @@ import compiler.Common
 private[core] trait CoreValidate extends Common {
   self: Core =>
 
-  import universe._
-  import Validation._
   import Core.{Lang => core}
+  import UniverseImplicits._
+  import Validation._
 
   /** Validation for the [[Core]] language. */
   private[core] object CoreValidate {
@@ -45,10 +45,9 @@ private[core] trait CoreValidate extends Common {
     object valid {
 
       /** Validates that a Scala AST belongs to the supported [[Core]] language. */
-      // TODO: Narrow scope of valid top-level trees
-      def apply(tree: Tree): Verdict = {
+      def apply(tree: u.Tree): Verdict = {
         assert(has.tpe(tree), "Core.validate can only be used on typechecked trees.")
-        tree is oneOf(Term, Let) otherwise "Unexpected tree"
+        tree is Let otherwise "Unexpected tree (expected let-in block)"
       }
 
       // ---------------------------------------------------------------------------
@@ -59,8 +58,9 @@ private[core] trait CoreValidate extends Common {
         case core.Lit(_) => pass
       }
 
-      lazy val Ref: Validator =
-        oneOf(BindingRef, ModuleRef)
+      lazy val Ref: Validator = {
+        case core.Ref(x) if !x.isVar => pass
+      }
 
       lazy val This: Validator = {
         case core.This(_) => pass
@@ -105,19 +105,6 @@ private[core] trait CoreValidate extends Common {
         oneOf(ValDef, ParDef)
 
       // ---------------------------------------------------------------------------
-      // Modules
-      // ---------------------------------------------------------------------------
-
-      lazy val ModuleRef: Validator = {
-        case core.ModuleRef(_) => pass
-      }
-
-      lazy val ModuleAcc: Validator = {
-        case core.ModuleAcc(target, _) =>
-          target is Atomic otherwise s"Invalid ${core.ModuleAcc} target"
-      }
-
-      // ---------------------------------------------------------------------------
       // Methods
       // ---------------------------------------------------------------------------
 
@@ -150,6 +137,11 @@ private[core] trait CoreValidate extends Common {
       // Terms
       // ---------------------------------------------------------------------------
 
+      lazy val TermAcc: Validator = {
+        case core.TermAcc(target, _) =>
+          target is Atomic otherwise s"Invalid ${core.TermAcc} target"
+      }
+
       lazy val Branch: Validator = {
         case core.Branch(cond, thn, els) => {
           cond is Atomic otherwise s"Invalid ${core.Branch} condition"
@@ -177,7 +169,7 @@ private[core] trait CoreValidate extends Common {
       }
 
       lazy val Term: Validator =
-        oneOf(Atomic, ModuleAcc, Inst, DefCall, Branch, Lambda, TypeAscr)
+        oneOf(Atomic, TermAcc, Inst, DefCall, Branch, Lambda, TypeAscr)
 
       // ---------------------------------------------------------------------------
       // Let-in blocks

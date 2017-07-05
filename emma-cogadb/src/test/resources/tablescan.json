@@ -1,0 +1,8 @@
+{
+  "QUERY_PLAN":
+  {
+    "OPERATOR_NAME": "TABLE_SCAN",
+    "TABLE_NAME": "CUSTOMER",
+    "VERSION": 1
+  }
+}

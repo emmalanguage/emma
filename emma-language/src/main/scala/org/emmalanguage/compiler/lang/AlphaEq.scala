@@ -18,14 +18,16 @@ package compiler.lang
 
 import compiler.Common
 
-import org.scalactic.{Bad, Good, Or}
+import org.scalactic.Bad
+import org.scalactic.Good
+import org.scalactic.Or
 
 import scala.collection.mutable
 
 /** Provides alpha equivalence for Scala ASTs. */
 trait AlphaEq extends Common {
 
-  import universe._
+  import u._
   import internal._
 
   // ---------------------------------------------------------------------------
@@ -69,7 +71,7 @@ trait AlphaEq extends Common {
     var vals = freeTerms(rhs) ::: freeTypes(rhs)
     val dict = mutable.Map(keys zip vals: _*)
 
-    /** Updates the dictionary with a alias. */
+    /* Updates the dictionary with a alias. */
     def alias(original: Symbol, alias: Symbol): Unit = {
       dict += original -> alias
       keys ::= original

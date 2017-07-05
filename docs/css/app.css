@@ -1,0 +1,127 @@
+body {
+    font-family: 'Ubuntu', sans-serif;
+    background: #fdf6e3;
+    color: #657b83;
+}
+
+strong {
+    color: #586e75;
+}
+
+a, a strong {
+    color: #268bd2;
+}
+a:hover, a:active {
+    color: #2aa198;
+}
+
+h1, h2, h3, h4, h5, h6, h7 {
+    color: #cb4b16;
+}
+
+table thead {
+    background: #073642;
+    color: #93a1a1;
+}
+
+table tbody {
+    background: #002b36;
+    color: #839496;
+}
+
+table tbody tr:nth-child(even) {
+    background: #073642;
+    color: #839496;
+}
+
+section.content-container {
+    margin: 2ex 0;
+}
+
+code, kbd {
+    border: none;
+    background: transparent;
+    color: #b58900;
+    padding-left: 0;
+    padding-right: 0;
+}
+
+.tabs {
+    background: #fdf6e3;
+    border-color: #fdf6e3;
+}
+
+.top-bar > a:hover {
+    color: #eee8d5;
+}
+.tabs-title > a {
+    color: #b58900;
+}
+.tabs-title > a:hover {
+    background: #002b36;
+    color: #eee8d5;
+}
+.tabs-title > a:focus, .tabs-title > a[aria-selected='true'] {
+    background: #002b36;
+    color: #b58900;
+}
+
+.highlight {
+    padding: 1ex 1em;
+    margin: 1ex 0em 2ex 0em;
+}
+
+.highlight code {
+    background-color: inherit;
+    font-family: inherit;
+    color: inherit;
+    border: inherit;
+    font-weight: inherit;
+    font-size: inherit;
+    margin: 0;
+    padding: 0;
+}
+
+.tabs-panel {
+    padding: 0;
+}
+
+.tabs-panel .highlight {
+    margin: 0;
+}
+
+.snippets-content {
+    margin-bottom: 2ex;
+}
+
+.top-bar {
+    border-bottom: 1ex solid #cb4b16;
+}
+
+.top-bar, .top-bar ul {
+    background: #002b36;
+}
+
+.top-bar a {
+    color: #b58900;
+}
+
+.top-bar a:hover {
+    color: #eee8d5;
+}
+
+.top-bar a.emma {
+    font-family: 'Lobster', cursive;
+    background: url("../img/silhouette.yellow.gif") no-repeat left center;
+    background-size: contain;
+    padding-left: 2em !important;
+    margin-left: 1rem;
+}
+
+h1 {
+    font-family: 'Lobster', cursive;
+    background: url("../img/silhouette.orange.gif") no-repeat left center;
+    background-size: contain;
+    padding: 0.2em 0 0.2em 1.5em;
+    margin-bottom: 1.5rem;
+}

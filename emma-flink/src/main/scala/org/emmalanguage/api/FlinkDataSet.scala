@@ -16,24 +16,27 @@
 package org.emmalanguage
 package api
 
+import alg.Alg
 import compiler.RuntimeCompiler
-import io.csv._
-import io.parquet._
 
-import org.apache.flink.api.java.io.TypeSerializerInputFormat
-import org.apache.flink.api.java.io.TypeSerializerOutputFormat
+import org.apache.flink.api.common.functions.RichMapPartitionFunction
 import org.apache.flink.api.scala.DataSet
+import org.apache.flink.api.scala.utils.DataSetUtils
 import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
+import org.apache.flink.configuration.Configuration
 import org.apache.flink.core.fs.FileSystem
+import org.apache.flink.util.Collector
 
-import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
 
-import java.net.URI
+import java.lang
 
 /** A `DataBag` implementation backed by a Flink `DataSet`. */
-class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSet[A]) extends DataBag[A] {
+class FlinkDataSet[A: Meta] private[api]
+(
+  @transient private[emmalanguage] val rep: DataSet[A]
+) extends DataBag[A] {
 
   import FlinkDataSet.typeInfoForType
   import FlinkDataSet.wrap
@@ -41,16 +44,16 @@ class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSe
 
   @transient override val m = implicitly[Meta[A]]
 
-  private implicit def env = this.rep.getExecutionEnvironment
+  private[emmalanguage] implicit def env = this.rep.getExecutionEnvironment
 
   // -----------------------------------------------------
   // Structural recursion
   // -----------------------------------------------------
 
-  override def fold[B: Meta](z: B)(s: A => B, u: (B, B) => B): B = {
-    val collected = rep.map(x => s(x)).reduce(u).collect()
+  override def fold[B: Meta](alg: Alg[A, B]): B = {
+    val collected = rep.map(x => alg.init(x)).reduce(alg.plus).collect()
     assert(collected.size <= 1)
-    if (collected.isEmpty) z
+    if (collected.isEmpty) alg.zero
     else collected.head
   }
 
@@ -58,20 +61,20 @@ class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSe
   // Monad Ops
   // -----------------------------------------------------
 
-  override def map[B: Meta](f: (A) => B): FlinkDataSet[B] =
+  override def map[B: Meta](f: (A) => B): DataBag[B] =
     rep.map(f)
 
-  override def flatMap[B: Meta](f: (A) => DataBag[B]): FlinkDataSet[B] =
-    rep.flatMap((x: A) => f(x).fetch())
+  override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
+    rep.flatMap((x: A) => f(x).collect())
 
-  def withFilter(p: (A) => Boolean): FlinkDataSet[A] =
+  def withFilter(p: (A) => Boolean): DataBag[A] =
     rep.filter(p)
 
   // -----------------------------------------------------
   // Grouping
   // -----------------------------------------------------
 
-  override def groupBy[K: Meta](k: (A) => K): FlinkDataSet[Group[K, DataBag[A]]] =
+  override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
     rep.groupBy(k).reduceGroup((it: Iterator[A]) => {
       val buffer = it.toBuffer // This is because the iterator might not be serializable
       Group(k(buffer.head), DataBag(buffer))
@@ -81,34 +84,72 @@ class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSe
   // Set operations
   // -----------------------------------------------------
 
-  override def union(that: DataBag[A]): FlinkDataSet[A] = that match {
-    case dbag: ScalaSeq[A] => this.rep union FlinkDataSet(dbag.rep).rep
+  override def union(that: DataBag[A]): DataBag[A] = that match {
+    case dbag: ScalaSeq[A] => this union FlinkDataSet(dbag.rep)
     case dbag: FlinkDataSet[A] => this.rep union dbag.rep
     case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
 
-  override def distinct: FlinkDataSet[A] =
+  override def distinct: DataBag[A] =
     rep.distinct
+
+  // -----------------------------------------------------
+  // Partition-based Ops
+  // -----------------------------------------------------
+
+  def sample(k: Int, seed: Long = 5394826801L): Vector[A] = {
+    // sample per partition and sorted by partition ID
+    val Seq(hd, tl@_*) = new DataSetUtils(rep).zipWithIndex
+      .mapPartition(new RichMapPartitionFunction[(Long, A), (Int, Array[Option[A]])] {
+        @transient private var pid = 0
+
+        override def open(parameters: Configuration) = {
+          super.open(parameters)
+          pid = getRuntimeContext.getIndexOfThisSubtask
+        }
+
+        import scala.collection.JavaConversions._
+
+        def mapPartition(it: lang.Iterable[(Long, A)], out: Collector[(Int, Array[Option[A]])]) = {
+          val sample = Array.fill(k)(Option.empty[A])
+          for ((i, e) <- it) {
+            if (i >= k) {
+              val j = util.RanHash(seed).at(i).nextLong(i + 1)
+              if (j < k) sample(j.toInt) = Some(e)
+            } else sample(i.toInt) = Some(e)
+          }
+          out.collect(pid -> sample)
+        }
+      }).collect().sortBy(_._1).map(_._2)
+
+    // merge the sequence of samples and filter None values
+    val rs = for {
+      Some(v) <- tl.foldLeft(hd)((xs, ys) => for ((x, y) <- xs zip ys) yield y orElse x)
+    } yield v
+
+    // convert result to vector
+    rs.toVector
+  }
+
+  def zipWithIndex(): DataBag[(A, Long)] =
+    wrap(new DataSetUtils(rep).zipWithIndex).map(_.swap)
 
   // -----------------------------------------------------
   // Sinks
   // -----------------------------------------------------
 
   override def writeCSV(path: String, format: CSV)(implicit converter: CSVConverter[A]): Unit = {
-    require(format.charset == CSV.defaultCharset,
-      s"""Unsupported `charset` value: `${format.charset}`""")
-    require(format.escape == CSV.defaultEscape,
-      s"""Unsupported `escape` character: '${format.escape.fold("")(_.toString)}'""")
-    require(format.comment == CSV.defaultComment,
-      s"""Unsupported `comment` character: '${format.comment.fold("")(_.toString)}'""")
-    require(format.nullValue == CSV.defaultNullValue,
-      s"""Unsupported `nullValue` string: "${format.nullValue}"""")
-
-    rep.writeAsCsv(
-      filePath = path,
-      fieldDelimiter = format.delimiter.toString,
-      writeMode = FileSystem.WriteMode.OVERWRITE
-    )
+    rep.mapPartition((it: Iterator[A]) => new Traversable[String] {
+      def foreach[U](f: (String) => U): Unit = {
+        val csv = CSVScalaSupport[A](format).writer()
+        val con = CSVConverter[A]
+        val rec = Array.ofDim[String](con.size)
+        for (x <- it) {
+          con.write(x, rec, 0)(format)
+          f(csv.writeRowToString(rec))
+        }
+      }
+    }).writeAsText(path, FileSystem.WriteMode.OVERWRITE)
 
     rep.getExecutionEnvironment.execute()
   }
@@ -122,9 +163,9 @@ class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSe
   def writeParquet(path: String, format: Parquet)(implicit converter: ParquetConverter[A]): Unit =
     ???
 
-  override def fetch(): Seq[A] = collect
+  override def collect(): Seq[A] = collected
 
-  private lazy val collect: Seq[A] =
+  private lazy val collected: Seq[A] =
     rep.collect()
 
   // -----------------------------------------------------
@@ -161,7 +202,7 @@ class FlinkDataSet[A: Meta] private[api](@transient private[api] val rep: DataSe
   }
 }
 
-object FlinkDataSet {
+object FlinkDataSet extends DataBagCompanion[FlinkEnv] {
 
   import org.apache.flink.api.common.typeinfo.TypeInformation
 
@@ -188,93 +229,38 @@ object FlinkDataSet {
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def empty[A: Meta](implicit flink: FlinkEnv): FlinkDataSet[A] =
-    flink.fromElements[A]()
+  def empty[A: Meta](
+    implicit flink: FlinkEnv
+  ): DataBag[A] = flink.fromElements[A]()
 
-  def apply[A: Meta](values: Seq[A])(implicit flink: FlinkEnv): FlinkDataSet[A] =
-    flink.fromCollection(values)
+  def apply[A: Meta](values: Seq[A])(
+    implicit flink: FlinkEnv
+  ): DataBag[A] = flink.fromCollection(values)
 
-  def readCSV[A: Meta](path: String, format: CSV)(implicit flink: FlinkEnv): FlinkDataSet[A] = {
-    require(format.charset == CSV.defaultCharset,
-      s"""Unsupported `charset` value: `${format.charset}`""")
-    require(format.escape == CSV.defaultEscape,
-      s"""Unsupported `escape` character: '${format.escape.fold("")(_.toString)}'""")
-    require(format.nullValue == CSV.defaultNullValue,
-      s"""Unsupported `nullValue` string: "${format.nullValue}"""")
+  def readText(path: String)(
+    implicit flink: FlinkEnv
+  ): DataBag[String] = flink.readTextFile(path)
 
-    flink.readCsvFile[A](
-      filePath = path,
-      ignoreFirstLine = format.header,
-      fieldDelimiter = s"${format.delimiter}",
-      quoteCharacter = format.quote.getOrElse[Char]('"')
-    )
-  }
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(
+    implicit flink: FlinkEnv
+  ): DataBag[A] = flink
+    .readTextFile(path, format.charset)
+    .mapPartition((it: Iterator[String]) => new Traversable[A] {
+      def foreach[U](f: (A) => U): Unit = {
+        val csv = CSVScalaSupport[A](format).parser()
+        val con = CSVConverter[A]
+        for (line <- it) f(con.read(csv.parseLine(line), 0)(format))
+      }
+    })
 
-  def readText(path: String)(implicit flink: FlinkEnv): FlinkDataSet[String] =
-    flink.readTextFile(path)
-
-  def readParquet[A: Meta](path: String, format: Parquet): DataBag[A] = ???
+  def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(
+    implicit flink: FlinkEnv
+  ): DataBag[A] = ???
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  implicit def wrap[A: Meta](rep: DataSet[A]): FlinkDataSet[A] =
+  implicit def wrap[A: Meta](rep: DataSet[A]): DataBag[A] =
     new FlinkDataSet(rep)
-
-  // ---------------------------------------------------------------------------
-  // ComprehensionCombinators
-  // (these should correspond to `compiler.ir.ComprehensionCombinators`)
-  // ---------------------------------------------------------------------------
-
-  def cross[A: Meta, B: Meta](
-    xs: DataBag[A], ys: DataBag[B]
-  )(implicit flink: FlinkEnv): FlinkDataSet[(A, B)] = (xs, ys) match {
-    case (xs: FlinkDataSet[A], ys: FlinkDataSet[B]) => xs.rep.cross(ys.rep)
-  }
-
-  def equiJoin[A: Meta, B: Meta, K: Meta](
-    keyx: A => K, keyy: B => K)(xs: DataBag[A], ys: DataBag[B]
-  )(implicit flink: FlinkEnv): FlinkDataSet[(A, B)] = {
-    val rddOf = new DataSetExtractor(flink)
-    (xs, ys) match {
-      case (rddOf(xsDS), rddOf(ysDS)) =>
-        (xsDS join ysDS) where keyx equalTo keyy
-    }
-  }
-
-  private class DataSetExtractor(flink: FlinkEnv) {
-    def unapply[A: Meta](bag: DataBag[A]): Option[DataSet[A]] = bag match {
-      case bag: FlinkDataSet[A] => Some(bag.rep)
-      case _ => Some(flink.fromCollection(bag.fetch()))
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // RuntimeOps
-  // ---------------------------------------------------------------------------
-
-  def cache[A: Meta](xs: DataBag[A])(implicit flink: FlinkEnv): DataBag[A] =
-    xs match {
-      case xs: FlinkDataSet[A] =>
-        val typeInfo = typeInfoForType[A]
-        val filePath = tempNames.next().toString
-        val outFmt = new TypeSerializerOutputFormat[A]
-        outFmt.setInputType(typeInfo, flink.getConfig)
-        outFmt.setSerializer(typeInfo.createSerializer(flink.getConfig))
-        xs.rep.write(outFmt, filePath, FileSystem.WriteMode.OVERWRITE)
-        xs.env.execute(s"emma-temp-$filePath")
-        val inFmt = new TypeSerializerInputFormat[A](typeInfo)
-        inFmt.setFilePath(filePath)
-        flink.readFile(inFmt, filePath)
-      case _ => xs
-    }
-
-  private val tempBase =
-    new URI(System.getProperty("emma.flink.temp-base", "file:///tmp/emma/flink-temp/"))
-
-  private val tempNames = Stream.iterate(0)(i => i + 1)
-    .map(i => f"dataflow$i%03d")
-    .map(s => tempBase.resolve(s).toURL)
-    .toIterator
 }

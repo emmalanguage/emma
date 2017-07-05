@@ -24,7 +24,6 @@ import examples.ml.classification._
 import examples.ml.clustering._
 import examples.ml.model._
 import examples.text._
-import io.csv._
 import util.Iso
 
 import breeze.linalg.{Vector => Vec}
@@ -32,7 +31,7 @@ import org.apache.spark.sql.SparkSession
 
 import scala.reflect.ClassTag
 
-object SparkExamplesRunner {
+object SparkExamplesRunner extends SparkAware {
 
   // ---------------------------------------------------------------------------
   // Config and helper type aliases
@@ -42,19 +41,23 @@ object SparkExamplesRunner {
   case class Config
   (
     // general parameters
-    master      : String               = "local[*]",
-    command     : Option[String]       = None,
+    master       : String               = defaultSparkConfig.master,
+    warehouseDir : String               = defaultSparkConfig.warehouseDir,
+    command      : Option[String]       = None,
     // union of all parameters bound by a command option or argument
     // (in alphabetic order)
-    csv         : CSV                  = CSV(),
-    epsilon     : Double               = 0,
-    iterations  : Int                  = 0,
-    input       : String               = System.getProperty("java.io.tmpdir"),
-    k           : Int                  = 0,
-    lambda      : Double               = 0,
-    nbModelType : NaiveBayes.ModelType = NaiveBayes.ModelType.Bernoulli,
-    output      : String               = System.getProperty("java.io.tmpdir")
-  )
+    csv          : CSV                  = CSV(),
+    epsilon      : Double               = 0,
+    iterations   : Int                  = 0,
+    input        : String               = sys.props("java.io.tmpdir"),
+    D            : Int                  = 0,
+    k            : Int                  = 0,
+    lambda       : Double               = 0,
+    nbModelType  : NaiveBayes.ModelType = NaiveBayes.ModelType.Bernoulli,
+    output       : String               = sys.props("java.io.tmpdir")
+  ) extends SparkConfig {
+    lazy val appName = s"Emma example: ${command.getOrElse("unknown")}"
+  }
   //@formatter:on
 
   // ---------------------------------------------------------------------------
@@ -72,6 +75,15 @@ object SparkExamplesRunner {
       .text("Spark master address")
 
     section("Graph Analytics")
+    cmd("connected-components")
+      .text("Label undirected graph vertices with component IDs")
+      .children(
+        arg[String]("input")
+          .text("edges path")
+          .action((x, c) => c.copy(input = x)),
+        arg[String]("output")
+          .text("labeled vertices path")
+          .action((x, c) => c.copy(output = x)))
     cmd("transitive-closure")
       .text("Compute the transitive closure of a directed graph")
       .children(
@@ -109,13 +121,14 @@ object SparkExamplesRunner {
     cmd("k-means")
       .text("K-Means Clustering")
       .children(
+        arg[Int]("D")
+          .text("number of dimensions")
+          .action((x, c) => c.copy(D = x))
+          .validate(between("D", 0, Int.MaxValue)),
         arg[Int]("k")
           .text("number of clusters")
-          .action((x, c) => c.copy(k = x)),
-        arg[Double]("epsilon")
-          .text("termination threshold")
-          .action((x, c) => c.copy(epsilon = x))
-          .validate(between("epsilon", 0, 1.0)),
+          .action((x, c) => c.copy(k = x))
+          .validate(between("k", 0, Int.MaxValue)),
         arg[Int]("iterations")
           .text("number of repeated iterations")
           .action((x, c) => c.copy(iterations = x))
@@ -145,6 +158,8 @@ object SparkExamplesRunner {
       cmd <- cfg.command
       res <- cmd match {
         // Graphs
+        case "connected-components" =>
+          Some(connectedComponents(cfg)(sparkSession(cfg)))
         case "transitive-closure" =>
           Some(transitiveClosure(cfg)(sparkSession(cfg)))
         case "triangle-count" =>
@@ -171,6 +186,16 @@ object SparkExamplesRunner {
       Iso.make(Vec.apply, _.toArray), implicitly)
 
   // Graphs
+
+  def connectedComponents(c: Config)(implicit spark: SparkSession): Unit =
+    emma.onSpark {
+      // read in set of edges to be used as input
+      val edges = DataBag.readCSV[Edge[Long]](c.input, c.csv)
+      // build the transitive closure
+      val paths = ConnectedComponents(edges)
+      // write the results into a file
+      paths.writeCSV(c.output, c.csv)
+    }
 
   def transitiveClosure(c: Config)(implicit spark: SparkSession): Unit =
     emma.onSpark {
@@ -214,14 +239,14 @@ object SparkExamplesRunner {
   def kMeans(c: Config)(implicit spark: SparkSession): Unit =
     emma.onSpark {
       // read the input
-      val points = for (line <- DataBag.readCSV[String](c.input, c.csv)) yield {
+      val points = for (line <- DataBag.readText(c.input)) yield {
         val record = line.split("\t")
-        Point(record.head.toLong, Vec(record.tail.map(_.toDouble)))
+        Point(record.head.toLong, record.tail.map(_.toDouble))
       }
       // do the clustering
-      val solution = KMeans(c.k, c.epsilon, c.iterations)(points)
-      // write the result model into a file
-      solution.writeCSV(c.output, c.csv)
+      val solution = KMeans(c.D, c.k, c.epsilon, c.iterations)(points)
+      // write the (pointID, clusterID) pairs into a file
+      solution.map(s => (s.id, s.label.id)).writeCSV(c.output, c.csv)
     }
 
   // Text
@@ -229,7 +254,7 @@ object SparkExamplesRunner {
   def wordCount(c: Config)(implicit spark: SparkSession): Unit =
     emma.onSpark {
       // read the input files and split them into lowercased words
-      val docs = DataBag.readCSV[String](c.input, c.csv)
+      val docs = DataBag.readText(c.input)
       // parse and count the words
       val counts = WordCount(docs)
       // write the results into a file
@@ -239,11 +264,6 @@ object SparkExamplesRunner {
   // ---------------------------------------------------------------------------
   // Helper methods
   // ---------------------------------------------------------------------------
-
-  private def sparkSession(c: Config): SparkSession = SparkSession.builder()
-    .master(c.master)
-    .appName(s"Emma example: c.command")
-    .getOrCreate()
 
   class Parser extends scopt.OptionParser[Config]("emma-examples") {
 

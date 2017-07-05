@@ -24,7 +24,6 @@ import examples.ml.classification._
 import examples.ml.clustering._
 import examples.ml.model._
 import examples.text._
-import io.csv._
 import util.Iso
 
 import breeze.linalg.{Vector => Vec}
@@ -32,7 +31,7 @@ import org.apache.flink.api.scala.ExecutionEnvironment
 
 import scala.reflect.ClassTag
 
-object FlinkExamplesRunner {
+object FlinkExamplesRunner extends FlinkAware {
 
   // ---------------------------------------------------------------------------
   // Config and helper type aliases
@@ -49,11 +48,12 @@ object FlinkExamplesRunner {
     epsilon     : Double               = 0,
     iterations  : Int                  = 0,
     input       : String               = System.getProperty("java.io.tmpdir"),
+    D           : Int                  = 0,
     k           : Int                  = 0,
     lambda      : Double               = 0,
     nbModelType : NaiveBayes.ModelType = NaiveBayes.ModelType.Bernoulli,
     output      : String               = System.getProperty("java.io.tmpdir")
-  )
+  ) extends FlinkConfig
   //@formatter:on
 
   // ---------------------------------------------------------------------------
@@ -66,7 +66,23 @@ object FlinkExamplesRunner {
     help("help")
       .text("Show this help message")
 
+    opt[String]("codegen")
+      .text("custom codegen path")
+      .action((x, c) => {
+        System.setProperty("emma.codegen.dir", x)
+        c
+      })
+
     section("Graph Analytics")
+    cmd("connected-components")
+      .text("Label undirected graph vertices with component IDs")
+      .children(
+        arg[String]("input")
+          .text("edges path")
+          .action((x, c) => c.copy(input = x)),
+        arg[String]("output")
+          .text("labeled vertices path")
+          .action((x, c) => c.copy(output = x)))
     cmd("transitive-closure")
       .text("Compute the transitive closure of a directed graph")
       .children(
@@ -104,9 +120,14 @@ object FlinkExamplesRunner {
     cmd("k-means")
       .text("K-Means Clustering")
       .children(
+        arg[Int]("D")
+          .text("number of dimensions")
+          .action((x, c) => c.copy(D = x))
+          .validate(between("D", 0, Int.MaxValue)),
         arg[Int]("k")
           .text("number of clusters")
-          .action((x, c) => c.copy(k = x)),
+          .action((x, c) => c.copy(k = x))
+          .validate(between("k", 0, Int.MaxValue)),
         arg[Double]("epsilon")
           .text("termination threshold")
           .action((x, c) => c.copy(epsilon = x))
@@ -140,18 +161,20 @@ object FlinkExamplesRunner {
       cmd <- cfg.command
       res <- cmd match {
         // Graphs
+        case "connected-components" =>
+          Some(connectedComponents(cfg)(flinkEnv(cfg)))
         case "transitive-closure" =>
-          Some(transitiveClosure(cfg)(flinkExecEnv(cfg)))
+          Some(transitiveClosure(cfg)(flinkEnv(cfg)))
         case "triangle-count" =>
-          Some(triangleCount(cfg)(flinkExecEnv(cfg)))
+          Some(triangleCount(cfg)(flinkEnv(cfg)))
         // Machine Learning
         case "naive-bayes" =>
-          Some(naiveBayes(cfg)(flinkExecEnv(cfg)))
+          Some(naiveBayes(cfg)(flinkEnv(cfg)))
         case "k-means" =>
-          Some(kMeans(cfg)(flinkExecEnv(cfg)))
+          Some(kMeans(cfg)(flinkEnv(cfg)))
         // Text
         case "word-count" =>
-          Some(wordCount(cfg)(flinkExecEnv(cfg)))
+          Some(wordCount(cfg)(flinkEnv(cfg)))
         case _ =>
           None
       }
@@ -161,10 +184,20 @@ object FlinkExamplesRunner {
   // Parallelized algorithms
   // ---------------------------------------------------------------------------
 
-  implicit def breezeVectorCSVConverter[V: CSVColumn: ClassTag]: CSVConverter[Vec[V]] =
+  implicit def breezeVectorCSVConverter[V: CSVColumn : ClassTag]: CSVConverter[Vec[V]] =
     CSVConverter.iso[Array[V], Vec[V]](Iso.make(Vec.apply, _.toArray), implicitly)
 
   // Graphs
+
+  def connectedComponents(c: Config)(implicit flink: ExecutionEnvironment): Unit =
+    emma.onFlink {
+      // read in set of edges to be used as input
+      val edges = DataBag.readCSV[Edge[Long]](c.input, c.csv)
+      // build the transitive closure
+      val paths = ConnectedComponents(edges)
+      // write the results into a file
+      paths.writeCSV(c.output, c.csv)
+    }
 
   def transitiveClosure(c: Config)(implicit flink: ExecutionEnvironment): Unit =
     emma.onFlink {
@@ -208,14 +241,14 @@ object FlinkExamplesRunner {
   def kMeans(c: Config)(implicit flink: ExecutionEnvironment): Unit =
     emma.onFlink {
       // read the input
-      val points = for (line <- DataBag.readCSV[String](c.input, c.csv)) yield {
+      val points = for (line <- DataBag.readText(c.input)) yield {
         val record = line.split("\t")
-        Point(record.head.toLong, Vec(record.tail.map(_.toDouble)))
+        Point(record.head.toLong, record.tail.map(_.toDouble))
       }
       // do the clustering
-      val solution = KMeans(c.k, c.epsilon, c.iterations)(points)
-      // write the result model into a file
-      solution.writeCSV(c.output, c.csv)
+      val solution = KMeans(c.D, c.k, c.epsilon, c.iterations)(points)
+      // write the (pointID, clusterID) pairs into a file
+      solution.map(s => (s.id, s.label.id)).writeCSV(c.output, c.csv)
     }
 
   // Text
@@ -223,7 +256,7 @@ object FlinkExamplesRunner {
   def wordCount(c: Config)(implicit flink: ExecutionEnvironment): Unit =
     emma.onFlink {
       // read the input files and split them into lowercased words
-      val docs = DataBag.readCSV[String](c.input, c.csv)
+      val docs = DataBag.readText(c.input)
       // parse and count the words
       val counts = WordCount(docs)
       // write the results into a file
@@ -233,9 +266,6 @@ object FlinkExamplesRunner {
   // ---------------------------------------------------------------------------
   // Helper methods
   // ---------------------------------------------------------------------------
-
-  private def flinkExecEnv(c: Config): ExecutionEnvironment =
-    ExecutionEnvironment.getExecutionEnvironment
 
   class Parser extends scopt.OptionParser[Config]("emma-examples") {
 

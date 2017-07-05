@@ -16,7 +16,7 @@
 package org.emmalanguage
 package examples.graphs
 
-import io.csv.CSV
+import api._
 import test.util._
 
 import org.scalatest.BeforeAndAfter
@@ -43,7 +43,7 @@ trait BaseTriangleCountIntegrationSpec extends FlatSpec with Matchers with Befor
     deleteRecursive(new File(path))
   }
 
-  "Triangle Count" should "find the correct number of triangles" in {
+  it should "find the correct number of triangles" in {
     val ts = triangleCount(s"$path/edges.tsv", CSV())
     ts should be(3629)
   }

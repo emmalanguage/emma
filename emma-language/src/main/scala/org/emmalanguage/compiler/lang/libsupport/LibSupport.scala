@@ -17,104 +17,26 @@ package org.emmalanguage
 package compiler.lang.libsupport
 
 import api.emma
-import compiler.{Common, Compiler}
-import util.Monoids
+import compiler.Common
+import compiler.Compiler
 import util.Memo
+import util.Monoids
 
-import cats.std.all._
+import cats.instances.all._
 import shapeless._
 
 import scala.annotation.tailrec
 import scala.collection.mutable.ListBuffer
 
 /** Basic support for library functions inlining & normalization. */
-trait LibSupport extends Common {
+private[compiler] trait LibSupport extends Common {
   self: Compiler =>
 
-  import api._
+  import LibDefRegistry.withAST
   import UniverseImplicits._
-  import LibSupport.LibDefRegistry.withAST
+  import api._
 
-  private[compiler] object LibSupport {
-
-    // -------------------------------------------------------------------------
-    // Data structures
-    // -------------------------------------------------------------------------
-
-    /**
-     * The type of the function call graph.
-     *
-     * The vertex set `vs` represents callers.
-     *
-     * The directed edges set `es` represents
-     * - `caller calls callee` relations or
-     * - `param binds to lambda` relations.
-     */
-    case class CG
-    (
-      vs: Set[CG.Vertex] = Set.empty[CG.Vertex],
-      es: Set[CG.Edge] = Set.empty[CG.Edge]
-    )
-
-    object CG {
-
-      sealed trait Vertex
-
-      sealed trait TreeRef extends Vertex {
-        val tree: u.Tree
-      }
-
-      sealed trait Callee extends Vertex {
-        val sym: u.TermSymbol
-
-        override def equals(that: Any): Boolean =
-          that match {
-            case that: Callee => this.sym == that.sym
-            case _ => false
-          }
-
-        override def hashCode: Int =
-          sym.hashCode()
-      }
-
-      case class Snippet(tree: u.Tree) extends Vertex with TreeRef {
-        override def toString: String = "snippet"
-      }
-
-      case class FunPar(sym: u.TermSymbol) extends Callee {
-        override def toString: String = s"${sym.name}"
-      }
-
-      case class Lambda(sym: u.TermSymbol, tree: u.Tree) extends Callee with TreeRef {
-        override def toString: String = s"${sym.name}"
-      }
-
-      case class LibDef(sym: u.MethodSymbol, tree: u.Tree) extends Callee with TreeRef {
-        override def toString: String = s"${sym.owner.name}.${sym.name}"
-      }
-
-      sealed trait Edge {
-        val src: Vertex
-        val tgt: Vertex
-      }
-
-      object Edge {
-        def unapply(e: Edge): Option[(Vertex, Vertex)] = e match {
-          case Calls(src, tgt) => Some((src, tgt))
-          case Binds(src, tgt) => Some((src, tgt))
-          case _ => None
-        }
-      }
-
-      case class Calls(src: Vertex, tgt: Callee) extends Edge {
-        override def toString: String = s"$src -> $tgt"
-      }
-
-      case class Binds(src: FunPar, tgt: Callee) extends Edge {
-        override def toString: String = s"$src := $tgt"
-      }
-
-    }
+  object LibSupport {
 
     // -------------------------------------------------------------------------
     // API
@@ -131,7 +53,7 @@ trait LibSupport extends Common {
       for {
         comp <- LibSupport.stronglyConnComp(cg)
         if comp.size > 1
-      } self.abort(s"Cyclic call dependency: ${dep(comp.head, comp.tail)}")
+      } abort(s"Cyclic call dependency: ${dep(comp.head, comp.tail)}")
 
       normalize(cg)
     }
@@ -184,6 +106,10 @@ trait LibSupport extends Common {
 
     private[libsupport] lazy val inline: (CG.Callee, CG.Snippet) => CG.Snippet = (callee, snippet) => {
       val result = callee match {
+        case CG.FunPar(_) =>
+          // handled while inlining the parent Lambda / LibDef
+          snippet.tree
+
         case CG.Lambda(sym, Lambda(_, _, _)) =>
           val result = BottomUp.withDefs.transformWith({
             case Attr.none(call@DefCall(Some(TermRef(`sym`)), _, Seq(), _)) =>
@@ -436,62 +362,141 @@ trait LibSupport extends Common {
         if Sym.findAnn[emma.src](sym).isDefined => sym -> CG.LibDef(sym, ast)
     }).toMap
 
-    /* Lirary function registry. */
-    object LibDefRegistry {
+  }
 
-      /** If the given MethodSymbol is a library function, loads it into the registry and retuns its AST. */
-      def apply(sym: u.MethodSymbol): Option[u.DefDef] = getOrLoad(sym)
+  /* Lirary function registry. */
+  object LibDefRegistry {
 
-      /** Extractor for the AST associated with a library function symbol. */
-      object withAST {
-        def unapply(sym: u.MethodSymbol): Option[(u.MethodSymbol, u.DefDef)] =
-          apply(sym).map(ast => (sym, ast))
+    /** If the given MethodSymbol is a library function, loads it into the registry and retuns its AST. */
+    def apply(sym: u.MethodSymbol): Option[u.DefDef] = getOrLoad(sym)
+
+    /** Extractor for the AST associated with a library function symbol. */
+    object withAST {
+      def unapply(sym: u.MethodSymbol): Option[(u.MethodSymbol, u.DefDef)] =
+        apply(sym).map(ast => (sym, ast))
+    }
+
+    /** Extractor for the `emma.src` annotation associated with a library function symbol. */
+    object withAnn {
+      def unapply(sym: u.MethodSymbol): Option[(u.MethodSymbol, u.Annotation)] =
+        Sym.findAnn[emma.src](sym) match {
+          case Some(ann) => Some(sym, ann)
+          case None => None
+        }
+    }
+
+    /** Loads and memoizes an AST for a library function from a `sym` with an `emma.src` annotation. */
+    private lazy val getOrLoad = Memo[u.MethodSymbol, Option[u.DefDef]]({
+      case sym withAnn ann =>
+        ann.tree.collect {
+          case Lit(fldName: String) =>
+            // build an `objSym.fldSym` selection expression
+            val cls = sym.owner.asClass
+            val fld = cls.info.member(TermName(fldName)).asTerm
+            val sel = qualifyStatics(DefCall(Some(Ref(cls.module)), fld))
+            // evaluate `objSym.fldSym` and grab the DefDef source
+            val src = eval[String](sel)
+            // parse the source and grab the DefDef AST
+            parse(Seq(_.collect(extractDef).head, fixDefDefSymbols(sym)))(src)
+        }.collectFirst(extractDef)
+      case _ =>
+        None
+    })
+
+    /** Extracts the first DefDef from an input tree. */
+    private lazy val extractDef: u.Tree =?> u.DefDef = {
+      case dd@DefDef(_, _, _, _) => dd
+    }
+
+    /** Parses a DefDef AST from a string. */
+    private val parse = (transformations: Seq[u.Tree => u.Tree]) =>
+      pipeline(typeCheck = true, withPost = false)(
+        transformations: _*
+      ).compose(self.parse)
+
+    /** Replaces the top-level DefDef symbol of the quoted tree with the corrsponding original symbol. */
+    private val fixDefDefSymbols = (original: u.MethodSymbol) =>
+      TopDown.break.transform {
+        case DefDef(_, tparams, paramss, body) =>
+          DefDef(original, tparams, paramss.map(_.map(_.symbol.asTerm)), body)
+      } andThen (_.tree)
+  }
+
+  // -------------------------------------------------------------------------
+  // Data structures
+  // -------------------------------------------------------------------------
+
+  /**
+   * The type of the function call graph.
+   *
+   * The vertex set `vs` represents callers.
+   *
+   * The directed edges set `es` represents
+   * - `caller calls callee` relations or
+   * - `param binds to lambda` relations.
+   */
+  case class CG
+  (
+    vs: Set[CG.Vertex] = Set.empty[CG.Vertex],
+    es: Set[CG.Edge] = Set.empty[CG.Edge]
+  )
+
+  object CG {
+
+    sealed trait Vertex
+
+    sealed trait TreeRef extends Vertex {
+      val tree: u.Tree
+    }
+
+    sealed trait Callee extends Vertex {
+      val sym: u.TermSymbol
+
+      override def equals(that: Any): Boolean =
+        that match {
+          case that: Callee => this.sym == that.sym
+          case _ => false
+        }
+
+      override def hashCode: Int =
+        sym.hashCode()
+    }
+
+    case class Snippet(tree: u.Tree) extends Vertex with TreeRef {
+      override def toString: String = "snippet"
+    }
+
+    case class FunPar(sym: u.TermSymbol) extends Callee {
+      override def toString: String = s"${sym.name}"
+    }
+
+    case class Lambda(sym: u.TermSymbol, tree: u.Tree) extends Callee with TreeRef {
+      override def toString: String = s"${sym.name}"
+    }
+
+    case class LibDef(sym: u.MethodSymbol, tree: u.Tree) extends Callee with TreeRef {
+      override def toString: String = s"${sym.owner.name}.${sym.name}"
+    }
+
+    sealed trait Edge {
+      val src: Vertex
+      val tgt: Vertex
+    }
+
+    object Edge {
+      def unapply(e: Edge): Option[(Vertex, Vertex)] = e match {
+        case Calls(src, tgt) => Some((src, tgt))
+        case Binds(src, tgt) => Some((src, tgt))
+        case _ => None
       }
+    }
 
-      /** Extractor for the `emma.src` annotation associated with a library function symbol. */
-      object withAnn {
-        def unapply(sym: u.MethodSymbol): Option[(u.MethodSymbol, u.Annotation)] =
-          Sym.findAnn[emma.src](sym) match {
-            case Some(ann) => Some(sym, ann)
-            case None => None
-          }
-      }
+    case class Calls(src: Vertex, tgt: Callee) extends Edge {
+      override def toString: String = s"$src -> $tgt"
+    }
 
-      /** Loads and memoizes an AST for a library function from a `sym` with an `emma.src` annotation. */
-      private lazy val getOrLoad = Memo[u.MethodSymbol, Option[u.DefDef]]({
-        case sym withAnn ann =>
-          ann.tree.collect {
-            case Lit(fldName: String) =>
-              // build an `objSym.fldSym` selection expression
-              val cls = sym.owner.asClass
-              val fld = cls.info.member(TermName(fldName)).asTerm
-              val sel = qualifyStatics(DefCall(Some(Ref(cls.module)), fld))
-              // evaluate `objSym.fldSym` and grab the DefDef source
-              val src = eval[String](sel)
-              // parse the source and grab the DefDef AST
-              parse(Seq(_.collect(extractDef).head, fixDefDefSymbols(sym)))(src)
-          }.collectFirst(extractDef)
-        case _ =>
-          None
-      })
-
-      /** Extracts the first DefDef from an input tree. */
-      private lazy val extractDef: u.Tree =?> u.DefDef = {
-        case dd@DefDef(_, _, _, _) => dd
-      }
-
-      /** Parses a DefDef AST from a string. */
-      private val parse = (transformations: Seq[u.Tree => u.Tree]) =>
-        pipeline(typeCheck = true, withPost = false)(
-          transformations: _*
-        ).compose(self.parse)
-
-      /** Replaces the top-level DefDef symbol of the quoted tree with the corrsponding original symbol. */
-      private val fixDefDefSymbols = (original: u.MethodSymbol) =>
-        TopDown.break.transform {
-          case DefDef(_, tparams, paramss, body) =>
-            DefDef(original, tparams, paramss.map(_.map(_.symbol.asTerm)), body)
-        } andThen (_.tree)
+    case class Binds(src: FunPar, tgt: Callee) extends Edge {
+      override def toString: String = s"$src := $tgt"
     }
 
   }

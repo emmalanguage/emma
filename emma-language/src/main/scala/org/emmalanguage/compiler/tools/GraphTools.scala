@@ -25,9 +25,8 @@ import resource._
 import java.io.FileWriter
 import java.nio.file.Path
 
-trait GraphTools extends Common
-  with ControlFlow {
-  this: Core =>
+trait GraphTools extends Common with ControlFlow {
+  self: Core =>
 
   import UniverseImplicits._
 
@@ -80,7 +79,7 @@ trait GraphTools extends Common
     import CytoscapeGraphJsonProtocol._
     import spray.json._
 
-    val cs = new Comprehension.Syntax(API.bagSymbol)
+    val cs = Comprehension.Syntax(API.DataBag.sym)
 
     def mkGraph(tree: u.Tree): Iterable[Element] = {
       val graph = ControlFlow.cfg(tree)
@@ -144,7 +143,7 @@ trait GraphTools extends Common
     def renderGraph(basePath: Path)(name: String): u.Tree => u.Tree =
       writeJsonGraph(basePath, name, _)
 
-    private[emmalanguage] def label(graph: CFG.FlowGraph[u.TermSymbol])(sym: u.TermSymbol): String =
+    private[emmalanguage] def label(graph: FlowGraph[u.TermSymbol])(sym: u.TermSymbol): String =
       graph.data.label(sym).map(_.rhs) match {
         case Some(core.Atomic(x)) => u.showCode(x)
         case Some(core.DefCall(_, method, _, _)) => method.name.decodedName.toString

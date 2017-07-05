@@ -20,7 +20,7 @@
     <artifact>
         <groupId>jdk.tools</groupId>
         <artifactId>jdk.tools</artifactId>
-        <version>1.6</version>
+        <version>1.8</version>
         <license>Oracle Binary Code License Agreement for the Java SE</license>
     </artifact>
     <artifact>
@@ -32,5 +32,16 @@
         <groupId>org.codehaus.jettison</groupId>
         <artifactId>jettison</artifactId>
         <license>Apache License, Version 2.0</license>
+    </artifact>
+    <artifact>
+        <groupId>com.ankurdave</groupId>
+        <artifactId>part_2.10</artifactId>
+        <version>0.1</version>
+        <license>Apache License, Version 2.0</license>
+    </artifact>
+    <artifact>
+        <groupId>org.scala-tools.testing</groupId>
+        <artifactId>test-interface</artifactId>
+        <license>MIT</license>
     </artifact>
 </license-lookup>

@@ -1,0 +1,17 @@
+<!doctype html>
+<html class="no-js" lang="en">
+<head>
+    {% include head.html %}
+<body>
+
+{% include navigation.top.html nav=page.nav %}
+
+<section id="main-content" class="off-canvas-content" data-off-canvas-content>
+    {{ content }}
+</section>
+
+{% include footer.html nav=page.nav %}
+
+{% include scripts.html %}
+</body>
+</html>

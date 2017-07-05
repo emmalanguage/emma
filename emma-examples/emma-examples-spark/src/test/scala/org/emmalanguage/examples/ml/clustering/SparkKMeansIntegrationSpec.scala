@@ -17,31 +17,22 @@ package org.emmalanguage
 package examples.ml.clustering
 
 import KMeans.Solution
-import api._
 import api.Meta.Projections._
+import api._
 import examples.ml.model._
-import io.csv.CSV
 
-import breeze.linalg.{Vector => Vec}
-import org.apache.spark.sql.SparkSession
-
-class SparkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec {
+class SparkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec with SparkAware {
 
   override def kMeans(k: Int, epsilon: Double, iterations: Int, input: String): Set[Solution[Long]] =
-    emma.onSpark {
+    withDefaultSparkSession(implicit spark => emma.onSpark {
       // read the input
-      val points = for (line <- DataBag.readCSV[String](input, CSV())) yield {
+      val points = for (line <- DataBag.readText(input)) yield {
         val record = line.split("\t")
-        Point(record.head.toLong, Vec(record.tail.map(_.toDouble)))
+        Point(record.head.toLong, record.tail.map(_.toDouble))
       }
       // do the clustering
-      val result = KMeans(k, epsilon, iterations)(points)
+      val result = KMeans(2, k, epsilon, iterations)(points)
       // return the solution as a local set
-      result.fetch().toSet[Solution[Long]]
-    }
-
-  implicit lazy val sparkSession = SparkSession.builder()
-    .master("local[*]")
-    .appName(this.getClass.getSimpleName)
-    .getOrCreate()
+      result.collect().toSet[Solution[Long]]
+    })
 }

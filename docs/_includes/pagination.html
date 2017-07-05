@@ -1,0 +1,24 @@
+<hr>
+
+{% for item in include.items %}
+    {% if item.title == page.title %}
+        {% assign prevIndex = forloop.index | minus:2 %}
+        {% if prevIndex >= 0 %}
+            {% assign prev = include.items[prevIndex] %}
+        {% endif %}
+        {% assign next = include.items[forloop.index] %}
+    {% endif %}
+{% endfor %}
+
+<div class="row">
+    <div class="small-6 columns">
+        {% if prev %}
+        <a href="{{prev.url | prepend: site.baseurl}}"><i class="fi-arrow-left"></i> {{prev.title}}</a>
+        {% endif %}
+    </div>
+    <div class="small-6 columns" style="text-align:right">
+        {% if next %}
+        <a href="{{next.url | prepend: site.baseurl}}">{{next.title}} <i class="fi-arrow-right"></i></a>
+        {% endif %}
+    </div>
+</div>

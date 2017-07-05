@@ -33,7 +33,7 @@ trait BaseNaiveBayesIntegrationSpec extends FlatSpec with Matchers with BeforeAn
   type Model = NaiveBayes.Model[Double]
 
   val codegenDir = tempPath("codegen")
-  val dir = "/classification/naivebayes"
+  val dir = "/ml.classification/naivebayes"
   val path = tempPath(dir)
 
   before {
@@ -49,7 +49,7 @@ trait BaseNaiveBayesIntegrationSpec extends FlatSpec with Matchers with BeforeAn
     deleteRecursive(new File(path))
   }
 
-  "NaiveBayes" should "create the correct model on Bernoulli house-votes-84 data set" in {
+  it should "create the correct model on Bernoulli house-votes-84 data set" in {
     val expectedModel = for {
       line <- Source.fromFile(s"$path/model.txt").getLines().toSet[String]
     } yield {

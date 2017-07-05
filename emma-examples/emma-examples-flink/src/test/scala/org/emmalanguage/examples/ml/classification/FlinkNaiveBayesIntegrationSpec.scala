@@ -16,17 +16,16 @@
 package org.emmalanguage
 package examples.ml.classification
 
-import api._
 import api.Meta.Projections._
+import api._
 import examples.ml.model._
 
 import breeze.linalg.{Vector => Vec}
-import org.apache.flink.api.scala.ExecutionEnvironment
 
-class FlinkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec {
+class FlinkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec with FlinkAware {
 
   def naiveBayes(input: String, lambda: Double, modelType: MType): Set[Model] =
-    emma.onFlink {
+    withDefaultFlinkEnv(implicit flink => emma.onFlink {
       // read the input
       val data = for (line <- DataBag.readText(input)) yield {
         val record = line.split(",").map(_.toDouble)
@@ -34,9 +33,7 @@ class FlinkNaiveBayesIntegrationSpec extends BaseNaiveBayesIntegrationSpec {
       }
       // classification
       val result = NaiveBayes(lambda, modelType)(data)
-      // fetch the result locally
-      result.fetch().toSet[Model]
-    }
-
-  implicit lazy val flinkEnv = ExecutionEnvironment.getExecutionEnvironment
+      // collect the result locally
+      result.collect().toSet[Model]
+    })
 }

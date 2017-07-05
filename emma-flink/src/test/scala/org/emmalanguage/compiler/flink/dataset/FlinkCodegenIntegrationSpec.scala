@@ -16,27 +16,40 @@
 package org.emmalanguage
 package compiler.flink.dataset
 
+import api._
+import api.flink._
 import compiler.BaseCodegenIntegrationSpec
+import compiler.FlinkCompiler
+import compiler.RuntimeCompiler
 
-class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
+import org.apache.flink.api.scala.DataSet
+import org.apache.flink.api.scala.ExecutionEnvironment
+
+class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkAware {
+  override val compiler = new RuntimeCompiler with FlinkCompiler
 
   import compiler._
+  import u.reify
 
-  lazy val flinkDataSetModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.FlinkDataSet")
+  type Env = ExecutionEnvironment
 
-  override lazy val backendPipeline: (compiler.u.Tree) => compiler.u.Tree = {
-    Comprehension.desugar(API.bagSymbol)
-  } andThen {
-    Backend.translateToDataflows(flinkDataSetModuleSymbol)
-  } andThen {
-    addContext
-  }
+  override lazy val Env = api.Type[org.apache.flink.api.scala.ExecutionEnvironment]
+  override lazy val env = defaultFlinkEnv
 
-  private lazy val addContext: u.Tree => u.Tree = tree => {
-    import u._
-    q"""
-        implicit val ctx = _root_.org.apache.flink.api.scala.ExecutionEnvironment.getExecutionEnvironment
-        $tree
-    """
+  override lazy val backendPipeline: u.Tree => u.Tree =
+    Backend.specialize(FlinkAPI)
+
+  // --------------------------------------------------------------------------
+  // Distributed collection conversion
+  // --------------------------------------------------------------------------
+
+  "Convert from/to a Flink DataSet" in {
+    implicit val e: Env = env
+    verify(reify {
+      val xs = DataBag(1 to 1000).withFilter(_ > 800)
+      val ys = xs.as[DataSet].filter(_ < 200)
+      val zs = DataBag.from(ys)
+      zs.size
+    })
   }
 }

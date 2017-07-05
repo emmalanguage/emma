@@ -19,13 +19,15 @@ package compiler
 class ASTSpec extends BaseCompilerSpec {
 
   import compiler._
+  import u.reify
+
   object Bal
 
   "method calls should" - {
     "resolve overloaded symbols" in {
-      val seq = compiler.typeCheck(u.reify(Seq).tree)
+      val seq = compiler.typeCheck(reify(Seq).tree)
       val fill = api.Type[Seq.type].member(api.TermName("fill")).asTerm
-      val examples = compiler.typeCheck(u.reify {(
+      val examples = compiler.typeCheck(reify {(
         Seq.fill(1)('!'),
         Seq.fill(1, 2)('!'),
         Seq.fill(1, 2, 3)('!')
@@ -42,7 +44,7 @@ class ASTSpec extends BaseCompilerSpec {
   "static objects should" - {
     "be unqualified" in {
       val bar = u.rootMirror.staticModule("org.example.Foo.Bar")
-      val ref = api.ModuleRef(bar)
+      val ref = api.TermRef(bar)
       val qual = api.Tree.resolveStatic(bar)
       unQualifyStatics(qual) shouldBe alphaEqTo (ref)
       qualifyStatics(ref) shouldBe alphaEqTo (qual)
@@ -61,7 +63,7 @@ class ASTSpec extends BaseCompilerSpec {
 
   "dynamic objects should" - {
     "remain qualified" in {
-      val bal = compiler.typeCheck(u.reify(Bal).tree)
+      val bal = compiler.typeCheck(reify(Bal).tree)
       val ref = api.TermRef(bal.symbol.asTerm)
       val act = unQualifyStatics(bal)
       act should not be alphaEqTo (ref)

@@ -18,7 +18,6 @@ package api.emma
 
 import compiler.MacroCompiler
 
-import scala.language.experimental.macros
 import scala.reflect.macros.blackbox
 
 class QuoteMacro(val c: blackbox.Context) extends MacroCompiler {

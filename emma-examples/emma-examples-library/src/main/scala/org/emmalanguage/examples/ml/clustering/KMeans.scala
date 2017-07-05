@@ -16,91 +16,87 @@
 package org.emmalanguage
 package examples.ml.clustering
 
-import api._
 import api.Meta.Projections._
+import api._
 import examples.ml.model._
 
-import breeze.linalg.{Vector => Vec, _}
-import breeze.numerics.pow
+import breeze.linalg._
 
 @emma.lib
 object KMeans {
 
   def apply[PID: Meta](
-    k: Int, epsilon: Double, iterations: Int // hyper-parameters
+    D: Int, k: Int, epsilon: Double, iterations: Int // hyper-parameters
   )(
     points: DataBag[Point[PID]] // data-parameters
   ): DataBag[Solution[PID]] = {
+    // Required for expanding at runtime.
+    // FIXME: Come up with a better Meta scheme.
+    implicit val pidCTag = ctagFor[PID]
+    implicit val pidTTag = ttagFor[PID]
 
-    val dimensions = points.map(_.vector.length).distinct.fetch()
-    assert(dimensions.size == 1,
-      "Multiple dimensions in input data. All vectors should have the same length.")
-    val N = dimensions.head
+    // helper method: orders points `x` based on their distance to `pos`
+    val distanceTo = (pos: Array[Double]) => Ordering.by { x: Point[PID] =>
+      squaredDistance(Vector(pos), Vector(x.pos))
+    }
 
-    var bestSolution = DataBag.empty[Solution[PID]]
+    // helper fold algebra: sum positions of labeled (solution) points
+    val Sum = alg.Fold[Solution[PID], Vector[Double]](
+      z = Vector.zeros[Double](D),
+      i = x => Vector(x.pos),
+      p = _ + _
+    )
+
+    var optSolution = DataBag.empty[Solution[PID]]
     var minSqrDist = 0.0
-    val zeroVec = Vec.zeros[Double](N)
 
     for (i <- 1 to iterations) {
       // initialize forgy cluster means
-      var change = 0.0
-      var centroids = DataBag(points.sample(k))
+      var delta = 0.0
+      var ctrds = DataBag(points.sample(k))
 
-      // initialize solution
-      var solution = for (p <- points) yield {
-        val closest = centroids.min(Ordering.fromLessThan { (m1, m2) =>
-          val diff1 = p.vector - m1.vector
-          val diff2 = p.vector - m2.vector
-          (diff1 dot diff1) < (diff2 dot diff2)
-        })
-
-        val diff = p.vector - closest.vector
-        Solution(p, closest.id, diff dot diff)
-      }
+      // initialize solution: label points with themselves
+      var solution = for (p <- points) yield LPoint(p.id, p.pos, p)
 
       do {
-        // update means
-        val newMeans = for (Group(clusterID, associatedPoints) <- solution.groupBy {
-          _.clusterID
-        }) yield {
-          val sum = associatedPoints.fold(zeroVec)(_.point.vector, _ + _)
-          val cnt = associatedPoints.size.toDouble
-          Point(clusterID, sum / cnt)
-        }
-
-        // compute change between the old and the new means
-        change = (for {
-          mean <- centroids
-          newMean <- newMeans
-          if mean.id == newMean.id
-        } yield sum(pow(mean.vector - newMean.vector, 2))).sum
-
-        // update solution: re-assign clusters
+        // update solution: label each point with its nearest cluster
         solution = for (s <- solution) yield {
-          val closest = centroids.min(Ordering.fromLessThan { (m1, m2) =>
-            val diff1 = s.point.vector - m1.vector
-            val diff2 = s.point.vector - m2.vector
-            (diff1.t * diff1) < (diff2.t * diff2)
-          })
-
-          val diff = s.point.vector - closest.vector
-          s.copy(clusterID = closest.id, sqrDist = diff dot diff)
+          val closest = ctrds.min(distanceTo(s.pos))
+          s.copy(label = closest)
         }
+        // update centroid positions as mean of associated points
+        val newCtrds = for {
+          Group(cid, ps) <- solution.groupBy(_.label.id)
+        } yield {
+          val sum = ps.fold(Sum)
+          val cnt = ps.size.toDouble
+          Point(cid, (sum / cnt).toArray)
+        }
+
+        // update delta as the sum of squared distances between the old and the new means
+        delta = (for {
+          cOld <- ctrds
+          cNew <- newCtrds
+          if cOld.id == cNew.id
+        } yield squaredDistance(Vector(cOld.pos), Vector(cNew.pos))).sum
 
         // use new means for the next iteration
-        centroids = newMeans
-      } while (change > epsilon)
+        ctrds = newCtrds
+      } while (delta > epsilon)
 
-      val sumSqrDist = solution.map(_.sqrDist).sum
+      val sumSqrDist = (for (p <- solution) yield {
+        squaredDistance(Vector(p.label.pos), Vector(p.pos))
+      }).sum
+
       if (i <= 1 || sumSqrDist < minSqrDist) {
         minSqrDist = sumSqrDist
-        bestSolution = solution
+        optSolution = solution
       }
     }
 
-    bestSolution
+    optSolution
   }
 
-  case class Solution[PID](point: Point[PID], clusterID: PID, sqrDist: Double = 0)
+  type Solution[PID] = LPoint[PID, Point[PID]]
 
 }

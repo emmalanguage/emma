@@ -18,7 +18,6 @@ package io.parquet
 
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
-import org.apache.parquet.hadoop.ParquetFileWriter
 import org.apache.parquet.hadoop.ParquetWriter
 import org.apache.parquet.hadoop.api.WriteSupport
 import org.apache.parquet.io.api._
@@ -27,67 +26,40 @@ import org.apache.parquet.schema._
 import scala.Function.const
 import scala.collection.JavaConverters.mapAsJavaMapConverter
 
-private[parquet] class ParquetWriteSupport[A](implicit converter: ParquetConverter[A])
-  extends WriteSupport[A] {
-  import WriteSupport.WriteContext
-
+private[parquet] class ParquetWriteSupport[A](implicit converter: ParquetConverter[A]) extends WriteSupport[A] {
   var consumer: RecordConsumer = _
   var callback: A => Unit = const(())
-  val schema = new MessageType("actor", converter.schema)
 
-  def init(configuration: Configuration): WriteContext = {
+  val schema = {
+    val schema = converter.schema
+    if (schema.isPrimitive) new MessageType(ParquetConverter.defaultName, schema)
+    else new MessageType(schema.getName, schema.asGroupType.getFields)
+  }
+
+  def init(configuration: Configuration) = {
     val metadata = Map.empty[String, String].asJava
     new WriteSupport.WriteContext(schema, metadata)
   }
 
-  def prepareForWrite(recordConsumer: RecordConsumer): Unit = {
+  def prepareForWrite(recordConsumer: RecordConsumer) = {
     consumer = recordConsumer
-    callback = converter.writer(consumer)
+    callback = converter.writer(consumer, top = true)
   }
 
-  def write(record: A): Unit = {
-    consumer.startMessage()
-    consumer.startField(ParquetConverter.defaultField, 0)
+  def write(record: A) =
     callback(record)
-    consumer.endField(ParquetConverter.defaultField, 0)
-    consumer.endMessage()
-  }
 }
 
 private[parquet] object ParquetWriteSupport {
   def builder[A: ParquetConverter](file: Path): WriterBuilder[A] =
     new WriterBuilder[A](new ParquetWriteSupport, file)
 
-  class WriterBuilder[A](support: WriteSupport[A], file: Path) {
-
-    var conf = new Configuration()
-    var mode = ParquetFileWriter.Mode.CREATE
+  class WriterBuilder[A](support: WriteSupport[A], file: Path)
+    extends ParquetWriter.Builder[A, WriterBuilder[A]](file) {
 
     def getWriteSupport(conf: Configuration) = support
+
     def self() = this
-
-    def withConf(conf: Configuration): WriterBuilder[A] = {
-      this.conf = conf
-      this
-    }
-
-    def withWriteMode(mode: ParquetFileWriter.Mode): WriterBuilder[A] = {
-      this.mode = mode
-      this
-    }
-
-    def build(): ParquetWriter[A] = new ParquetWriter[A](
-      file,
-      mode,
-      support,
-      ParquetWriter.DEFAULT_COMPRESSION_CODEC_NAME,
-      ParquetWriter.DEFAULT_BLOCK_SIZE,
-      ParquetWriter.DEFAULT_PAGE_SIZE,
-      ParquetWriter.DEFAULT_PAGE_SIZE,
-      ParquetWriter.DEFAULT_IS_DICTIONARY_ENABLED,
-      ParquetWriter.DEFAULT_IS_VALIDATING_ENABLED,
-      ParquetWriter.DEFAULT_WRITER_VERSION,
-      conf
-    )
   }
+
 }

@@ -34,7 +34,7 @@ trait Variables { this: AST =>
    */
   trait VariableAPI { this: API =>
 
-    import universe._
+    import u._
     import internal._
     import reificationSupport._
     import Flag._

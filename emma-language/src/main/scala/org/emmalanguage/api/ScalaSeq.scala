@@ -16,16 +16,11 @@
 package org.emmalanguage
 package api
 
-import io.csv._
-import io.text._
-import io.parquet._
+import alg.Alg
 
-import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.reflect.ClassTag
 import scala.reflect.runtime.universe._
-
-import scala.language.{higherKinds, implicitConversions}
 
 /** A `DataBag` implementation backed by a Scala `Seq`. */
 class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] {
@@ -43,27 +38,27 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
   // Structural recursion
   // -----------------------------------------------------
 
-  override def fold[B: Meta](z: B)(s: A => B, p: (B, B) => B): B =
-    rep.foldLeft(z)((acc, x) => p(s(x), acc))
+  override def fold[B: Meta](alg: Alg[A, B]): B =
+    rep.foldLeft(alg.zero)((acc, x) => alg.plus(alg.init(x), acc))
 
   // -----------------------------------------------------
   // Monad Ops
   // -----------------------------------------------------
 
-  override def map[B: Meta](f: (A) => B): ScalaSeq[B] =
+  override def map[B: Meta](f: (A) => B): DataBag[B] =
     rep.map(f)
 
-  override def flatMap[B: Meta](f: (A) => DataBag[B]): ScalaSeq[B] =
-    rep.flatMap(x => f(x).fetch())
+  override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
+    rep.flatMap(x => f(x).collect())
 
-  def withFilter(p: (A) => Boolean): ScalaSeq[A] =
+  def withFilter(p: (A) => Boolean): DataBag[A] =
     rep.filter(p)
 
   // -----------------------------------------------------
   // Grouping
   // -----------------------------------------------------
 
-  override def groupBy[K: Meta](k: (A) => K): ScalaSeq[Group[K, DataBag[A]]] =
+  override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
     wrap(rep.groupBy(k).toSeq map { case (key, vals) => Group(key, wrap(vals)) })
 
   // -----------------------------------------------------
@@ -75,8 +70,27 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
     case _ => that union this
   }
 
-  override def distinct: ScalaSeq[A] =
+  override def distinct: DataBag[A] =
     rep.distinct
+
+  // -----------------------------------------------------
+  // Partition-based Ops
+  // -----------------------------------------------------
+
+  def sample(k: Int, seed: Long = 5394826801L): Vector[A] = {
+    val sample = new collection.mutable.ArrayBuffer[A](k)
+    val random = util.RanHash(seed)
+    for ((e, i) <- rep.zipWithIndex) {
+      if (i >= k) {
+        val j = random.nextInt(i + 1)
+        if (j < k) sample(j) = e
+      } else sample += e
+    }
+    sample.toVector
+  }
+
+  def zipWithIndex(): DataBag[(A, Long)] =
+    rep zip Stream.iterate(0L)(_ + 1)
 
   // -----------------------------------------------------
   // Sinks
@@ -91,39 +105,44 @@ class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] 
   def writeParquet(path: String, format: Parquet)(implicit converter: ParquetConverter[A]): Unit =
     ParquetScalaSupport(format).write(path)(rep)
 
-  override def fetch(): Seq[A] =
+  override def collect(): Seq[A] =
     rep
 }
 
-object ScalaSeq {
+object ScalaSeq extends DataBagCompanion[LocalEnv] {
 
   // ---------------------------------------------------------------------------
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def empty[A]: ScalaSeq[A] =
-    new ScalaSeq(Seq.empty)
+  def empty[A: Meta](
+    implicit env: LocalEnv
+  ): DataBag[A] = new ScalaSeq(Seq.empty)
 
-  def apply[A](values: Seq[A]): ScalaSeq[A] =
-    new ScalaSeq(values)
+  def apply[A: Meta](values: Seq[A])(
+    implicit env: LocalEnv
+  ): DataBag[A] = new ScalaSeq(values)
 
-  def readCSV[A: CSVConverter](path: String, format: CSV): ScalaSeq[A] =
-    new ScalaSeq(CSVScalaSupport(format).read(path).toStream)
+  def readText(path: String)(
+    implicit env: LocalEnv
+  ): DataBag[String] = new ScalaSeq(TextSupport.read(path).toStream)
 
-  def readText(path: String): ScalaSeq[String] =
-    new ScalaSeq(TextSupport.read(path).toStream)
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(
+    implicit env: LocalEnv
+  ): DataBag[A] = new ScalaSeq(CSVScalaSupport(format).read(path).toStream)
 
-  def readParquet[A: ParquetConverter](path: String, format: Parquet): DataBag[A] =
-    new ScalaSeq(ParquetScalaSupport(format).read(path).toStream)
+  def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(
+    implicit env: LocalEnv
+  ): DataBag[A] = new ScalaSeq(ParquetScalaSupport(format).read(path).toStream)
 
-  // This is used in the code generation in TranslateToDataflows when inserting fetches
-  def byFetch[A](bag: DataBag[A]): ScalaSeq[A] =
-    new ScalaSeq(bag.fetch())
+  // This is used in the code generation in TranslateToDataflows when inserting `collect` calls
+  def fromDataBag[A](bag: DataBag[A]): DataBag[A] =
+    new ScalaSeq(bag.collect())
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  private implicit def wrap[A](rep: Seq[A]): ScalaSeq[A] =
+  private[emmalanguage] implicit def wrap[A](rep: Seq[A]): DataBag[A] =
     new ScalaSeq(rep)
 }

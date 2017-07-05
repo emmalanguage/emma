@@ -17,14 +17,13 @@ package org.emmalanguage
 package compiler.lang.core
 
 import compiler.Common
+import compiler.ir.DSCFAnnotations._
 import compiler.lang.AlphaEq
 import compiler.lang.comprehension.Comprehension
 import compiler.lang.source.Source
 
-import cats.Monoid
-
 /** Core language. */
-trait Core extends Common
+private[compiler] trait Core extends Common
   with ANF
   with Comprehension
   with CoreValidate
@@ -32,9 +31,11 @@ trait Core extends Common
   with DCE
   with DSCF
   with Pickling
+  with Reduce
   with Trampoline {
-  this: AlphaEq with Source =>
+  self: AlphaEq with Source =>
 
+  import API._
   import UniverseImplicits._
 
   /** Core language. */
@@ -114,19 +115,14 @@ trait Core extends Common
       val ValRef = api.ValRef
       val ValDef = api.ValDef
 
-      // Modules
-      val ModuleRef = api.ModuleRef
-      val ModuleAcc = api.ModuleAcc
-
       // Methods
       val DefCall = api.DefCall
       val DefDef  = api.DefDef
 
-      // Definitions
-      val TermDef = api.TermDef
-
       // Terms
       val Term     = api.Term
+      val TermAcc  = api.TermAcc
+      val TermDef  = api.TermDef
       val Branch   = api.Branch
       val Inst     = api.Inst
       val Lambda   = api.Lambda
@@ -162,6 +158,28 @@ trait Core extends Common
         }
       }
 
+      // Matcher for comprehensions
+      object Comprehension {
+        import API.ComprehensionSyntax._
+        def unapply(tree: u.Tree): Option[u.Tree] = tree match {
+          case DefCall(Some(Ref(`sym`)), _, _, _) => Some(tree)
+          case _ => None
+        }
+      }
+
+      // Matcher for continuations (local method calls and branches)
+      object Continuation {
+        def unapply(tree: u.Tree): Option[u.Tree] = tree match {
+          case DefCall(None, method, _, _) if isCont(method) => Some(tree)
+          case Branch(_, DefCall(None, thn, _, _), DefCall(None, els, _, _))
+            if isCont(thn) && isCont(els) => Some(tree)
+          case _ => None
+        }
+
+        private def isCont(method: u.TermSymbol) =
+          api.Sym.findAnn[continuation](method).isDefined
+      }
+
       //@formatter:on
     }
 
@@ -176,7 +194,6 @@ trait Core extends Common
       def ref(target: u.TermSymbol): A
 
       // References (with defaults)
-      def moduleRef(target: u.ModuleSymbol): A = ref(target)
       def bindingRef(target: u.TermSymbol): A = ref(target)
       def valRef(target: u.TermSymbol): A = bindingRef(target)
       def parRef(target: u.TermSymbol): A = bindingRef(target)
@@ -191,7 +208,7 @@ trait Core extends Common
 
       // Other
       def typeAscr(target: A, tpe: u.Type): A
-      def moduleAcc(target: A, member: u.ModuleSymbol): A
+      def termAcc(target: A, member: u.TermSymbol): A
       def defCall(target: Option[A], method: u.MethodSymbol, targs: Seq[u.Type], argss: Seq[Seq[A]]): A
       def inst(target: u.Type, targs: Seq[u.Type], argss: Seq[Seq[A]]): A
       def lambda(sym: u.TermSymbol, params: Seq[A], body: A): A
@@ -203,12 +220,11 @@ trait Core extends Common
       def generator(lhs: u.TermSymbol, rhs: A): A
       def guard(expr: A): A
       def head(expr: A): A
-      def flatten(expr: A): A
     }
 
     def fold[A](a: Algebra[A])(tree: u.Tree): A = {
       // construct comprehension syntax helper for the given monad
-      val cs = new Comprehension.Syntax(API.bagSymbol)
+      val cs = Comprehension.Syntax(DataBag.sym)
       def fold(tree: u.Tree): A = tree match {
         // Comprehensions
         case cs.Comprehension(qs, hd) =>
@@ -219,8 +235,6 @@ trait Core extends Common
           a.guard(fold(expr))
         case cs.Head(expr) =>
           a.head(fold(expr))
-        case cs.Flatten(expr) =>
-          a.flatten(fold(expr))
 
         // Empty
         case Lang.Empty(_) =>
@@ -231,26 +245,30 @@ trait Core extends Common
           a.lit(value)
         case Lang.This(encl) =>
           a.this_(encl)
-        case Lang.ModuleRef(target) =>
-          a.moduleRef(target)
         case Lang.ValRef(target) =>
           a.valRef(target)
         case Lang.ParRef(target) =>
           a.parRef(target)
+        case Lang.BindingRef(target) =>
+          a.bindingRef(target)
+        case Lang.Ref(target) =>
+          a.ref(target)
 
         // Definitions
         case Lang.ValDef(lhs, rhs) =>
           a.valDef(lhs, fold(rhs))
         case Lang.ParDef(lhs, rhs) =>
           a.parDef(lhs, fold(rhs))
+        case Lang.BindingDef(lhs, rhs) =>
+          a.bindingDef(lhs, fold(rhs))
         case Lang.DefDef(sym, tparams, paramss, body) =>
           a.defDef(sym, tparams, paramss.map(_.map(fold)), fold(body))
 
         // Other
         case Lang.TypeAscr(target, tpe) =>
           a.typeAscr(fold(target), tpe)
-        case Lang.ModuleAcc(target, member) =>
-          a.moduleAcc(fold(target), member)
+        case Lang.TermAcc(target, member) =>
+          a.termAcc(fold(target), member)
         case Lang.DefCall(target, method, targs, argss) =>
           a.defCall(target.map(fold), method, targs, argss.map(_.map(fold)))
         case Lang.Inst(target, targs, argss) =>
@@ -283,10 +301,10 @@ trait Core extends Common
     /** Lifting. The canonical compiler frontend. */
     lazy val lift: u.Tree => u.Tree = Function.chain(Seq(
       lnf,
-      Comprehension.resugar(API.bagSymbol),
-      inlineLetExprs,
-      Comprehension.normalize(API.bagSymbol),
-      uninlineLetExprs))
+      Comprehension.resugarDataBag,
+      Comprehension.normalizeDataBag,
+      Reduce.transform
+    ))
 
     /** Chains [[ANF.transform]], and [[DSCF.transform]]. */
     lazy val lnf: u.Tree => u.Tree = anf andThen dscf
@@ -297,14 +315,12 @@ trait Core extends Common
     /** Delegates to [[ANF.transform]]. */
     lazy val anf = ANF.transform
 
-    /** Delegates to [[ANF.flatten]]. */
-    lazy val flatten = ANF.flatten
+    /** Delegates to [[ANF.unnest]]. */
+    lazy val unnest = ANF.unnest
 
-    /** Delegates to [[ANF.inlineLetExprs]]. */
-    lazy val inlineLetExprs = ANF.inlineLetExprs
-
-    /** Delegates to [[ANF.uninlineLetExprs]]. */
-    lazy val uninlineLetExprs = ANF.uninlineLetExprs
+    /** Reduce an Emma Core term. */
+    lazy val reduce: u.Tree => u.Tree =
+      Reduce.transform
 
     /** Delegates to [[DSCF.stripAnnotations]]. */
     lazy val stripAnnotations = DSCF.stripAnnotations
@@ -353,7 +369,7 @@ trait Core extends Common
      * Gets the type argument of the DataBag type that is the type of the given expression.
      */
     def bagElemTpe(xs: u.Tree): u.Type = {
-      assert(api.Type.constructor(xs.tpe) =:= API.DataBag,
+      assert(api.Type.constructor(xs.tpe) =:= DataBag.tpe,
         s"`bagElemTpe` was called with a tree that has a non-bag type. " +
           s"The tree:\n-----\n$xs\n-----\nIts type: `${xs.tpe}`")
       api.Type.arg(1, xs.tpe)

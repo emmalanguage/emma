@@ -27,8 +27,8 @@ trait DataBagEquality {
 
     override def areEqual(lhs: M[A], any: Any): Boolean = any match {
       case rhs: DataBag[_] =>
-        val lhsVals = lhs.fetch().toSeq
-        val rhsVals = rhs.fetch().toSeq
+        val lhsVals = lhs.collect()
+        val rhsVals = rhs.collect()
 
         val lhsXtra = lhsVals diff rhsVals
         val rhsXtra = rhsVals diff lhsVals

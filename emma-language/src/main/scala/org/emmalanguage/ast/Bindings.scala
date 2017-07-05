@@ -39,7 +39,7 @@ trait Bindings { this: AST =>
    */
   trait BindingAPI { this: API =>
 
-    import universe._
+    import u._
     import internal._
     import reificationSupport._
 

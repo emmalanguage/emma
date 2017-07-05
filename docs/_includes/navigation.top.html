@@ -1,0 +1,37 @@
+<div class="title-bar show-for-small-only">
+    <div class="title-bar-left">
+        <button class="menu-icon" type="button" data-open="offCanvasLeft"></button>
+        <span class="title-bar-title"><a href="{{ site.baseurl }}/" class="emma">{{ site.title }}</a></span>
+    </div>
+</div>
+
+<div class="off-canvas position-left" id="offCanvasLeft" data-off-canvas style="display: none">
+    <!-- Close button -->
+    <button class="close-button" aria-label="Close menu" type="button" data-close>
+        <span aria-hidden="true">&times;</span>
+    </button>
+
+    <!-- Menu -->
+    <ul class="vertical menu">
+        <li><a href="{{ site.baseurl }}/">Homepage</a></li>
+        <li><a href="{{ site.baseurl }}/programming-guide.html">Programming Guide</a></li>
+        <li><a href="{{ site.baseurl }}/project-setup.html">Project Setup</a></li>
+    </ul>
+</div>
+
+<div class="top-bar hide-for-small-only" id="example-menu">
+    <div class="row">
+        <div class="top-bar-left">
+            <ul class="dropdown menu" data-dropdown-menu>
+                <li><a href="{{ site.baseurl }}/" class="emma">{{ site.title }}</a></li>
+                <li><a href="{{ site.baseurl }}/programming-guide.html">Programming Guide</a></li>
+                <li><a href="{{ site.baseurl }}/project-setup.html">Project Setup</a></li>
+            </ul>
+        </div>
+        <div class="top-bar-right">
+            <ul class="menu">
+                <li><a href="https://www.github.com/emmalanguage/emma"><i class="fi-social-github"></i> GitHub</a></li>
+            </ul>
+        </div>
+    </div>
+</div>

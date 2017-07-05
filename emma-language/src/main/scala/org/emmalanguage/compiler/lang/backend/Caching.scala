@@ -17,41 +17,42 @@ package org.emmalanguage
 package compiler.lang.backend
 
 import compiler.Common
-import compiler.lang.core.Core
 import compiler.ir.DSCFAnnotations._
+import compiler.lang.core.Core
 import util.Monoids._
 
-import cats.std.all._
+import cats.instances.all._
 import shapeless._
 
 import scala.collection.breakOut
 
 /** Translating to dataflows. */
 private[backend] trait Caching extends Common {
-  self: Backend with Core =>
+  self: Core =>
 
   private[backend] object Caching {
 
+    import API._
     import Core.{Lang => core}
     import UniverseImplicits._
 
-    private val runtime = Some(core.ModuleRef(Runtime.module))
-    private val cache   = Runtime.cache
+    private type CacheFlags = Map[u.Symbol, (Boolean, Int)]
+    private type CacheStore = Map[u.Symbol, u.ValDef]
+
+    private val runtime = Some(Ops.ref)
+    private val cache   = Ops.cache
+
+    /** Does `sym` have a type of `DataBag` or a subtype? */
+    private def isDataBag(sym: u.Symbol) =
+      api.Type.constructor(sym.info) =:= DataBag.tpe
 
     /** Is `sym` a method defining a loop or the body of a loop? */
     private def isLoop(sym: u.Symbol) = is.method(sym) &&
       (api.Sym.findAnn[loop](sym).isDefined || api.Sym.findAnn[loopBody](sym).isDefined)
 
-    /** Does `sym` have a type of `DataBag` or a subtype? */
-    private def isDataBag(sym: u.Symbol) =
-      api.Type.constructor(sym.info) =:= API.DataBag
-
-    /** Caches `x` as the new value `y`. */
-    private def cacheAs(x: u.TermSymbol, y: u.TermSymbol) = {
-      val targs = Seq(api.Type.arg(1, x.info))
-      val argss = Seq(Seq(core.Ref(x)))
-      core.ValDef(y, core.DefCall(runtime, cache, targs, argss))
-    }
+    /** Is `sym` a method defining a suffix continuation? */
+    private def isSuffix(sym: u.Symbol) = is.method(sym) &&
+      api.Sym.findAnn[suffix](sym).isDefined
 
     /**
      * Wraps `DataBag` term in `cache(...)` calls if needed.
@@ -72,65 +73,66 @@ private[backend] trait Caching extends Common {
      */
     lazy val addCacheCalls: u.Tree => u.Tree = tree => {
       // Per DataBag reference, collect flag for access in a loop and ref count.
-      val refs = api.TopDown.withOwnerChain
-        .accumulateWith[Map[u.Symbol, (Boolean, Int)]] {
-          // Increment counter and set flag if referenced in a loop.
-          case Attr.inh(core.BindingRef(target), owners :: _) if isDataBag(target) =>
-            val inLoop = owners.reverseIterator.takeWhile(_ != target.owner).exists(isLoop)
-            Map(target -> (inLoop, 1))
-          // Arguments to loop methods are considered as referenced in the loop.
-          case Attr.none(core.DefCall(None, method, _, argss)) if isLoop(method) =>
-            argss.flatten.collect { case core.Ref(target) if isDataBag(target) =>
-              target -> (true, 1)
-            } (breakOut)
-        } (merge(tuple2Monoid(disj, implicitly))).traverseAny._acc(tree).head
+      val refs = api.TopDown.withOwnerChain.accumulateWith[CacheFlags] {
+        // Increment counter and set flag if referenced in a loop.
+        case Attr.inh(core.BindingRef(target), owners :: _) if isDataBag(target) =>
+          val inLoop = owners.reverseIterator.takeWhile {
+            owner => owner != target.owner && !isSuffix(owner)
+          }.exists(isLoop)
+          Map(target -> (inLoop, 1))
+        // Arguments to loop methods are considered as referenced in the loop.
+        case Attr.none(core.DefCall(None, method, _, argss)) if isLoop(method) =>
+          argss.flatten.collect { case core.Ref(target) if isDataBag(target) =>
+            target -> (true, 1)
+          } (breakOut)
+      } (merge(catsKernelStdMonoidForTuple2(disj, implicitly))).traverseAny._acc(tree).head
 
-      /** Cache when referenced in a loop or more than once. */
-      def shouldCache(sym: u.Symbol) = {
-        val (inLoop, refCount) = refs(sym)
+      /* Cache when referenced in a loop or more than once. */
+      def shouldCache(x: u.Symbol) = {
+        val (inLoop, refCount) = refs(x)
         inLoop || refCount > 1
       }
 
-      /** Creates cached values for parameters of methods and lambdas. */
-      def cacheParams(params: Seq[u.ValDef]): Map[u.Symbol, u.ValDef] =
-        params.collect { case core.ParDef(p, _) if shouldCache(p) =>
-          p -> cacheAs(p, api.ValSym(p.owner, api.TermName.fresh(p), p.info))
+      /* Creates cached values for parameters of methods and lambdas. */
+      def cacheBindings(binds: Seq[u.ValDef]): CacheStore =
+        binds.collect { case core.BindingDef(x, _) if shouldCache(x) =>
+          val y = api.ValSym(x.owner, api.TermName.fresh(x), x.info.widen)
+          val targs = Seq(api.Type.arg(1, x.info))
+          val argss = Seq(Seq(core.Ref(x)))
+          x -> core.ValDef(y, core.DefCall(runtime, cache, targs, argss))
         } (breakOut)
 
-      api.TopDown.withParent.accumulate {
-        // Accumulate cached lambda and method parameters.
+      api.TopDown.withParent.accumulate[CacheStore] {
         case core.Lambda(_, params, _) =>
-          cacheParams(params)
+          cacheBindings(params)
         case core.DefDef(method, _, paramss, _) if !isLoop(method) =>
-          cacheParams(paramss.flatten)
+          cacheBindings(paramss.flatten)
+        case core.Let(vals, _, _) =>
+          cacheBindings(vals.filter {
+            case core.ValDef(_, core.DefCall(_, m, _, _)) => !API.DataBag$.ops(m)
+            case _ => true
+          })
       } (overwrite).transformWith {
+        // Prepend cached parameters, replace cached values.
         case Attr(let @ core.Let(vals, defs, expr), cached :: _, parent :: _, _) =>
-          val params = parent match {
-            case Some(core.Lambda(_, params, _)) => params
-            case Some(core.DefDef(_, _, paramss, _)) => paramss.flatten
+          val cachedParams = (parent match {
+            case Some(core.Lambda(_, ps, _)) => ps
+            case Some(core.DefDef(_, _, pss, _)) => pss.flatten
             case _ => Seq.empty
-          }
+          }).map(_.symbol).collect(cached)
 
-          // Prepend cached parameters, replace cached vals.
-          val cachedParams = params.map(_.symbol).collect(cached)
-          val cachedVals = vals.flatMap {
-            // Don't cache reads.
-            case value @ core.ValDef(_, core.DefCall(_, method, _, _))
-              if API.sourceOps(method) => Seq(value)
-            case core.ValDef(x, rhs) if shouldCache(x) =>
-              val y = api.TermSym.fresh(x)
-              Seq(core.ValDef(y, rhs), cacheAs(y, x))
-            case value => Seq(value)
+          val cachedVals = vals.flatMap { v =>
+            v +: cached.get(v.symbol).toSeq
           }
 
           if (cachedParams.isEmpty && cachedVals.size == vals.size) let
           else core.Let(cachedParams ++ cachedVals, defs, expr)
 
         // Dont't replace references in cache(...).
-        case Attr.inh(tree, Some(call) :: _) if call.symbol == cache =>
-          tree
+        case Attr.inh(t, Some(call) :: _)
+          if call.symbol == cache => t
 
-        // Replace references to cached parameters.
+        // Replace references to cached parameters or values.
         case Attr.acc(core.Ref(x), cached :: _) if cached.contains(x) =>
           core.Ref(cached(x).symbol.asTerm)
       }._tree(tree)

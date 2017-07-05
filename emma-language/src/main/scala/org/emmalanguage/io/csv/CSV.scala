@@ -18,9 +18,6 @@ package io.csv
 
 import io.Format
 
-import java.nio.charset.Charset
-import java.nio.charset.StandardCharsets
-
 import CSV._
 
 /**
@@ -33,17 +30,19 @@ import CSV._
  * @param escape     Escaped characters are always treated as data.
  * @param comment    Lines starting with a comment character are ignored.
  * @param nullValue  Fields matching this string will be set to null.
+ * @param skipRows   Skip a number of rows starting at the beginning of the file.
  */
 case class CSV(
     //@formatter:off
     header     : Boolean      = defaultHeader,
     delimiter  : Char         = defaultDelimiter,
     delimitSeq : Char         = defaultDelimitSeq,
-    charset    : Charset      = defaultCharset,
+    charset    : String       = defaultCharset,
     quote      : Option[Char] = defaultQuote,
     escape     : Option[Char] = defaultEscape,
     comment    : Option[Char] = defaultComment,
-    nullValue  : String       = defaultNullValue
+    nullValue  : String       = defaultNullValue,
+    skipRows   : Int          = defaultSkipRows
     //@formatter:on
 ) extends Format {
   require({
@@ -57,11 +56,12 @@ object CSV {
   val defaultHeader       = false
   val defaultDelimiter    = '\t'
   val defaultDelimitSeq   = ';'
-  val defaultCharset      = StandardCharsets.UTF_8
+  val defaultCharset      = "UTF-8"
   val defaultQuote        = Some('"')
   val defaultEscape       = Some('\\')
   val defaultComment      = None
   val defaultNullValue    = ""
+  val defaultSkipRows     = 0
   //@formatter:on
   val default = CSV()
 }

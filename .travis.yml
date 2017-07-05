@@ -1,3 +1,7 @@
+sudo: required
+
+dist: trusty
+
 language: java
 
 jdk:
@@ -6,26 +10,38 @@ jdk:
 notifications:
   email: false
 
-sudo: required
-
-before_install:
-  - sudo apt-get -qq update
-  - sudo apt-get install -y pv
-
 env:
   global:
     # Make sure there is enough memory to complete the build
-    - MAVEN_OPTS="-Xms1024m -Xmx2048m -Xss1m -XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled"
+    - MAVEN_OPTS="-Xms256m -Xmx512m -Xss16m -XX:+UseConcMarkSweepGC -XX:+CMSClassUnloadingEnabled"
 
   matrix:
     # Unit tests
     - TEST_ARGS="-Pcompile-spec-pipelines"
+
 cache:
   directories:
-    $HOME/.m2
+    - $HOME/.m2
+    - $HOME/.zinc
+
+addons:
+  apt:
+    packages:
+    - pv
+
+install:
+  - mvn -q dependency:resolve-plugins
+  - mvn -q dependency:resolve
+  - tools/zinc_setup.sh
+
+before_script:
+  - tools/zinc.sh start
 
 script:
   # Enable exit code propagation through pipes
   - set -o pipefail
   # Use pipe view (`pv`) to work around command line output timeout
   - mvn verify $TEST_ARGS | pv -t -b -l -i 10
+
+after_script:
+  - tools/zinc.sh stop

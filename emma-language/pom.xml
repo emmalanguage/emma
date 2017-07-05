@@ -29,6 +29,13 @@
     <artifactId>emma-language</artifactId>
     <name>${project.artifactId}</name>
 
+    <properties>
+        <!-- Predicates -->
+        <scala-maven-plugin.skip>false</scala-maven-plugin.skip>
+        <scalastyle-maven-plugin.skip>false</scalastyle-maven-plugin.skip>
+        <scalatest-maven-plugin.skip>${skipTests}</scalatest-maven-plugin.skip>
+    </properties>
+
     <dependencies>
         <!-- Scala -->
         <dependency>
@@ -69,8 +76,8 @@
 
         <!-- CSV -->
         <dependency>
-            <groupId>net.sf.opencsv</groupId>
-            <artifactId>opencsv</artifactId>
+            <groupId>com.univocity</groupId>
+            <artifactId>univocity-parsers</artifactId>
         </dependency>
 
         <!-- HDFS -->
@@ -130,6 +137,12 @@
             <groupId>io.verizon.quiver</groupId>
             <artifactId>core_${scala.tools.version}</artifactId>
         </dependency>
+
+        <!-- Hocon configuration -->
+        <dependency>
+            <groupId>com.typesafe</groupId>
+            <artifactId>config</artifactId>
+        </dependency>
     </dependencies>
 
     <profiles>
@@ -137,6 +150,9 @@
         <profile>
             <id>dev</id>
             <properties>
+                <scala.scope>compile</scala.scope>
+                <flink.scope>compile</flink.scope>
+                <spark.scope>compile</spark.scope>
                 <hadoop.scope>compile</hadoop.scope>
             </properties>
         </profile>

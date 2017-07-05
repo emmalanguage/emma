@@ -21,7 +21,7 @@ import util.Functions._
 import util.Monoids._
 
 import cats.Monoid
-import cats.std.all._
+import cats.instances.all._
 import cats.syntax.group._
 import shapeless._
 
@@ -34,7 +34,7 @@ import scala.language.higherKinds
 /** Utility for traversing and transforming trees. */
 trait Transversers { this: AST =>
 
-  import universe._
+  import u._
 
   /**
    * Placeholder for attribute grammars.
@@ -52,12 +52,16 @@ trait Transversers { this: AST =>
       initAcc: A, initInh: I, initSyn: S,
       accumulation: Attr[A, I, S] => A,
       inheritance:  Attr[HNil, I, S] => I,
-      synthesis:    Attr[HNil, HNil, S] => S
+      synthesis:    Attr[HNil, HNil, S] => S,
+      typeSafe:     Boolean = true
   )(implicit
     val MAcc: Monoid[A],
     val MInh: Monoid[I],
     val MSyn: Monoid[S]
   ) {
+
+    /** Skip type-safety assertions. WARNING: Use only if you mean to change types in the tree. */
+    def unsafe = copy(typeSafe = false)
 
     /** Prepends an accumulated (along the traversal path) attribute. */
     def accumulate[X](init: X, acc: Attr[X :: A, I, S] =?> X)(implicit M: Monoid[X]) =
@@ -199,6 +203,9 @@ trait Transversers { this: AST =>
     type Inh = I
     type Syn = S
 
+    /** Skip type-safety assertions. WARNING: Use only if you mean to change types in the tree. */
+    def unsafe = copy(grammar = grammar.unsafe)
+
     /** Prepends an accumulated attribute based on all attributes. */
     def accumulateInit[X: Monoid](init: X)(acc: Attr[X :: A, I, S] =?> X) =
       copy(grammar = grammar.accumulate(init, acc))
@@ -209,7 +216,7 @@ trait Transversers { this: AST =>
 
     /** Prepends an accumulated attribute based on trees only. */
     def accumulate[X: Monoid](acc: Tree =?> X) =
-      accumulateWith[X](forgetful(acc))
+      accumulateWith[X](compose(acc)(_.tree))
 
     /** Prepends an inherited attribute based on inherited and synthesized attributes. */
     def inheritInit[X: Monoid](init: X)(inh: Attr[HNil, X :: I, S] =?> X) =
@@ -221,7 +228,7 @@ trait Transversers { this: AST =>
 
     /** Prepends an inherited attribute based on trees only. */
     def inherit[X: Monoid](inh: Tree =?> X) =
-      inheritWith[X](forgetful(inh))
+      inheritWith[X](compose(inh)(_.tree))
 
     /** Prepends a synthesized attribute based on all synthesized attributes. */
     def synthesizeInit[X: Monoid](init: X)(syn: Attr[HNil, HNil, X :: S] =?> X) =
@@ -233,7 +240,7 @@ trait Transversers { this: AST =>
 
     /** Prepends a synthesized attribute based on trees only. */
     def synthesize[X: Monoid](syn: Tree =?> X) =
-      synthesizeWith[X](forgetful(syn))
+      synthesizeWith[X](compose(syn)(_.tree))
 
     /** Traverses a tree with access to all attributes (and a memoized synthesis function). */
     def traverseSyn(callback: Attr[A, I, Tree => S] =?> Unit): Traversal[A, I, S] = {
@@ -251,7 +258,7 @@ trait Transversers { this: AST =>
 
     /** Traverses a tree without access to attributes. */
     def traverse(callback: Tree =?> Unit): Traversal[A, I, S] =
-      traverseWith(forgetful(callback))
+      traverseWith(compose(callback)(_.tree))
 
     /** Shortcut for visiting every node in a tree. */
     def traverseAny: Traversal[A, I, S] =
@@ -273,7 +280,7 @@ trait Transversers { this: AST =>
 
     /** Transforms a tree without access to attributes. */
     def transform(template: Tree =?> Tree): Transform[A, I, S] =
-      transformWith(forgetful(template))
+      transformWith(compose(template)(_.tree))
 
     /** Inherits the root of the tree ([[None]] if the current node is the root). */
     def withRoot = inherit(partial(Option.apply))(first(None))
@@ -293,9 +300,9 @@ trait Transversers { this: AST =>
       inherit { case api.Owner(sym) => sym } (last(default))
 
     /** Inherits the owner chain of the current node. */
-    def withOwnerChain = inherit(Attr.collect[Vector, Symbol] {
-      case api.Owner(sym) => sym
-    })
+    def withOwnerChain = inheritInit(Vector(api.Owner.encl)) {
+      case Attr.none(api.Owner(sym)) => Vector(sym)
+    }
 
     /** Synthesizes all term definitions contained in the current node and its children. */
     def withDefs = synthesize(Attr.group {
@@ -361,11 +368,6 @@ trait Transversers { this: AST =>
     def withDefCalls = synthesize(Attr.group {
       case api.DefCall(_, method, _, _) => method -> 1
     })(merge)
-
-    /** Converts a partial function over trees to a partial function over attributed trees. */
-    private def forgetful[X, Acc, Inh, Syn](pf: Tree =?> X): Attr[Acc, Inh, Syn] =?> X = {
-      case Attr.none(t) if pf.isDefinedAt(t) => pf(t)
-    }
   }
 
   /** An abstract transformation (default is top-down break). */
@@ -382,9 +384,21 @@ trait Transversers { this: AST =>
     override def transform(tree: Tree): Tree =
       at(tree)(super.transform(tree))
 
+    override def transformStats(stats: List[Tree], owner: Symbol) =
+      super.transformStats(stats, owner).filter {
+        case api.Empty(_) => false
+        case _ => true
+      }
+
     protected final def accTransform(tree: Tree): Tree = {
       accumulate(tree)
-      complete(transformation)(tree)(tree)
+      complete(transformation andThen { xtree =>
+        assert(!grammar.typeSafe
+          || xtree.tpe == tree.tpe
+          || xtree.tpe <:< tree.tpe.widen,
+          s"${xtree.tpe} <!:< ${tree.tpe.widen}")
+        xtree
+      })(tree)(tree)
     }
 
     @tailrec

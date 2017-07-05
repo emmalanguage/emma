@@ -22,13 +22,15 @@ trait Types { this: AST =>
 
   trait TypeAPI { this: API =>
 
-    import universe._
+    import u._
     import definitions._
     import internal._
     import reificationSupport._
 
     /** Type names. */
     object TypeName extends Node {
+
+      private val regex = s"(.*)\\$$$freshNameSuffix(\\d+)".r
 
       // Predefined type names
       lazy val empty    = u.typeNames.EMPTY
@@ -55,22 +57,23 @@ trait Types { this: AST =>
       }
 
       /** Creates a fresh type name with the given `prefix`. */
-      def fresh(prefix: String): u.TypeName = apply {
+      def fresh(prefix: String = "T"): u.TypeName = apply {
         assert(prefix.nonEmpty, "Cannot create a fresh name with empty prefix")
         freshTypeName(s"$prefix$$$freshNameSuffix")
       }
 
       /** Creates a fresh type name with the given `prefix`. */
-      def fresh(prefix: u.Name): u.TypeName = {
-        assert(is.defined(prefix), "Undefined prefix")
-        fresh(prefix.toString)
-      }
+      def fresh(prefix: u.Name): u.TypeName =
+        if (is.defined(prefix)) fresh(prefix.toString) else fresh()
 
       /** Creates a fresh type name with the given symbol's name as `prefix`. */
-      def fresh(prefix: u.Symbol): u.TypeName = {
-        assert(is.defined(prefix), "Undefined prefix")
-        assert(has.nme(prefix),   s"Prefix $prefix has no name")
-        fresh(prefix.name)
+      def fresh(prefix: u.Symbol): u.TypeName =
+        if (is.defined(prefix)) fresh(prefix.name) else fresh()
+
+      /** Tries to return the original name used to create this `fresh` name. */
+      def original(fresh: u.Name): (u.TypeName, Int) = fresh match {
+        case u.TypeName(regex(original, i)) => u.TypeName(original) -> i.toInt
+        case _ => fresh.toTypeName -> 0
       }
 
       def unapply(name: u.TypeName): Option[String] =
@@ -278,14 +281,16 @@ trait Types { this: AST =>
 
       /** Returns the original type-tree corresponding to `tpe`. */
       def tree(tpe: u.Type): u.Tree = {
-        /** Converts stable path-dependent types to a selection chain. */
+        /* Resolve if static, otherwise reference. */
+        def resolve(sym: u.Symbol) =
+          if (sym.isStatic) api.Tree.resolveStatic(sym) else Id(sym)
+
+        /* Converts stable path-dependent types to a selection chain. */
         def stable(tpe: u.Type): u.Tree = tpe match {
-          // Degenerate static type: `this[T]`.
-          case u.ThisType(encl) if encl.isStatic =>
-            api.Tree.resolveStatic(encl)
           // Qualified this type: `T.this`.
           case u.ThisType(encl) =>
-            api.This(encl)
+            if (!encl.isStatic) api.This(encl)
+            else api.Tree.resolveStatic(encl)
           // Super type: `this.super[T]`
           case u.SuperType(ths, parent) =>
             val sym = parent.typeSymbol.asType
@@ -293,13 +298,13 @@ trait Types { this: AST =>
             setType(setSymbol(sup, sym), tpe)
           // Singleton type: `target.type`.
           case u.SingleType(u.NoPrefix, target) =>
-            Id(target)
+            resolve(target)
           // Path-dependent singleton type: `prefix.target.type`.
           case u.SingleType(prefix, target) =>
             Sel(stable(prefix), target)
           // Singleton type: `target.type`.
           case u.TypeRef(u.NoPrefix, target, Nil) =>
-            Id(target)
+            resolve(target)
           // Path-dependent singleton type: `prefix.target.type`.
           case u.TypeRef(prefix, target, Nil) if is.stable(prefix) =>
             Sel(stable(prefix), target)
@@ -307,7 +312,7 @@ trait Types { this: AST =>
             abort(s"Unstable path-dependent $tpe")
         }
 
-        /** Creates the original field of the type-tree. */
+        /* Creates the original field of the type-tree. */
         def original(tpe: u.Type): u.Tree = setType(tpe match {
           // This / super type
           case ThisType(_) | SuperType(_, _) =>
@@ -317,7 +322,7 @@ trait Types { this: AST =>
             u.SingletonTypeTree(stable(tpe))
           // Abstract type: `T`.
           case u.TypeRef(u.NoPrefix, target, Nil) =>
-            Id(target)
+            resolve(target)
           // Path dependent type: `prefix.T`.
           // Type projection: `Prefix#T`
           case u.TypeRef(prefix, target, Nil) => original(prefix) match {
@@ -379,10 +384,14 @@ trait Types { this: AST =>
     }
 
     /** By-name types (`=> T`), legal only in parameter declarations. */
-    // TODO: Define a constructor?
-    object ByNameType {
+    object ByNameType extends Node {
 
       lazy val sym: u.ClassSymbol = ByNameParamClass
+
+      def apply(arg: u.Type): u.Type = {
+        assert(is.defined(arg), s"$this type argument is not defined")
+        typeRef(u.NoPrefix, sym, arg :: Nil)
+      }
 
       def unapply(tpe: u.TypeRef): Option[u.Type] = tpe match {
         case u.TypeRef(_, `sym`, Seq(arg)) => Some(arg)
@@ -391,11 +400,15 @@ trait Types { this: AST =>
     }
 
     /** Vararg types (`T*`), legal only in parameter declarations. */
-    // TODO: Define a constructor?
-    object VarArgType {
+    object VarArgType extends Node {
 
       lazy val scalaSym: u.ClassSymbol = RepeatedParamClass
       lazy val javaSym:  u.ClassSymbol = JavaRepeatedParamClass
+
+      def apply(arg: u.Type): u.Type = {
+        assert(is.defined(arg), s"$this type argument is not defined")
+        typeRef(u.NoPrefix, scalaSym, arg :: Nil)
+      }
 
       def unapply(tpe: u.TypeRef): Option[u.Type] = tpe match {
         case u.TypeRef(_, `scalaSym`, Seq(arg)) => Some(arg)

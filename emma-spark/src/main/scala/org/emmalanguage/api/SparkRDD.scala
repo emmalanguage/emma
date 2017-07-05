@@ -16,20 +16,23 @@
 package org.emmalanguage
 package api
 
-import io.csv._
-import io.parquet._
+import alg.Alg
 
 import org.apache.spark.rdd._
+import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
-import scala.language.higherKinds
 import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
 
 /** A `DataBag` implementation backed by a Spark `RDD`. */
 class SparkRDD[A: Meta] private[api]
-  (@transient private[api] val rep: RDD[A])
-  (@transient private[api] implicit val spark: SparkSession) extends DataBag[A] {
+(
+  @transient private[emmalanguage] val rep: RDD[A]
+)(
+  @transient private[emmalanguage] implicit val spark: SparkSession
+) extends DataBag[A] {
 
   import Meta.Projections._
   import SparkRDD.encoderForType
@@ -43,41 +46,72 @@ class SparkRDD[A: Meta] private[api]
   // Structural recursion
   // -----------------------------------------------------
 
-  override def fold[B: Meta](z: B)(s: A => B, u: (B, B) => B): B =
-    rep.map(x => s(x)).fold(z)(u)
+  override def fold[B: Meta](alg: Alg[A, B]): B =
+    rep.map(x => alg.init(x)).fold(alg.zero)(alg.plus)
 
   // -----------------------------------------------------
   // Monad Ops
   // -----------------------------------------------------
 
-  override def map[B: Meta](f: (A) => B): SparkRDD[B] =
+  override def map[B: Meta](f: (A) => B): DataBag[B] =
     rep.map(f)
 
-  override def flatMap[B: Meta](f: (A) => DataBag[B]): SparkRDD[B] =
-    rep.flatMap((x: A) => f(x).fetch())
+  override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
+    rep.flatMap((x: A) => f(x).collect())
 
-  def withFilter(p: (A) => Boolean): SparkRDD[A] =
+  def withFilter(p: (A) => Boolean): DataBag[A] =
     rep.filter(p)
 
   // -----------------------------------------------------
   // Grouping
   // -----------------------------------------------------
 
-  override def groupBy[K: Meta](k: (A) => K): SparkRDD[Group[K, DataBag[A]]] =
+  override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
     rep.groupBy(k).map { case (key, vals) => Group(key, DataBag(vals.toSeq)) }
 
   // -----------------------------------------------------
   // Set operations
   // -----------------------------------------------------
 
-  override def union(that: DataBag[A]): SparkRDD[A] = that match {
-    case dbag: ScalaSeq[A] => this.rep union SparkRDD(dbag.rep).rep
+  override def union(that: DataBag[A]): DataBag[A] = that match {
+    case dbag: ScalaSeq[A] => this union SparkRDD(dbag.rep)
     case dbag: SparkRDD[A] => this.rep union dbag.rep
+    case dbag: SparkDataset[A] => SparkDataset.wrap(this.rep.toDS() union dbag.rep)
     case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
 
-  override def distinct: SparkRDD[A] =
+  override def distinct: DataBag[A] =
     rep.distinct
+
+  // -----------------------------------------------------
+  // Partition-based Ops
+  // -----------------------------------------------------
+
+  def sample(k: Int, seed: Long = 5394826801L): Vector[A] = {
+    // sample per partition and sorted by partition ID
+    val Seq(hd, tl@_*) = rep.zipWithIndex()
+      .mapPartitionsWithIndex({ (pid, it) =>
+        val sample = Array.fill(k)(Option.empty[A])
+        for ((e, i) <- it) {
+          if (i >= k) {
+            val j = util.RanHash(seed).at(i).nextLong(i + 1)
+            if (j < k) sample(j.toInt) = Some(e)
+          } else sample(i.toInt) = Some(e)
+        }
+        Seq(pid -> sample).toIterator
+      }).collect().sortBy(_._1).map(_._2).toSeq
+
+    // merge the sequence of samples and filter None values
+    val rs = for {
+      Some(v) <- tl.foldLeft(hd)((xs, ys) => for ((x, y) <- xs zip ys) yield y orElse x)
+    } yield v
+
+    // convert result to vector
+    rs.toVector
+  }
+
+  def zipWithIndex(): DataBag[(A, Long)] =
+    rep.zipWithIndex()
 
   // -----------------------------------------------------
   // Sinks
@@ -106,9 +140,9 @@ class SparkRDD[A: Meta] private[api]
       .option("codec", format.codec.toString)
       .mode("overwrite").parquet(path)
 
-  def fetch(): Seq[A] = collect
+  def collect(): Seq[A] = collected
 
-  private lazy val collect: Seq[A] =
+  private lazy val collected: Seq[A] =
     rep.collect()
 
   // -----------------------------------------------------
@@ -145,12 +179,9 @@ class SparkRDD[A: Meta] private[api]
   }
 }
 
-object SparkRDD {
+object SparkRDD extends DataBagCompanion[SparkSession] {
 
   import Meta.Projections._
-
-  import org.apache.spark.sql.Encoder
-  import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
   implicit def encoderForType[T: Meta]: Encoder[T] =
     ExpressionEncoder[T]
@@ -159,85 +190,45 @@ object SparkRDD {
   // Constructors
   // ---------------------------------------------------------------------------
 
-  def empty[A: Meta](implicit spark: SparkSession): SparkRDD[A] =
-    spark.sparkContext.emptyRDD[A]
+  def empty[A: Meta](
+    implicit spark: SparkSession
+  ): DataBag[A] = spark.sparkContext.emptyRDD[A]
 
-  def apply[A: Meta](values: Seq[A])(implicit spark: SparkSession): SparkRDD[A] =
-    spark.sparkContext.parallelize(values)
+  def apply[A: Meta](values: Seq[A])(
+    implicit spark: SparkSession
+  ): DataBag[A] = spark.sparkContext.parallelize(values)
 
-  def readCSV[A: Meta](path: String, format: CSV)
-    (implicit spark: SparkSession): SparkRDD[A] = spark.read
-      .option("header", format.header)
-      .option("delimiter", format.delimiter.toString)
-      .option("charset", format.charset.toString)
-      .option("quote", format.quote.getOrElse('"').toString)
-      .option("escape", format.escape.getOrElse('\\').toString)
-      .option("comment", format.escape.map(_.toString).orNull)
-      .option("nullValue", format.nullValue)
-      .schema(encoderForType[A].schema)
-      .csv(path).as[A].rdd
+  def readText(path: String)(
+    implicit spark: SparkSession
+  ): DataBag[String] = spark.sparkContext.textFile(path)
 
-  def readText(path: String)(implicit spark: SparkSession): SparkRDD[String] =
-    spark.sparkContext.textFile(path)
+  def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(
+    implicit spark: SparkSession
+  ): DataBag[A] = spark.read
+    .option("header", format.header)
+    .option("delimiter", format.delimiter.toString)
+    .option("charset", format.charset.toString)
+    .option("quote", format.quote.getOrElse('"').toString)
+    .option("escape", format.escape.getOrElse('\\').toString)
+    .option("comment", format.escape.map(_.toString).orNull)
+    .option("nullValue", format.nullValue)
+    .schema(encoderForType[A].schema)
+    .csv(path).as[A].rdd
 
-  def readParquet[A: Meta](path: String, format: Parquet)
-    (implicit spark: SparkSession): SparkRDD[A] = spark.read
-      .option("binaryAsString", format.binaryAsString)
-      .option("int96AsTimestamp", format.int96AsTimestamp)
-      .option("cacheMetadata", format.cacheMetadata)
-      .option("codec", format.codec.toString)
-      .schema(encoderForType[A].schema)
-      .parquet(path).as[A].rdd
+  def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(
+    implicit spark: SparkSession
+  ): DataBag[A] = spark.read
+    .option("binaryAsString", format.binaryAsString)
+    .option("int96AsTimestamp", format.int96AsTimestamp)
+    .option("cacheMetadata", format.cacheMetadata)
+    .option("codec", format.codec.toString)
+    .schema(encoderForType[A].schema)
+    .parquet(path).as[A].rdd
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  implicit def wrap[A: Meta](rep: RDD[A])(implicit spark: SparkSession): SparkRDD[A] =
+  implicit def wrap[A: Meta](rep: RDD[A])(implicit spark: SparkSession): DataBag[A] =
     new SparkRDD(rep)
-
-  // ---------------------------------------------------------------------------
-  // ComprehensionCombinators
-  // (these should correspond to `compiler.ir.ComprehensionCombinators`)
-  // ---------------------------------------------------------------------------
-
-  def cross[A: Meta, B: Meta](
-    xs: DataBag[A], ys: DataBag[B]
-  )(implicit spark: SparkSession): SparkRDD[(A, B)] = {
-    val rddOf = new RDDExtractor(spark)
-    (xs, ys) match {
-      case (rddOf(xsRdd), rddOf(ysRdd)) => xsRdd cartesian ysRdd
-    }
-  }
-
-  def equiJoin[A: Meta, B: Meta, K: Meta](
-    keyx: A => K, keyy: B => K)(xs: DataBag[A], ys: DataBag[B]
-  )(implicit spark: SparkSession): SparkRDD[(A, B)] = {
-    val rddOf = new RDDExtractor(spark)
-    (xs, ys) match {
-      case (rddOf(xsRDD), rddOf(ysRDD)) =>
-        (xsRDD.map(extend(keyx)) join ysRDD.map(extend(keyy))).values
-    }
-  }
-
-  private def extend[X, K](k: X => K): X => (K, X) =
-    x => (k(x), x)
-
-  private class RDDExtractor(spark: SparkSession) {
-    def unapply[A: Meta](bag: DataBag[A]): Option[RDD[A]] = bag match {
-      case bag: SparkRDD[A] => Some(bag.rep)
-      case _ => Some(spark.sparkContext.parallelize(bag.fetch()))
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // RuntimeOps
-  // ---------------------------------------------------------------------------
-
-  def cache[A: Meta](xs: DataBag[A])(implicit spark: SparkSession): DataBag[A] =
-    xs match {
-      case xs: SparkRDD[A] => xs.rep.cache()
-      case xs: SparkDataset[A] => xs.rep.rdd.cache()
-      case _ => xs
-    }
 }

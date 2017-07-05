@@ -16,7 +16,6 @@
 package org.emmalanguage
 package compiler.lang.comprehension
 
-import api.DataBag
 import compiler.Common
 import compiler.lang.core.Core
 
@@ -26,16 +25,17 @@ import scala.annotation.tailrec
 import scala.collection.breakOut
 
 private[comprehension] trait Combination extends Common {
-  self: Core with Comprehension =>
+  self: Core =>
 
   private[comprehension] object Combination {
 
+    import API._
     import Comprehension._
-    import UniverseImplicits._
     import Core.{Lang => core}
+    import UniverseImplicits._
 
     private type Rule = (u.Symbol, u.Tree) => Option[u.Tree]
-    private val cs = new Comprehension.Syntax(API.bagSymbol)
+    private val cs = Comprehension.Syntax(DataBag.sym)
     private val tuple2 = core.Ref(api.Sym.tuple(2).companion.asModule)
     private val tuple2App = tuple2.tpe.member(api.TermName.app).asMethod
     private val Seq(_1, _2) = {
@@ -269,7 +269,7 @@ private[comprehension] trait Combination extends Common {
         if (api.Tree.refs(yGen) intersect gens(qs)) == Set(x)
       } yield {
         val xyTpe = api.Type.kind2[Tuple2](x.info, y.info)
-        val xyBag = Some(api.Type.kind1[DataBag](xyTpe))
+        val xyBag = Some(api.Type(DataBag.tpe, Seq(xyTpe)))
         val xy = api.ValSym(owner, api.TermName.fresh("xy"), xyTpe)
         val xyRef = core.Ref(xy)
         val xy1 = core.ValDef(x, core.DefCall(Some(xyRef), _1, Seq.empty, Seq.empty))
@@ -348,7 +348,7 @@ private[comprehension] trait Combination extends Common {
         if qs2.isEmpty && !api.Tree.refs(yGen).contains(x)
       } yield {
         val xyTpe = api.Type.kind2[Tuple2](x.info, y.info)
-        val xyBag = Some(api.Type.kind1[DataBag](xyTpe))
+        val xyBag = Some(api.Type(DataBag.tpe, Seq(xyTpe)))
         val xy = api.ValSym(owner, api.TermName.fresh("xy"), xyTpe)
         val xyRef = core.Ref(xy)
         val xy1 = core.ValDef(x, core.DefCall(Some(xyRef), _1, Seq.empty, Seq.empty))
@@ -460,7 +460,7 @@ private[comprehension] trait Combination extends Common {
         }
 
         val xyTpe = api.Type.kind2[Tuple2](x.info, y.info)
-        val xyBag = Some(api.Type.kind1[DataBag](xyTpe))
+        val xyBag = Some(api.Type.apply(DataBag.tpe, Seq(xyTpe)))
         val xy = api.ValSym(owner, api.TermName.fresh("xy"), xyTpe)
         val xyRef = core.Ref(xy)
         val xy1 = core.ValDef(x, core.DefCall(Some(xyRef), _1, Seq.empty, Seq.empty))
@@ -509,7 +509,7 @@ private[comprehension] trait Combination extends Common {
      */
     val MatchResidual: Rule = {
       case (owner, cs.Comprehension(Seq(cs.Generator(x, rhs)), cs.Head(hd))) =>
-        val tpe = if (x.info =:= hd.tpe) None else Some(api.Type.kind1[DataBag](hd.tpe))
+        val tpe = if (x.info =:= hd.tpe) None else Some(api.Type(DataBag.tpe, Seq(hd.tpe)))
         Some(Core.mapSuffix(rhs, tpe) { (vals, expr) =>
           val (fRef, fVal) = valRefAndDef(owner, "f", core.Lambda(Seq(x), hd))
           val (mRef, mVal) = valRefAndDef(owner, "mapped", cs.Map(expr)(fRef))

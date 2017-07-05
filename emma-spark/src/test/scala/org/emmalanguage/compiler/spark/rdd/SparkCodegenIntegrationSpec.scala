@@ -16,27 +16,40 @@
 package org.emmalanguage
 package compiler.spark.rdd
 
+import api._
+import api.spark._
 import compiler.BaseCodegenIntegrationSpec
+import compiler.RuntimeCompiler
+import compiler.SparkCompiler
 
-class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec {
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.SparkSession
+
+class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkAware {
+  override val compiler = new RuntimeCompiler with SparkCompiler
 
   import compiler._
+  import u.reify
 
-  lazy val sparkRDDModuleSymbol = universe.rootMirror.staticModule(s"$rootPkg.api.SparkRDD")
+  type Env = SparkSession
 
-  override lazy val backendPipeline: (compiler.u.Tree) => compiler.u.Tree = {
-    Comprehension.desugar(API.bagSymbol)
-  } andThen {
-    Backend.translateToDataflows(sparkRDDModuleSymbol)
-  } andThen {
-    addContext
-  }
+  override lazy val Env = api.Type[org.apache.spark.sql.SparkSession]
+  override lazy val env = defaultSparkSession
 
-  private lazy val addContext: u.Tree => u.Tree = tree => {
-    import u._
-    q"""
-        implicit val ctx = _root_.org.emmalanguage.LocalSparkSession.getOrCreate()
-        $tree
-    """
+  override lazy val backendPipeline: u.Tree => u.Tree =
+    Backend.specialize(SparkAPI)
+
+  // --------------------------------------------------------------------------
+  // Distributed collection conversion
+  // --------------------------------------------------------------------------
+
+  "Convert from/to a Spark RDD" in {
+    implicit val e: Env = env
+    verify(reify {
+      val xs = DataBag(1 to 1000).withFilter(_ > 800)
+      val ys = xs.as[RDD].filter(_ < 200)
+      val zs = DataBag.from(ys)
+      zs.size
+    })
   }
 }

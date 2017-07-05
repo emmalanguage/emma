@@ -17,22 +17,17 @@ package org.emmalanguage
 package examples.graphs
 
 import api._
-import examples.graphs.model.Edge
-import io.csv.CSV
+import model._
 
-import org.apache.flink.api.scala.ExecutionEnvironment
-
-class FlinkTransitiveClosureIntegrationSpec extends BaseTransitiveClosureIntegrationSpec {
+class FlinkTransitiveClosureIntegrationSpec extends BaseTransitiveClosureIntegrationSpec with FlinkAware {
 
   override def transitiveClosure(input: String, csv: CSV): Set[Edge[Long]] =
-    emma.onFlink {
+    withDefaultFlinkEnv(implicit flink => emma.onFlink {
       // read in set of edges
       val edges = DataBag.readCSV[Edge[Long]](input, csv)
       // build the transitive closure
       val paths = TransitiveClosure(edges)
       // return the closure as local set
-      paths.fetch().toSet
-    }
-
-  implicit lazy val flinkEnv = ExecutionEnvironment.getExecutionEnvironment
+      paths.collect().toSet
+    })
 }

@@ -22,6 +22,7 @@ import compiler.BaseCompilerSpec
 class Foreach2LoopSpec extends BaseCompilerSpec {
 
   import compiler._
+  import u.reify
 
   val foreach2loopPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true, withPre = false)(
@@ -33,11 +34,11 @@ class Foreach2LoopSpec extends BaseCompilerSpec {
 
   "foreach" - {
     "without closure modification" in {
-      val act = foreach2loopPipeline(u.reify {
+      val act = foreach2loopPipeline(reify {
         for (i <- 1 to 5) println(i)
       })
 
-      val exp = idPipeline(u.reify {
+      val exp = idPipeline(reify {
         for (i <- 1 to 5) println(i)
       })
 
@@ -45,12 +46,12 @@ class Foreach2LoopSpec extends BaseCompilerSpec {
     }
 
     "without argument access" in {
-      val act = foreach2loopPipeline(u.reify {
+      val act = foreach2loopPipeline(reify {
         var x = 42
         for (_ <- 1 to 5) x += 1
       })
 
-      val exp = idPipeline(u.reify {
+      val exp = idPipeline(reify {
         var x = 42; {
           val iter$1 = 1.to(5).toIterator
           var _$1 = null.asInstanceOf[Int]
@@ -65,12 +66,12 @@ class Foreach2LoopSpec extends BaseCompilerSpec {
     }
 
     "with argument access" in {
-      val act = foreach2loopPipeline(u.reify {
+      val act = foreach2loopPipeline(reify {
         var x = 42
         for (i <- 1 to 5) x += i
       })
 
-      val exp = idPipeline(u.reify {
+      val exp = idPipeline(reify {
         var x = 42; {
           val iter$1 = 1.to(5).toIterator
           var i$1 = null.asInstanceOf[Int]
@@ -85,12 +86,12 @@ class Foreach2LoopSpec extends BaseCompilerSpec {
     }
 
     "with monadic filter" in {
-      val act = foreach2loopPipeline(u.reify {
+      val act = foreach2loopPipeline(reify {
         var x = 42
         for (i <- 1 to 10 if i % 2 == 0) x += i
       })
 
-      val exp = idPipeline(u.reify {
+      val exp = idPipeline(reify {
         var x = 42; {
           val iter$1 = 1.to(10)
             .withFilter(_ % 2 == 0)

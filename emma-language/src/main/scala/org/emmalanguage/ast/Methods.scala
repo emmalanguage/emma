@@ -55,7 +55,7 @@ trait Methods { this: AST =>
    */
   trait MethodAPI { this: API =>
 
-    import universe._
+    import u._
     import internal._
     import reificationSupport._
     import Flag._

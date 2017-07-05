@@ -16,26 +16,16 @@
 package org.emmalanguage
 package api
 
-import io.csv.{CSV, CSVConverter}
-
 import org.apache.spark.sql.SparkSession
 
-class SparkDatasetSpec extends DataBagSpec {
+class SparkDatasetSpec extends DataBagSpec with SparkAware {
 
-  override type Bag[A] = SparkDataset[A]
+  override type TestBag[A] = SparkDataset[A]
   override type BackendContext = SparkSession
 
+  override val TestBag = SparkDataset
   override val suffix = "spark-dataset"
 
   override def withBackendContext[T](f: BackendContext => T): T =
-    LocalSparkSession.withSparkSession(f)
-
-  override def Bag[A: Meta]()(implicit spark: SparkSession): Bag[A] =
-    SparkDataset.empty[A]
-
-  override def Bag[A: Meta](seq: Seq[A])(implicit spark: SparkSession): Bag[A] =
-    SparkDataset(seq)
-
-  override def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(implicit spark: SparkSession): DataBag[A] =
-    SparkDataset.readCSV(path, format)
+    f(defaultSparkSession)
 }

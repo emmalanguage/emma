@@ -29,7 +29,10 @@
     <name>${project.artifactId}</name>
 
     <properties>
-        <runtime.scope>compile</runtime.scope>
+        <!-- Predicates -->
+        <scala-maven-plugin.skip>false</scala-maven-plugin.skip>
+        <scalastyle-maven-plugin.skip>false</scalastyle-maven-plugin.skip>
+        <scalatest-maven-plugin.skip>${skipTests}</scalatest-maven-plugin.skip>
     </properties>
 
     <dependencies>

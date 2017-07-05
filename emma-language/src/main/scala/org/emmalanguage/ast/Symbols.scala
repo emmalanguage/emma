@@ -18,7 +18,7 @@ package ast
 
 import util.Monoids._
 
-import cats.std.all._
+import cats.instances.all._
 import shapeless._
 
 import scala.annotation.tailrec
@@ -27,7 +27,7 @@ trait Symbols { this: AST =>
 
   trait SymbolAPI { this: API =>
 
-    import universe._
+    import u._
     import definitions._
     import internal._
     import reificationSupport._
@@ -120,7 +120,7 @@ trait Symbols { this: AST =>
               else newTermSymbol(own, termNme, pos, flg)
             }
 
-            setInfo(dup, tpe.dealias.widen)
+            setInfo(dup, tpe.dealias)
             setAnnotations(dup, ans.toList)
             dup.asInstanceOf[S]
           }
@@ -259,7 +259,7 @@ trait Symbols { this: AST =>
                 val dup = With(als)(own = own, tpe = tpe)
                 (Map(sym -> dup), (sym :: Nil, dup :: Nil))
               } else (Map.empty, (Nil, Nil))
-          } (tuple2Monoid(overwrite, tuple2Monoid(reverse, reverse)))
+          } (catsKernelStdMonoidForTuple2(overwrite, catsKernelStdMonoidForTuple2(reverse, reverse)))
           .traverseAny.andThen { case Attr.acc(tree, (dict, (keys, vals)) :: _) =>
             // Handle method types as well.
             def subst(tpe: u.Type) = if (is.defined(tpe)) {
@@ -273,7 +273,8 @@ trait Symbols { this: AST =>
             } else tpe
             // Can't be fused with the traversal above,
             // because method calls might appear before their definition.
-            if (dict.isEmpty) tree else TopDown.transform { case t
+            // Unsafe: The type of substituted symbols might change.
+            if (dict.isEmpty) tree else TopDown.unsafe.transform { case t
               if has.tpe(t) || (has.sym(t) && dict.contains(t.symbol))
               => Tree.With(t)(sym = dict(t.symbol), tpe = subst(t.tpe))
             }._tree(tree)
