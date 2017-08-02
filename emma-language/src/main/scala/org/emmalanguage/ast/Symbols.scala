@@ -203,11 +203,11 @@ trait Symbols { this: AST =>
           in.filter(_ != overloaded).exists { candidate =>
             val candSign = Type.signature(candidate, in = target)
             val yss = Type(candSign, targs).paramLists
-            (xss zip yss) forall { case (xs, ys) =>
-              (xs zip ys) forall { case (x, y) =>
+            xss.size >= yss.size && ((xss zip yss) forall { case (xs, ys) =>
+              xs.size >= ys.size && ((xs zip ys) forall { case (x, y) =>
                 Type.signature(y) <:< Type.signature(x)
-              }
-            }
+              })
+            })
           }
         }
 
