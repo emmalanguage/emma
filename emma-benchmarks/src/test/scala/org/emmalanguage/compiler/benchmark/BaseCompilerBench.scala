@@ -59,7 +59,7 @@ trait BaseCompilerBench extends Bench.OnlineRegressionReport {
 
   val expandPipeline: u.Expr[Any] => u.Tree =
     compiler.pipeline(typeCheck = true)(
-      LibSupport.expand
+      Lib.expand
     ).compose(_.tree)
 
   // ---------------------------------------------------------------------------

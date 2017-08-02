@@ -46,7 +46,7 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
     val xfms = Seq.newBuilder[u.Tree => u.Tree]
     // standard prefix
     xfms ++= Seq(
-      LibSupport.expand,
+      Lib.expand,
       Core.lift
     )
     // optional optimizing rewrites

@@ -19,7 +19,7 @@ package compiler
 import lang.AlphaEq
 import lang.backend.Backend
 import lang.core.Core
-import lang.libsupport.LibSupport
+import lang.lib.Lib
 import lang.opt.Optimizations
 import lang.source.Source
 import tools.GraphTools
@@ -37,7 +37,7 @@ import scala.reflect.api.Universe
  * compile time reflection.
  */
 trait Compiler extends AlphaEq
-  with LibSupport
+  with Lib
   with Source
   with Core
   with Backend

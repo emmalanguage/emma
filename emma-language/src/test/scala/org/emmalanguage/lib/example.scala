@@ -21,10 +21,10 @@ import api._
 import org.example.Foo
 
 @emma.lib
-object example {
+object example extends Arithmetic {
 
   // ---------------------------------------------------------------------------
-  // Examples A, E: acyclic call graphs
+  // Examples A, E, G: acyclic call graphs
   // ---------------------------------------------------------------------------
 
   def plus[A: Numeric](x: A, y: A): A = {
@@ -41,8 +41,10 @@ object example {
     times(x, x)
   }
 
-  def sameAs[A](x: A, y: A): Boolean = {
-    x == y
+  def sameAs[A](x: A, y: A): Map[A, Boolean] = {
+    val m = Map.empty[A, Boolean]
+    val b = x == y
+    m + (x -> b)
   }
 
   def pow[A: Numeric](x: A, y: Int): A = {
@@ -51,6 +53,10 @@ object example {
     var r = n.one
     for (_ <- 0 until y) r = times(r, x)
     r
+  }
+
+  def polynom[A: Numeric](a: Arithmetic)(x: A, y: A): A = {
+    a.plus(y, a.times(x, x))
   }
 
   // ---------------------------------------------------------------------------
