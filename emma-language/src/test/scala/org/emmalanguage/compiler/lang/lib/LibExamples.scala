@@ -14,12 +14,12 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.lang.libsupport
+package compiler.lang.lib
 
 import compiler.BaseCompilerSpec
 
 /** A spec for the `Beta.reduce` transformation. */
-trait LibSupportExamples extends BaseCompilerSpec {
+trait LibExamples extends BaseCompilerSpec {
 
   import compiler._
   import u.reify
@@ -72,25 +72,33 @@ trait LibSupportExamples extends BaseCompilerSpec {
 
   lazy val `Example A (normalized)` = {
     reify {
-      val check = (e: Double) => e < ν
-      val x = 51L
-      val y = 17
+      val check = (e: Double) => e.<(this.ν);
+      val x = 51L;
+      val y = 17;
       val e = {
-        val n$2 = implicitly[Numeric[Double]](Numeric.DoubleIsFractional)
-        n$2.plus(
+        val x$r1 = {
+          val x$r2 = x;
+          val y$r2 = y.toLong;
+          val evidence$2$r1 = Numeric.LongIsIntegral;
+          val n$r2 = Predef.implicitly[scala.math.Numeric[Long]](evidence$2$r1);
+          n$r2.times(x$r2, y$r2)
+        }.toDouble;
+        val y$r1 = {
+          val x$r3 = this.μ;
+          val evidence$3$r1 = Numeric.DoubleIsFractional;
           {
-            val n = implicitly[Numeric[Long]](Numeric.LongIsIntegral)
-            n.times(x, y.toLong)
-          }.toDouble, {
-            val x$1 = μ;
-            {
-              val n = implicitly[Numeric[Double]](Numeric.DoubleIsFractional)
-              n.times(x$1, x$1)
-            }
+            val x$r4 = x$r3;
+            val y$r3 = x$r3;
+            val evidence$2$r2 = evidence$3$r1;
+            val n$r3 = Predef.implicitly[scala.math.Numeric[Double]](evidence$2$r2);
+            n$r3.times(x$r4, y$r3)
           }
-        )
-      }
-      val r = check(e)
+        };
+        val evidence$1$r1 = Numeric.DoubleIsFractional;
+        val n$r1 = Predef.implicitly[scala.math.Numeric[Double]](evidence$1$r1);
+        n$r1.plus(x$r1, y$r1)
+      };
+      val r = check.apply(e);
       r
     }
   }
@@ -191,14 +199,18 @@ trait LibSupportExamples extends BaseCompilerSpec {
       val x = μ * ν
       val y = 100
       val r = {
+        val x$1 = x
         val y$1 = y
-        val evidence$4: Numeric[Double] = Numeric.DoubleIsFractional;
+        val evidence$1 = Numeric.DoubleIsFractional;
         require(y$1 >= 0, "Exponent must be a non-negative integer")
-        val n = implicitly[Numeric[Double]](evidence$4)
+        val n = implicitly[Numeric[Double]](evidence$1)
         var r = n.one
         for (_ <- 0 until y$1) r = {
-          val n$1 = implicitly[Numeric[Double]](evidence$4)
-          n$1.times(r, x)
+          val x$2 = r
+          val y$2 = x$1
+          val evidence$2 = evidence$1
+          val n$1 = implicitly[Numeric[Double]](evidence$2)
+          n$1.times(x$2, y$2)
         }
         r
       }
@@ -221,6 +233,7 @@ trait LibSupportExamples extends BaseCompilerSpec {
     }
   }
 
+
   lazy val `Example F (Emma Source)` = {
     import lib.example._
     reify {
@@ -232,7 +245,11 @@ trait LibSupportExamples extends BaseCompilerSpec {
   lazy val `Example F (normalized)` = {
     reify {
       val r = {
-        μ == ν.toDouble
+        val x$1 = this.μ;
+        val y$1 = this.ν.toDouble;
+        val m = Map.empty[Double, Boolean]
+        val b = x$1 == y$1
+        m + (x$1 -> b)
       }
       r
     }
@@ -240,4 +257,52 @@ trait LibSupportExamples extends BaseCompilerSpec {
 
   lazy val `Example F (Emma Core)` =
     liftPipeline(`Example F (Original Expr)`)
+
+  // ---------------------------------------------------------------------------
+  // Example G: Program representations
+  // ---------------------------------------------------------------------------
+
+  lazy val `Example G (Original Expr)` = {
+    import lib.example._
+    reify {
+      val r = polynom(lib.example)(μ, 42.42)
+      r
+    }
+  }
+
+  lazy val `Example G (Emma Source)` = {
+    import lib.example._
+    reify {
+      val r = polynom[Double](lib.example)(μ, 42.42)(Numeric.DoubleIsFractional)
+      r
+    }
+  }
+
+  lazy val `Example G (normalized)` = {
+    reify {
+      val r = {
+        val a$1 = lib.example;
+        val x$1 = this.μ;
+        val y$1 = 42.42;
+        val evidence$1 = Numeric.DoubleIsFractional;
+        {
+          val x$2 = y$1
+          val y$2 = {
+            val x$3 = x$1
+            val y$3 = x$1
+            val evidence$3 = evidence$1
+            val n$2 = implicitly[Numeric[Double]](evidence$3)
+            n$2.times(x$3, y$3)
+          }
+          val evidence$2 = evidence$1
+          val n$1 = implicitly[Numeric[Double]](evidence$2)
+          n$1.plus(x$2, y$2)
+        }
+      }
+      r
+    }
+  }
+
+  lazy val `Example G (Emma Core)` =
+    liftPipeline(`Example G (Original Expr)`)
 }

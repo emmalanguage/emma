@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.lang.libsupport
+package compiler.lang.lib
 
 /** A collection of program examples to be used in the `Function*Spec` classes. */
-class LibSupportExamplesSpec extends LibSupportExamples {
+class LibExamplesSpec extends LibExamples {
 
   // ---------------------------------------------------------------------------
   // Spec

@@ -14,27 +14,12 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.integration
+package lib
 
-import compiler.BaseCompilerSpec
+trait Arithmetic {
 
-/** Base trait for full Emma examples. */
-trait BaseCompilerIntegrationSpec extends BaseCompilerSpec {
+  def plus[A: Numeric](x: A, y: A): A
 
-  import compiler._
+  def times[A: Numeric](x: A, y: A): A
 
-  // ---------------------------------------------------------------------------
-  // Transformation pipelines
-  // ---------------------------------------------------------------------------
-
-  val anfPipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
-      Core.anf
-    ).compose(_.tree)
-
-  val liftPipeline: u.Expr[Any] => u.Tree =
-    compiler.pipeline(typeCheck = true)(
-      Lib.expand,
-      Core.lift
-    ).compose(_.tree)
 }
