@@ -31,7 +31,6 @@ addons:
 
 install:
   - mvn -q dependency:resolve-plugins
-  - mvn -q dependency:resolve
   - tools/zinc_setup.sh
 
 before_script:
