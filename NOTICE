@@ -93,11 +93,13 @@ This project includes:
   emma-benchmarks under The Apache License, Version 2.0
   emma-examples under The Apache License, Version 2.0
   emma-examples-flink under The Apache License, Version 2.0
-  emma-examples-library under The Apache License, Version 2.0
   emma-examples-spark under The Apache License, Version 2.0
   emma-flink under The Apache License, Version 2.0
   emma-gui under The Apache License, Version 2.0
   emma-language under The Apache License, Version 2.0
+  emma-lib under The Apache License, Version 2.0
+  emma-lib-flink under The Apache License, Version 2.0
+  emma-lib-spark under The Apache License, Version 2.0
   emma-quickstart under The Apache License, Version 2.0
   emma-spark under The Apache License, Version 2.0
   empty under The Apache License, Version 2.0
@@ -235,6 +237,7 @@ This project includes:
   Spark Project Catalyst under Apache 2.0 License
   Spark Project Core under Apache 2.0 License
   Spark Project Launcher under Apache 2.0 License
+  Spark Project ML Local Library under Apache 2.0 License
   Spark Project Networking under Apache 2.0 License
   Spark Project Shuffle Streaming Service under Apache 2.0 License
   Spark Project Sketch under Apache 2.0 License
