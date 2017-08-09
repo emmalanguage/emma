@@ -35,17 +35,53 @@ class DSCFSpec extends BaseCompilerSpec {
   val dscfInvPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.anf,
-      tree => time(DSCF.inverse(tree), "dscfInv"),
-      Core.dce
+      tree => time(DSCF.inverse(tree), "dscfInv")
     ).compose(_.tree)
 
   val anfPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
-      Core.anf,
-      Core.dce
+      Core.anf
     ).compose(_.tree)
 
   "If-Else" - {
+    "with one branch" - {
+      val src = reify {
+        val x = this.x
+        val c = x < 0
+        var y = -17
+        if (c) y = x + 17
+        y
+      }
+
+      val tgt = reify {
+        val x = this.x
+        val c = x < 0
+
+        @suffix def suffix(y: Int): Int = {
+          y
+        }
+
+        @thenBranch def thn(): Int = {
+          val y$1 = x + 17
+          suffix(y$1)
+        }
+
+        if (c) thn()
+        else suffix(-17)
+      }
+
+      "dscf" in {
+        val act = dscfPipeline(src)
+        val exp = anfPipeline(tgt)
+        act shouldBe alphaEqTo(exp)
+      }
+      "dscf inverse" in {
+        val act = dscfInvPipeline(tgt)
+        val exp = anfPipeline(src)
+        act shouldBe alphaEqTo(exp)
+      }
+    }
+
     "with two branches" - {
       val src = reify {
         val x = this.x
@@ -231,6 +267,8 @@ class DSCFSpec extends BaseCompilerSpec {
       "dscf" in {
         val act = dscfPipeline(src)
         val exp = anfPipeline(tgt)
+        println(act)
+        println(exp)
         act shouldBe alphaEqTo(exp)
       }
       "dscf inverse" in {

@@ -236,23 +236,41 @@ private[core] trait DSCF extends Common {
     lazy val inverse: u.Tree => u.Tree = (tree: u.Tree) => {
       // construct dataflow graph
       val cfg = ControlFlow.cfg(tree)
+      // construct transitive closure of nesting graph
+      val nst = quiver.empty[u.Symbol, Unit, Unit]
+        .addNodes(cfg.ctrl.nodes.map(quiver.LNode[u.Symbol, Unit](_, ())))
+        .safeAddEdges(for {
+          src <- cfg.ctrl.nodes
+          dst <- api.Owner.chain(src)
+          if dst != src
+          if dst.isMethod
+          if cfg.ctrl contains dst.asMethod
+        } yield quiver.LEdge[u.Symbol, Unit](src, dst.asMethod, ()))
+        .tclose.reverse
+
       // restrict dataflow to phi nodes only
+      // and eliminate (x, y) edges if the owner of x contains the owner of y
       val phi = cfg.data.labfilter({
         case core.BindingDef(_, core.DefCall(_, API.GraphRepresentation.phi, _, _)) => true
         case _ => false
+      }).efilter(e => {
+        val srcOwn = e.from.owner
+        val tgtOwn = e.to.owner
+        !(nst.successors(srcOwn) contains tgtOwn)
       })
-      // create a fresh variable `x` for each phi node `n` without successors in the phi graph
-      // and associate `x` with `n` and each each predecessor `p` of `x`
+
+      // create a fresh variable `x` for each phi node `n` without non-nested successors
+      // in the phi graph and associate `x` with `n` and each each predecessor `p` of `n`
       val varOf = (for {
         n <- phi.nodes
-        if phi.successors(n).isEmpty
+        if phi.outDegree(n) == 0
         x = api.Sym.With(n)(own = n.owner.owner, nme = api.TermName.fresh(n), flg = u.Flag.MUTABLE)
         p <- n +: phi.predecessors(n)
       } yield p -> x) (breakOut): Map[u.Symbol, u.TermSymbol]
 
       def mkVarDefsWithNulls(pars: Seq[u.ValDef], owner: u.Symbol) = for {
         (core.ParDef(p, _), i) <- pars.zipWithIndex
-        if phi.outDegree(p) == 0 // exclude assignments `x = y` if `x` as a successor in the phi graph
+        if phi.outDegree(p) == 0 // exclude `var x = null` defs if `x` has a successor in the phi graph
         bnddef <- {
           val (x1, rhs1) = (
             api.TermSym(owner, api.TermName.fresh("null"), p.info),
@@ -267,14 +285,13 @@ private[core] trait DSCF extends Common {
       } yield bnddef
 
       def mkVarDefsWithDefaults(pars: Seq[u.ValDef], rhss: Seq[u.Tree]) = for {
-        (core.ParDef(p, _), default) <- pars zip rhss
-        if phi.outDegree(p) == 0 // exclude assignments `x = y` if `x` as a successor in the phi graph
-      } yield src.VarDef(varOf(p), default)
+        (core.ParDef(p, _), y) <- pars zip rhss
+        if phi.outDegree(p) == 0 // exclude `var x = y` defs if `x` has a successor in the phi graph
+      } yield src.VarDef(varOf(p), y)
 
       def mkMuts(lhss: Seq[u.Symbol], rhss: Seq[u.Tree]) = for {
         (x, y) <- lhss zip rhss
-        // exclude assignments `x = y` if `x` and `y` are mapped to the same variable
-        if (y match {
+        if (y match { // exclude `x = y` assignments if `x` and `y` are mapped to the same variable
           case core.Ref(z) => varOf.getOrElse(x, x) != varOf.getOrElse(z, z)
           case _ => true
         })
@@ -329,8 +346,16 @@ private[core] trait DSCF extends Common {
             && is[loopBody](b)
             && is[suffix](s) =>
           //@formatter:on
+          val indx = (for {
+            (core.Ref(y), x) <- ags2 zip pars.map(_.symbol)
+          } yield y -> varOf(x)) (breakOut): Map[u.TermSymbol, u.Symbol]
+
           val vars = mkVarDefsWithDefaults(pars, ags1)
-          val body = src.Block(sbod ++ mkMuts(pars.map(_.symbol), ags2), api.Term.unit)
+          val muts = mkMuts(pars.map(_.symbol), ags2)
+          val blc1 = src.Block(pre2 ++ sbod ++ muts, cond)
+          val (bod1, con1) = split(indx)(
+            src.Block(blc1.stats, api.Term.unit),
+            src.Block(Seq.empty, blc1.expr))
 
           src.Block(
             Seq.concat(
@@ -338,8 +363,8 @@ private[core] trait DSCF extends Common {
               vars,
               Seq(
                 src.While(
-                  src.Block(pre2, cond),
-                  body)),
+                  con1,
+                  bod1)),
               suff.stats
             ),
             suff.expr)
@@ -386,6 +411,41 @@ private[core] trait DSCF extends Common {
               suf1.stats
             ),
             suf1.expr)
+
+        // a let block with nested `if($cond) $thn` control-flow
+        //@formatter:off
+        case Attr(
+          core.Let(
+            pref,
+            Seq(
+              core.DefDef(s, _, Seq(pars),
+                suff: u.Block),
+              core.DefDef(t, _, _,
+                src.Block(sthn, core.DefCall(None, m3, _, Seq(argsthn))))),
+            core.Branch(cond,
+              core.DefCall(None, m1, _, _),
+              core.DefCall(None, m2, _, Seq(argsels)))
+          ), _, owner :: _, _)
+            if t == m1
+            && s == m2
+            && s == m3
+            && is[thenBranch](t)
+            && is[continuation](s) =>
+          //@formatter:off
+          val vars = mkVarDefsWithDefaults(pars, argsels)
+          val thnb = src.Block(sthn ++ mkMuts(pars.map(_.symbol), argsthn), api.Term.unit)
+
+          src.Block(
+            Seq.concat(
+              pref,
+              vars,
+              Seq(
+                src.ValDef(
+                  api.TermSym(owner, api.TermName.fresh("if"), api.Type.unit),
+                  src.Branch(cond, thnb, api.Term.unit))),
+              suff.stats
+            ),
+            suff.expr)
 
         // a let block with nested `if($cond) $thn else $els` control-flow
         //@formatter:off
