@@ -26,9 +26,10 @@ import scala.io.Source
 
 class KMeansSpec extends lib.BaseLibSpec {
 
-  val epsilon = 1e-3
-  val iterations = 10
   val delimiter = "\t"
+
+  val runs = 2
+  val iterations = 2
   val overlap = .75
 
   val path = "/ml/clustering/kmeans"
@@ -42,19 +43,17 @@ class KMeansSpec extends lib.BaseLibSpec {
     materializeResource(s"$path/$file"): Unit
   }
 
-  it should "cluster points around the corners of a hypercube" in {
-    val exp =
-      clusters(for {
-        line <- Source.fromFile(s"$temp/clusters.tsv").getLines().toSet[String]
-      } yield {
-        val Seq(point, cluster) = line.split(delimiter).map(_.toLong).toSeq
-        point -> cluster
-      })
+  "kMeans" should "cluster points around the corners of a hypercube" in {
+    val exp = clusters(for {
+      line <- Source.fromFile(s"$temp/clusters.tsv").getLines().toSet[String]
+    } yield {
+      val Seq(pointID, clusterID) = line.split(delimiter).map(_.toLong).toSeq
+      LDPoint(pointID, dense(Array(0.0)), DPoint(clusterID, dense(Array(0.0))))
+    })
 
-    val act =
-      clusters(for {
-        s <- run(exp.size, epsilon, iterations, s"$temp/points.tsv")
-      } yield (s.id, s.label.id))
+    val act = clusters(for {
+      s <- run(exp.size, s"$temp/points.tsv")
+    } yield s)
 
     val correctClusters = for {
       act <- act
@@ -62,21 +61,20 @@ class KMeansSpec extends lib.BaseLibSpec {
       if (act & exp).size / exp.size.toDouble >= overlap
     } yield ()
 
-    correctClusters.size.toDouble should be >= (overlap * exp.size)
+    correctClusters.size shouldBe exp.size
   }
 
-  def clusters(associations: Set[(Long, Long)]): Iterable[Set[Long]] =
-    for ((_, values) <- associations.groupBy { case (p, c) => c })
-      yield values.map { case (p, c) => p }
+  def clusters(solution: Set[kMeans.Solution[Long]]): Iterable[Set[Long]] =
+    solution.groupBy(_.label.id).mapValues(_.map(_.id).toSet).values
 
-  def run(k: Int, epsilon: Double, iterations: Int, input: String): Set[kMeans.Solution[Long]] = {
+  def run(k: Int, input: String): Set[kMeans.Solution[Long]] = {
     // read the input
     val points = for (line <- DataBag.readText(input)) yield {
       val record = line.split("\t")
       DPoint(record.head.toLong, dense(record.tail.map(_.toDouble)))
     }
     // do the clustering
-    val result = kMeans(2, k, epsilon, iterations)(points)
+    val result = kMeans(2, k, runs, iterations)(points)
     // return the solution as a local set
     result.collect().toSet[kMeans.Solution[Long]]
   }

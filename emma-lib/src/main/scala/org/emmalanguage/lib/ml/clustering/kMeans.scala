@@ -21,39 +21,53 @@ import api._
 import lib.linalg._
 import lib.ml._
 import lib.stats._
+import util.RanHash
 
 @emma.lib
 object kMeans {
 
+  /**
+   * K-Means clustering algorithm.
+   *
+   * @param D          Number of dimensions
+   * @param k          Number of clusters
+   * @param runs       Number of runs.
+   * @param iterations Number of iterations.
+   * @param distance   Distance metric.
+   * @param seed       Centroids seed.
+   * @param points     Input points.
+   * @tparam PID Point identity type.
+   */
   def apply[PID: Meta](
-    D: Int, k: Int, epsilon: Double, iterations: Int // hyper-parameters
+    D: Int,
+    k: Int,
+    runs: Int,
+    iterations: Int,
+    distance: (DVector, DVector) => Double = sqdist,
+    seed: Long = 452642543145L
   )(
-    points: DataBag[DPoint[PID]] // data-parameters
+    points: DataBag[DPoint[PID]]
   ): DataBag[Solution[PID]] = {
     // helper method: orders points `x` based on their distance to `pos`
-    val distanceTo = (pos: DVector) => Ordering.by { x: DPoint[PID] =>
-      sqdist(pos, x.pos)
-    }
+    val distanceTo = (pos: DVector) => Ordering.by((x: DPoint[PID]) => distance(pos, x.pos))
 
     var optSolution = DataBag.empty[Solution[PID]]
-    var minSqrDist = 0.0
+    var minDistance = 0.0
 
-    for (i <- 1 to iterations) {
+    for (run <- 1 to runs) {
       // initialize forgy cluster means
-      var delta = 0.0
-      var ctrds = DataBag(points.sample(k))
-
+      var centroids = DataBag(points.sample(k, RanHash(seed, run).seed))
       // initialize solution: label points with themselves
       var solution = for (p <- points) yield LDPoint(p.id, p.pos, p)
 
-      do {
+      for (_ <- 1 to iterations) {
         // update solution: label each point with its nearest cluster
         solution = for (s <- solution) yield {
-          val closest = ctrds.min(distanceTo(s.pos))
+          val closest = centroids.min(distanceTo(s.pos))
           s.copy(label = closest)
         }
         // update centroid positions as mean of associated points
-        val newCtrds = for {
+        centroids = for {
           Group(cid, ps) <- solution.groupBy(_.label.id)
         } yield {
           val sum = stat.sum(D)(ps.map(_.pos))
@@ -61,24 +75,14 @@ object kMeans {
           val avg = sum * (1 / cnt)
           DPoint(cid, avg)
         }
+      }
 
-        // update delta as the sum of squared distances between the old and the new means
-        delta = (for {
-          cOld <- ctrds
-          cNew <- newCtrds
-          if cOld.id == cNew.id
-        } yield sqdist(cOld.pos, cNew.pos)).sum
-
-        // use new means for the next iteration
-        ctrds = newCtrds
-      } while (delta > epsilon)
-
-      val sumSqrDist = (for (p <- solution) yield {
-        sqdist(p.label.pos, p.pos)
+      val sumDistance = (for (p <- solution) yield {
+        distance(p.label.pos, p.pos)
       }).sum
 
-      if (i <= 1 || sumSqrDist < minSqrDist) {
-        minSqrDist = sumSqrDist
+      if (run <= 1 || sumDistance < minDistance) {
+        minDistance = sumDistance
         optSolution = solution
       }
     }
