@@ -207,12 +207,32 @@
             <!-- Emma -->
             <dependency>
                 <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-language</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
                 <artifactId>emma-flink</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
                 <groupId>org.emmalanguage</groupId>
-                <artifactId>emma-language</artifactId>
+                <artifactId>emma-spark</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-lib</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-lib-flink</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-lib-spark</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -230,15 +250,17 @@
                 <artifactId>emma-quickstart</artifactId>
                 <version>${project.version}</version>
             </dependency>
-            <dependency>
-                <groupId>org.emmalanguage</groupId>
-                <artifactId>emma-spark</artifactId>
-                <version>${project.version}</version>
-            </dependency>
             <!-- Emma (test jars) -->
             <dependency>
                 <groupId>org.emmalanguage</groupId>
                 <artifactId>emma-language</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-lib</artifactId>
                 <version>${project.version}</version>
                 <type>test-jar</type>
                 <scope>test</scope>
@@ -575,25 +597,6 @@
                 </executions>
             </plugin>
 
-            <!-- Creating code generation folder on the fly -->
-            <plugin>
-                <artifactId>maven-antrun-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>generate-sources</id>
-                        <phase>generate-sources</phase>
-                        <configuration>
-                            <target>
-                                <mkdir dir="${java.io.tmpdir}/emma/codegen"/>
-                            </target>
-                        </configuration>
-                        <goals>
-                            <goal>run</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-
             <!-- Disable surefire -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -843,6 +846,9 @@
         <module>emma-language</module>
         <module>emma-flink</module>
         <module>emma-spark</module>
+        <module>emma-lib</module>
+        <module>emma-lib-flink</module>
+        <module>emma-lib-spark</module>
         <module>emma-examples</module>
         <module>emma-benchmarks</module>
         <module>emma-gui</module>
