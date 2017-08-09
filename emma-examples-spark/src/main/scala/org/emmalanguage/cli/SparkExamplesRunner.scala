@@ -16,13 +16,10 @@
 package org.emmalanguage
 package cli
 
-import api._
 import api.Meta.Projections._
+import api._
 import examples.graphs._
 import examples.graphs.model._
-import examples.ml.classification._
-import examples.ml.clustering._
-import examples.ml.model._
 import examples.text._
 import util.Iso
 
@@ -50,10 +47,6 @@ object SparkExamplesRunner extends SparkAware {
     epsilon      : Double               = 0,
     iterations   : Int                  = 0,
     input        : String               = sys.props("java.io.tmpdir"),
-    D            : Int                  = 0,
-    k            : Int                  = 0,
-    lambda       : Double               = 0,
-    nbModelType  : NaiveBayes.ModelType = NaiveBayes.ModelType.Bernoulli,
     output       : String               = sys.props("java.io.tmpdir")
   ) extends SparkConfig {
     lazy val appName = s"Emma example: ${command.getOrElse("unknown")}"
@@ -84,15 +77,6 @@ object SparkExamplesRunner extends SparkAware {
         arg[String]("output")
           .text("labeled vertices path")
           .action((x, c) => c.copy(output = x)))
-    cmd("transitive-closure")
-      .text("Compute the transitive closure of a directed graph")
-      .children(
-        arg[String]("input")
-          .text("edges path")
-          .action((x, c) => c.copy(input = x)),
-        arg[String]("output")
-          .text("closure path")
-          .action((x, c) => c.copy(output = x)))
     note("")
     cmd("triangle-count")
       .text("Count the number of triangle cliques in a graph")
@@ -100,45 +84,6 @@ object SparkExamplesRunner extends SparkAware {
         arg[String]("input")
           .text("edges path")
           .action((x, c) => c.copy(input = x)))
-
-    section("Machine Learning")
-    cmd("naive-bayes")
-      .text("Naive Bayes classification")
-      .children(
-        arg[Double]("lambda")
-          .text("termination threshold")
-          .action((x, c) => c.copy(lambda = x)),
-        arg[NaiveBayes.ModelType]("model-type")
-          .text("'beroulli' or 'multinomial'")
-          .action((x, c) => c.copy(nbModelType = x)),
-        arg[String]("input")
-          .text("training data path")
-          .action((x, c) => c.copy(input = x)),
-        arg[String]("output")
-          .text("resulting model path")
-          .action((x, c) => c.copy(output = x)))
-    note("")
-    cmd("k-means")
-      .text("K-Means Clustering")
-      .children(
-        arg[Int]("D")
-          .text("number of dimensions")
-          .action((x, c) => c.copy(D = x))
-          .validate(between("D", 0, Int.MaxValue)),
-        arg[Int]("k")
-          .text("number of clusters")
-          .action((x, c) => c.copy(k = x))
-          .validate(between("k", 0, Int.MaxValue)),
-        arg[Int]("iterations")
-          .text("number of repeated iterations")
-          .action((x, c) => c.copy(iterations = x))
-          .validate(between("iterations", 0, 100)),
-        arg[String]("input")
-          .text("points path")
-          .action((x, c) => c.copy(input = x)),
-        arg[String]("output")
-          .text("solution path")
-          .action((x, c) => c.copy(output = x)))
 
     section("Text Analytics")
     cmd("word-count")
@@ -160,15 +105,8 @@ object SparkExamplesRunner extends SparkAware {
         // Graphs
         case "connected-components" =>
           Some(connectedComponents(cfg)(sparkSession(cfg)))
-        case "transitive-closure" =>
-          Some(transitiveClosure(cfg)(sparkSession(cfg)))
         case "triangle-count" =>
           Some(triangleCount(cfg)(sparkSession(cfg)))
-        // Machine Learning
-        case "naive-bayes" =>
-          Some(naiveBayes(cfg)(sparkSession(cfg)))
-        case "k-means" =>
-          Some(kMeans(cfg)(sparkSession(cfg)))
         // Text
         case "word-count" =>
           Some(wordCount(cfg)(sparkSession(cfg)))
@@ -191,18 +129,8 @@ object SparkExamplesRunner extends SparkAware {
     emma.onSpark {
       // read in set of edges to be used as input
       val edges = DataBag.readCSV[Edge[Long]](c.input, c.csv)
-      // build the transitive closure
+      // build the connected components
       val paths = ConnectedComponents(edges)
-      // write the results into a file
-      paths.writeCSV(c.output, c.csv)
-    }
-
-  def transitiveClosure(c: Config)(implicit spark: SparkSession): Unit =
-    emma.onSpark {
-      // read in set of edges to be used as input
-      val edges = DataBag.readCSV[Edge[Long]](c.input, c.csv)
-      // build the transitive closure
-      val paths = TransitiveClosure(edges)
       // write the results into a file
       paths.writeCSV(c.output, c.csv)
     }
@@ -219,34 +147,6 @@ object SparkExamplesRunner extends SparkAware {
       val triangleCount = triangles.size
       // print the result to the console
       println(s"The number of triangles in the graph is $triangleCount")
-    }
-
-  // Machine Learning
-
-  def naiveBayes(c: Config)(implicit spark: SparkSession): Unit =
-    emma.onSpark {
-      // read the training data
-      val data = for (line <- DataBag.readCSV[String](c.input, c.csv)) yield {
-        val record = line.split(",").map(_.toDouble)
-        LVector(record.head, Vec(record.slice(1, record.length)))
-      }
-      // run classification algorithm
-      val model = NaiveBayes(c.lambda, c.nbModelType)(data)
-      // write the result model into a file
-      model.writeCSV(c.output, c.csv)
-    }
-
-  def kMeans(c: Config)(implicit spark: SparkSession): Unit =
-    emma.onSpark {
-      // read the input
-      val points = for (line <- DataBag.readText(c.input)) yield {
-        val record = line.split("\t")
-        Point(record.head.toLong, record.tail.map(_.toDouble))
-      }
-      // do the clustering
-      val solution = KMeans(c.D, c.k, c.epsilon, c.iterations)(points)
-      // write the (pointID, clusterID) pairs into a file
-      solution.map(s => (s.id, s.label.id)).writeCSV(c.output, c.csv)
     }
 
   // Text
@@ -270,9 +170,6 @@ object SparkExamplesRunner extends SparkAware {
     import scopt._
 
     import scala.Ordering.Implicits._
-
-    implicit val naiveBayesModelTypeRead: scopt.Read[NaiveBayes.ModelType] =
-      scopt.Read.reads(NaiveBayes.ModelType.withName)
 
     override def usageExample: String =
       "emma-examples command [options] <args>..."
