@@ -68,7 +68,7 @@
         </dependency>
         <dependency>
             <groupId>org.emmalanguage</groupId>
-            <artifactId>emma-examples-library</artifactId>
+            <artifactId>emma-examples</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
         </dependency>

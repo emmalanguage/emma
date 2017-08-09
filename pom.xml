@@ -242,6 +242,16 @@
             </dependency>
             <dependency>
                 <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-examples-flink</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-examples-spark</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
                 <artifactId>emma-gui</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -261,6 +271,13 @@
             <dependency>
                 <groupId>org.emmalanguage</groupId>
                 <artifactId>emma-lib</artifactId>
+                <version>${project.version}</version>
+                <type>test-jar</type>
+                <scope>test</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-examples</artifactId>
                 <version>${project.version}</version>
                 <type>test-jar</type>
                 <scope>test</scope>
@@ -850,6 +867,8 @@
         <module>emma-lib-flink</module>
         <module>emma-lib-spark</module>
         <module>emma-examples</module>
+        <module>emma-examples-flink</module>
+        <module>emma-examples-spark</module>
         <module>emma-benchmarks</module>
         <module>emma-gui</module>
         <module>emma-quickstart</module>
