@@ -16,25 +16,16 @@
 package org.emmalanguage
 package compiler.benchmark
 
-import api._
 import api.Meta.Projections._
+import api._
 import compiler.RuntimeCompiler
 import examples.graphs._
 import examples.graphs.model._
 import examples.imdb._
-import examples.ml.classification._
-import examples.ml.clustering._
-import examples.ml.model._
 import examples.text._
-import util.Iso
-
-import breeze.linalg._
 
 import org.scalameter._
-
 import shapeless.cachedImplicit
-
-import scala.reflect.ClassTag
 
 /** Common methods and mixins for all compier benchmarks. */
 trait BaseCompilerBench extends Bench.OnlineRegressionReport {
@@ -48,10 +39,10 @@ trait BaseCompilerBench extends Bench.OnlineRegressionReport {
 
   // ToolBox.typecheck can't handle type class derivation.
   implicit val edgeCSVConverter:  CSVConverter[Edge[Long]]      = cachedImplicit
-  implicit val lvecCSVConverter:  CSVConverter[LVector[String]] = cachedImplicit
-  implicit val pointCSVConverter: CSVConverter[Point[Long]]     = cachedImplicit
-  implicit def breezeVecCSVConverter[A: ClassTag: CSVColumn]: CSVConverter[Vector[A]] =
-    CSVConverter.iso[Array[A], Vector[A]](Iso.make(DenseVector.apply, _.toArray), implicitly)
+  //implicit val lvecCSVConverter:  CSVConverter[LVector[String]] = cachedImplicit
+  //implicit val pointCSVConverter: CSVConverter[Point[Long]]     = cachedImplicit
+  //implicit def breezeVecCSVConverter[A: ClassTag: CSVColumn]: CSVConverter[Vector[A]] =
+  //  CSVConverter.iso[Array[A], Vector[A]](Iso.make(DenseVector.apply, _.toArray), implicitly)
 
   // ---------------------------------------------------------------------------
   // Transformation pipelines
@@ -76,10 +67,11 @@ trait BaseCompilerBench extends Bench.OnlineRegressionReport {
     EnumerateTriangles(edges)
   }
 
-  val transitiveClosure = reify {
-    val edges = DataBag.readCSV[Edge[Long]](input, csv)
+  // FIXME: migrate to the `emma-lib` version
+  /*val transitiveClosure = reify {
+    val edges = DataBag.readCSV[graphs.model.Edge[Long]](input, csv)
     TransitiveClosure(edges)
-  }
+  }*/
 
   val directorsMuses = reify {
     DirectorsMuses(input, csv)("John Doe")
@@ -92,16 +84,18 @@ trait BaseCompilerBench extends Bench.OnlineRegressionReport {
   //    }
   //  }
 
-  val naiveBayes = reify {
+  // FIXME: migrate to the `emma-lib` version
+  /*val naiveBayes = reify {
     val modelType = NaiveBayes.ModelType.Bernoulli
     val data = DataBag.readCSV[LVector[String]](input, csv)
     NaiveBayes(1.0, modelType)(data)
-  }
+  }*/
 
-  val kMeans = reify {
+  // FIXME: migrate to the `emma-lib` version
+  /*val kMeans = reify {
     val points = DataBag.readCSV[Point[Long]](input, csv)
     KMeans[Long](2, 8, 1e-3, 10)(points)
-  }
+  }*/
 
   val wordCount = reify {
     val documents = DataBag.readText(input)
@@ -111,11 +105,11 @@ trait BaseCompilerBench extends Bench.OnlineRegressionReport {
   val examples = Seq(
     connectedComponents,
     enumerateTriangles,
-    transitiveClosure,
+    //transitiveClosure,
     directorsMuses,
     //graphPreprocessing,
-    naiveBayes,
-    kMeans,
+    //naiveBayes,
+    //kMeans,
     wordCount
   ).map(expandPipeline)
 }

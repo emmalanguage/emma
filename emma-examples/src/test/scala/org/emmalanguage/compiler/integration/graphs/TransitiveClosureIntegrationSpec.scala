@@ -21,8 +21,7 @@ import api._
 import compiler.integration.BaseCompilerIntegrationSpec
 import compiler.ir.ComprehensionSyntax._
 import compiler.ir.DSCFAnnotations._
-import examples.graphs._
-import examples.graphs.model._
+import lib.graphs._
 
 class TransitiveClosureIntegrationSpec extends BaseCompilerIntegrationSpec {
 
@@ -47,7 +46,7 @@ class TransitiveClosureIntegrationSpec extends BaseCompilerIntegrationSpec {
     // read an initial collection of edges
     val edges = DataBag.readCSV[Edge[Int]](input, csv)
     // compute the transitive closure of the edges
-    val closure = TransitiveClosure(edges)
+    val closure = transitiveClosure(edges)
     // write the results into a CSV file
     closure.writeCSV(output, csv)
   })
