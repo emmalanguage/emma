@@ -20,7 +20,7 @@ email:                   emma@emma-language.org
 description: > # this means to ignore newlines until "baseurl:"
   Emma is a quotation-based DSL for scalable data analysis embedded in Scala.
 
-current_version:         0.2.0
+current_version:         0.2.1
 
 baseurl:                 "" # the subpath of your site, e.g. /blog
 
