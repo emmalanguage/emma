@@ -181,6 +181,8 @@ This project includes:
   Jetty SSLEngine under Apache License Version 2
   Jetty Utilities under Apache Software License - Version 2.0 or Eclipse Public License - Version 1.0
   JLine under BSD
+  JPMML class model under BSD 3-Clause License
+  JPMML schema under BSD 3-Clause License
   JSch under BSD
   JSON Small and Fast Parser under The Apache Software License, Version 2.0
   json4s-ast under ASL
@@ -236,12 +238,15 @@ This project includes:
   snappy-java under The Apache Software License, Version 2.0
   Spark Project Catalyst under Apache 2.0 License
   Spark Project Core under Apache 2.0 License
+  Spark Project GraphX under Apache 2.0 License
   Spark Project Launcher under Apache 2.0 License
+  Spark Project ML Library under Apache 2.0 License
   Spark Project ML Local Library under Apache 2.0 License
   Spark Project Networking under Apache 2.0 License
   Spark Project Shuffle Streaming Service under Apache 2.0 License
   Spark Project Sketch under Apache 2.0 License
   Spark Project SQL under Apache 2.0 License
+  Spark Project Streaming under Apache 2.0 License
   Spark Project Tags under Apache 2.0 License
   Spark Project Unsafe under Apache 2.0 License
   spark-indexedrdd under Apache-2.0

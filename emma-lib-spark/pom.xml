@@ -77,15 +77,13 @@
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-core_${scala.tools.version}</artifactId>
         </dependency>
-        <!--<dependency>
-            <groupId>org.apache.spark</groupId>
-            <artifactId>spark-mllib_${scala.tools.version}</artifactId>
-            <version>2.1.0</version>
-            <scope>${spark.scope}</scope>
-        </dependency>-->
         <dependency>
             <groupId>org.apache.spark</groupId>
             <artifactId>spark-sql_${scala.tools.version}</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.spark</groupId>
+            <artifactId>spark-mllib_${scala.tools.version}</artifactId>
         </dependency>
         <dependency>
             <groupId>amplab</groupId>
