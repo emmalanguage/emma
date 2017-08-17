@@ -26,7 +26,12 @@ import lib.stats._
 object naiveBayes {
 
   type ModelType = ModelType.Value
-  case class Model[L](label: L, pi: Double, theta: DVector)
+  case class Model[L](label: L, pi: Double, theta: DVector) {
+    def this(label: L, pi: Double, theta: Vector) = this(label, pi, theta match {
+      case pos: DVector => pos
+      case pos: SVector => pos.toDense
+    })
+  }
 
   def apply[ID: Meta, L: Meta](D: Int,
     lambda: Double, modelType: ModelType // hyper-parameters

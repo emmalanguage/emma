@@ -58,7 +58,11 @@ object kMeans {
       // initialize forgy cluster means
       var centroids = DataBag(points.sample(k, RanHash(seed, run).seed))
       // initialize solution: label points with themselves
-      var solution = for (p <- points) yield LDPoint(p.id, p.pos, p)
+      var solution = for (p <- points) yield {
+        val id = p.id
+        val pos = p.pos
+        LDPoint(id, pos, DPoint(id, pos)) // FIXME: specialize `LDPoint(p.id, p.pos, p)`
+      }
 
       for (_ <- 1 to iterations) {
         // update solution: label each point with its nearest cluster

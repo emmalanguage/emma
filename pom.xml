@@ -337,6 +337,12 @@
                 <scope>${spark.scope}</scope>
             </dependency>
             <dependency>
+                <groupId>org.apache.spark</groupId>
+                <artifactId>spark-mllib_${scala.tools.version}</artifactId>
+                <version>${spark.version}</version>
+                <scope>${spark.scope}</scope>
+            </dependency>
+            <dependency>
                 <groupId>amplab</groupId>
                 <artifactId>spark-indexedrdd</artifactId>
                 <version>${spark.indexedrdd.version}</version>
