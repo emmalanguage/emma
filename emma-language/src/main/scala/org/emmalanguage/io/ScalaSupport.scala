@@ -26,8 +26,6 @@ import java.nio.file.Paths
 /** An abstract interface for local IO support. */
 abstract class ScalaSupport[A, F <: Format] {
 
-  import ScalaSupport.hdfs
-
   /** The concrete class of the underlying format. */
   def format: F
 
@@ -40,7 +38,8 @@ abstract class ScalaSupport[A, F <: Format] {
   protected def inpStream(uri: URI): InputStream = uri.getScheme match {
     case "hdfs" =>
       val path = new HadoopPath(uri)
-      hdfs.open(path)
+      val deFS = new URI(uri.toString.replace(uri.getPath, "/"))
+      FileSystem.get(deFS, new Configuration()).open(path)
     case _ =>
       val path = Paths.get(ensureFileScheme(uri))
       new FileInputStream(path.toFile)
@@ -49,7 +48,8 @@ abstract class ScalaSupport[A, F <: Format] {
   protected def outStream(uri: URI): OutputStream = uri.getScheme match {
     case "hdfs" =>
       val path = new HadoopPath(uri)
-      hdfs.create(path, true)
+      val deFS = new URI(uri.toString.replace(uri.getPath, "/"))
+      FileSystem.get(deFS, new Configuration()).create(path, true)
     case _ =>
       val path = Paths.get(ensureFileScheme(uri))
       deleteRecursive(path.toFile)
@@ -70,11 +70,4 @@ abstract class ScalaSupport[A, F <: Format] {
     else fileRoot.resolve(uri)
 
   private val fileRoot = new URI("file:///")
-}
-
-private object ScalaSupport {
-
-  /** A local instance of the Hadoop file system. */
-  lazy val hdfs = FileSystem.get(new Configuration())
-
 }
