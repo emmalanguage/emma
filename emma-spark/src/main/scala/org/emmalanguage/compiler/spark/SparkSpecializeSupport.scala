@@ -17,9 +17,6 @@ package org.emmalanguage
 package compiler.spark
 
 import compiler.SparkCompiler
-import util.Monoids._
-
-import shapeless._
 
 import scala.collection.breakOut
 
@@ -28,70 +25,104 @@ private[compiler] trait SparkSpecializeSupport {
 
   import API.DataBag
   import Core.{Lang => core}
+  import SparkAPI.Exp
   import SparkAPI.Ntv
   import SparkAPI.Ops
-  import SparkAPI.Exp
   import UniverseImplicits._
 
   object SparkSpecializeSupport {
-    /** Intorudces [[org.emmalanguage.api.spark.SparkNtv native Spark operators]] whenever possible. */
+    /** Introduces [[org.emmalanguage.api.spark.SparkNtv native Spark operators]] whenever possible. */
     lazy val specializeOps: u.Tree => u.Tree = tree => {
-      val cfg = ControlFlow.cfg(tree)
+      val disRslt = Backend.disambiguate(tree)
+      val disTree = disRslt._1
+      val dparCtx = disRslt._2.toSet[u.Symbol]
 
-      val isSpecializableUseFor = (f: u.TermSymbol, vd: u.ValDef) => vd.rhs match {
-        case core.DefCall(_, m, _, Seq(Seq(core.Ref(`f`))))
-          if m == DataBag.map || m == DataBag.withFilter => true
-        case core.DefCall(Some(ops), Ops.equiJoin, _, JoinArgs(kx, ky, _, _))
-          if f == kx || f == ky => true
-        case _ => false
+      val cfg = ControlFlow.cfg(disTree)
+      val vds = cfg.data.labNodes.map(_.label)
+
+      // specializable lambdas
+      val specLambdas = (for {
+        core.ValDef(x, f@core.Lambda(_, _, _)) <- vds
+        h = specializeLambda(f)
+        if h != f
+        y = api.TermSym(x.owner, api.TermName.fresh(x.name), h.tpe)
+      } yield x -> core.ValDef(y, h)) (breakOut): Map[u.TermSymbol, u.ValDef]
+
+      val specLambdaRef = (f: u.TermSymbol) => core.Ref(specLambdas(f).symbol.asTerm)
+
+      // specializable operator calls
+      val specOps = (for {
+        core.ValDef(lhs, call) <- vds
+        // don't specialize calls in a data-parallel context
+        if (dparCtx intersect api.Owner.chain(lhs).toSet).isEmpty
+        spec <- call match {
+          // specialize `DataBag.withFilter` as `SparkOps.Native.select`
+          case core.DefCall(Some(xs), DataBag.withFilter, _, Seq(Seq(core.Ref(p))))
+            if specLambdas contains p =>
+            val tgt = Ntv.ref
+            val met = Ntv.select
+            val tas = Seq(api.Type.arg(1, xs.tpe))
+            val ass = Seq(Seq(specLambdaRef(p)), Seq(xs))
+            Some(core.ValDef(lhs, core.DefCall(Some(tgt), met, tas, ass)))
+          // specialize `DataBag.map` as `SparkOps.Native.project`
+          case core.DefCall(Some(xs), DataBag.map, Seq(t), Seq(Seq(core.Ref(f))))
+            if specLambdas contains f =>
+            val tgt = Ntv.ref
+            val met = Ntv.project
+            val tas = Seq(api.Type.arg(1, xs.tpe), t)
+            val ass = Seq(Seq(specLambdaRef(f)), Seq(xs))
+            Some(core.ValDef(lhs, core.DefCall(Some(tgt), met, tas, ass)))
+          // specialize `SparkOps.equiJoin` as `SparkOps.Native.equiJoin`
+          case core.DefCall(_, Ops.equiJoin, tas, JoinArgs(kx, ky, xs, ys))
+            if (specLambdas contains kx) && (specLambdas contains ky) =>
+            val tgt = Ntv.ref
+            val met = Ntv.equiJoin
+            val ass = Seq(Seq(specLambdaRef(kx), specLambdaRef(ky)), Seq(core.Ref(xs), core.Ref(ys)))
+            Some(core.ValDef(lhs, core.DefCall(Some(tgt), met, tas, ass)))
+          case _ =>
+            None
+        }
+      } yield lhs -> spec) (breakOut): Map[u.TermSymbol, u.ValDef]
+
+      // a map from specializable lambdas to (#total, #specialized) uses
+      val specLambdaUses = for ((x, _) <- specLambdas) yield {
+        val uses = cfg.data.successors(x)
+        x -> (uses.size, uses.count(specOps.contains))
       }
 
-      api.BottomUp
-        .inherit { // accumulate lambdas in scope that can be specialized
-          case core.Let(vals, _, _) =>
-            (for {
-              core.ValDef(x, f@core.Lambda(_, _, _)) <- vals
-              h = specializeLambda(f)
-              if h != f
-              xUses = cfg.data.outEdges(x).flatMap(e => cfg.data.label(e.to))
-              if xUses.forall(vd => isSpecializableUseFor(x, vd))
-              y = api.TermSym(x.owner, x.name, h.tpe)
-            } yield x -> core.ValDef(y, h)) (breakOut): Map[u.TermSymbol, u.Tree]
-          case _ =>
-            Map.empty[u.TermSymbol, u.Tree]
-        }(overwrite)
-        .transformWith {
-          case Attr.inh(vd@core.ValDef(lhs, rhs), sp /* specialized lambdas */ :: _) =>
-            val mapFun = (f: u.TermSymbol) => core.Ref(sp(f).symbol.asTerm)
-            if (sp contains lhs) sp(lhs)
-            else rhs match {
-              // specialize `DataBag.withFilter` as `SparkOps.Native.select`
-              case core.DefCall(Some(xs), DataBag.withFilter, _, Seq(Seq(core.Ref(p))))
-                if sp contains p =>
-                val tgt = Ntv.ref
-                val met = Ntv.select
-                val tas = Seq(api.Type.arg(1, xs.tpe))
-                val ass = Seq(Seq(mapFun(p)), Seq(xs))
-                core.ValDef(lhs, core.DefCall(Some(tgt), met, tas, ass))
-              // specialize `DataBag.map` as `SparkOps.Native.project`
-              case core.DefCall(Some(xs), DataBag.map, Seq(t), Seq(Seq(core.Ref(f))))
-                if sp contains f =>
-                val tgt = Ntv.ref
-                val met = Ntv.project
-                val tas = Seq(api.Type.arg(1, xs.tpe), t)
-                val ass = Seq(Seq(mapFun(f)), Seq(xs))
-                core.ValDef(lhs, core.DefCall(Some(tgt), met, tas, ass))
-              // specialize `SparkOps.equiJoin` as `SparkOps.Native.equiJoin`
-              case core.DefCall(Some(ops), Ops.equiJoin, tas, JoinArgs(kx, ky, xs, ys))
-                if (sp contains kx) && (sp contains ky) =>
-                val tgt = Ntv.ref
-                val met = Ntv.equiJoin
-                val ass = Seq(Seq(mapFun(kx), mapFun(ky)), Seq(core.Ref(xs), core.Ref(ys)))
-                core.ValDef(lhs, core.DefCall(Some(tgt), met, tas, ass))
-              case _ =>
-                vd
+      api.BottomUp.transform {
+        case core.Let(vals, defs, expr) =>
+          core.Let(for {
+            x@core.ValDef(lhs, _) <- vals
+            y <- {
+              if (specLambdas contains lhs) {
+                // Case 1) definition of a specialized lambda
+                val (totlUses, specUses) = specLambdaUses(lhs)
+                if (totlUses > 0) {
+                  if (specUses == 0) {
+                    // Case 1.a) only original lambda needed
+                    Seq(x)
+                  } else if (specUses == totlUses) {
+                    // Case 1.b) only specialized lambda needed
+                    Seq(specLambdas(lhs))
+                  } else {
+                    // Case 1.c) both lambdas needed
+                    Seq(specLambdas(lhs), x)
+                  }
+                } else {
+                  // Case 1.d) not used at all
+                  Seq.empty[u.ValDef]
+                }
+              } else if (specOps contains lhs) {
+                // Case 2) definition of a specialized operator call
+                Seq(specOps(lhs))
+              } else {
+                // Case 3) something else
+                Seq(x)
+              }
             }
-        }(tree).tree
+          } yield y, defs, expr)
+      }(disTree).tree
     }
 
     /** Specializes lambdas as [[org.emmalanguage.api.spark.SparkExp SparkExp]] expressions. */
@@ -103,22 +134,18 @@ private[compiler] trait SparkSpecializeSupport {
         })(breakOut): Map[u.TermSymbol, u.Tree]
 
         def isProductApply(x: u.TermSymbol): Boolean = valOf.get(x) match {
-          case Some(core.DefCall(Some(core.Ref(t)), method, _, Seq(args))) if method.isSynthetic
+          case Some(core.DefCall(Some(core.Ref(t)), method, _, Seq(_))) if method.isSynthetic
             && method.name == api.TermName.app
             && t.companion.info.baseClasses.contains(api.Sym[Product]) => true
           case _ => false
         }
 
-        if (valOf.contains(r)) {
+        if (p == r || valOf.contains(r)) {
           val mapSym = Map(
-            p -> api.TermSym.free(p.name, api.Type[String])
+            p -> api.TermSym.free(p.name, Exp.Root)
           ) ++ (vals.map(vd => {
             val x = vd.symbol.asTerm
-            val W =
-              if (x == r && isProductApply(x)) api.Type.kind1[Seq](Exp.Column)
-              else Exp.Column
-            val w = api.TermSym.free(x.name, W)
-            x -> w
+            x -> api.TermSym.free(x.name, Exp.Type)
           })(breakOut): Map[u.TermSymbol, u.TermSymbol])
 
           val mapArgs = (args: Seq[u.Tree]) => args map {
@@ -133,11 +160,26 @@ private[compiler] trait SparkSpecializeSupport {
 
               mapSym.get(z).map(w => {
                 val tgt = Exp.ref
-                val met = if (p == z) Exp.rootProj else Exp.nestProj
+                val met = Exp.proj
                 val ags = Seq(core.Ref(w), core.Lit(method.name.toString))
                 val rhs = core.DefCall(Some(tgt), met, Seq(), Seq(ags))
                 core.ValDef(mapSym(x), rhs)
               })
+
+            // translate case class constructors
+            case core.DefCall(_, app, _, Seq(args))
+              if isProductApply(x) =>
+              val tgt = Exp.ref
+              val met = Exp.struct
+              val as1 = app.paramLists.head.map(p =>
+                core.Lit(p.name.toString)
+              )
+              val as2 = args.map({
+                case core.Ref(a) if mapSym contains a => core.Ref(mapSym(a))
+                case a => a
+              })
+              val rhs = core.DefCall(Some(tgt), met, Seq(), Seq(as1, as2))
+              Some(core.ValDef(mapSym(x), rhs))
 
             // translate comparisons
             case core.DefCall(Some(y), method, _, zs)
@@ -175,61 +217,13 @@ private[compiler] trait SparkSpecializeSupport {
               val rhs = core.DefCall(Some(tgt), met, Seq(), Seq(ags))
               Some(core.ValDef(mapSym(x), rhs))
 
-            // translate case class constructors in non-return position
-            case core.DefCall(_, app, _, Seq(args))
-              if x != r && isProductApply(x) =>
-              val tgt = Exp.ref
-              val met = Exp.nestStruct
-              val as1 = app.paramLists.head.map(p =>
-                core.Lit(p.name.toString)
-              )
-              val as2 = args.map({
-                case core.Ref(a) if mapSym contains a => core.Ref(mapSym(a))
-                case a => a
-              })
-              val rhs = core.DefCall(Some(tgt), met, Seq(), Seq(as1, as2))
-              Some(core.ValDef(mapSym(x), rhs))
-
-            // translate case class constructors in return position
-            case core.DefCall(_, app, _, Seq(args))
-              if x == r && isProductApply(x) =>
-              val tgt = Exp.ref
-              val met = Exp.rootStruct
-              val as1 = app.paramLists.head.map(p =>
-                core.Lit(p.name.toString)
-              )
-              val as2 = args.map({
-                case core.Ref(a) if mapSym contains a => core.Ref(mapSym(a))
-                case a => a
-              })
-              val rhs = core.DefCall(Some(tgt), met, Seq(), Seq(as1, as2))
-              Some(core.ValDef(mapSym(x), rhs))
-
             case _ => None
           }
 
-          val (vals2, expr1) = if (isProductApply(r)) {
-            val vs2 = Seq.empty[Option[u.ValDef]]
-            val ex2 = core.Ref(mapSym(r))
-
-            (vs2, ex2)
-          } else {
-            val tgt = Exp.ref
-            val met = Exp.rootStruct
-            val as1 = Seq(core.Lit("_1"))
-            val as2 = Seq(core.Ref(mapSym(r)))
-            val rhs = core.DefCall(Some(tgt), met, Seq(), Seq(as1, as2))
-            val Tpe = api.Type.kind1[Seq](Exp.Column)
-            val lhs = api.TermSym.free(api.TermName.fresh("r"), Tpe)
-
-            val vs2 = Seq(Some(core.ValDef(lhs, rhs)))
-            val ex2 = core.Ref(lhs)
-
-            (vs2, ex2)
-          }
+          val expr1 = core.Ref(mapSym(r))
 
           if (vals1.exists(_.isEmpty)) lambda // not all valdefs were translated
-          else core.Lambda(Seq(mapSym(p)), core.Let((vals1 ++ vals2).flatten, Seq(), expr1))
+          else core.Lambda(Seq(mapSym(p)), core.Let(vals1.flatten, Seq(), expr1))
         } else lambda
 
       case root =>

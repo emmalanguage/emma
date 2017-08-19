@@ -37,13 +37,13 @@ trait SparkCompiler extends Compiler with SparkSpecializeSupport {
   trait SparkExpAPI extends ModuleAPI {
     //@formatter:off
     val Column      = api.Type[org.apache.spark.sql.Column]
+    val Type        = api.Type[org.emmalanguage.api.spark.SparkExp.Expr]
+    val Root        = api.Type[org.emmalanguage.api.spark.SparkExp.Root]
     val sym         = api.Sym[org.emmalanguage.api.spark.SparkExp.type].asModule
 
     // projections
-    val rootProj    = op("rootProj")
-    val nestProj    = op("nestProj")
-    val rootStruct  = op("rootStruct")
-    val nestStruct  = op("nestStruct")
+    val proj        = op("proj")
+    val struct      = op("struct")
     // comparisons
     val eq          = op("eq", List(2, 1))
     val ne          = op("ne", List(2, 1))
@@ -64,13 +64,13 @@ trait SparkCompiler extends Compiler with SparkSpecializeSupport {
     // string
     val startsWith  = op("startsWith")
 
-    val projections = Set(rootProj, nestProj, rootStruct, nestStruct)
+    val structural  = Set(proj, struct)
     val comparisons = Set(eq, ne, lt, gt, leq, geq)
     val boolean     = Set(not, and, or)
     val arithmetic  = Set(plus, minus, multiply, divide, mod)
     val string      = Set(startsWith)
 
-    val ops         = projections ++ comparisons ++ boolean ++ arithmetic ++ string
+    val ops         = structural ++ comparisons ++ boolean ++ arithmetic ++ string
     //@formatter:on
   }
 

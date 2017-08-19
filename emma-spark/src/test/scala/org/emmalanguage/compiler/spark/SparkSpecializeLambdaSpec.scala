@@ -74,14 +74,13 @@ class SparkSpecializeLambdaSpec extends BaseCompilerSpec with SparkAware {
     })
 
     val exp = anfPipeline(reify {
-      (y: String) => {
-        val a = SparkExp.rootProj(y, "_2")
-        val b = SparkExp.rootProj(y, "_3")
+      (y: SparkExp.Root) => {
+        val a = SparkExp.proj(y, "_2")
+        val b = SparkExp.proj(y, "_3")
         val c = SparkExp.gt(a, 1)
         val d = SparkExp.startsWith(b, "a")
         val e = SparkExp.and(c, d)
-        val r = SparkExp.rootStruct("_1")(e)
-        r
+        e
       }
     })
 
@@ -103,16 +102,15 @@ class SparkSpecializeLambdaSpec extends BaseCompilerSpec with SparkAware {
     })
 
     val exp = anfPipeline(reify {
-      (y: String) => {
-        val a = SparkExp.rootProj(y, "_1")
-        val b = SparkExp.rootProj(y, "_2")
+      (y: SparkExp.Root) => {
+        val a = SparkExp.proj(y, "_1")
+        val b = SparkExp.proj(y, "_2")
         val c = SparkExp.minus(a, b)
         val d = SparkExp.gt(c, 1.0)
         val e = SparkExp.geq(-1.0, c)
         val f = SparkExp.or(d, e)
         val g = SparkExp.not(f)
-        val r = SparkExp.rootStruct("_1")(g)
-        r
+        g
       }
     })
 
@@ -129,11 +127,10 @@ class SparkSpecializeLambdaSpec extends BaseCompilerSpec with SparkAware {
     })
 
     val exp = anfPipeline(reify {
-      (x: String) => {
-        val a = SparkExp.rootProj(x, "_1")
-        val b = SparkExp.nestProj(a, "_2")
-        val r = SparkExp.rootStruct("_1")(b)
-        r
+      (x: SparkExp.Root) => {
+        val a = SparkExp.proj(x, "_1")
+        val b = SparkExp.proj(a, "_2")
+        b
       }
     })
 
@@ -151,10 +148,10 @@ class SparkSpecializeLambdaSpec extends BaseCompilerSpec with SparkAware {
     })
 
     val exp = anfPipeline(reify {
-      (y: String) => {
-        val a = SparkExp.rootProj(y, "_2")
-        val b = SparkExp.rootProj(y, "_3")
-        val r = SparkExp.rootStruct("_1", "_2")(a, b)
+      (y: SparkExp.Root) => {
+        val a = SparkExp.proj(y, "_2")
+        val b = SparkExp.proj(y, "_3")
+        val r = SparkExp.struct("_1", "_2")(a, b)
         r
       }
     })
@@ -172,9 +169,9 @@ class SparkSpecializeLambdaSpec extends BaseCompilerSpec with SparkAware {
     })
 
     val exp = anfPipeline(reify {
-      (y: String) => {
-        val a = SparkExp.rootProj(y, "_2")
-        val r = SparkExp.rootStruct("src", "dst")(a, a)
+      (y: SparkExp.Root) => {
+        val a = SparkExp.proj(y, "_2")
+        val r = SparkExp.struct("src", "dst")(a, a)
         r
       }
     })
@@ -195,13 +192,29 @@ class SparkSpecializeLambdaSpec extends BaseCompilerSpec with SparkAware {
     })
 
     val exp = anfPipeline(reify {
-      (y: String) => {
-        val a = SparkExp.rootProj(y, "_2")
-        val b = SparkExp.rootProj(y, "_3")
-        val c = SparkExp.nestStruct("src", "dst", "label")(a, b, "->")
-        val d = SparkExp.nestStruct("src", "dst", "label")(b, a, "<-")
-        val r = SparkExp.rootStruct("_1", "_2")(c, d)
+      (y: SparkExp.Root) => {
+        val a = SparkExp.proj(y, "_2")
+        val b = SparkExp.proj(y, "_3")
+        val c = SparkExp.struct("src", "dst", "label")(a, b, "->")
+        val d = SparkExp.struct("src", "dst", "label")(b, a, "<-")
+        val r = SparkExp.struct("_1", "_2")(c, d)
         r
+      }
+    })
+
+    act shouldBe alphaEqTo(exp)
+  })
+
+  "projection #5" in withDefaultSparkSession(implicit spark => {
+    val act = testPipeline(reify {
+      (y: Long) => {
+        y
+      }
+    })
+
+    val exp = anfPipeline(reify {
+      (y: SparkExp.Root) => {
+        y
       }
     })
 
