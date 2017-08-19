@@ -145,19 +145,6 @@
         </dependency>
     </dependencies>
 
-    <profiles>
-        <!-- profile that activates provided dependencies -->
-        <profile>
-            <id>dev</id>
-            <properties>
-                <scala.scope>compile</scala.scope>
-                <flink.scope>compile</flink.scope>
-                <spark.scope>compile</spark.scope>
-                <hadoop.scope>compile</hadoop.scope>
-            </properties>
-        </profile>
-    </profiles>
-
     <build>
         <plugins>
             <plugin>

@@ -50,7 +50,9 @@ This project includes:
   ApacheDS I18n under The Apache Software License, Version 2.0
   ApacheDS Protocol Kerberos Codec under The Apache Software License, Version 2.0
   ASM Core under BSD
+  base64 under Public domain
   Bean Validation API under The Apache Software License, Version 2.0
+  Bouncy Castle Provider under Bouncy Castle Licence
   breeze under Apache 2
   breeze-macros under Apache 2
   Cats core under MIT
@@ -81,7 +83,7 @@ This project includes:
   commons-beanutils under Apache License, Version 2.0
   Compress-LZF under Apache License 2.0
   config under Apache License, Version 2.0
-  core under BSD 3 Clause
+  core under MIT
   Curator Client under The Apache Software License, Version 2.0
   Curator Framework under The Apache Software License, Version 2.0
   Curator Recipes under The Apache Software License, Version 2.0
@@ -135,7 +137,6 @@ This project includes:
   HK2 API module under CDDL + GPLv2 with classpath exception
   HK2 Implementation Utilities under CDDL + GPLv2 with classpath exception
   htrace-core4 under The Apache Software License, Version 2.0
-  HttpClient under Apache License
   Jackson under The Apache Software License, Version 2.0
   Jackson Integration for Metrics under Apache License 2.0
   Jackson-annotations under The Apache Software License, Version 2.0
@@ -147,6 +148,8 @@ This project includes:
   Java Servlet API under CDDL + GPLv2 with classpath exception
   java-xmlbuilder under Apache License, Version 2.0
   JavaBeans Activation Framework (JAF) under Common Development and Distribution License (CDDL) v1.0
+  JavaBeans(TM) Activation Framework under COMMON DEVELOPMENT AND DISTRIBUTION LICENSE (CDDL) Version 1.0
+  JavaMail API (compat) under CDDL or GPLv2+CE
   Javassist under MPL 1.1 or LGPL 2.1 or Apache License 2.0
   javax.annotation API under CDDL + GPLv2 with classpath exception
   javax.inject:1 as OSGi bundle under CDDL + GPLv2 with classpath exception
@@ -166,6 +169,7 @@ This project includes:
   jersey-media-jaxb under CDDL+GPL License
   jersey-repackaged-guava under CDDL+GPL License
   jersey-server under CDDL 1.1 or GPL2 w/ CPE
+  JetS3t under Apache 2.0
   Jettison under Apache License, Version 2.0
   Jetty :: Continuation under Apache Software License - Version 2.0 or Eclipse Public License - Version 1.0
   Jetty :: EventSource Servlet under Apache License - Version 2.0
@@ -199,9 +203,11 @@ This project includes:
   leveldbjni-all under The BSD 3-Clause License
   LZ4 and xxHash under The Apache Software License, Version 2.0
   machinist under MIT
-  macros under Apache License
+  macros under MIT
   Metrics Core under Apache License 2.0
   MinLog under New BSD License
+  MX4J under The Apache Software License, Version 2.0
+  Netty under Apache License, Version 2.0
   Netty/All-in-One under Apache License, Version 2.0
   Nimbus JOSE+JWT under The Apache Software License, Version 2.0
   Objenesis under Apache 2

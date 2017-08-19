@@ -17,6 +17,7 @@ package org.emmalanguage
 package api
 
 import alg.Alg
+import util.RanHash
 
 import org.apache.spark.rdd._
 import org.apache.spark.sql.Encoder
@@ -94,7 +95,7 @@ class SparkRDD[A: Meta] private[api]
         val sample = Array.fill(k)(Option.empty[A])
         for ((e, i) <- it) {
           if (i >= k) {
-            val j = util.RanHash(seed).at(i).nextLong(i + 1)
+            val j = RanHash(seed).at(i).nextLong(i + 1)
             if (j < k) sample(j.toInt) = Some(e)
           } else sample(i.toInt) = Some(e)
         }

@@ -135,7 +135,7 @@
         <!-- Flink -->
         <flink.version>1.2.1</flink.version>
         <!-- Spark -->
-        <spark.version>2.1.0</spark.version>
+        <spark.version>2.2.0</spark.version>
         <spark.indexedrdd.version>0.4.0</spark.indexedrdd.version>
         <!-- Parquet -->
         <parquet.version>1.9.0</parquet.version>
@@ -306,6 +306,12 @@
                 <groupId>org.apache.hadoop</groupId>
                 <artifactId>hadoop-hdfs</artifactId>
                 <version>${hadoop.version}</version>
+                <scope>${hadoop.scope}</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.hadoop</groupId>
+                <artifactId>hadoop-client</artifactId>
+                <version>2.2.0</version><!-- Circumvent https://issues.scala-lang.org/browse/SI-10129 -->
                 <scope>${hadoop.scope}</scope>
             </dependency>
 
@@ -792,6 +798,16 @@
     </build>
 
     <profiles>
+        <!-- Profile that changed the scope of `provided` dependencies to `compile` -->
+        <profile>
+            <id>provided-as-compile</id>
+            <properties>
+                <scala.scope>compile</scala.scope>
+                <flink.scope>compile</flink.scope>
+                <spark.scope>compile</spark.scope>
+                <hadoop.scope>compile</hadoop.scope>
+            </properties>
+        </profile>
         <!-- Profile that activates integration tests and compile-spec-pipelines -->
         <profile>
             <id>compile-spec-pipelines</id>
