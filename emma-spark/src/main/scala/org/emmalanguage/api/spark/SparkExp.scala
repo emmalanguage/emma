@@ -20,67 +20,151 @@ import org.apache.spark.sql.Column
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.{functions => fun}
 
-/** Wrapper around the supported subset of the Spark expression API. */
+import scala.language.implicitConversions
+
 object SparkExp {
-  def rootProj(x: String, field: String)(implicit s: SparkSession): Column = {
-    import s.implicits._; $"$x.$field"
+
+  //@formatter:off
+  sealed trait Expr {
+    implicit val spark: SparkSession
+    lazy val col: Column = eval(this)
+  }
+  // structural expressions
+  case class Root private(name: String)(implicit val spark: SparkSession) extends Expr
+  case class Proj private(parent: Expr, name: String)(implicit val spark: SparkSession) extends Expr
+  case class Struct private(names: Seq[String], vals: Seq[Expr])(implicit val spark: SparkSession) extends Expr
+  // other expressions
+  case class Lit private(x: Any)(implicit val spark: SparkSession) extends Expr
+  case class Eq private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Ne private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Gt private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Lt private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Geq private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Leq private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Not private(x: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Or private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class And private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Plus private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Minus private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Multiply private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Divide private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Mod private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class StartsWith private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  //@formatter:on
+
+  object Chain {
+    def unapply(path: Expr): Option[Seq[String]] = path match {
+      case Root(name) => Some(Seq(name))
+      case Proj(Chain(xs), y) => Some(xs :+ y)
+      case _ => None
+    }
   }
 
-  def nestProj(x: Column, field: String)(implicit s: SparkSession): Column =
-    x.getField(field)
-
-  def rootStruct(names: String*)(vals: Any*): Seq[Column] = {
-    assert(vals.size == names.size, "Number of field values and field names for struct must be the same")
-    for ((col, name) <- vals zip names) yield fun.lit(col).as(name)
+  private def eval(expr: Expr)(implicit spark: SparkSession): Column = {
+    import spark.sqlContext.implicits._
+    expr match {
+      // structural expressions
+      case Chain(names) =>
+        $"${names.mkString(".")}"
+      case Root(name) =>
+        $"$name"
+      case Proj(parent, name) =>
+        parent.col.getField(name)
+      case Struct(names, vals) =>
+        fun.struct((for ((v, n) <- vals zip names) yield v.col.as(n)): _*)
+      // other expressions
+      case Lit(x) =>
+        fun.lit(x)
+      case Eq(x, y) =>
+        x.col eqNullSafe y.col
+      case Ne(x, y) =>
+        !(x.col eqNullSafe y.col)
+      case Gt(x, y) =>
+        x.col gt y.col
+      case Lt(x, y) =>
+        x.col lt y.col
+      case Geq(x, y) =>
+        x.col geq y.col
+      case Leq(x, y) =>
+        x.col leq y.col
+      case Not(x) =>
+        !x.col
+      case Or(x, y) =>
+        x.col or y.col
+      case And(x, y) =>
+        x.col and y.col
+      case Plus(x, y) =>
+        x.col plus y.col
+      case Minus(x, y) =>
+        x.col minus y.col
+      case Multiply(x, y) =>
+        x.col multiply y.col
+      case Divide(x, y) =>
+        x.col divide y.col
+      case Mod(x, y) =>
+        x.col mod y.col
+      case StartsWith(x, y) =>
+        x.col startsWith y.col
+    }
   }
 
-  def nestStruct(names: String*)(vals: Any*): Column = {
-    assert(vals.size == names.size, "Number of field values and field names for struct must be the same")
-    fun.struct((for ((col, name) <- vals zip names) yield fun.lit(col).as(name)): _*)
-  }
+  implicit private def anyToExpr(x: Any)(implicit spark: SparkSession): Expr =
+    x match {
+      case x: Expr => x
+      case _ => Lit(x)
+    }
 
-  def eq(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) eqNullSafe fun.lit(y)
+  def root(name: String)(implicit spark: SparkSession): Expr =
+    Root(name)
 
-  def ne(x: Any, y: Any)(implicit s: SparkSession): Column =
-    !(fun.lit(x) eqNullSafe y)
+  def proj(parent: Expr, name: String)(implicit spark: SparkSession): Expr =
+    Proj(parent, name)
 
-  def gt(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) gt fun.lit(y)
+  def struct(names: String*)(vals: Any*)(implicit spark: SparkSession): Expr =
+    Struct(names, vals.map(anyToExpr))
 
-  def lt(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) lt fun.lit(y)
+  def eq(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Eq(x, y)
 
-  def geq(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) geq fun.lit(y)
+  def ne(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Ne(x, y)
 
-  def leq(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) leq fun.lit(y)
+  def gt(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Gt(x, y)
 
-  def not(x: Any)(implicit s: SparkSession): Column =
-    !fun.lit(x)
+  def lt(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Lt(x, y)
 
-  def or(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) or fun.lit(y)
+  def geq(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Geq(x, y)
 
-  def and(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) and fun.lit(y)
+  def leq(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Leq(x, y)
 
-  def plus(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) plus fun.lit(y)
+  def not(x: Any)(implicit spark: SparkSession): Expr =
+    Not(x)
 
-  def minus(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) minus fun.lit(y)
+  def or(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Or(x, y)
 
-  def multiply(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) multiply fun.lit(y)
+  def and(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    And(x, y)
 
-  def divide(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) divide fun.lit(y)
+  def plus(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Plus(x, y)
 
-  def mod(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) mod fun.lit(y)
+  def minus(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Minus(x, y)
 
-  def startsWith(x: Any, y: Any)(implicit s: SparkSession): Column =
-    fun.lit(x) startsWith fun.lit(y)
+  def multiply(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Multiply(x, y)
+
+  def divide(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Divide(x, y)
+
+  def mod(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Mod(x, y)
+
+  def startsWith(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    StartsWith(x, y)
 }

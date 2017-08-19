@@ -34,5 +34,8 @@ private[compiler] trait Backend extends Common
 
     /** Delegates to [[Caching.addCacheCalls]]. */
     lazy val addCacheCalls = Caching.addCacheCalls
+
+    /** Delegates to [[Order.disambiguate]]. */
+    lazy val disambiguate = Order.disambiguate
   }
 }

@@ -16,7 +16,9 @@
 package org.emmalanguage
 package compiler.spark
 
+import api.DataBag
 import api.SparkDataset
+import api.backend.LocalOps
 import api.spark.SparkExp
 import api.spark.SparkNtv
 import api.spark.SparkOps
@@ -67,166 +69,266 @@ class SparkSpecializeOpsSpec extends BaseCompilerSpec with SparkAware {
   type Seq1 = (String, Int)
   type Seq2 = (Int, Double, String)
   type Seq3 = Edge[Int]
+  type Seq4 = (DataBag[Seq1], DataBag[Seq2])
 
   val seq1 = for (c <- '0' to 'z') yield c.toLower.toString -> c.toInt
   val seq2 = for (c <- '0' to 'z') yield (c.toInt, Math.PI, c.toString)
   val seq3 = for (c <- 'a' to 'y') yield Edge(c.toInt, c.toInt + 1)
+  val seq4 = Seq((DataBag(seq1), DataBag(seq2)))
 
-  "select" in withDefaultSparkSession(implicit spark => {
-    val act = testPipeline(reify {
-      val x1 = this.seq2
-      val x2 = SparkDataset(x1)
-      val f1 = (y: Seq2) => {
-        val y1 = y._2
-        val y2 = y._3
-        val y3 = y1 > 1
-        val y4 = y2 startsWith "a"
-        val y5 = y3 && y4
-        y5
-      }
-      val x4 = x2.withFilter(f1)
-      x4
-    })
+  val proj = (x: Seq3) => x.dst
 
-    val exp = dscfPipeline(reify {
-      val x1 = this.seq2
-      val x2 = SparkDataset(x1)
-      val p1 = (y: String) => {
-        val y1 = SparkExp.rootProj(y, "_2")
-        val y2 = SparkExp.rootProj(y, "_3")
-        val y3 = SparkExp.gt(y1, 1)
-        val y4 = SparkExp.startsWith(y2, "a")
-        val y5 = SparkExp.and(y3, y4)
-        val y6 = SparkExp.rootStruct("_1")(y5)
-        y6
-      }
-      val x4 = SparkNtv.select(p1)(x2)
-      x4
-    })
-
-    act shouldBe alphaEqTo(exp)
-  })
-
-  "project" in withDefaultSparkSession(implicit spark => {
-    val act = testPipeline(reify {
-      val x1 = this.seq1
-      val x2 = SparkDataset(x1)
-      val f1 = (y: Seq1) => {
-        val y1 = y._1
-        y1
-      }
-      val x4 = x2.map(f1)
-      x4
-    })
-
-    val exp = dscfPipeline(reify {
-      val x1 = this.seq1
-      val x2 = SparkDataset(x1)
-      val f1 = (y: String) => {
-        val y1 = SparkExp.rootProj(y, "_1")
-        val y2 = SparkExp.rootStruct("_1")(y1)
-        y2
-      }
-      val x4 = SparkNtv.project[Seq1, String](f1)(x2)
-      x4
-    })
-
-    act shouldBe alphaEqTo(exp)
-  })
-
-  "join" - {
-    "#1" in withDefaultSparkSession(implicit spark => {
+  "specializeOps" - {
+    "should specialize `withFilter` calls" in withDefaultSparkSession(implicit spark => {
       val act = testPipeline(reify {
-        val s1 = this.seq1
-        val s2 = this.seq2
-        val x1 = SparkDataset(s1)
-        val x2 = SparkDataset(s2)
-        val f1 = (u: Seq1) => {
-          val y1 = u._2
-          y1
+        val x1 = this.seq2
+        val x2 = SparkDataset(x1)
+        val f1 = (y: Seq2) => {
+          val y1 = y._2
+          val y2 = y._3
+          val y3 = y1 > 1
+          val y4 = y2 startsWith "a"
+          val y5 = y3 && y4
+          y5
         }
-        val f2 = (v: Seq2) => {
-          val z1 = v._1
-          z1
-        }
-        val x3 = SparkOps.equiJoin(f1, f2)(x1, x2)
-        x3
-      })
-
-      val exp = dscfPipeline(reify {
-        val s1 = this.seq1
-        val s2 = this.seq2
-        val x1 = SparkDataset(s1)
-        val x2 = SparkDataset(s2)
-        val f1 = (u: String) => {
-          val y1 = SparkExp.rootProj(u, "_2")
-          val y2 = SparkExp.rootStruct("_1")(y1)
-          y2
-        }
-        val f2 = (v: String) => {
-          val z1 = SparkExp.rootProj(v, "_1")
-          val z2 = SparkExp.rootStruct("_1")(z1)
-          z2
-        }
-        val x3 = SparkNtv.equiJoin[Seq1, Seq2, Int](f1, f2)(x1, x2)
-        x3
-      })
-
-      act shouldBe alphaEqTo(exp)
-    })
-
-    "#2" in withDefaultSparkSession(implicit spark => {
-      val act = testPipeline(reify {
-        val s1 = this.seq3
-        val x1 = SparkDataset(s1)
-        val f1 = (u: Seq3) => {
-          val y1 = u.dst
-          y1
-        }
-        val f2 = (v: Seq3) => {
-          val z1 = v.src
-          z1
-        }
-        val f3 = (w: (Seq3, Seq3)) => {
-          val t1 = w._1
-          val t2 = w._2
-          val t3 = t1.src
-          val t4 = t2.dst
-          val t5 = Edge(t3, t4)
-          t5
-        }
-        val x3 = SparkOps.equiJoin(f1, f2)(x1, x1)
-        val x4 = x3.map(f3)
+        val x4 = x2.withFilter(f1)
         x4
       })
 
       val exp = dscfPipeline(reify {
-        val s1 = this.seq3
-        val x1 = SparkDataset(s1)
-        val f1 = (u: String) => {
-          val y1 = SparkExp.rootProj(u, "dst")
-          val r1 = SparkExp.rootStruct("_1")(y1)
-          r1
+        val x1 = this.seq2
+        val x2 = SparkDataset(x1)
+        val p1 = (y: SparkExp.Root) => {
+          val y1 = SparkExp.proj(y, "_2")
+          val y2 = SparkExp.proj(y, "_3")
+          val y3 = SparkExp.gt(y1, 1)
+          val y4 = SparkExp.startsWith(y2, "a")
+          val y5 = SparkExp.and(y3, y4)
+          y5
         }
-        val f2 = (v: String) => {
-          val z1 = SparkExp.rootProj(v, "src")
-          val r2 = SparkExp.rootStruct("_1")(z1)
-          r2
-        }
-        val f3 = (w: String) => {
-          val t1 = SparkExp.rootProj(w, "_1")
-          val t2 = SparkExp.rootProj(w, "_2")
-          val t3 = SparkExp.nestProj(t1, "src")
-          val t4 = SparkExp.nestProj(t2, "dst")
-          val t5 = SparkExp.rootStruct("src", "dst")(t3, t4)
-          t5
-        }
-        val x3 = SparkNtv.equiJoin[Seq3, Seq3, Int](f1, f2)(x1, x1)
-        val x4 = SparkNtv.project[(Seq3, Seq3), Seq3](f3)(x3)
+        val x4 = SparkNtv.select(p1)(x2)
         x4
       })
 
       act shouldBe alphaEqTo(exp)
     })
+
+    "should specialize `map` calls" in withDefaultSparkSession(implicit spark => {
+      val act = testPipeline(reify {
+        val x1 = this.seq1
+        val x2 = SparkDataset(x1)
+        val f1 = (y: Seq1) => {
+          val y1 = y._1
+          y1
+        }
+        val x4 = x2.map(f1)
+        x4
+      })
+
+      val exp = dscfPipeline(reify {
+        val x1 = this.seq1
+        val x2 = SparkDataset(x1)
+        val f1 = (y: SparkExp.Root) => {
+          val y1 = SparkExp.proj(y, "_1")
+          y1
+        }
+        val x4 = SparkNtv.project[Seq1, String](f1)(x2)
+        x4
+      })
+
+      act shouldBe alphaEqTo(exp)
+    })
+
+    "should specialize `equiJoin` calls" - {
+      "example #1" in withDefaultSparkSession(implicit spark => {
+        val act = testPipeline(reify {
+          val s1 = this.seq1
+          val s2 = this.seq2
+          val x1 = SparkDataset(s1)
+          val x2 = SparkDataset(s2)
+          val f1 = (u: Seq1) => {
+            val y1 = u._2
+            y1
+          }
+          val f2 = (v: Seq2) => {
+            val z1 = v._1
+            z1
+          }
+          val x3 = SparkOps.equiJoin(f1, f2)(x1, x2)
+          x3
+        })
+
+        val exp = dscfPipeline(reify {
+          val s1 = this.seq1
+          val s2 = this.seq2
+          val x1 = SparkDataset(s1)
+          val x2 = SparkDataset(s2)
+          val f1 = (u: SparkExp.Root) => {
+            val y1 = SparkExp.proj(u, "_2")
+            y1
+          }
+          val f2 = (v: SparkExp.Root) => {
+            val z1 = SparkExp.proj(v, "_1")
+            z1
+          }
+          val x3 = SparkNtv.equiJoin[Seq1, Seq2, Int](f1, f2)(x1, x2)
+          x3
+        })
+
+        act shouldBe alphaEqTo(exp)
+      })
+
+      "example #2" in withDefaultSparkSession(implicit spark => {
+        val act = testPipeline(reify {
+          val s1 = this.seq3
+          val x1 = SparkDataset(s1)
+          val f1 = (u: Seq3) => {
+            val y1 = u.dst
+            y1
+          }
+          val f2 = (v: Seq3) => {
+            val z1 = v.src
+            z1
+          }
+          val f3 = (w: (Seq3, Seq3)) => {
+            val t1 = w._1
+            val t2 = w._2
+            val t3 = t1.src
+            val t4 = t2.dst
+            val t5 = Edge(t3, t4)
+            t5
+          }
+          val x3 = SparkOps.equiJoin(f1, f2)(x1, x1)
+          val x4 = x3.map(f3)
+          x4
+        })
+
+        val exp = dscfPipeline(reify {
+          val s1 = this.seq3
+          val x1 = SparkDataset(s1)
+          val f1 = (u: SparkExp.Root) => {
+            val y1 = SparkExp.proj(u, "dst")
+            y1
+          }
+          val f2 = (v: SparkExp.Root) => {
+            val z1 = SparkExp.proj(v, "src")
+            z1
+          }
+          val f3 = (w: SparkExp.Root) => {
+            val t1 = SparkExp.proj(w, "_1")
+            val t2 = SparkExp.proj(w, "_2")
+            val t3 = SparkExp.proj(t1, "src")
+            val t4 = SparkExp.proj(t2, "dst")
+            val t5 = SparkExp.struct("src", "dst")(t3, t4)
+            t5
+          }
+          val x3 = SparkNtv.equiJoin[Seq3, Seq3, Int](f1, f2)(x1, x1)
+          val x4 = SparkNtv.project[(Seq3, Seq3), Seq3](f3)(x3)
+          x4
+        })
+
+        act shouldBe alphaEqTo(exp)
+      })
+    }
+
+    "should not specialize calls" - {
+      "with a non-specializable lambda argument" in withDefaultSparkSession(implicit spark => {
+        val act = testPipeline(reify {
+          val s1 = this.seq3
+          val x1 = SparkDataset(s1)
+          val f1 = (u: Seq3) => {
+            val y1 = u.dst
+            y1
+          }
+          val f2 = (v: Seq3) => {
+            val z1 = proj(v)
+            z1
+          }
+          val f3 = (w: (Seq3, Seq3)) => {
+            val t1 = w._1
+            val t2 = w._2
+            val t3 = t1.src
+            val t4 = t2.dst
+            val t5 = Edge(t3, t4)
+            t5
+          }
+          val x3 = SparkOps.equiJoin(f1, f2)(x1, x1)
+          val x4 = x3.map(f3)
+          x4
+        })
+
+        val exp = dscfPipeline(reify {
+          val s1 = this.seq3
+          val x1 = SparkDataset(s1)
+          val f1 = (u: Seq3) => {
+            val y1 = u.dst
+            y1
+          }
+          val f2 = (v: Seq3) => {
+            val z1 = proj(v)
+            z1
+          }
+          val f3 = (w: SparkExp.Root) => {
+            val t1 = SparkExp.proj(w, "_1")
+            val t2 = SparkExp.proj(w, "_2")
+            val t3 = SparkExp.proj(t1, "src")
+            val t4 = SparkExp.proj(t2, "dst")
+            val t5 = SparkExp.struct("src", "dst")(t3, t4)
+            t5
+          }
+          val x3 = SparkOps.equiJoin(f1, f2)(x1, x1)
+          val x4 = SparkNtv.project[(Seq3, Seq3), Seq3](f3)(x3)
+          x4
+        })
+
+        act shouldBe alphaEqTo(exp)
+      })
+
+      "in a data-parallel context" in withDefaultSparkSession(implicit spark => {
+        val act = testPipeline(reify {
+          val s4 = this.seq4
+          val x4 = SparkDataset(s4)
+          val f1 = (u: Seq1) => {
+            val y1 = u._2
+            y1
+          }
+          val f3 = (u: Seq4) => {
+            val f2 = (v: Seq2) => {
+              val z1 = v._1
+              z1
+            }
+            val x1 = u._1
+            val x2 = u._2
+            val x3 = LocalOps.equiJoin(f1, f2)(x1, x2)
+            x3
+          }
+          val x5 = x4.map(f3)
+          x5
+        })
+
+        val exp = dscfPipeline(reify {
+          val s4 = this.seq4
+          val x4 = SparkDataset(s4)
+          val f1 = (u: Seq1) => {
+            val y1 = u._2
+            y1
+          }
+          val f3 = (u: Seq4) => {
+            val f2 = (v: Seq2) => {
+              val z1 = v._1
+              z1
+            }
+            val x1 = u._1
+            val x2 = u._2
+            val x3 = LocalOps.equiJoin(f1, f2)(x1, x2)
+            x3
+          }
+          val x5 = x4.map(f3)
+          x5
+        })
+
+        act shouldBe alphaEqTo(exp)
+      })
+    }
   }
 }
