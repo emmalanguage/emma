@@ -19,15 +19,9 @@ package examples.graphs
 import api._
 import model._
 
-class FlinkConnectedComponentsIntegrationSpec extends BaseConnectedComponentsIntegrationSpec {
+class FlinkConnectedComponentsIntegrationSpec extends BaseConnectedComponentsIntegrationSpec with FlinkAware {
 
   def connectedComponents(edges: Seq[Edge[Int]]): Seq[LVertex[Int, Int]] =
-    FlinkConnectedComponentsIntegrationSpec(edges)
-}
-
-object FlinkConnectedComponentsIntegrationSpec extends FlinkAware {
-
-  def apply(edges: Seq[Edge[Int]]): Seq[LVertex[Int, Int]] =
     withDefaultFlinkEnv(implicit flink => emma.onFlink {
       val es = DataBag(edges)
       val rs = ConnectedComponents[Int](es)

@@ -19,15 +19,9 @@ package examples.graphs
 import api._
 import model._
 
-class SparkConnectedComponentsIntegrationSpec extends BaseConnectedComponentsIntegrationSpec {
+class SparkConnectedComponentsIntegrationSpec extends BaseConnectedComponentsIntegrationSpec with SparkAware {
 
   def connectedComponents(edges: Seq[Edge[Int]]): Seq[LVertex[Int, Int]] =
-    SparkConnectedComponentsIntegrationSpec(edges)
-}
-
-object SparkConnectedComponentsIntegrationSpec extends SparkAware {
-
-  def apply(edges: Seq[Edge[Int]]): Seq[LVertex[Int, Int]] =
     withDefaultSparkSession(implicit spark => emma.onSpark {
       ConnectedComponents[Int](DataBag(edges)).collect()
     })
