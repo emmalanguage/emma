@@ -16,7 +16,7 @@
 package org.emmalanguage
 package lib.ml.optimization.solver
 
-import api.Meta.Projections._
+//import api.Meta.Projections._
 import api._
 import lib.linalg._
 import lib.ml._

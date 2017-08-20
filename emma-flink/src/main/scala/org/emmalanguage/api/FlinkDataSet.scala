@@ -213,7 +213,7 @@ object FlinkDataSet extends DataBagCompanion[FlinkEnv] {
   private lazy val memo = collection.mutable.Map.empty[Any, Any]
 
   implicit def typeInfoForType[T: Meta]: TypeInformation[T] = {
-    val ttag = implicitly[Meta[T]].ttag
+    val ttag = implicitly[Meta[T]]
     memo.getOrElseUpdate(
       ttag,
       compiler.eval[TypeInformation[T]](

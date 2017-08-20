@@ -8,7 +8,6 @@ import KMeans.Solution
 import algorithms.ml.model._
 
 import org.emmalanguage.FlinkAware
-import org.emmalanguage.api.Meta.Projections._
 import org.emmalanguage.api._
 
 class FlinkKMeansIntegrationSpec extends BaseKMeansIntegrationSpec with FlinkAware {

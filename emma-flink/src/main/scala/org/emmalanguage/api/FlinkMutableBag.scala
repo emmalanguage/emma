@@ -17,7 +17,7 @@ package org.emmalanguage
 package api
 
 import FlinkMutableBag.State
-import Meta.Projections._
+//import Meta.Projections._
 import flink._
 import flink.FlinkOps.cache
 

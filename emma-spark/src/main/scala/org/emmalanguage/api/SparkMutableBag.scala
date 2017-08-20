@@ -16,7 +16,7 @@
 package org.emmalanguage
 package api
 
-import api.Meta.Projections._
+import api.Meta.Projections.ctagFor
 import api.spark._
 
 import edu.berkeley.cs.amplab.spark.indexedrdd.IndexedRDD
@@ -66,7 +66,7 @@ object SparkMutableBag {
   implicit private def keySerializer[K](implicit m: Meta[K]): KeySerializer[K] = {
     import scala.reflect.runtime.universe._
 
-    val ttag = m.ttag
+    val ttag = m
 
     if (ttag.tpe == typeOf[Long]) IndexedRDD.longSer.asInstanceOf[KeySerializer[K]]
     else if (ttag.tpe == typeOf[String]) IndexedRDD.stringSer.asInstanceOf[KeySerializer[K]]

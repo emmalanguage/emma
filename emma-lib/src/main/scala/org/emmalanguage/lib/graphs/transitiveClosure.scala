@@ -21,7 +21,7 @@ import api._
 @emma.lib
 object transitiveClosure {
 
-  def apply[V: Meta.Tag](edges: DataBag[Edge[V]]): DataBag[Edge[V]] = {
+  def apply[V: Meta](edges: DataBag[Edge[V]]): DataBag[Edge[V]] = {
     var paths = edges.distinct
     var count = paths.size
     var added = 0L

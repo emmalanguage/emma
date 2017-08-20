@@ -17,27 +17,16 @@ package org.emmalanguage
 package api
 
 import scala.reflect.ClassTag
-import scala.reflect.runtime.universe.TypeTag
 
 // -----------------------------------------------------
 // types supported by Emma
 // -----------------------------------------------------
 
-trait Meta[T] extends Serializable {
-  def ctag: ClassTag[T]
-  def ttag: TypeTag[T]
-}
-
 object Meta {
-  type Tag[T] = TypeTag[T]
-
-  implicit def apply[T: Tag]: Meta[T] = new Meta[T] {
-    lazy val ctag = ClassTag[T](ttag.mirror.runtimeClass(ttag.tpe))
-    def ttag = implicitly[TypeTag[T]]
-  }
 
   object Projections {
-    implicit def ttagFor[T](implicit meta: Meta[T]): TypeTag[T]  = meta.ttag
-    implicit def ctagFor[T](implicit meta: Meta[T]): ClassTag[T] = meta.ctag
+    implicit def ctagFor[T](implicit meta: Meta[T]): ClassTag[T] =
+      ClassTag[T](meta.mirror.runtimeClass(meta.tpe))
   }
+
 }

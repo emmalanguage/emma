@@ -25,7 +25,7 @@ object GraphPreprocessing {
 
   type Proj[L] = DataBag[Collaboration] => L
 
-  def apply[L: Meta.Tag](input: String, csv: CSV)(proj: Proj[L]): DataBag[LEdge[Person, L]] = {
+  def apply[L: Meta](input: String, csv: CSV)(proj: Proj[L]): DataBag[LEdge[Person, L]] = {
 
     val people : DataBag[Person] = DataBag.readCSV[Person](s"$input/people.csv", csv)
     val movies : DataBag[Movie]  = DataBag.readCSV[Movie](s"$input/people.csv", csv)

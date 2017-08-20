@@ -7,7 +7,6 @@ package algorithms.ml.clustering
 import algorithms.ml.model._
 
 import breeze.linalg._
-import org.emmalanguage.api.Meta.Projections._
 import org.emmalanguage.api._
 
 @emma.lib

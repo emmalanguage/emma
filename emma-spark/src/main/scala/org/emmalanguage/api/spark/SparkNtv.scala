@@ -25,7 +25,7 @@ import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
 object SparkNtv {
 
-  import Meta.Projections._
+  //import Meta.Projections._
   import SparkExp._
 
   implicit def encoderForType[T: Meta]: Encoder[T] =

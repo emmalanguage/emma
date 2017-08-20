@@ -23,7 +23,7 @@ import scala.language.higherKinds
 /** An abstraction for homogeneous distributed collections. */
 trait DataBag[A] extends Serializable {
 
-  import Meta.Projections._
+  //import Meta.Projections._
 
   implicit def m: Meta[A]
 
