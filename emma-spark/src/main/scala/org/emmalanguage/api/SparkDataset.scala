@@ -29,7 +29,7 @@ import scala.util.hashing.MurmurHash3
 /** A `DataBag` implementation backed by a Spark `Dataset`. */
 class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val rep: Dataset[A]) extends DataBag[A] {
 
-  import Meta.Projections._
+  //import Meta.Projections._
   import SparkDataset.encoderForType
   import SparkDataset.wrap
   import api.spark.fromRDD
@@ -206,7 +206,7 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
 
 object SparkDataset extends DataBagCompanion[SparkSession] {
 
-  import Meta.Projections._
+  //import Meta.Projections._
 
   implicit def encoderForType[T: Meta]: Encoder[T] =
     ExpressionEncoder[T]

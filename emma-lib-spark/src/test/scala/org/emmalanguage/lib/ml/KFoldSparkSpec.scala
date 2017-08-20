@@ -17,7 +17,7 @@ package org.emmalanguage
 package lib.ml
 
 import api._
-import Meta.Projections._
+//import Meta.Projections._
 
 class KFoldSparkSpec extends KFoldSpec with SparkAware {
 

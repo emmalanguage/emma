@@ -16,7 +16,7 @@
 package org.emmalanguage
 package cli
 
-import api.Meta.Projections._
+//import api.Meta.Projections._
 import api._
 import examples.graphs._
 import examples.graphs.model._

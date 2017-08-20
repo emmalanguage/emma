@@ -24,7 +24,7 @@ import Ordering.Implicits._
 @emma.lib
 object ConnectedComponents {
 
-  def apply[V: Ordering : Meta.Tag](edges: DataBag[Edge[V]]): DataBag[LVertex[V, V]] = {
+  def apply[V: Ordering : Meta](edges: DataBag[Edge[V]]): DataBag[LVertex[V, V]] = {
     val vertices = edges.map(_.src).distinct
 
     // initial state

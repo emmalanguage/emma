@@ -23,6 +23,7 @@ package object api {
   type Parquet = io.parquet.Parquet
   type ParquetSupport[A] = io.parquet.ParquetScalaSupport[A]
   type ParquetConverter[A] = io.parquet.ParquetConverter[A]
+  type Meta[A] = scala.reflect.runtime.universe.TypeTag[A]
 
   val CSV = io.csv.CSV
   val CSVScalaSupport = io.csv.CSVScalaSupport

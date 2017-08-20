@@ -24,7 +24,7 @@ import scala.Ordering.Implicits._
 @emma.lib
 object EnumerateTriangles {
 
-  def apply[V: Ordering: Meta.Tag](edges: DataBag[Edge[V]]): DataBag[Triangle[V]] = {
+  def apply[V: Ordering: Meta](edges: DataBag[Edge[V]]): DataBag[Triangle[V]] = {
     // generate all triangles (x - v - w) such that x < v < w
     val triangles = for {
       Edge(x, u) <- edges

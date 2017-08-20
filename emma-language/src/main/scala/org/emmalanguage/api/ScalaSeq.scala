@@ -19,19 +19,22 @@ package api
 import alg.Alg
 
 import scala.language.implicitConversions
-import scala.reflect.ClassTag
-import scala.reflect.runtime.universe._
 
 /** A `DataBag` implementation backed by a Scala `Seq`. */
-class ScalaSeq[A] private[api](private[api] val rep: Seq[A]) extends DataBag[A] {
+class ScalaSeq[A] private[api]
+(
+  private[api] val rep: Seq[A]
+)(
+  @transient implicit val m: Meta[A]
+) extends DataBag[A] {
 
   import ScalaSeq.wrap
 
   //@formatter:off
-  @transient override val m: Meta[A] = new Meta[A] {
+  /*@transient override val m: Meta[A] = new Meta[A] {
     override def ctag: ClassTag[A] = null
     override def ttag: TypeTag[A] = null
-  }
+  }*/
   //@formatter:on
 
   // -----------------------------------------------------
@@ -136,13 +139,13 @@ object ScalaSeq extends DataBagCompanion[LocalEnv] {
   ): DataBag[A] = new ScalaSeq(ParquetScalaSupport(format).read(path).toStream)
 
   // This is used in the code generation in TranslateToDataflows when inserting `collect` calls
-  def fromDataBag[A](bag: DataBag[A]): DataBag[A] =
+  def fromDataBag[A: Meta](bag: DataBag[A]): DataBag[A] =
     new ScalaSeq(bag.collect())
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  private[emmalanguage] implicit def wrap[A](rep: Seq[A]): DataBag[A] =
+  private[emmalanguage] implicit def wrap[A: Meta](rep: Seq[A]): DataBag[A] =
     new ScalaSeq(rep)
 }
