@@ -18,12 +18,13 @@ package api
 
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Dataset
+import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
 package object spark {
 
   import Meta.Projections.ctagFor
-  import SparkDataset.encoderForType
 
   implicit def fromDataset[A](
     implicit spark: SparkSession, m: Meta[A]
@@ -59,4 +60,6 @@ package object spark {
       throw new RuntimeException(s"Cannot convert a DataBag of type ${bag.getClass.getSimpleName} to a Spark RDD")
   }
 
+  private[api] implicit def encoderForType[T: Meta]: Encoder[T] =
+    ExpressionEncoder[T]
 }
