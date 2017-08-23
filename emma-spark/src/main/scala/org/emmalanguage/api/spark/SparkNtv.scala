@@ -18,7 +18,6 @@ package api.spark
 
 import api._
 
-import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -38,16 +37,16 @@ object SparkNtv {
   def select[A: Meta](p: Root => Expr)(xs: DataBag[A])(
     implicit s: SparkSession
   ): DataBag[A] = xs match {
-    case dst(us) =>
+    case SparkDataset(us) =>
       val xs = us.as("x")
       val cx = p(Root("x")).col
-      dst(xs.filter(cx))
+      SparkDataset(xs.filter(cx))
   }
 
   def project[A: Meta, B: Meta](f: Root => Expr)(xs: DataBag[A])(
     implicit s: SparkSession
   ): DataBag[B] = xs match {
-    case dst(us) =>
+    case SparkDataset(us) =>
       import s.sqlContext.implicits._
       val fs = encoderForType[B].schema.fields
       val xs = us.as("x")
@@ -63,36 +62,18 @@ object SparkNtv {
         case expr =>
           Seq(expr.col)
       }
-      dst(xs.select(cx: _*).as[B])
+      SparkDataset(xs.select(cx: _*).as[B])
   }
 
   def equiJoin[A: Meta, B: Meta, K: Meta](
     kx: Root => Expr, ky: Root => Expr)(xs: DataBag[A], ys: DataBag[B]
   )(implicit s: SparkSession): DataBag[(A, B)] = (xs, ys) match {
-    case (dst(us), dst(vs)) =>
+    case (SparkDataset(us), SparkDataset(vs)) =>
       val xs = us.as("x")
       val ys = vs.as("y")
       val cx = kx(Root("x")).col
       val cy = ky(Root("y")).col
-      dst(xs.joinWith(ys, cx === cy))
-  }
-
-  //----------------------------------------------------------------------------
-  // Helper Objects and Methods
-  //----------------------------------------------------------------------------
-
-  private object dst {
-    def apply[A: Meta](
-      rep: Dataset[A]
-    )(implicit s: SparkSession): DataBag[A] = new SparkDataset(rep)
-
-    def unapply[A: Meta](
-      bag: DataBag[A]
-    )(implicit s: SparkSession): Option[Dataset[A]] = bag match {
-      case bag: SparkDataset[A] => Some(bag.rep)
-      case bag: SparkRDD[A] => Some(s.createDataset(bag.rep))
-      case _ => None
-    }
+      SparkDataset(xs.joinWith(ys, cx === cy))
   }
 
 }

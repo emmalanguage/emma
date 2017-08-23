@@ -29,11 +29,13 @@ protected[emmalanguage] trait API extends AST {
     def ops: Set[u.MethodSymbol]
 
     protected def op(name: String): u.MethodSymbol =
-      sym.info.member(api.TermName(name)).asMethod
+      sym.info.member(api.TermName(name)).alternatives.collectFirst({
+        case api.DefSym(m) if m.isPublic => m
+      }).get
 
     protected def op(name: String, arities: List[Int]): u.MethodSymbol =
       sym.info.member(api.TermName(name)).alternatives.collectFirst({
-        case api.DefSym(m) if m.info.paramLists.map(_.size) == arities => m
+        case api.DefSym(m) if m.isPublic && m.info.paramLists.map(_.size) == arities => m
       }).get
 
     protected def ann(sym: u.ClassSymbol) =

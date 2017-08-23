@@ -17,22 +17,16 @@ package org.emmalanguage
 package api
 
 import alg.Alg
+import spark.encoderForType
 
 import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
-import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
 
 /** A `DataBag` implementation backed by a Spark `Dataset`. */
 class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val rep: Dataset[A]) extends DataBag[A] {
-
-  //import Meta.Projections._
-  import SparkDataset.encoderForType
-  import SparkDataset.wrap
-  import api.spark.fromRDD
 
   import rep.sparkSession.sqlContext.implicits._
 
@@ -56,20 +50,20 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
   // -----------------------------------------------------
 
   override def map[B: Meta](f: (A) => B): DataBag[B] =
-    rep.map(f)
+    SparkDataset(rep.map(f))
 
   override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
-    rep.flatMap((x: A) => f(x).collect())
+    SparkDataset(rep.flatMap((x: A) => f(x).collect()))
 
   def withFilter(p: (A) => Boolean): DataBag[A] =
-    rep.filter(p)
+    SparkDataset(rep.filter(p))
 
   // -----------------------------------------------------
   // Grouping
   // -----------------------------------------------------
 
   override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
-    DataBag.from(rep.rdd).groupBy(k)
+    SparkRDD(rep.rdd).groupBy(k)
 
   // -----------------------------------------------------
   // Set operations
@@ -77,13 +71,13 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
 
   override def union(that: DataBag[A]): DataBag[A] = that match {
     case dbag: ScalaSeq[A] => this union SparkDataset(dbag.rep)
-    case dbag: SparkRDD[A] => this.rep union dbag.rep.toDS()
-    case dbag: SparkDataset[A] => this.rep union dbag.rep
+    case dbag: SparkRDD[A] => SparkDataset(this.rep union dbag.rep.toDS())
+    case dbag: SparkDataset[A] => SparkDataset(this.rep union dbag.rep)
     case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
 
   override def distinct: DataBag[A] =
-    rep.distinct
+    SparkDataset(rep.distinct)
 
   // -----------------------------------------------------
   // Partition-based Ops
@@ -112,34 +106,37 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
   }
 
   def zipWithIndex(): DataBag[(A, Long)] =
-    DataBag.from(rep.rdd.zipWithIndex())
+    SparkRDD(rep.rdd.zipWithIndex())
 
   // -----------------------------------------------------
   // Sinks
   // -----------------------------------------------------
 
-  override def writeCSV(path: String, format: CSV)
-    (implicit converter: CSVConverter[A]): Unit = rep.write
-      .option("header", format.header)
-      .option("delimiter", format.delimiter.toString)
-      .option("charset", format.charset.toString)
-      .option("quote", format.quote.getOrElse('"').toString)
-      .option("escape", format.escape.getOrElse('\\').toString)
-      .option("nullValue", format.nullValue)
-      .mode("overwrite").csv(path)
+  override def writeCSV(path: String, format: CSV)(
+    implicit converter: CSVConverter[A]
+  ): Unit = rep.write
+    .option("header", format.header)
+    .option("delimiter", format.delimiter.toString)
+    .option("charset", format.charset.toString)
+    .option("quote", format.quote.getOrElse('"').toString)
+    .option("escape", format.escape.getOrElse('\\').toString)
+    .option("nullValue", format.nullValue)
+    .mode("overwrite").csv(path)
 
   override def writeText(path: String): Unit =
     rep.write.text(path)
 
-  def writeParquet(path: String, format: Parquet)
-    (implicit converter: ParquetConverter[A]): Unit = rep.write
-      .option("binaryAsString", format.binaryAsString)
-      .option("int96AsTimestamp", format.int96AsTimestamp)
-      .option("cacheMetadata", format.cacheMetadata)
-      .option("codec", format.codec.toString)
-      .mode("overwrite").parquet(path)
+  def writeParquet(path: String, format: Parquet)(
+    implicit converter: ParquetConverter[A]
+  ): Unit = rep.write
+    .option("binaryAsString", format.binaryAsString)
+    .option("int96AsTimestamp", format.int96AsTimestamp)
+    .option("cacheMetadata", format.cacheMetadata)
+    .option("codec", format.codec.toString)
+    .mode("overwrite").parquet(path)
 
-  def collect(): Seq[A] = collected
+  def collect(): Seq[A] =
+    collected
 
   private lazy val collected: Seq[A] =
     rep.collect()
@@ -206,30 +203,25 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
 
 object SparkDataset extends DataBagCompanion[SparkSession] {
 
-  //import Meta.Projections._
-
-  implicit def encoderForType[T: Meta]: Encoder[T] =
-    ExpressionEncoder[T]
-
   // ---------------------------------------------------------------------------
   // Constructors
   // ---------------------------------------------------------------------------
 
   def empty[A: Meta](
     implicit spark: SparkSession
-  ): DataBag[A] = spark.emptyDataset[A]
+  ): DataBag[A] = SparkDataset(spark.emptyDataset[A])
 
   def apply[A: Meta](values: Seq[A])(
     implicit spark: SparkSession
-  ): DataBag[A] = spark.createDataset(values)
+  ): DataBag[A] = SparkDataset(spark.createDataset(values))
 
   def readText(path: String)(
     implicit spark: SparkSession
-  ): DataBag[String] = spark.read.textFile(path)
+  ): DataBag[String] = SparkDataset(spark.read.textFile(path))
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(
     implicit spark: SparkSession
-  ): DataBag[A] = spark.read
+  ): DataBag[A] = SparkDataset(spark.read
     .option("header", format.header)
     .option("delimiter", format.delimiter.toString)
     .option("charset", format.charset.toString)
@@ -237,23 +229,32 @@ object SparkDataset extends DataBagCompanion[SparkSession] {
     .option("escape", format.escape.getOrElse('\\').toString)
     .option("comment", format.escape.map(_.toString).orNull)
     .option("nullValue", format.nullValue)
-    .schema(encoderForType[A].schema)
-    .csv(path).as[A]
+    .schema(implicitly[Encoder[A]].schema)
+    .csv(path).as[A])
 
   def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(
     implicit spark: SparkSession
-  ): DataBag[A] = spark.read
+  ): DataBag[A] = SparkDataset(spark.read
     .option("binaryAsString", format.binaryAsString)
     .option("int96AsTimestamp", format.int96AsTimestamp)
     .option("cacheMetadata", format.cacheMetadata)
     .option("codec", format.codec.toString)
-    .schema(encoderForType[A].schema)
-    .parquet(path).as[A]
+    .schema(implicitly[Encoder[A]].schema)
+    .parquet(path).as[A])
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  implicit def wrap[A: Meta](rep: Dataset[A]): DataBag[A] =
-    new SparkDataset(rep)
+  private[api] def apply[A: Meta](
+    rep: Dataset[A]
+  )(implicit s: SparkSession): DataBag[A] = new SparkDataset(rep)
+
+  private[api] def unapply[A: Meta](
+    bag: DataBag[A]
+  )(implicit spark: SparkSession): Option[Dataset[A]] = bag match {
+    case bag: SparkDataset[A] => Some(bag.rep)
+    case bag: SparkRDD[A] => Some(spark.createDataset(bag.rep))
+    case _ => None
+  }
 }

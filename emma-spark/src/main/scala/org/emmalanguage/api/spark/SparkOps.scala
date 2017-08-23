@@ -21,7 +21,6 @@ import api.alg._
 import api.backend.ComprehensionCombinators
 import api.backend.Runtime
 
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -41,13 +40,13 @@ object SparkOps extends ComprehensionCombinators[SparkSession] with Runtime[Spar
   def cross[A: Meta, B: Meta](
     xs: DataBag[A], ys: DataBag[B]
   )(implicit s: SparkSession): DataBag[(A, B)] = (xs, ys) match {
-    case (rdd(us), rdd(vs)) => rdd(us cartesian vs)
+    case (SparkRDD(us), SparkRDD(vs)) => SparkRDD(us cartesian vs)
   }
 
   def equiJoin[A: Meta, B: Meta, K: Meta](
     kx: A => K, ky: B => K)(xs: DataBag[A], ys: DataBag[B]
   )(implicit s: SparkSession): DataBag[(A, B)] = (xs, ys) match {
-    case (rdd(us), rdd(vs)) => rdd((us.map(extend(kx)) join vs.map(extend(ky))).values)
+    case (SparkRDD(us), SparkRDD(vs)) => SparkRDD((us.map(extend(kx)) join vs.map(extend(ky))).values)
   }
 
   private def extend[X, K](k: X => K): X => (K, X) =
@@ -59,36 +58,18 @@ object SparkOps extends ComprehensionCombinators[SparkSession] with Runtime[Spar
 
   def cache[A: Meta](xs: DataBag[A])(implicit s: SparkSession): DataBag[A] =
     xs match {
-      case xs: SparkDataset[A] => SparkDataset.wrap(xs.rep.cache())
-      case xs: SparkRDD[A] => SparkRDD.wrap(xs.rep.cache())
+      case xs: SparkDataset[A] => SparkDataset(xs.rep.cache())
+      case xs: SparkRDD[A] => SparkRDD(xs.rep.cache())
       case _ => xs
     }
 
   def foldGroup[A: Meta, B: Meta, K: Meta](
     xs: DataBag[A], key: A => K, alg: Alg[A, B]
   )(implicit s: SparkSession): DataBag[Group[K, B]] = xs match {
-    case rdd(us) => rdd(us
+    case SparkRDD(us) => SparkRDD(us
       .map(x => key(x) -> alg.init(x))
       .reduceByKey(alg.plus)
       .map(x => Group(x._1, x._2)))
-  }
-
-  //----------------------------------------------------------------------------
-  // Helper Objects
-  //----------------------------------------------------------------------------
-
-  private object rdd {
-    def apply[A: Meta](
-      rep: RDD[A]
-    )(implicit s: SparkSession): DataBag[A] = new SparkRDD(rep)
-
-    def unapply[A: Meta](
-      bag: DataBag[A]
-    )(implicit s: SparkSession): Option[RDD[A]] = bag match {
-      case bag: SparkRDD[A] => Some(bag.rep)
-      case bag: SparkDataset[A] => Some(bag.rep.rdd)
-      case _ => Some(s.sparkContext.parallelize(bag.collect()))
-    }
   }
 
 }
