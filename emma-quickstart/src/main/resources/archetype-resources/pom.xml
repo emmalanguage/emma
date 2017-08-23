@@ -49,7 +49,7 @@
         <scala.tools.version>2.11</scala.tools.version>
 
         <!-- Emma -->
-        <emma.version>0.2.1</emma.version>
+        <emma.version>0.2-SNAPSHOT</emma.version>
         <!-- Hadoop -->
         <hadoop.version>2.8.0</hadoop.version>
         <!-- Flink -->
