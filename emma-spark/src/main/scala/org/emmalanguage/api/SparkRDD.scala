@@ -22,7 +22,6 @@ import spark.encoderForType
 import util.RanHash
 
 import org.apache.spark.rdd._
-import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.SparkSession
 
 import scala.util.hashing.MurmurHash3
@@ -73,7 +72,7 @@ class SparkRDD[A: Meta] private[api]
   override def union(that: DataBag[A]): DataBag[A] = that match {
     case dbag: ScalaSeq[A] => this union SparkRDD(dbag.rep)
     case dbag: SparkRDD[A] => SparkRDD(this.rep union dbag.rep)
-    case dbag: SparkDataset[A] => SparkDataset(this.rep.toDS() union dbag.rep)
+    case dbag: SparkDataset[A] => SparkRDD(this.rep union dbag.rep.rdd)
     case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
 
@@ -116,28 +115,14 @@ class SparkRDD[A: Meta] private[api]
 
   override def writeCSV(path: String, format: CSV)(
     implicit converter: CSVConverter[A]
-  ): Unit = spark
-    .createDataset(rep).write
-    .option("header", format.header)
-    .option("delimiter", format.delimiter.toString)
-    .option("charset", format.charset.toString)
-    .option("quote", format.quote.getOrElse('"').toString)
-    .option("escape", format.escape.getOrElse('\\').toString)
-    .option("nullValue", format.nullValue)
-    .mode("overwrite").csv(path)
+  ): Unit = SparkDataset(spark.createDataset(rep)).writeCSV(path, format)
 
   override def writeText(path: String): Unit =
-    spark.createDataset(rep).write.text(path)
+    SparkDataset(spark.createDataset(rep)).writeText(path)
 
   def writeParquet(path: String, format: Parquet)(
     implicit converter: ParquetConverter[A]
-  ): Unit = spark
-    .createDataset(rep).write
-    .option("binaryAsString", format.binaryAsString)
-    .option("int96AsTimestamp", format.int96AsTimestamp)
-    .option("cacheMetadata", format.cacheMetadata)
-    .option("codec", format.codec.toString)
-    .mode("overwrite").parquet(path)
+  ): Unit = SparkDataset(spark.createDataset(rep)).writeParquet(path, format)
 
   def collect(): Seq[A] =
     collected
@@ -195,30 +180,15 @@ object SparkRDD extends DataBagCompanion[SparkSession] {
 
   def readText(path: String)(
     implicit spark: SparkSession
-  ): DataBag[String] = SparkRDD(spark.sparkContext.textFile(path))
+  ): DataBag[String] = SparkDataset.readText(path)
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(
     implicit spark: SparkSession
-  ): DataBag[A] = SparkRDD(spark.read
-    .option("header", format.header)
-    .option("delimiter", format.delimiter.toString)
-    .option("charset", format.charset.toString)
-    .option("quote", format.quote.getOrElse('"').toString)
-    .option("escape", format.escape.getOrElse('\\').toString)
-    .option("comment", format.escape.map(_.toString).orNull)
-    .option("nullValue", format.nullValue)
-    .schema(implicitly[Encoder[A]].schema)
-    .csv(path).as[A].rdd)
+  ): DataBag[A] = SparkDataset.readCSV(path, format)
 
   def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(
     implicit spark: SparkSession
-  ): DataBag[A] = SparkRDD(spark.read
-    .option("binaryAsString", format.binaryAsString)
-    .option("int96AsTimestamp", format.int96AsTimestamp)
-    .option("cacheMetadata", format.cacheMetadata)
-    .option("codec", format.codec.toString)
-    .schema(implicitly[Encoder[A]].schema)
-    .parquet(path).as[A].rdd)
+  ): DataBag[A] = SparkDataset.readParquet(path, format)
 
   // ---------------------------------------------------------------------------
   // Implicit Rep -> DataBag conversion
