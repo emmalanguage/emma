@@ -21,17 +21,12 @@ import api.alg._
 import api.backend.ComprehensionCombinators
 import api.backend.Runtime
 
-import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
 /** Spark backend operators. */
 object SparkOps extends ComprehensionCombinators[SparkSession] with Runtime[SparkSession] {
 
   import Meta.Projections._
-
-  implicit def encoderForType[T: Meta]: Encoder[T] =
-    ExpressionEncoder[T]
 
   //----------------------------------------------------------------------------
   // ComprehensionCombinators

@@ -18,17 +18,11 @@ package api.spark
 
 import api._
 
-import org.apache.spark.sql.Encoder
 import org.apache.spark.sql.SparkSession
-import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 
 object SparkNtv {
 
-  //import Meta.Projections._
   import SparkExp._
-
-  implicit def encoderForType[T: Meta]: Encoder[T] =
-    ExpressionEncoder[T]
 
   //----------------------------------------------------------------------------
   // Specialized combinators

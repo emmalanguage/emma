@@ -38,25 +38,20 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
   // -----------------------------------------------------
 
   override def fold[B: Meta](alg: Alg[A, B]): B =
-    try {
-      rep.map(x => alg.init(x)).reduce(alg.plus)
-    } catch {
-      case e: UnsupportedOperationException if e.getMessage == "empty collection" => alg.zero
-      case e: Throwable => throw e
-    }
+    SparkRDD(rep.rdd).fold(alg)
 
   // -----------------------------------------------------
   // Monad Ops
   // -----------------------------------------------------
 
   override def map[B: Meta](f: (A) => B): DataBag[B] =
-    SparkDataset(rep.map(f))
+    SparkRDD(rep.rdd).map(f)
 
   override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
-    SparkDataset(rep.flatMap((x: A) => f(x).collect()))
+    SparkRDD(rep.rdd).flatMap(f)
 
   def withFilter(p: (A) => Boolean): DataBag[A] =
-    SparkDataset(rep.filter(p))
+    SparkRDD(rep.rdd).withFilter(p)
 
   // -----------------------------------------------------
   // Grouping
@@ -71,7 +66,7 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
 
   override def union(that: DataBag[A]): DataBag[A] = that match {
     case dbag: ScalaSeq[A] => this union SparkDataset(dbag.rep)
-    case dbag: SparkRDD[A] => SparkDataset(this.rep union dbag.rep.toDS())
+    case dbag: SparkRDD[A] => SparkRDD(this.rep.rdd union dbag.rep)
     case dbag: SparkDataset[A] => SparkDataset(this.rep union dbag.rep)
     case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
@@ -83,30 +78,11 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
   // Partition-based Ops
   // -----------------------------------------------------
 
-  def sample(k: Int, seed: Long = 5394826801L): Vector[A] = {
-    // counts per partition, sorted by partition ID
-    val Seq(hd, tl@_*) = rep.rdd.zipWithIndex()
-      .mapPartitionsWithIndex({ (pid, it) =>
-        val sample = Array.fill(k)(Option.empty[A])
-        for ((e, i) <- it) {
-          if (i >= k) {
-            val j = util.RanHash(seed).at(i).nextLong(i + 1)
-            if (j < k) sample(j.toInt) = Some(e)
-          } else sample(i.toInt) = Some(e)
-        }
-        Seq(pid -> sample).toIterator
-      }).collect().sortBy(_._1).map(_._2).toSeq
-
-    // merge the sequence of samples and filter None values
-    val rs = for {
-      Some(v) <- tl.foldLeft(hd)((xs, ys) => for ((x, y) <- xs zip ys) yield y orElse x)
-    } yield v
-
-    rs.toVector
-  }
+  def sample(k: Int, seed: Long = 5394826801L): Vector[A] =
+    SparkRDD(rep.rdd).sample(k, seed)
 
   def zipWithIndex(): DataBag[(A, Long)] =
-    SparkRDD(rep.rdd.zipWithIndex())
+    SparkRDD(rep.rdd).zipWithIndex()
 
   // -----------------------------------------------------
   // Sinks
@@ -140,32 +116,6 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
 
   private lazy val collected: Seq[A] =
     rep.collect()
-
-  // -----------------------------------------------------
-  // Pre-defined folds
-  // -----------------------------------------------------
-
-  override def reduceOption(p: (A, A) => A): Option[A] =
-    try {
-      Option(rep.reduce(p))
-    } catch {
-      case e: UnsupportedOperationException if e.getMessage == "empty collection" => None
-      case e: Throwable => throw e
-    }
-
-  override def find(p: A => Boolean): Option[A] =
-    try {
-      Option(rep.filter(p).head())
-    } catch {
-      case e: NoSuchElementException if e.getMessage == "next on empty iterator" => None
-      case e: Throwable => throw e
-    }
-
-  override def min(implicit o: Ordering[A]): A =
-    reduceOption(o.min).get
-
-  override def max(implicit o: Ordering[A]): A =
-    reduceOption(o.max).get
 
   // -----------------------------------------------------
   // equals and hashCode
@@ -255,6 +205,6 @@ object SparkDataset extends DataBagCompanion[SparkSession] {
   )(implicit spark: SparkSession): Option[Dataset[A]] = bag match {
     case bag: SparkDataset[A] => Some(bag.rep)
     case bag: SparkRDD[A] => Some(spark.createDataset(bag.rep))
-    case _ => None
+    case _ => Some(spark.createDataset(bag.collect()))
   }
 }
