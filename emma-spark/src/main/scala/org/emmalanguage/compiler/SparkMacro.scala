@@ -30,7 +30,7 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler with SparkCompil
     if (cfg.getBoolean("emma.compiler.print-result")) {
       c.warning(e.tree.pos, api.Tree.show(res))
     }
-    c.Expr[T]((removeShadowedThis andThen unTypeCheck) (res))
+    c.Expr[T](unTypeCheck(res))
   }
 
   def onSparkImpl2[T](config: c.Expr[String])(e: c.Expr[T]): c.Expr[T] = {
@@ -39,7 +39,7 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler with SparkCompil
     if (cfg.getBoolean("emma.compiler.print-result")) {
       c.warning(e.tree.pos, api.Tree.show(res))
     }
-    c.Expr[T]((removeShadowedThis andThen unTypeCheck) (res))
+    c.Expr[T](unTypeCheck(res))
   }
 
   private def pipeline(cfg: Config): c.Expr[Any] => u.Tree = {
@@ -78,6 +78,8 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler with SparkCompil
       case "dscfInv" =>
         xfms += Core.dscfInv
     }
+
+    xfms += removeShadowedThis
 
     // construct the compilation pipeline
     pipeline()(xfms.result(): _*).compose(_.tree)

@@ -290,6 +290,7 @@ trait Types { this: AST =>
           // Qualified this type: `T.this`.
           case u.ThisType(encl) =>
             if (!encl.isStatic) api.This(encl)
+            else if (encl.isClass && !encl.isModuleClass && api.Owner.inEnclChain(encl)) api.This(encl)
             else api.Tree.resolveStatic(encl)
           // Super type: `this.super[T]`
           case u.SuperType(ths, parent) =>

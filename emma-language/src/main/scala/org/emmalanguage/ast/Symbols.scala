@@ -301,6 +301,10 @@ trait Symbols { this: AST =>
       def chain(sym: u.Symbol): Stream[u.Symbol] =
         Stream.iterate(sym)(_.owner).takeWhile(is.defined)
 
+      /** Returns true if the chain of the enclosing symbol contains `sym`. */
+      def inEnclChain(sym: u.Symbol): Boolean =
+        chain(api.Owner.encl).contains(encl)
+
       /** Fixes the owner chain of a tree with `owner` at the root. */
       def at(owner: u.Symbol): u.Tree => u.Tree = {
         assert(is.defined(owner), "Undefined owner")

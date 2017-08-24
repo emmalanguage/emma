@@ -30,7 +30,7 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
     if (cfg.getBoolean("emma.compiler.print-result")) {
       c.warning(e.tree.pos, api.Tree.show(res))
     }
-    c.Expr[T]((removeShadowedThis andThen unTypeCheck) (res))
+    c.Expr[T](unTypeCheck(res))
   }
 
   def onFlinkImpl2[T](config: c.Expr[String])(e: c.Expr[T]): c.Expr[T] = {
@@ -39,7 +39,7 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
     if (cfg.getBoolean("emma.compiler.print-result")) {
       c.warning(e.tree.pos, api.Tree.show(res))
     }
-    c.Expr[T]((removeShadowedThis andThen unTypeCheck) (res))
+    c.Expr[T](unTypeCheck(res))
   }
 
   private def pipeline(cfg: Config): c.Expr[Any] => u.Tree = {
@@ -70,6 +70,8 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
       case "dscfInv" =>
         xfms += Core.dscfInv
     }
+
+    xfms += removeShadowedThis
 
     // construct the compilation pipeline
     pipeline()(xfms.result(): _*).compose(_.tree)

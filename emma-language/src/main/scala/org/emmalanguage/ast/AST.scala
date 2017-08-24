@@ -105,6 +105,10 @@ trait AST extends CommonAST
   lazy val removeShadowedThis =
     if (shadowedOwners.isEmpty) identity[u.Tree] _
     else api.TopDown.transform {
+      case api.BindingDef(x, api.Sel(api.This(encl), member))
+        if shadowedOwners(encl) =>
+        setInfo(x, x.info.widen)
+        api.BindingDef(x, api.Id(member))
       case api.Sel(api.This(encl), member)
         if shadowedOwners(encl) => api.Id(member)
     }.andThen(_.tree)
