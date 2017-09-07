@@ -63,6 +63,8 @@ protected[emmalanguage] trait API extends AST {
 
   class DataBagAPI(cls: u.ClassSymbol) extends ClassAPI {
 
+    def apply(A: u.Type): u.Type = api.Type(tpe, Seq(A))
+
     //@formatter:off
     lazy val sym              = cls
 
@@ -160,6 +162,9 @@ protected[emmalanguage] trait API extends AST {
   }
 
   trait GroupAPI extends ClassAPI {
+
+    def apply(K: u.Type, V: u.Type): u.Type = api.Type(tpe, Seq(K, V))
+
     //@formatter:off
     lazy val sym              = api.Sym[org.emmalanguage.api.Group[Any, Any]].asClass
 

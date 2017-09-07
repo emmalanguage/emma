@@ -22,24 +22,34 @@ import scala.reflect.macros.blackbox
 
 class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompiler {
 
+  import UniverseImplicits._
+
   override protected val baseConfig = "reference.emma.onFlink.conf" +: super.baseConfig
 
   def onFlinkImpl1[T](e: c.Expr[T]): c.Expr[T] = {
     val cfg = loadConfig(configPaths())
     val res = pipeline(cfg)(e)
+    val pre = memoizedTypeInfos(res)
     if (cfg.getBoolean("emma.compiler.print-result")) {
       c.warning(e.tree.pos, api.Tree.show(res))
     }
-    c.Expr[T](unTypeCheck(res))
+    c.Expr[T](unTypeCheck(res match {
+      case api.Block(stats, expr) => api.Block(pre ++ stats, expr)
+      case _ => api.Block(pre, res)
+    }))
   }
 
   def onFlinkImpl2[T](config: c.Expr[String])(e: c.Expr[T]): c.Expr[T] = {
     val cfg = loadConfig(configPaths(Some(config.tree)))
     val res = pipeline(cfg)(e)
+    val pre = memoizedTypeInfos(res)
     if (cfg.getBoolean("emma.compiler.print-result")) {
       c.warning(e.tree.pos, api.Tree.show(res))
     }
-    c.Expr[T](unTypeCheck(res))
+    c.Expr[T](unTypeCheck(res match {
+      case api.Block(stats, expr) => api.Block(pre ++ stats, expr)
+      case _ => api.Block(pre, res)
+    }))
   }
 
   private def pipeline(cfg: Config): c.Expr[Any] => u.Tree = {

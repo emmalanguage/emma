@@ -16,14 +16,12 @@
 package org.emmalanguage
 package api
 
-import test.util._
+import test.schema.Literature._
 
+import org.apache.flink.api.scala.createTypeInformation
 import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
-import org.scalatest.BeforeAndAfter
 
-import java.io.File
-
-class FlinkDataSetSpec extends DataBagSpec with BeforeAndAfter with FlinkAware {
+class FlinkDataSetSpec extends DataBagSpec with FlinkAware {
 
   override val supportsParquet = false
 
@@ -36,15 +34,19 @@ class FlinkDataSetSpec extends DataBagSpec with BeforeAndAfter with FlinkAware {
   override def withBackendContext[T](f: BackendContext => T): T =
     withDefaultFlinkEnv(f)
 
-  val codegenDir = new File(tempPath("codegen"))
-
-  before {
-    // make sure that the base paths exist
-    codegenDir.mkdirs()
-    addToClasspath(codegenDir)
-  }
-
-  after {
-    deleteRecursive(codegenDir)
-  }
+  // explicitly memoize required TypeInformation instances
+  // in practice these lines will be implicitly synthesized by the `emma.onFlink` quotes
+  FlinkDataSet.memoizeTypeInfo[Book]
+  FlinkDataSet.memoizeTypeInfo[Character]
+  FlinkDataSet.memoizeTypeInfo[(Book, Seq[Character])]
+  FlinkDataSet.memoizeTypeInfo[(Int, Double)]
+  FlinkDataSet.memoizeTypeInfo[(String, String)]
+  FlinkDataSet.memoizeTypeInfo[Option[Int]]
+  FlinkDataSet.memoizeTypeInfo[Option[Character]]
+  FlinkDataSet.memoizeTypeInfo[Option[(Int, Double)]]
+  FlinkDataSet.memoizeTypeInfo[List[Int]]
+  FlinkDataSet.memoizeTypeInfo[Group[Book, DataBag[Character]]]
+  FlinkDataSet.memoizeTypeInfo[(Int, Array[Option[Int]])]
+  FlinkDataSet.memoizeTypeInfo[(String, Long)]
+  FlinkDataSet.memoizeTypeInfo[DataBagSpec.CSVRecord]
 }
