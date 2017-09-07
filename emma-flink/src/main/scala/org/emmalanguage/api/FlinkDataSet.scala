@@ -17,9 +17,9 @@ package org.emmalanguage
 package api
 
 import alg.Alg
-import compiler.RuntimeCompiler
 
 import org.apache.flink.api.common.functions.RichMapPartitionFunction
+import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.scala.DataSet
 import org.apache.flink.api.scala.utils.DataSetUtils
 import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
@@ -103,14 +103,14 @@ class FlinkDataSet[A: Meta] private[api]
       .mapPartition(new RichMapPartitionFunction[(Long, A), (Int, Array[Option[A]])] {
         @transient private var pid = 0
 
-        override def open(parameters: Configuration) = {
+        override def open(parameters: Configuration): Unit = {
           super.open(parameters)
           pid = getRuntimeContext.getIndexOfThisSubtask
         }
 
         import scala.collection.JavaConversions._
 
-        def mapPartition(it: lang.Iterable[(Long, A)], out: Collector[(Int, Array[Option[A]])]) = {
+        def mapPartition(it: lang.Iterable[(Long, A)], out: Collector[(Int, Array[Option[A]])]): Unit = {
           val sample = Array.fill(k)(Option.empty[A])
           for ((i, e) <- it) {
             if (i >= k) {
@@ -204,24 +204,60 @@ class FlinkDataSet[A: Meta] private[api]
 
 object FlinkDataSet extends DataBagCompanion[FlinkEnv] {
 
-  import org.apache.flink.api.common.typeinfo.TypeInformation
+  import scala.reflect.runtime.{universe => u}
 
-  val compiler = new RuntimeCompiler()
+  private val memo = collection.mutable.Map.empty[Any, Any]
 
-  import compiler.u._
-
-  private lazy val memo = collection.mutable.Map.empty[Any, Any]
-
-  implicit def typeInfoForType[T: Meta]: TypeInformation[T] = {
-    val ttag = implicitly[Meta[T]]
-    memo.getOrElseUpdate(
-      ttag,
-      compiler.eval[TypeInformation[T]](
-        // The dynamic cast in the following line is necessary, because the compiler can't see statically that
-        // these path-dependent types are actually the same.
-        q"org.apache.flink.api.scala.createTypeInformation[${ttag.tpe.asInstanceOf[Type]}]")
-    ).asInstanceOf[TypeInformation[T]]
+  { // initialize memo table with standard types
+    import org.apache.flink.api.scala._
+    // standard Scala types
+    memoizeTypeInfo(implicitly[Meta[Unit]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[Boolean]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[Char]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[Byte]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[Short]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[Int]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[Long]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[Float]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[Double]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[String]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[BigInt]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[BigDecimal]], createTypeInformation)
+    // standard Java types
+    memoizeTypeInfo(implicitly[Meta[java.lang.Void]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[java.lang.Boolean]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[java.lang.Character]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[java.lang.Byte]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[java.lang.Short]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[java.lang.Integer]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[java.lang.Long]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[java.lang.Float]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[java.lang.Double]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[java.math.BigInteger]], createTypeInformation)
+    memoizeTypeInfo(implicitly[Meta[java.math.BigDecimal]], createTypeInformation)
   }
+
+  def memoizeTypeInfo[T](implicit meta: Meta[T], info: TypeInformation[T]): TypeInformation[T] = {
+    val tpe = fix(meta.tpe).toString
+    val res = memo.getOrElseUpdate(tpe, info)
+    res.asInstanceOf[TypeInformation[T]]
+  }
+
+  implicit def typeInfoForType[T](implicit meta: Meta[T]): TypeInformation[T] = {
+    val tpe = fix(meta.tpe).toString
+    if (memo.contains(tpe)) memo(tpe).asInstanceOf[TypeInformation[T]]
+    else throw new RuntimeException(
+      s"""
+        |Cannot find TypeInformation for type $tpe.
+        |Try calling `FlinkDataSet.memoizeTypeInfo[$tpe]` explicitly before the `emma.onFlink` quote.
+      """.stripMargin.trim
+    )
+  }
+
+  private def fix(tpe: u.Type): u.Type = tpe.dealias.map(t => {
+    if (t =:= u.typeOf[java.lang.String]) u.typeOf[String]
+    else t
+  })
 
   import Meta.Projections._
 

@@ -24,6 +24,7 @@ import compiler.RuntimeCompiler
 
 import org.apache.flink.api.scala.DataSet
 import org.apache.flink.api.scala.ExecutionEnvironment
+import org.apache.flink.api.scala.createTypeInformation
 
 class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkAware {
   override val compiler = new RuntimeCompiler with FlinkCompiler
@@ -38,6 +39,14 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkA
 
   override lazy val backendPipeline: u.Tree => u.Tree =
     Backend.specialize(FlinkAPI)
+
+  override lazy val addContext: u.Tree => u.Tree = tree => {
+    import u._
+    q"(env: $Env) => { implicit val e: $Env = env; ..${memoizedTypeInfos(tree)}; $tree }"
+  }
+
+  // FIXME: no idea why, but all tests require TypeInformation[(Int, Int, Int, Int)]
+  FlinkDataSet.memoizeTypeInfo[(Int, Int, Int, Int)]
 
   // --------------------------------------------------------------------------
   // Distributed collection conversion

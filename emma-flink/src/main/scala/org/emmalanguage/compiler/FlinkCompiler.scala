@@ -16,9 +16,65 @@
 package org.emmalanguage
 package compiler
 
+import cats.implicits._
+
 trait FlinkCompiler extends Compiler {
 
   override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ FlinkAPI.implicitTypes
+
+  /** Infers types `T` in the given `tree` for which a Flink `TypeInformation[T]` might be required. */
+  def requiredTypeInfos(tree: u.Tree): Set[u.Type] =
+    api.BottomUp.synthesize({
+      case api.DefCall(Some(tgt), m, targs, _)
+        if FlinkAPI.DataBag.groupBy.overrides.contains(m) =>
+        val K = targs(0)
+        val A = api.Type.arg(1, tgt.tpe)
+        Set(K, API.Group(K, API.DataBag(A)))
+      case api.DefCall(Some(tgt), m, _, _)
+        if FlinkAPI.DataBag.zipWithIndex.overrides.contains(m) =>
+        val A = api.Type.arg(1, tgt.tpe)
+        Set(api.Type.tupleOf(Seq(A, api.Type.long)))
+      case api.DefCall(Some(tgt), m, _, _)
+        if FlinkAPI.DataBag.sample.overrides.contains(m) =>
+        val A = api.Type.arg(1, tgt.tpe)
+        val X = api.Type.tupleOf(Seq(A, api.Type.long))
+        val Y = api.Type.tupleOf(Seq(api.Type.int, api.Type.arrayOf(api.Type.optionOf(A))))
+        Set(X, Y)
+      case api.DefCall(_, FlinkAPI.Ops.foldGroup, targs, _) =>
+        val B = targs(1)
+        val K = targs(2)
+        Set(K, API.Group(K, B))
+      case api.DefCall(_, FlinkAPI.MutableBag$.apply, targs, _) =>
+        val K = targs(0)
+        val V = targs(1)
+        Set(K, V, api.Type(FlinkAPI.State, Seq(K, V)))
+      case api.DefCall(_, FlinkAPI.DataBag$.readText, _, _) =>
+        Set(api.Type.string)
+      case api.DefCall(_, FlinkAPI.DataBag$.readCSV, targs, _) =>
+        val A = targs(0)
+        Set(A, api.Type.string)
+      case api.DefCall(_, m, _, _)
+        if m == FlinkAPI.DataBag.writeCSV.overrides.contains(m) =>
+        Set(api.Type.string)
+      case api.DefCall(_, FlinkAPI.DataBag$.from, targs, _) =>
+        val A = targs(1)
+        Set(A)
+      case api.DefCall(Some(tgt), FlinkAPI.DataBag.as, _, _) =>
+        val A = api.Type.arg(1, tgt.tpe)
+        Set(A)
+      case api.DefCall(_, m, targs, _)
+        if FlinkAPI.GenericOps(m) => targs.toSet
+    }).traverseAny._syn(tree).head
+
+  /** Generates `FlinkDataSet.memoizeTypeInfo[T]` calls for all required types `T` in the given `tree`. */
+  def memoizedTypeInfos(tree: u.Tree): Seq[u.Tree] = {
+    import u.Quasiquote
+    for (tpe <- requiredTypeInfos(tree).toSeq.sortBy(_.toString)) yield {
+      val ttag = q"implicitly[scala.reflect.runtime.universe.TypeTag[$tpe]]"
+      val info = q"org.apache.flink.api.scala.`package`.createTypeInformation[$tpe]"
+      q"org.emmalanguage.api.FlinkDataSet.memoizeTypeInfo[$tpe]($ttag, $info)"
+    }
+  }
 
   object FlinkAPI extends BackendAPI {
 
@@ -26,6 +82,8 @@ trait FlinkCompiler extends Compiler {
     lazy val ExecutionEnvironment = api.Type[org.apache.flink.api.scala.ExecutionEnvironment]
 
     lazy val implicitTypes = Set(TypeInformation, ExecutionEnvironment)
+
+    lazy val State = api.Type[org.emmalanguage.api.FlinkMutableBag.State[Any, Any]].typeConstructor
 
     lazy val DataBag = new DataBagAPI(api.Sym[org.emmalanguage.api.FlinkDataSet[Any]].asClass)
 
@@ -36,6 +94,13 @@ trait FlinkCompiler extends Compiler {
     lazy val MutableBag$ = new MutableBag$API(api.Sym[org.emmalanguage.api.FlinkMutableBag.type].asModule)
 
     lazy val Ops = new OpsAPI(api.Sym[org.emmalanguage.api.flink.FlinkOps.type].asModule)
+
+    lazy val GenericOps = for {
+      ops <- Set(DataBag.ops, DataBag$.ops, MutableBag.ops, MutableBag$.ops, Ops.ops)
+      sym <- ops
+      if sym.info.takesTypeArgs
+      res <- sym +: sym.overrides
+    } yield res
   }
 
 }

@@ -213,6 +213,10 @@ trait Types { this: AST =>
       def arrayOf(elements: u.Type): u.Type =
         kind1[Array](elements)
 
+      /** Creates a new option type. */
+      def optionOf(element: u.Type): u.Type =
+        kind1[Option](element)
+
       /** Creates a new function (lambda) type. */
       def fun(params: Seq[u.Type] = Seq.empty, result: u.Type = Type.unit): u.Type = {
         val n = params.size
