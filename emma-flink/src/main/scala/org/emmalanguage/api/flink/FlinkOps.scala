@@ -105,7 +105,7 @@ object FlinkOps extends ComprehensionCombinators[FlinkEnv] with Runtime[FlinkEnv
     flink.readFile(inFmt, filePath)
   }
 
-  private val tempBase =
+  lazy val tempBase =
     new URI(System.getProperty("emma.flink.temp-base", "file:///tmp/emma/flink-temp/"))
 
   private[emmalanguage] val tempNames = Stream.iterate(0)(_ + 1)
@@ -113,6 +113,6 @@ object FlinkOps extends ComprehensionCombinators[FlinkEnv] with Runtime[FlinkEnv
     .toIterator
 
   private[emmalanguage] def tempPath(tempName: String): String =
-    tempBase.resolve(tempName).toURL.toString
+    tempBase.resolve(tempName).toString
 
 }
