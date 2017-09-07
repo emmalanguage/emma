@@ -67,7 +67,7 @@ object RuntimeCompiler {
 
     val runMethod = "run"
 
-    val codeGenDir = Paths
+    lazy val codeGenDir = Paths
       .get(sys.props("java.io.tmpdir"), "emma", "codegen")
       .toAbsolutePath.toString
 
