@@ -20,12 +20,16 @@ import alg._
 
 import scala.language.higherKinds
 
+import java.util.UUID
+
 /** An abstraction for homogeneous distributed collections. */
 trait DataBag[A] extends Serializable {
 
   //import Meta.Projections._
 
   implicit def m: Meta[A]
+
+  val uuid: UUID = UUID.randomUUID()
 
   // -----------------------------------------------------
   // Structural recursion
@@ -344,7 +348,7 @@ trait DataBag[A] extends Serializable {
     fold(Top(n, o))
 
   // -----------------------------------------------------
-  // equals and hashCode
+  // equals, hashCode and toString
   // -----------------------------------------------------
 
   override def equals(o: Any): Boolean = o match {
@@ -363,6 +367,8 @@ trait DataBag[A] extends Serializable {
   override def hashCode(): Int =
     scala.util.hashing.MurmurHash3.unorderedHash(collect())
 
+  override def toString: String =
+    getClass.getName + "@" + uuid;
 }
 
 trait DataBagCompanion[E] {

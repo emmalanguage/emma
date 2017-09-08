@@ -169,7 +169,7 @@ class FlinkDataSet[A: Meta] private[api]
     rep.collect()
 
   // -----------------------------------------------------
-  // equals and hashCode
+  // equals, hashCode and toString
   // -----------------------------------------------------
 
   override def equals(o: Any) =

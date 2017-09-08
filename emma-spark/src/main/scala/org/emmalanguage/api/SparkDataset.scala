@@ -118,7 +118,7 @@ class SparkDataset[A: Meta] private[api](@transient private[emmalanguage] val re
     rep.collect()
 
   // -----------------------------------------------------
-  // equals and hashCode
+  // equals, hashCode and toString
   // -----------------------------------------------------
 
   override def equals(o: Any): Boolean =
