@@ -18,6 +18,7 @@ package lib.ml
 
 import api._
 import lib.BaseLibSpec
+import lib.linalg._
 
 class KFoldSpec extends BaseLibSpec {
 
@@ -26,7 +27,7 @@ class KFoldSpec extends BaseLibSpec {
 
   val s1 = 54326427L
   val s2 = 23546473L
-  val xs = 1 to N
+  val xs = (1 to N).map(i =>LDPoint(i, dense(Array(i.toDouble)), i))
   val fs = Seq(0.3, 0.2, 0.5)
 
   it should "returns the same assignment with a matching pdf and seed" in {
@@ -57,18 +58,18 @@ class KFoldSpec extends BaseLibSpec {
     }
   }
 
-  protected def split(pdf: Seq[Double], seed: Long, xs: Seq[Int]) = {
+  protected def split(pdf: Seq[Double], seed: Long, xs: Seq[LDPoint[Int, Int]]) = {
     val folds = kfold.split(pdf)(DataBag(xs))(seed)
     folds.collect()
   }
 
-  protected def splitAndCount(pdf: Seq[Double], seed: Long, xs: Seq[Int]) = {
+  protected def splitAndCount(pdf: Seq[Double], seed: Long, xs: Seq[LDPoint[Int, Int]]) = {
     val folds = kfold.split(pdf)(DataBag(xs))(seed)
     val sizes = for (g <- folds.groupBy(_.foldID)) yield g.key -> g.values.size
     sizes.collect().toMap
   }
 
-  protected def splitAndProject(pdf: Seq[Double], seed: Long, xs: Seq[Int]) = {
+  protected def splitAndProject(pdf: Seq[Double], seed: Long, xs: Seq[LDPoint[Int, Int]]) = {
     val folds = kfold.split(pdf)(DataBag(xs))(seed)
     for (k <- pdf.indices) yield {
       val us = kfold.select(k)(folds).collect()

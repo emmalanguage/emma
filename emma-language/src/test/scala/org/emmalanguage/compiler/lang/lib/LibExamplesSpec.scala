@@ -48,5 +48,13 @@ class LibExamplesSpec extends LibExamples {
     "Example F (Emma Source)" in {
       idPipeline(`Example F (Original Expr)`) shouldBe alphaEqTo(idPipeline(`Example F (Emma Source)`))
     }
+
+    "Example G (Emma Source)" in {
+      idPipeline(`Example G (Original Expr)`) shouldBe alphaEqTo(idPipeline(`Example G (Emma Source)`))
+    }
+
+    "Example H (Emma Source)" in {
+      idPipeline(`Example H (Original Expr)`) shouldBe alphaEqTo(idPipeline(`Example H (Emma Source)`))
+    }
   }
 }

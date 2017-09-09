@@ -95,8 +95,8 @@ private[compiler] trait Lib extends Common {
       } yield tp -> ta.typeSymbol.asType
       // compute type bindings substitution map
       val typesSubstMap = (for {
-        (tp, ta) <- typesSubstSeq
-      } yield tp.toType -> ta.toType).toMap.withDefault(t => t)
+        (tp, ta) <- tparams zip targs
+      } yield tp.toType -> ta).toMap.withDefault(t => t)
 
       // compute binding defs substitution sequence
       val bndDefsSubstSeq = for {
@@ -113,7 +113,7 @@ private[compiler] trait Lib extends Common {
       } yield  p -> x
 
       ({
-        api.Tree.rename(typesSubstSeq ++ bndDefsSubstSeq ++ parDefsSubstSeq)
+        api.Tree.rename(typesSubstSeq ++ bndDefsSubstSeq ++ parDefsSubstSeq, typesSubstMap)
       } andThen {
         appendPrefix(parDefsPrefix)
       } andThen {

@@ -289,9 +289,12 @@ trait Trees { this: AST =>
        * Dependent symbols are changed as well, such as children symbols with renamed owners,
        * and method symbols with renamed (type) parameters.
        */
-      def rename(aliases: Seq[(u.Symbol, u.Symbol)]): u.Tree => u.Tree =
+      def rename(
+        aliases: Seq[(u.Symbol, u.Symbol)],
+        typeMap: Map[u.Type, u.Type] = Map.empty.withDefault(identity)
+      ): u.Tree => u.Tree =
         if (aliases.isEmpty) identity
-        else tree => Sym.subst(Owner.of(tree), aliases)(tree)
+        else tree => Sym.subst(Owner.of(tree), aliases, typeMap)(tree)
 
       /** Replaces occurrences of `find` with `repl` in a tree. */
       def replace(find: u.Tree, repl: u.Tree): u.Tree => u.Tree =

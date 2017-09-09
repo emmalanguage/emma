@@ -114,4 +114,12 @@ object example extends Arithmetic {
     val n = implicitly[Numeric[A]]
     Foo.Bar.Baz(n.toInt(n.plus(x, y)))
   }
+
+  // ---------------------------------------------------------------------------
+  // Example H: parametric method with parametric parameter
+  // ---------------------------------------------------------------------------
+
+  def zipWithZero[A](xs: Seq[A]): Seq[(A, Int)] = {
+    xs.map(x => (x, 0))
+  }
 }
