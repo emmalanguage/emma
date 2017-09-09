@@ -229,15 +229,20 @@ trait Symbols { this: AST =>
        * Performs a symbol substitution, given a set of `aliases` and a new owner.
        * @param at The new owner of the tree.
        * @param aliases Pairs of symbols to substitute from -> to.
+       * @param typeMap Pairs of types to substitute from -> to.
        * @return A structurally equivalent tree, owned by `at`, with all `aliases` substituted.
        */
-      def subst(at: u.Symbol, aliases: Seq[(u.Symbol, u.Symbol)] = Seq.empty): u.Tree => u.Tree =
+      def subst(
+        at: u.Symbol,
+        aliases: Seq[(u.Symbol, u.Symbol)] = Seq.empty,
+        typeMap: Map[u.Type, u.Type] = Map.empty.withDefault(identity)
+      ): u.Tree => u.Tree =
         if (!is.defined(at) && aliases.isEmpty) identity else TopDown.withOwner(at)
           .accumulateInit(aliases.toMap.withDefault(identity), aliases.toList.unzip) {
             case Attr(Owner(sym), (dict, (keys, vals)) :: _, cur :: _, _) =>
               val als = dict(sym)
               val own = dict(cur)
-              val tpe = als.info.substituteSymbols(keys, vals)
+              val tpe = als.info.map(typeMap).substituteSymbols(keys, vals)
               val changed = own != als.owner || tpe != als.info
               if (is.method(als)) {
                 val met = als.asMethod
@@ -267,9 +272,9 @@ trait Symbols { this: AST =>
                 tpe.paramLists.iterator.flatten.exists(dict.contains)) {
                 val tps = tpe.typeParams.map(dict(_).asType)
                 val pss = tpe.paramLists.map(_.map(dict(_).asTerm))
-                val res = tpe.finalResultType.substituteSymbols(keys, vals)
+                val res = tpe.finalResultType.map(typeMap).substituteSymbols(keys, vals)
                 Type.method(tps, pss, res)
-              } else tpe.substituteSymbols(keys, vals)
+              } else tpe.map(typeMap).substituteSymbols(keys, vals)
             } else tpe
             // Can't be fused with the traversal above,
             // because method calls might appear before their definition.

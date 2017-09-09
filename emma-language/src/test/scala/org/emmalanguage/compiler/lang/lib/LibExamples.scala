@@ -305,4 +305,40 @@ trait LibExamples extends BaseCompilerSpec {
 
   lazy val `Example G (Emma Core)` =
     liftPipeline(`Example G (Original Expr)`)
+
+  // ---------------------------------------------------------------------------
+  // Example H: Program representations
+  // ---------------------------------------------------------------------------
+
+  lazy val `Example H (Original Expr)` = {
+    import lib.example._
+    reify {
+      val xs = Seq('a' -> 1)
+      val rs = zipWithZero(xs)
+      rs
+    }
+  }
+
+  lazy val `Example H (Emma Source)` = {
+    import lib.example._
+    reify {
+      val xs = Seq('a' -> 1)
+      val rs = zipWithZero(xs)
+      rs
+    }
+  }
+
+  lazy val `Example H (normalized)` = {
+    reify {
+      val xs = Seq('a' -> 1)
+      val rs = {
+        val ys = xs
+        ys.map(x => (x, 0))
+      }
+      rs
+    }
+  }
+
+  lazy val `Example H (Emma Core)` =
+    liftPipeline(`Example H (Original Expr)`)
 }

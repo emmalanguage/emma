@@ -21,20 +21,20 @@ import api._
 
 class KFoldFlinkSpec extends KFoldSpec with FlinkAware {
 
-  override protected def split(pdf: Seq[Double], seed: Long, xs: Seq[Int]) =
+  override protected def split(pdf: Seq[Double], seed: Long, xs: Seq[LDPoint[Int, Int]]) =
     withDefaultFlinkEnv(implicit flink => emma.onFlink {
       val folds = kfold.split(pdf)(DataBag(xs))(seed)
       folds.collect()
     })
 
-  override protected def splitAndCount(pdf: Seq[Double], seed: Long, xs: Seq[Int]) =
+  override protected def splitAndCount(pdf: Seq[Double], seed: Long, xs: Seq[LDPoint[Int, Int]]) =
     withDefaultFlinkEnv(implicit flink => emma.onFlink {
       val folds = kfold.split(pdf)(DataBag(xs))(seed)
       val sizes = for (g <- folds.groupBy(_.foldID)) yield g.key -> g.values.size
       sizes.collect().toMap
     })
 
-  override protected def splitAndProject(pdf: Seq[Double], seed: Long, xs: Seq[Int]) =
+  override protected def splitAndProject(pdf: Seq[Double], seed: Long, xs: Seq[LDPoint[Int, Int]]) =
     withDefaultFlinkEnv(implicit flink => emma.onFlink {
       val folds = kfold.split(pdf)(DataBag(xs))(seed)
       for (k <- pdf.indices) yield {

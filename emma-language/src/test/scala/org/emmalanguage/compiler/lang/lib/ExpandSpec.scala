@@ -69,4 +69,10 @@ class ExpandSpec extends LibExamples {
     val exp = prePipeline(`Example G (normalized)`)
     expand(inp) shouldBe alphaEqTo(exp)
   }
+
+  "Exampe H" in {
+    val inp = prePipeline(`Example H (Emma Source)`)
+    val exp = prePipeline(`Example H (normalized)`)
+    expand(inp) shouldBe alphaEqTo(exp)
+  }
 }
