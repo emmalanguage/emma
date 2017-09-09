@@ -27,7 +27,6 @@ import org.apache.flink.configuration.Configuration
 import org.apache.flink.core.fs.FileSystem
 import org.apache.flink.util.Collector
 
-import scala.language.implicitConversions
 import scala.util.hashing.MurmurHash3
 
 import java.lang
@@ -39,7 +38,6 @@ class FlinkDataSet[A: Meta] private[api]
 ) extends DataBag[A] {
 
   import FlinkDataSet.typeInfoForType
-  import FlinkDataSet.wrap
   import Meta.Projections._
 
   @transient override val m = implicitly[Meta[A]]
@@ -62,23 +60,23 @@ class FlinkDataSet[A: Meta] private[api]
   // -----------------------------------------------------
 
   override def map[B: Meta](f: (A) => B): DataBag[B] =
-    rep.map(f)
+    FlinkDataSet(rep.map(f))
 
   override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
-    rep.flatMap((x: A) => f(x).collect())
+    FlinkDataSet(rep.flatMap((x: A) => f(x).collect()))
 
   def withFilter(p: (A) => Boolean): DataBag[A] =
-    rep.filter(p)
+    FlinkDataSet(rep.filter(p))
 
   // -----------------------------------------------------
   // Grouping
   // -----------------------------------------------------
 
   override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
-    rep.groupBy(k).reduceGroup((it: Iterator[A]) => {
+    FlinkDataSet(rep.groupBy(k).reduceGroup((it: Iterator[A]) => {
       val buffer = it.toBuffer // This is because the iterator might not be serializable
       Group(k(buffer.head), DataBag(buffer))
-    })
+    }))
 
   // -----------------------------------------------------
   // Set operations
@@ -86,12 +84,12 @@ class FlinkDataSet[A: Meta] private[api]
 
   override def union(that: DataBag[A]): DataBag[A] = that match {
     case dbag: ScalaSeq[A] => this union FlinkDataSet(dbag.rep)
-    case dbag: FlinkDataSet[A] => this.rep union dbag.rep
+    case dbag: FlinkDataSet[A] => FlinkDataSet(this.rep union dbag.rep)
     case _ => throw new IllegalArgumentException(s"Unsupported rhs for `union` of type: ${that.getClass}")
   }
 
   override def distinct: DataBag[A] =
-    rep.distinct
+    FlinkDataSet(rep.distinct)
 
   // -----------------------------------------------------
   // Partition-based Ops
@@ -132,7 +130,7 @@ class FlinkDataSet[A: Meta] private[api]
   }
 
   def zipWithIndex(): DataBag[(A, Long)] =
-    wrap(new DataSetUtils(rep).zipWithIndex).map(_.swap)
+    FlinkDataSet(new DataSetUtils(rep).zipWithIndex).map(_.swap)
 
   // -----------------------------------------------------
   // Sinks
@@ -267,19 +265,19 @@ object FlinkDataSet extends DataBagCompanion[FlinkEnv] {
 
   def empty[A: Meta](
     implicit flink: FlinkEnv
-  ): DataBag[A] = flink.fromElements[A]()
+  ): DataBag[A] = FlinkDataSet(flink.fromElements[A]())
 
   def apply[A: Meta](values: Seq[A])(
     implicit flink: FlinkEnv
-  ): DataBag[A] = flink.fromCollection(values)
+  ): DataBag[A] = FlinkDataSet(flink.fromCollection(values))
 
   def readText(path: String)(
     implicit flink: FlinkEnv
-  ): DataBag[String] = flink.readTextFile(path)
+  ): DataBag[String] = FlinkDataSet(flink.readTextFile(path))
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(
     implicit flink: FlinkEnv
-  ): DataBag[A] = flink
+  ): DataBag[A] = FlinkDataSet(flink
     .readTextFile(path, format.charset)
     .mapPartition((it: Iterator[String]) => new Traversable[A] {
       def foreach[U](f: (A) => U): Unit = {
@@ -287,7 +285,7 @@ object FlinkDataSet extends DataBagCompanion[FlinkEnv] {
         val con = CSVConverter[A]
         for (line <- it) f(con.read(csv.parseLine(line), 0)(format))
       }
-    })
+    }))
 
   def readParquet[A: Meta : ParquetConverter](path: String, format: Parquet)(
     implicit flink: FlinkEnv
@@ -297,6 +295,14 @@ object FlinkDataSet extends DataBagCompanion[FlinkEnv] {
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  implicit def wrap[A: Meta](rep: DataSet[A]): DataBag[A] =
-    new FlinkDataSet(rep)
+  private[api] def apply[A: Meta](
+    rep: DataSet[A]
+  )(implicit flink: FlinkEnv): DataBag[A] = new FlinkDataSet(rep)
+
+  private[api] def unapply[A: Meta](
+    bag: DataBag[A]
+  )(implicit flink: FlinkEnv): Option[DataSet[A]] = bag match {
+    case bag: FlinkDataSet[A] => Some(bag.rep)
+    case _ => Some(flink.fromCollection(bag.collect()))
+  }
 }

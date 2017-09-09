@@ -33,7 +33,6 @@ import java.net.URI
 object FlinkOps extends ComprehensionCombinators[FlinkEnv] with Runtime[FlinkEnv] {
 
   import FlinkDataSet.typeInfoForType
-  import FlinkDataSet.wrap
   import Meta.Projections._
 
   // ---------------------------------------------------------------------------
@@ -42,28 +41,14 @@ object FlinkOps extends ComprehensionCombinators[FlinkEnv] with Runtime[FlinkEnv
 
   def cross[A: Meta, B: Meta](
     xs: DataBag[A], ys: DataBag[B]
-  )(implicit flink: FlinkEnv): DataBag[(A, B)] = {
-    val datasetOf = new DataSetExtractor(flink)
-    (xs, ys) match {
-      case (datasetOf(xsDS), datasetOf(ysDS)) => xsDS cross ysDS
-    }
+  )(implicit flink: FlinkEnv): DataBag[(A, B)] = (xs, ys) match {
+    case (FlinkDataSet(us), FlinkDataSet(vs)) => FlinkDataSet(us cross vs)
   }
 
   def equiJoin[A: Meta, B: Meta, K: Meta](
-    keyx: A => K, keyy: B => K)(xs: DataBag[A], ys: DataBag[B]
-  )(implicit flink: FlinkEnv): DataBag[(A, B)] = {
-    val datasetOf = new DataSetExtractor(flink)
-    (xs, ys) match {
-      case (datasetOf(xsDS), datasetOf(ysDS)) =>
-        (xsDS join ysDS) where keyx equalTo keyy
-    }
-  }
-
-  private class DataSetExtractor(flink: FlinkEnv) {
-    def unapply[A: Meta](bag: DataBag[A]): Option[DataSet[A]] = bag match {
-      case bag: FlinkDataSet[A] => Some(bag.rep)
-      case _ => Some(flink.fromCollection(bag.collect()))
-    }
+    kx: A => K, ky: B => K)(xs: DataBag[A], ys: DataBag[B]
+  )(implicit flink: FlinkEnv): DataBag[(A, B)] = (xs, ys) match {
+    case (FlinkDataSet(us), FlinkDataSet(vs)) => FlinkDataSet((us join vs) where kx equalTo ky)
   }
 
   // ---------------------------------------------------------------------------
@@ -75,16 +60,17 @@ object FlinkOps extends ComprehensionCombinators[FlinkEnv] with Runtime[FlinkEnv
       case xs: FlinkDataSet[A] =>
         val sinkName = sink(xs.rep)
         xs.env.execute(s"emma-cache-$sinkName")
-        source[A](sinkName)
+        FlinkDataSet(source[A](sinkName))
       case _ => xs
     }
 
   def foldGroup[A: Meta, B: Meta, K: Meta](
     xs: DataBag[A], key: A => K, alg: Alg[A, B]
   )(implicit flink: FlinkEnv): DataBag[Group[K, B]] = xs match {
-    case xs: FlinkDataSet[A] => xs.rep
-      .map(x => Group(key(x), alg.init(x))).groupBy("key")
-      .reduce((x, y) => Group(x.key, alg.plus(x.values, y.values)))
+    case xs: FlinkDataSet[A] => FlinkDataSet(xs.rep
+      .map(x => Group(key(x), alg.init(x)))
+      .groupBy("key")
+      .reduce((x, y) => Group(x.key, alg.plus(x.values, y.values))))
   }
 
   private def sink[A: Meta](xs: DataSet[A])(implicit flink: FlinkEnv): String = {

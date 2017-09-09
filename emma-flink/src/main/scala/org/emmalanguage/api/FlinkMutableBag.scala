@@ -19,7 +19,6 @@ package api
 import FlinkMutableBag.State
 //import Meta.Projections._
 import flink._
-import flink.FlinkOps.cache
 
 import org.apache.flink.api.scala.DataSet
 import org.apache.flink.api.scala.ExecutionEnvironment
@@ -37,7 +36,7 @@ class FlinkMutableBag[K: Meta, V: Meta] private
 
   def update[M: Meta](ms: DataBag[Group[K, M]])(f: UpdateFunction[M]): DataBag[(K, V)] = {
     val conv = implicitly[DataSet[State[K, V]] => DataBag[State[K, V]]]
-    ss = cache(conv((ss.as[DataSet] fullOuterJoin ms.as[DataSet]).where(0).equalTo(0)(
+    ss = FlinkOps.cache(conv((ss.as[DataSet] fullOuterJoin ms.as[DataSet]).where(0).equalTo(0)(
       (s: State[K, V], m: Group[K, M], out: Collector[State[K, V]]) => {
         val rs = Option(m) match {
           case Some(m) =>
@@ -67,7 +66,7 @@ object FlinkMutableBag {
     init: DataBag[(K, V)]
   )(
     implicit flink: ExecutionEnvironment
-  ): MutableBag[K, V] = new FlinkMutableBag(cache(for {
+  ): MutableBag[K, V] = new FlinkMutableBag(FlinkOps.cache(for {
     (k, v) <- init
   } yield State(k, v)))
 
