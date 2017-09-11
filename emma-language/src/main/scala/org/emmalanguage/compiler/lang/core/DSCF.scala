@@ -257,20 +257,20 @@ private[core] trait DSCF extends Common {
         val srcOwn = e.from.owner
         val tgtOwn = e.to.owner
         !(nst.successors(srcOwn) contains tgtOwn)
-      })
+      }).tclose
 
       // create a fresh variable `x` for each phi node `n` without non-nested successors
       // in the phi graph and associate `x` with `n` and each each predecessor `p` of `n`
       val varOf = (for {
         n <- phi.nodes
-        if phi.outDegree(n) == 0
+        if phi.outDegree(n) == 1
         x = api.Sym.With(n)(own = n.owner.owner, nme = api.TermName.fresh(n), flg = u.Flag.MUTABLE)
-        p <- n +: phi.predecessors(n)
+        p <- phi.predecessors(n)
       } yield p -> x) (breakOut): Map[u.Symbol, u.TermSymbol]
 
       def mkVarDefsWithNulls(pars: Seq[u.ValDef], owner: u.Symbol) = for {
         (core.ParDef(p, _), i) <- pars.zipWithIndex
-        if phi.outDegree(p) == 0 // exclude `var x = null` defs if `x` has a successor in the phi graph
+        if phi.outDegree(p) == 1 // exclude `var x = null` defs if `x` has a successor in the phi graph
         bnddef <- {
           val (x1, rhs1) = (
             api.TermSym(owner, api.TermName.fresh("null"), p.info),
@@ -286,8 +286,18 @@ private[core] trait DSCF extends Common {
 
       def mkVarDefsWithDefaults(pars: Seq[u.ValDef], rhss: Seq[u.Tree]) = for {
         (core.ParDef(p, _), y) <- pars zip rhss
-        if phi.outDegree(p) == 0 // exclude `var x = y` defs if `x` has a successor in the phi graph
+        if phi.outDegree(p) == 1 // exclude `var x = y` defs if `x` has a successor in the phi graph
       } yield src.VarDef(varOf(p), y)
+
+      def mkCondValDefs(pars: Seq[u.ValDef], cnd: u.Tree, thns: Seq[u.Tree], elss: Seq[u.Tree]) = for {
+        (core.ParDef(p, _), thn, els) <- (pars, thns, elss).zipped.toSeq
+        if phi.outDegree(p) == 1 // exclude `var x = y` defs if `x` has a successor in the phi graph
+        x = api.TermSym(p.owner.owner, api.TermName.fresh("if"), p.info)
+        y = varOf(p)
+        z <- Seq(
+          src.ValDef(x, src.Branch(cnd, thn, els)),
+          src.VarDef(y, core.Ref(x)))
+      } yield z
 
       def mkMuts(lhss: Seq[u.Symbol], rhss: Seq[u.Tree]) = for {
         (x, y) <- lhss zip rhss
@@ -319,6 +329,21 @@ private[core] trait DSCF extends Common {
         else (body, api.Tree.rename(indx.toSeq)(cond).asInstanceOf[u.Block])
       }
 
+      @tailrec
+      def prune(
+        vals: Seq[u.ValDef], frontier: Set[u.TermSymbol]
+      ): Seq[u.ValDef] = {
+        val newFrontier = (for {
+          core.BindingDef(lhs, rhs) <- vals
+          if frontier contains lhs
+          sym <- Set(lhs) ++ api.Tree.refs(rhs)
+        } yield sym) (breakOut): Set[u.TermSymbol]
+
+        val delta = newFrontier diff frontier
+        if (delta.nonEmpty) prune(vals, newFrontier)
+        else vals.filter(frontier contains _.symbol.asTerm)
+      }
+
       api.BottomUp.unsafe.withOwner.transformWith {
         // a let block with nested `while($cond) { $body }` control-flow
         //@formatter:off
@@ -346,16 +371,24 @@ private[core] trait DSCF extends Common {
             && is[loopBody](b)
             && is[suffix](s) =>
           //@formatter:on
-          val indx = (for {
-            (core.Ref(y), x) <- ags2 zip pars.map(_.symbol)
-          } yield y -> varOf(x)) (breakOut): Map[u.TermSymbol, u.Symbol]
-
           val vars = mkVarDefsWithDefaults(pars, ags1)
           val muts = mkMuts(pars.map(_.symbol), ags2)
-          val blc1 = src.Block(pre2 ++ sbod ++ muts, cond)
-          val (bod1, con1) = split(indx)(
-            src.Block(blc1.stats, api.Term.unit),
-            src.Block(Seq.empty, blc1.expr))
+
+          val con1 = {
+            val pref = prune(pre2, api.Tree.refs(cond))
+            val blck = src.Block(pref, cond)
+            api.Tree.refresh(pref.map(_.symbol))(blck)
+          }
+          val bod1 = {
+            val pref = prune(pre2, (sbod ++ muts).flatMap(api.Tree.refs).toSet)
+            val blck = src.Block(pref ++ sbod ++ muts, api.Term.unit)
+            api.Tree.refresh(pref.map(_.symbol))(blck)
+          }
+          val suf1 = {
+            val pref = prune(pre2, api.Tree.refs(suff))
+            val blck = src.Block(pref ++ suff.stats, suff.expr)
+            api.Tree.refresh(pref.map(_.symbol))(blck).asInstanceOf[u.Block]
+          }
 
           src.Block(
             Seq.concat(
@@ -365,9 +398,9 @@ private[core] trait DSCF extends Common {
                 src.While(
                   con1,
                   bod1)),
-              suff.stats
+              suf1.stats
             ),
-            suff.expr)
+            suf1.expr)
 
         // a let block with nested `do { $body } while($cond)` control-flow
         //@formatter:off
@@ -412,6 +445,34 @@ private[core] trait DSCF extends Common {
             ),
             suf1.expr)
 
+        // a let block with nested `if($cond) suff($args1) else suff($args2)` control-flow
+        //@formatter:off
+        case Attr(
+          core.Let(
+            pref,
+            Seq(
+              core.DefDef(s, _, Seq(pars),
+                suff: u.Block)),
+            core.Branch(cond,
+              core.DefCall(None, m1, _, Seq(argsthn)),
+              core.DefCall(None, m2, _, Seq(argsels)))
+          ), _, owner :: _, _)
+            if s == m1
+            && s == m2
+            && is[continuation](s) =>
+          //@formatter:off
+          val vars = mkCondValDefs(pars, cond, argsthn, argsels)
+
+          val rslt = src.Block(
+            Seq.concat(
+              pref,
+              vars,
+              suff.stats
+            ),
+            suff.expr)
+
+          rslt
+
         // a let block with nested `if($cond) $thn` control-flow
         //@formatter:off
         case Attr(
@@ -443,6 +504,41 @@ private[core] trait DSCF extends Common {
                 src.ValDef(
                   api.TermSym(owner, api.TermName.fresh("if"), api.Type.unit),
                   src.Branch(cond, thnb, api.Term.unit))),
+              suff.stats
+            ),
+            suff.expr)
+
+        // a let block with nested `if($cond) $els` control-flow
+        //@formatter:off
+        case Attr(
+          core.Let(
+            pref,
+            Seq(
+              core.DefDef(s, _, Seq(pars),
+                suff: u.Block),
+              core.DefDef(e, _, _,
+                src.Block(sthn, core.DefCall(None, m3, _, Seq(argsels))))),
+            core.Branch(cond,
+              core.DefCall(None, m1, _, Seq(argsthn)),
+              core.DefCall(None, m2, _, _))
+          ), _, owner :: _, _)
+            if s == m1
+            && e == m2
+            && s == m3
+            && is[elseBranch](e)
+            && is[continuation](s) =>
+          //@formatter:off
+          val vars = mkVarDefsWithDefaults(pars, argsthn)
+          val elsb = src.Block(sthn ++ mkMuts(pars.map(_.symbol), argsels), api.Term.unit)
+
+          src.Block(
+            Seq.concat(
+              pref,
+              vars,
+              Seq(
+                src.ValDef(
+                  api.TermSym(owner, api.TermName.fresh("if"), api.Type.unit),
+                  src.Branch(cond, api.Term.unit, elsb))),
               suff.stats
             ),
             suff.expr)
