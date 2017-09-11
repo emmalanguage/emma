@@ -44,7 +44,39 @@ class DSCFSpec extends BaseCompilerSpec {
     ).compose(_.tree)
 
   "If-Else" - {
-    "with one branch" - {
+    "with trivial branches" - {
+      val src = reify {
+        val x = this.x
+        val c = x < 0
+        var y = if (c) 17 else x
+        y
+      }
+
+      val tgt = reify {
+        val x = this.x
+        val c = x < 0
+
+        @suffix def suffix(y: Int): Int = {
+          y
+        }
+
+        if (c) suffix(17)
+        else suffix(x)
+      }
+
+      "dscf" in {
+        val act = dscfPipeline(src)
+        val exp = anfPipeline(tgt)
+        act shouldBe alphaEqTo(exp)
+      }
+      "dscf inverse" in {
+        val act = dscfInvPipeline(tgt)
+        val exp = anfPipeline(src)
+        act shouldBe alphaEqTo(exp)
+      }
+    }
+
+    "with trivial else" - {
       val src = reify {
         val x = this.x
         val c = x < 0
@@ -68,6 +100,43 @@ class DSCFSpec extends BaseCompilerSpec {
 
         if (c) thn()
         else suffix(-17)
+      }
+
+      "dscf" in {
+        val act = dscfPipeline(src)
+        val exp = anfPipeline(tgt)
+        act shouldBe alphaEqTo(exp)
+      }
+      "dscf inverse" in {
+        val act = dscfInvPipeline(tgt)
+        val exp = anfPipeline(src)
+        act shouldBe alphaEqTo(exp)
+      }
+    }
+
+    "with trivial then" - {
+      val src = reify {
+        val x = this.x
+        val c = x < 0
+        var y = 0
+        if (c) () else y = 42
+        y
+      }
+
+      val tgt = reify {
+        val x = this.x
+        val c = x < 0
+
+        @suffix def suffix(y: Int): Int = {
+          y
+        }
+
+        @elseBranch def els(): Int = {
+          suffix(42)
+        }
+
+        if (c) suffix(0)
+        else els()
       }
 
       "dscf" in {
@@ -267,8 +336,7 @@ class DSCFSpec extends BaseCompilerSpec {
       "dscf" in {
         val act = dscfPipeline(src)
         val exp = anfPipeline(tgt)
-        println(act)
-        println(exp)
+        act shouldBe alphaEqTo(exp)
         act shouldBe alphaEqTo(exp)
       }
       "dscf inverse" in {
