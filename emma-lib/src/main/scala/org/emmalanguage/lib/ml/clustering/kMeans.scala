@@ -51,23 +51,17 @@ object kMeans {
     val distanceTo = (pos: DVector) => Ordering.by((x: DPoint[PID]) => distance(pos, x.pos))
 
     var optSolution = DataBag.empty[Solution[PID]]
-    var minDistance = 0.0
+    var minDistance = Double.MaxValue
 
     for (run <- 1 to runs) {
       // initialize forgy cluster means
       var centroids = DataBag(points.sample(k, RanHash(seed, run).seed))
-      // initialize solution: label points with themselves
-      var solution = for (p <- points) yield {
-        val id = p.id
-        val pos = p.pos
-        LDPoint(id, pos, DPoint(id, pos)) // FIXME: specialize `LDPoint(p.id, p.pos, p)`
-      }
 
-      for (_ <- 1 to iterations) {
+      for (_ <- 0 until iterations) {
         // update solution: label each point with its nearest cluster
-        solution = for (s <- solution) yield {
-          val closest = centroids.min(distanceTo(s.pos))
-          s.copy(label = closest)
+        val solution = for (p <- points) yield {
+          val closest = centroids.min(distanceTo(p.pos))
+          LDPoint(p.id, p.pos, closest)
         }
         // update centroid positions as mean of associated points
         centroids = for {
@@ -78,6 +72,11 @@ object kMeans {
           val avg = sum * (1 / cnt)
           DPoint(cid, avg)
         }
+      }
+
+      val solution = for (p <- points) yield {
+        val closest = centroids.min(distanceTo(p.pos))
+        LDPoint(p.id, p.pos, closest)
       }
 
       val sumDistance = (for (p <- solution) yield {
