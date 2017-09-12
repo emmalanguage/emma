@@ -30,7 +30,6 @@ import scala.collection.Map
 object LocalOps extends ComprehensionCombinators[LocalEnv] with Runtime[LocalEnv] {
 
   //import Meta.Projections._
-  import ScalaSeq.wrap
 
   //--------------------------------------------------------
   // ComprehensionCombinators
@@ -63,11 +62,11 @@ object LocalOps extends ComprehensionCombinators[LocalEnv] with Runtime[LocalEnv
   /** Fuse a groupBy and a subsequent fold into a single operator. */
   def foldGroup[A: Meta, B: Meta, K: Meta](
     xs: DataBag[A], key: A => K, alg: Alg[A, B]
-  )(implicit env: LocalEnv): DataBag[Group[K, B]] = xs.collect()
+  )(implicit env: LocalEnv): DataBag[Group[K, B]] = ScalaSeq(xs.collect()
     .foldLeft(Map.empty[K, B]) { (acc, x) =>
       val k = key(x)
       val s = alg.init(x)
       val u = acc.get(k).fold(s)(alg.plus(_, s))
       acc + (k -> u)
-    }.map(x => Group(x._1, x._2)).toSeq
+    }.map(x => Group(x._1, x._2)).toSeq)
 }

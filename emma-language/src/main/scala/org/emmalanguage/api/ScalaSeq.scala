@@ -18,8 +18,6 @@ package api
 
 import alg.Alg
 
-import scala.language.implicitConversions
-
 /** A `DataBag` implementation backed by a Scala `Seq`. */
 class ScalaSeq[A] private[api]
 (
@@ -27,8 +25,6 @@ class ScalaSeq[A] private[api]
 )(
   @transient implicit val m: Meta[A]
 ) extends DataBag[A] {
-
-  import ScalaSeq.wrap
 
   //@formatter:off
   /*@transient override val m: Meta[A] = new Meta[A] {
@@ -49,32 +45,32 @@ class ScalaSeq[A] private[api]
   // -----------------------------------------------------
 
   override def map[B: Meta](f: (A) => B): DataBag[B] =
-    rep.map(f)
+    ScalaSeq(rep.map(f))
 
   override def flatMap[B: Meta](f: (A) => DataBag[B]): DataBag[B] =
-    rep.flatMap(x => f(x).collect())
+    ScalaSeq(rep.flatMap(x => f(x).collect()))
 
   def withFilter(p: (A) => Boolean): DataBag[A] =
-    rep.filter(p)
+    ScalaSeq(rep.filter(p))
 
   // -----------------------------------------------------
   // Grouping
   // -----------------------------------------------------
 
   override def groupBy[K: Meta](k: (A) => K): DataBag[Group[K, DataBag[A]]] =
-    wrap(rep.groupBy(k).toSeq map { case (key, vals) => Group(key, wrap(vals)) })
+    ScalaSeq(rep.groupBy(k).toSeq map { case (key, vals) => Group(key, ScalaSeq(vals)) })
 
   // -----------------------------------------------------
   // Set operations
   // -----------------------------------------------------
 
   override def union(that: DataBag[A]): DataBag[A] = that match {
-    case dbag: ScalaSeq[A] => this.rep ++ dbag.rep
+    case dbag: ScalaSeq[A] => ScalaSeq(this.rep ++ dbag.rep)
     case _ => that union this
   }
 
   override def distinct: DataBag[A] =
-    rep.distinct
+    ScalaSeq(rep.distinct)
 
   // -----------------------------------------------------
   // Partition-based Ops
@@ -93,7 +89,7 @@ class ScalaSeq[A] private[api]
   }
 
   def zipWithIndex(): DataBag[(A, Long)] =
-    rep zip Stream.iterate(0L)(_ + 1)
+    ScalaSeq(rep zip Stream.iterate(0L)(_ + 1))
 
   // -----------------------------------------------------
   // Sinks
@@ -146,6 +142,9 @@ object ScalaSeq extends DataBagCompanion[LocalEnv] {
   // Implicit Rep -> DataBag conversion
   // ---------------------------------------------------------------------------
 
-  private[emmalanguage] implicit def wrap[A: Meta](rep: Seq[A]): DataBag[A] =
-    new ScalaSeq(rep)
+  private[api] def unapply[A: Meta](
+    bag: DataBag[A]
+  ): Option[Seq[A]] = bag match {
+    case bag: ScalaSeq[A] => Some(bag.rep)
+  }
 }
