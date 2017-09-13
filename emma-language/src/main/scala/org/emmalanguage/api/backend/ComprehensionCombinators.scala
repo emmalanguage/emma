@@ -17,7 +17,9 @@ package org.emmalanguage
 package api.backend
 
 import api.DataBag
+import api.Group
 import api.Meta
+import api.alg.Alg
 
 /** Comprehension combinators (backend-agnostic IR nodes). */
 trait ComprehensionCombinators[E] {
@@ -29,4 +31,9 @@ trait ComprehensionCombinators[E] {
   def equiJoin[A: Meta, B: Meta, K: Meta](
     kx: A => K, ky: B => K)(xs: DataBag[A], ys: DataBag[B]
   )(implicit env: E): DataBag[(A, B)]
+
+  /** Fuse a groupBy and a subsequent fold into a single operator. */
+  def foldGroup[A: Meta, B: Meta, K: Meta](
+    xs: DataBag[A], key: A => K, agg: Alg[A, B]
+  )(implicit env: E): DataBag[Group[K, B]]
 }

@@ -17,16 +17,10 @@ package org.emmalanguage
 package api.backend
 
 import api._
-import api.alg._
 
 /** Runtime operators (backend-agnostic IR nodes API). */
 trait Runtime[E] {
 
   /** Mark the dataset for caching. */
   def cache[A: Meta](xs: DataBag[A])(implicit env: E): DataBag[A]
-
-  /** Fuse a groupBy and a subsequent fold into a single operator. */
-  def foldGroup[A: Meta, B: Meta, K: Meta](
-    xs: DataBag[A], key: A => K, agg: Alg[A, B]
-  )(implicit env: E): DataBag[Group[K, B]]
 }

@@ -187,7 +187,7 @@ protected[emmalanguage] trait API extends AST {
     //@formatter:on
   }
 
-  trait ComprehensionCombinatorsAPI extends ModuleAPI {
+  trait ComprehensionCombinatorsAPI[S <: u.Symbol] extends ReflectedSymbol[S] {
     //@formatter:off
     val cross                 = op("cross")
     val equiJoin              = op("equiJoin")
@@ -197,7 +197,7 @@ protected[emmalanguage] trait API extends AST {
     //@formatter:on
   }
 
-  trait RuntimeAPI extends ModuleAPI {
+  trait RuntimeAPI[S <: u.Symbol] extends ReflectedSymbol[S] {
     //@formatter:off
     val cache                 = op("cache")
 
@@ -205,7 +205,9 @@ protected[emmalanguage] trait API extends AST {
     //@formatter:on
   }
 
-  class OpsAPI(mod: u.ModuleSymbol) extends ComprehensionCombinatorsAPI with RuntimeAPI {
+  class OpsAPI(mod: u.ModuleSymbol) extends ModuleAPI
+    with ComprehensionCombinatorsAPI[u.ModuleSymbol]
+    with RuntimeAPI[u.ModuleSymbol] {
     //@formatter:off
     lazy val sym              = mod
 
@@ -312,6 +314,14 @@ protected[emmalanguage] trait API extends AST {
     object Group$ extends Group$API
 
     object Ops extends OpsAPI(api.Sym[org.emmalanguage.api.backend.LocalOps.type].asModule)
+
+    object ComprehensionCombinators extends ComprehensionCombinatorsAPI[u.ClassSymbol] {
+      override def sym = api.Sym[org.emmalanguage.api.backend.ComprehensionCombinators[Any]].asClass
+    }
+
+    object Runtime extends RuntimeAPI[u.ClassSymbol] {
+      override def sym = api.Sym[org.emmalanguage.api.backend.Runtime[Any]].asClass
+    }
 
     object ComprehensionSyntax extends ComprehensionSyntaxAPI
 
