@@ -34,7 +34,7 @@ trait FlinkCompilerAware extends RuntimeCompilerAware {
       Optimizations.foldFusion,
       Backend.addCacheCalls,
       Comprehension.combine,
-      Backend.specialize(FlinkAPI),
+      FlinkBackend.transform,
       Core.dscfInv,
       removeShadowedThis,
       prependMemoizeTypeInfoCalls,

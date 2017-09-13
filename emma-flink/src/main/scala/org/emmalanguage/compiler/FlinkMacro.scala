@@ -62,7 +62,7 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
 
     xfms += Comprehension.combine
 
-    xfms += Backend.specialize(FlinkAPI)
+    xfms += FlinkBackend.transform
 
     cfg.getString("emma.compiler.lower") match {
       case "trampoline" =>

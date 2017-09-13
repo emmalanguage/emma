@@ -38,7 +38,7 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkA
   override lazy val env = defaultFlinkEnv
 
   override lazy val backendPipeline: u.Tree => u.Tree =
-    Backend.specialize(FlinkAPI)
+    FlinkBackend.transform
 
   override lazy val addContext: u.Tree => u.Tree = tree => {
     import u._

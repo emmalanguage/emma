@@ -18,6 +18,7 @@ package api
 
 import test.schema.Literature._
 
+import org.apache.flink.api.common.functions.RuntimeContext
 import org.apache.flink.api.scala.createTypeInformation
 import org.apache.flink.api.scala.{ExecutionEnvironment => FlinkEnv}
 
@@ -49,4 +50,16 @@ class FlinkDataSetSpec extends DataBagSpec with FlinkAware {
   FlinkDataSet.memoizeTypeInfo[(Int, Array[Option[Int]])]
   FlinkDataSet.memoizeTypeInfo[(String, Long)]
   FlinkDataSet.memoizeTypeInfo[DataBagSpec.CSVRecord]
+
+  "broadcast map" in withBackendContext(implicit env => {
+    val xs = FlinkDataSet(400 to 600)
+    val ys = FlinkDataSet(1 to 50)
+    val fn = (ctx: RuntimeContext) => {
+      val xs1 = flink.FlinkNtv.bag(ys)(ctx)
+      (y: Int) => xs1.exists(_ == y * y)
+    }
+    val zs1 = flink.FlinkNtv.map(fn)(xs)
+    val zs = flink.FlinkNtv.broadcast(zs1, ys)
+    print(zs.collect())
+  })
 }
