@@ -62,7 +62,7 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler with SparkCompil
 
     xfms += Comprehension.combine
 
-    xfms += Backend.specialize(SparkAPI)
+    xfms += SparkBackend.transform
 
     if (cfg.getBoolean("emma.compiler.spark.native-ops")) {
       xfms += SparkSpecializeSupport.specializeOps
