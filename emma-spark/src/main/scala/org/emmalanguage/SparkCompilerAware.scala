@@ -34,7 +34,7 @@ trait SparkCompilerAware extends RuntimeCompilerAware {
       Optimizations.foldFusion,
       Backend.addCacheCalls,
       Comprehension.combine,
-      Backend.specialize(SparkAPI),
+      SparkBackend.transform,
       Core.dscfInv,
       removeShadowedThis,
       addContext

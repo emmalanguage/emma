@@ -18,6 +18,7 @@ package api.spark
 
 import api._
 
+import org.apache.spark.broadcast.Broadcast
 import org.apache.spark.sql.SparkSession
 
 object SparkNtv {
@@ -70,4 +71,18 @@ object SparkNtv {
       SparkDataset(xs.joinWith(ys, cx === cy))
   }
 
+  //----------------------------------------------------------------------------
+  // Broadcast support
+  //----------------------------------------------------------------------------
+
+  class BroadcastBag[A](private[spark] val value: Broadcast[Seq[A]]) extends Serializable
+
+  def broadcast[A: Meta](xs: DataBag[A])(
+    implicit spark: SparkSession
+  ): BroadcastBag[A] = {
+    new BroadcastBag(spark.sparkContext.broadcast(xs.collect()))
+  }
+
+  def bag[A: Meta](bc: BroadcastBag[A]): DataBag[A] =
+    DataBag(bc.value.value)
 }

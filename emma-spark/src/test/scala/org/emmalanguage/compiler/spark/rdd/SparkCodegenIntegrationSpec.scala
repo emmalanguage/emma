@@ -37,7 +37,7 @@ class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkA
   override lazy val env = defaultSparkSession
 
   override lazy val backendPipeline: u.Tree => u.Tree =
-    Backend.specialize(SparkAPI)
+    SparkBackend.transform
 
   // --------------------------------------------------------------------------
   // Distributed collection conversion

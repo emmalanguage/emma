@@ -16,21 +16,28 @@
 package org.emmalanguage
 package compiler
 
+import backend.SparkBackend
 import spark.SparkSpecializeSupport
 
-trait SparkCompiler extends Compiler with SparkSpecializeSupport {
+trait SparkCompiler extends Compiler
+  with SparkBackend
+  with SparkSpecializeSupport {
 
   override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ SparkAPI.implicitTypes
 
   trait NtvAPI extends ModuleAPI {
     //@formatter:off
+    val Broadcast         = api.Type[org.emmalanguage.api.spark.SparkNtv.BroadcastBag[Any]].typeConstructor
     val sym               = api.Sym[org.emmalanguage.api.spark.SparkNtv.type].asModule
 
     val select            = op("select")
     val project           = op("project")
     val equiJoin          = op("equiJoin")
 
-    override lazy val ops = Set(select, project, equiJoin)
+    val broadcast         = op("broadcast")
+    val bag               = op("bag")
+
+    override lazy val ops = Set(select, project, equiJoin, broadcast, bag)
     //@formatter:on
   }
 
