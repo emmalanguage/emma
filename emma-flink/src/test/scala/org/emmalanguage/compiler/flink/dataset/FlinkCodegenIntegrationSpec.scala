@@ -42,7 +42,7 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkA
 
   override lazy val addContext: u.Tree => u.Tree = tree => {
     import u._
-    q"(env: $Env) => { implicit val e: $Env = env; ..${memoizedTypeInfos(tree)}; $tree }"
+    q"(env: $Env) => { implicit val e: $Env = env; ..${memoizeTypeInfoCalls(tree)}; $tree }"
   }
 
   // FIXME: no idea why, but all tests require TypeInformation[(Int, Int, Int, Int)]

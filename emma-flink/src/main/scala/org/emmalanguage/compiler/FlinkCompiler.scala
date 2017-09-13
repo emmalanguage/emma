@@ -22,6 +22,27 @@ trait FlinkCompiler extends Compiler {
 
   override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ FlinkAPI.implicitTypes
 
+  import UniverseImplicits._
+
+  /** Prepends `memoizeTypeInfo` calls for `TypeInformation[T]` instances requried in the given `tree`. */
+  def prependMemoizeTypeInfoCalls(tree: u.Tree): u.Tree = {
+    val pref = memoizeTypeInfoCalls(tree)
+    tree match {
+      case api.Block(stats, expr) => api.Block(pref ++ stats, expr)
+      case _ => api.Block(pref, tree)
+    }
+  }
+
+  /** Generates `FlinkDataSet.memoizeTypeInfo[T]` calls for all required types `T` in the given `tree`. */
+  def memoizeTypeInfoCalls(tree: u.Tree): Seq[u.Tree] = {
+    import u.Quasiquote
+    for (tpe <- requiredTypeInfos(tree).toSeq.sortBy(_.toString)) yield {
+      val ttag = q"implicitly[scala.reflect.runtime.universe.TypeTag[$tpe]]"
+      val info = q"org.apache.flink.api.scala.`package`.createTypeInformation[$tpe]"
+      q"org.emmalanguage.api.FlinkDataSet.memoizeTypeInfo[$tpe]($ttag, $info)"
+    }
+  }
+
   /** Infers types `T` in the given `tree` for which a Flink `TypeInformation[T]` might be required. */
   def requiredTypeInfos(tree: u.Tree): Set[u.Type] =
     api.BottomUp.synthesize({
