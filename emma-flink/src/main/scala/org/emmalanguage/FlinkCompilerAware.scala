@@ -18,27 +18,19 @@ package org.emmalanguage
 import compiler.FlinkCompiler
 import compiler.RuntimeCompiler
 
+import com.typesafe.config.Config
+import org.apache.flink.api.scala.ExecutionEnvironment
+
 trait FlinkCompilerAware extends RuntimeCompilerAware {
 
-  val compiler = new RuntimeCompiler(codegenFile.toString) with FlinkCompiler
+  type Env = ExecutionEnvironment
+
+  val compiler = new RuntimeCompiler(codegenDir) with FlinkCompiler
 
   import compiler._
 
   def Env: u.Type = FlinkAPI.ExecutionEnvironment
 
-  lazy val evaluate: u.Expr[Any] => u.Tree =
-    pipeline(typeCheck = true)(
-      Lib.expand,
-      Core.lift,
-      Core.cse,
-      FlinkOptimizations.specializeLoops,
-      Optimizations.foldFusion,
-      Optimizations.addCacheCalls,
-      Comprehension.combine,
-      FlinkBackend.transform,
-      Core.dscfInv,
-      removeShadowedThis,
-      prependMemoizeTypeInfoCalls,
-      addContext
-    ).compose(_.tree)
+  def transformations(cfg: Config): Seq[u.Tree => u.Tree] =
+    compiler.transformations(cfg)
 }

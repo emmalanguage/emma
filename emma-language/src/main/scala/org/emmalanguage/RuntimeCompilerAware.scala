@@ -15,61 +15,68 @@
  */
 package org.emmalanguage
 
-import compiler.Compiler
 import compiler.RuntimeCompiler
+
+import com.typesafe.config.Config
 
 import scala.util.control.NonFatal
 
 import java.io.File
 import java.net.URL
 import java.net.URLClassLoader
-import java.nio.file.Paths
-import java.util.UUID
 
 trait RuntimeCompilerAware {
 
-  val codegenFile = Paths.get("tmp", "emma", "codegen").toFile
+  type Env
 
-  codegenFile.mkdirs()
-  addToClasspath(codegenFile)
+  val codegenDir = RuntimeCompiler.codeGenDir
 
-  val compiler: Compiler
+  codegenDir.toFile.mkdirs()
+  addToClasspath(codegenDir.toFile)
+
+  sys.addShutdownHook({
+    deleteRecursive(codegenDir.toFile)
+  })
+
+  val compiler: RuntimeCompiler
 
   import compiler._
   import compiler.api._
 
   def Env: u.Type
 
-  def evaluate: u.Expr[Any] => u.Tree
+  def transformations(cfg: Config): Seq[u.Tree => u.Tree]
 
-  def addContext(tree: u.Tree): u.Tree = {
+  def execute[T](e: u.Expr[T]): Env => T =
+    execute(loadConfig(baseConfig))(e)
+
+  def execute[T](config: String)(e: u.Expr[T]): Env => T =
+    execute(loadConfig(config +: baseConfig))(e)
+
+  def execute[T](cfg: Config)(e: u.Expr[T]): Env => T = {
+    // construct the compilation pipeline
+    val xfms = transformations(cfg) :+ addContext _
+    // apply the pipeline to the input tree
+    val rslt = pipeline(typeCheck = true)(xfms: _*)(e.tree)
+    // optionally, print the result
+    if (cfg.getBoolean("emma.compiler.print-result")) {
+      warning(Tree.show(rslt), e.tree.pos)
+    }
+    // evaluate the resulting tree
+    compiler.eval(rslt)
+  }
+
+  protected def addContext(tree: u.Tree): u.Tree = {
     import u.Quasiquote
-
-    val Cls = TypeName(UUID.randomUUID().toString)
-    val run = TermName(RuntimeCompiler.default.runMethod)
-    val prs = for {
-      sym <- Tree.closure(tree).toSeq.sortBy(_.name.toString)
-      if !sym.isStatic
-      if !sym.isVar
-    } yield {
-      val x = sym.name
-      val T = sym.info
-      q"val $x: $T"
-    }
-
-    q"""
-    class $Cls {
-      def $run(..$prs)(implicit env: $Env) = $tree
-    }
-    """
+    q"(env: $Env) => { implicit val e: $Env = env; $tree }"
   }
 
   /** Adds a [[File]] to the classpath. */
-  def addToClasspath(f: File): Unit =
+  protected def addToClasspath(f: File): Unit =
     addToClasspath(f.toURI.toURL)
 
   /** Adds a [[URL]] to the classpath. */
-  def addToClasspath(u: URL): Unit = {
+  protected def addToClasspath(u: URL): Unit = {
     try {
       val clsldr = ClassLoader.getSystemClassLoader.asInstanceOf[URLClassLoader]
       val method = classOf[URLClassLoader].getDeclaredMethod("addURL", classOf[URL])
@@ -79,5 +86,15 @@ trait RuntimeCompilerAware {
       case NonFatal(t) =>
         throw new java.io.IOException("Error, could not add URL to system classloader", t)
     }
+  }
+
+  /** Deletes a file recursively. */
+  protected def deleteRecursive(path: java.io.File): Boolean = {
+    val ret = if (path.isDirectory) {
+      path.listFiles().toSeq.foldLeft(true)((_, f) => deleteRecursive(f))
+    } else /* regular file */ {
+      true
+    }
+    ret && path.delete()
   }
 }

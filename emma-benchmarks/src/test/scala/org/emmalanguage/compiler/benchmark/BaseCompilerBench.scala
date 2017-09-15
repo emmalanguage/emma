@@ -30,7 +30,7 @@ import shapeless.cachedImplicit
 /** Common methods and mixins for all compier benchmarks. */
 trait BaseCompilerBench extends Bench.OnlineRegressionReport {
 
-  val compiler = RuntimeCompiler.default.instance
+  val compiler = new RuntimeCompiler()
   import compiler._
   import u.reify
 

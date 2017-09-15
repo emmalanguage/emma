@@ -15,28 +15,22 @@
  */
 package org.emmalanguage
 
-import compiler.SparkCompiler
 import compiler.RuntimeCompiler
+import compiler.SparkCompiler
+
+import com.typesafe.config.Config
+import org.apache.spark.sql.SparkSession
 
 trait SparkCompilerAware extends RuntimeCompilerAware {
 
-  val compiler = new RuntimeCompiler(codegenFile.toString) with SparkCompiler
+  type Env = SparkSession
+
+  val compiler = new RuntimeCompiler(codegenDir) with SparkCompiler
 
   import compiler._
 
   def Env: u.Type = SparkAPI.SparkSession
 
-  lazy val evaluate: u.Expr[Any] => u.Tree =
-    pipeline(typeCheck = true)(
-      Lib.expand,
-      Core.lift,
-      Core.cse,
-      Optimizations.foldFusion,
-      Optimizations.addCacheCalls,
-      Comprehension.combine,
-      SparkBackend.transform,
-      Core.dscfInv,
-      removeShadowedThis,
-      addContext
-    ).compose(_.tree)
+  def transformations(cfg: Config): Seq[u.Tree => u.Tree] =
+    compiler.transformations(cfg)
 }

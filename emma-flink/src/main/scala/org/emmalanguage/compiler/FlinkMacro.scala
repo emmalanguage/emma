@@ -22,62 +22,22 @@ import scala.reflect.macros.blackbox
 
 class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompiler {
 
-  override protected val baseConfig = "reference.emma.onFlink.conf" +: super.baseConfig
+  def onFlinkImpl1[T](e: c.Expr[T]): c.Expr[T] =
+    onFlink(loadConfig(configPaths()))(e)
 
-  def onFlinkImpl1[T](e: c.Expr[T]): c.Expr[T] = {
-    val cfg = loadConfig(configPaths())
-    val res = pipeline(cfg)(e)
-    if (cfg.getBoolean("emma.compiler.print-result")) {
-      c.warning(e.tree.pos, api.Tree.show(res))
-    }
-    c.Expr[T](unTypeCheck(res))
-  }
+  def onFlinkImpl2[T](config: c.Expr[String])(e: c.Expr[T]): c.Expr[T] =
+    onFlink(loadConfig(configPaths(Some(config.tree))))(e)
 
-  def onFlinkImpl2[T](config: c.Expr[String])(e: c.Expr[T]): c.Expr[T] = {
-    val cfg = loadConfig(configPaths(Some(config.tree)))
-    val res = pipeline(cfg)(e)
-    if (cfg.getBoolean("emma.compiler.print-result")) {
-      c.warning(e.tree.pos, api.Tree.show(res))
-    }
-    c.Expr[T](unTypeCheck(res))
-  }
-
-  private def pipeline(cfg: Config): c.Expr[Any] => u.Tree = {
-    val xfms = Seq.newBuilder[u.Tree => u.Tree]
-    // standard prefix
-    xfms ++= Seq(
-      Lib.expand,
-      Core.lift
-    )
-    // optional optimizing rewrites
-    if (cfg.getBoolean("emma.compiler.opt.cse")) {
-      xfms += Core.cse
-    }
-    if (cfg.getBoolean("emma.compiler.flink.native-its")) {
-      xfms += FlinkOptimizations.specializeLoops
-    }
-    if (cfg.getBoolean("emma.compiler.opt.fold-fusion")) {
-      xfms += Optimizations.foldFusion
-    }
-    if (cfg.getBoolean("emma.compiler.opt.auto-cache")) {
-      xfms += Optimizations.addCacheCalls
-    }
-
-    xfms += Comprehension.combine
-
-    xfms += FlinkBackend.transform
-
-    cfg.getString("emma.compiler.lower") match {
-      case "trampoline" =>
-        xfms += Core.trampoline
-      case "dscfInv" =>
-        xfms += Core.dscfInv
-    }
-
-    xfms += removeShadowedThis
-    xfms += prependMemoizeTypeInfoCalls
-
+  def onFlink[T](cfg: Config)(e: c.Expr[T]): c.Expr[T] = {
     // construct the compilation pipeline
-    pipeline()(xfms.result(): _*).compose(_.tree)
+    val xfms = transformations(cfg)
+    // apply the pipeline to the input tree
+    val rslt = pipeline()(xfms: _*)(e.tree)
+    // optionally, print the result
+    if (cfg.getBoolean("emma.compiler.print-result")) {
+      c.warning(e.tree.pos, api.Tree.show(rslt))
+    }
+    // wrap the result in an Expr and return it
+    c.Expr[T](unTypeCheck(rslt))
   }
 }

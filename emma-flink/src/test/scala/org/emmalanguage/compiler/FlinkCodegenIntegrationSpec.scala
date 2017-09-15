@@ -20,27 +20,16 @@ import api._
 import api.flink._
 
 import org.apache.flink.api.scala.DataSet
-import org.apache.flink.api.scala.ExecutionEnvironment
 import org.apache.flink.api.scala.createTypeInformation
 
-class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkAware {
-  override val compiler = new RuntimeCompiler with FlinkCompiler
+class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec
+  with FlinkCompilerAware
+  with FlinkAware {
 
   import compiler._
-  import u.reify
 
-  type Env = ExecutionEnvironment
-
-  override lazy val Env = api.Type[org.apache.flink.api.scala.ExecutionEnvironment]
-  override lazy val env = defaultFlinkEnv
-
-  override lazy val backendPipeline: u.Tree => u.Tree =
-    FlinkBackend.transform
-
-  override lazy val addContext: u.Tree => u.Tree = tree => {
-    import u._
-    q"(env: $Env) => { implicit val e: $Env = env; ..${memoizeTypeInfoCalls(tree)}; $tree }"
-  }
+  def withBackendContext[T](f: Env => T): T =
+    withDefaultFlinkEnv(f)
 
   // FIXME: no idea why, but all tests require TypeInformation[(Int, Int, Int, Int)]
   FlinkDataSet.memoizeTypeInfo[(Int, Int, Int, Int)]
@@ -49,13 +38,12 @@ class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkA
   // Distributed collection conversion
   // --------------------------------------------------------------------------
 
-  "Convert from/to a Flink DataSet" in {
-    implicit val e: Env = env
-    verify(reify {
+  "Convert from/to a Flink DataSet" in withBackendContext(implicit env => {
+    verify(u.reify {
       val xs = DataBag(1 to 1000).withFilter(_ > 800)
       val ys = xs.as[DataSet].filter(_ < 200)
       val zs = DataBag.from(ys)
       zs.size
     })
-  }
+  })
 }
