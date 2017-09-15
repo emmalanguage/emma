@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.lang.lib
+package compiler.lib
 
 import scala.tools.reflect.ToolBoxError
 

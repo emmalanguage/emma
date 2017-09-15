@@ -19,8 +19,8 @@ package compiler
 import backend.GenericBackend
 import lang.AlphaEq
 import lang.core.Core
-import lang.lib.Lib
 import lang.source.Source
+import lib.Lib
 import opt.Optimizations
 import tools.GraphTools
 
