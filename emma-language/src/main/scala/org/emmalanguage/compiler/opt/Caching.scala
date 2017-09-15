@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.lang.backend
+package compiler.opt
 
 import compiler.Common
 import compiler.ir.DSCFAnnotations._
@@ -27,10 +27,10 @@ import shapeless._
 import scala.collection.breakOut
 
 /** Translating to dataflows. */
-private[backend] trait Caching extends Common {
+private[opt] trait Caching extends Common {
   self: Core =>
 
-  private[backend] object Caching {
+  private[opt] object Caching {
 
     import API._
     import Core.{Lang => core}

@@ -23,7 +23,6 @@ import compiler.lang.core.Core
 
 /** Backend-related (but backend-agnostic) transformations. */
 private[compiler] trait Backend extends Common
-  with Caching
   with Order
   with Context
   with Specialization {
@@ -34,8 +33,5 @@ private[compiler] trait Backend extends Common
     /** Delegates to [[Specialization.specialize]]. */
     def specialize(backend: BackendAPI) =
       Specialization.specialize(backend)
-
-    /** Delegates to [[Caching.addCacheCalls]]. */
-    lazy val addCacheCalls = Caching.addCacheCalls
   }
 }
