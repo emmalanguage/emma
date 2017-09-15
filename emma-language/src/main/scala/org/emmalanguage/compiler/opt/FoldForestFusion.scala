@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.lang.opt
+package compiler.opt
 
 import api.{alg => algebra}
 import compiler.Common
@@ -35,7 +35,7 @@ private[compiler] trait FoldForestFusion extends Common {
   self: Core with Comprehension with ControlFlow =>
 
   /** The fold-fusion optimization. */
-  object FoldForestFusion {
+  private[compiler] object FoldForestFusion {
 
     import API._
     import Core.{Lang => core}

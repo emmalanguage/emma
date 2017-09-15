@@ -20,8 +20,8 @@ import lang.AlphaEq
 import lang.backend.Backend
 import lang.core.Core
 import lang.lib.Lib
-import lang.opt.Optimizations
 import lang.source.Source
+import opt.Optimizations
 import tools.GraphTools
 
 import com.typesafe.config.Config

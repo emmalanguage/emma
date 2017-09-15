@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.lang.opt
+package compiler.opt
 
 import compiler.Common
 import compiler.lang.cf.ControlFlow
