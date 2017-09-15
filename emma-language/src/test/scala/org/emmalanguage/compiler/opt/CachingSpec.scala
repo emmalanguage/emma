@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.lang.backend
+package compiler.opt
 
 import api.DataBag
 import api.backend.LocalOps._

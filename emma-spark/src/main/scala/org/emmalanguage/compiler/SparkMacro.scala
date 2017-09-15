@@ -57,7 +57,7 @@ class SparkMacro(val c: blackbox.Context) extends MacroCompiler with SparkCompil
       xfms += Optimizations.foldFusion
     }
     if (cfg.getBoolean("emma.compiler.opt.auto-cache")) {
-      xfms += Backend.addCacheCalls
+      xfms += Optimizations.addCacheCalls
     }
 
     xfms += Comprehension.combine

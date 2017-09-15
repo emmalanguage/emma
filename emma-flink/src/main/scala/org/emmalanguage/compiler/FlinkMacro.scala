@@ -60,7 +60,7 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
       xfms += Optimizations.foldFusion
     }
     if (cfg.getBoolean("emma.compiler.opt.auto-cache")) {
-      xfms += Backend.addCacheCalls
+      xfms += Optimizations.addCacheCalls
     }
 
     xfms += Comprehension.combine

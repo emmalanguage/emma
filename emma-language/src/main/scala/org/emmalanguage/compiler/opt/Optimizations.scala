@@ -22,6 +22,7 @@ import compiler.lang.core.Core
 
 /** Static (compile-time) optimizations. */
 trait Optimizations extends Common
+  with Caching
   with FoldForestFusion
   with FoldGroupFusion {
   self: Core with ControlFlow =>
@@ -32,5 +33,8 @@ trait Optimizations extends Common
     /** Performs [[FoldForestFusion.foldForestFusion()]] followed by [[FoldGroupFusion.foldGroupFusion]]. */
     lazy val foldFusion: u.Tree => u.Tree =
       FoldForestFusion.foldForestFusion andThen FoldGroupFusion.foldGroupFusion
+
+    /** Delegates to [[Caching.addCacheCalls]]. */
+    lazy val addCacheCalls = Caching.addCacheCalls
   }
 }

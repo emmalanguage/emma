@@ -56,7 +56,7 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
       Core.lift,
       Optimizations.foldFusion,
       Comprehension.combine,
-      Backend.addCacheCalls,
+      Optimizations.addCacheCalls,
       backendPipeline,
       addContext
     ).compose(_.tree)

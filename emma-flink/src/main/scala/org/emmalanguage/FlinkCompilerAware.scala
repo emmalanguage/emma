@@ -33,7 +33,7 @@ trait FlinkCompilerAware extends RuntimeCompilerAware {
       Core.cse,
       FlinkOptimizations.specializeLoops,
       Optimizations.foldFusion,
-      Backend.addCacheCalls,
+      Optimizations.addCacheCalls,
       Comprehension.combine,
       FlinkBackend.transform,
       Core.dscfInv,
