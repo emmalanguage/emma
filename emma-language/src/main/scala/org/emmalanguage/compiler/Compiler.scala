@@ -17,7 +17,7 @@ package org.emmalanguage
 package compiler
 
 import lang.AlphaEq
-import lang.backend.Backend
+import lang.backend.GenericBackend
 import lang.core.Core
 import lang.lib.Lib
 import lang.source.Source
@@ -40,7 +40,7 @@ trait Compiler extends AlphaEq
   with Lib
   with Source
   with Core
-  with Backend
+  with GenericBackend
   with GraphTools
   with Optimizations {
 

@@ -176,6 +176,6 @@ private[backend] trait Order extends Common {
 
       (disambiguatedTree, highFuns)
     }
-
   }
+
 }

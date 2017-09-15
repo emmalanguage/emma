@@ -26,10 +26,10 @@ import shapeless._
 import scala.collection.breakOut
 
 /** Translating to dataflows. */
-private[backend] trait Specialization extends Common {
+private[backend] trait GenericSpecialization extends Common {
   self: Core with Order =>
 
-  private[backend] object Specialization {
+  private[backend] object GenericSpecialization {
 
     import API._
     import Core.{Lang => core}
@@ -140,4 +140,5 @@ private[backend] trait Specialization extends Common {
       }
     }
   }
+
 }

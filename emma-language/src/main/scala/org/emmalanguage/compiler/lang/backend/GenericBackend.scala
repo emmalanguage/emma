@@ -22,16 +22,17 @@ import compiler.lang.comprehension.Comprehension
 import compiler.lang.core.Core
 
 /** Backend-related (but backend-agnostic) transformations. */
-private[compiler] trait Backend extends Common
+private[compiler] trait GenericBackend extends Common
   with Order
   with Context
-  with Specialization {
+  with GenericSpecialization {
   self: Core with ControlFlow with Comprehension =>
 
-  object Backend {
+  object GenericBackend {
 
-    /** Delegates to [[Specialization.specialize]]. */
+    /** Delegates to [[GenericSpecialization.specialize]]. */
     def specialize(backend: BackendAPI) =
-      Specialization.specialize(backend)
+      GenericSpecialization.specialize(backend)
   }
+
 }
