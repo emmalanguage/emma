@@ -17,11 +17,11 @@ package org.emmalanguage
 package compiler
 
 import backend.SparkBackend
-import spark.SparkSpecializeSupport
+import opt.SparkOptimizations
 
 trait SparkCompiler extends Compiler
   with SparkBackend
-  with SparkSpecializeSupport {
+  with SparkOptimizations {
 
   override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ SparkAPI.implicitTypes
 

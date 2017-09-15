@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.spark
+package compiler.opt
 
 import api.DataBag
 import api.SparkDataset
@@ -38,7 +38,7 @@ class SparkSpecializeOpsSpec extends BaseCompilerSpec with SparkAware {
 
   lazy val testPipeline: u.Expr[Any] => u.Tree =
     pipeline(true)(Core.dscf,
-      tree => time(SparkSpecializeSupport.specializeOps(tree), "specializeOps")
+      tree => time(SparkSpecializeOps.specializeOps(tree), "specializeOps")
     ).compose(_.tree)
 
   lazy val dscfPipeline: u.Expr[Any] => u.Tree =

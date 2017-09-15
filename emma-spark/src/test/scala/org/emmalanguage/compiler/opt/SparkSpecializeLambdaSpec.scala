@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.spark
+package compiler.opt
 
 import api.spark.SparkExp
 import compiler.BaseCompilerSpec
@@ -33,7 +33,7 @@ class SparkSpecializeLambdaSpec extends BaseCompilerSpec with SparkAware {
 
   lazy val testPipeline: u.Expr[Any] => u.Tree =
     pipeline(true)(Core.anf, collectFirstLambda,
-      tree => time(SparkSpecializeSupport.specializeLambda(tree), "specializeLambda")
+      tree => time(SparkSpecializeOps.specializeLambda(tree), "specializeLambda")
     ).compose(_.tree)
 
   lazy val anfPipeline: u.Expr[Any] => u.Tree =
