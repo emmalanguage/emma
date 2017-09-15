@@ -27,8 +27,6 @@ import java.io.File
 
 trait BaseLibSpec extends FlatSpec with Matchers with BeforeAndAfterAll with DataBagEquality {
 
-  val codegenDir = tempPath("codegen")
-
   type ResourceInitializer = () => Unit
 
   def tempPaths: Seq[String] = Seq.empty
@@ -36,19 +34,13 @@ trait BaseLibSpec extends FlatSpec with Matchers with BeforeAndAfterAll with Dat
   def resources: Seq[ResourceInitializer] = Seq.empty
 
   override protected def beforeAll(): Unit = {
-    new File(codegenDir).mkdirs()
-    addToClasspath(new File(codegenDir))
-
     for (path <- tempPaths)
       new File(tempPath(path)).mkdirs()
-
     for (init <- resources)
       init()
   }
 
   override protected def afterAll(): Unit = {
-    deleteRecursive(new File(codegenDir))
-
     for (path <- tempPaths)
       deleteRecursive(new File(tempPath(path)))
   }

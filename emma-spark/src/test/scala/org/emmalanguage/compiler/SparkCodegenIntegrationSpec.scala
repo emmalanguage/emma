@@ -20,33 +20,26 @@ import api._
 import api.spark._
 
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SparkSession
 
-class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkAware {
-  override val compiler = new RuntimeCompiler with SparkCompiler
+class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec
+  with SparkCompilerAware
+  with SparkAware {
 
   import compiler._
-  import u.reify
 
-  type Env = SparkSession
-
-  override lazy val Env = api.Type[org.apache.spark.sql.SparkSession]
-  override lazy val env = defaultSparkSession
-
-  override lazy val backendPipeline: u.Tree => u.Tree =
-    SparkBackend.transform
+  def withBackendContext[T](f: Env => T): T =
+    withDefaultSparkSession(f)
 
   // --------------------------------------------------------------------------
   // Distributed collection conversion
   // --------------------------------------------------------------------------
 
-  "Convert from/to a Spark RDD" in {
-    implicit val e: Env = env
-    verify(reify {
+  "Convert from/to a Spark RDD" in withBackendContext(implicit env => {
+    verify(u.reify {
       val xs = DataBag(1 to 1000).withFilter(_ > 800)
       val ys = xs.as[RDD].filter(_ < 200)
       val zs = DataBag.from(ys)
       zs.size
     })
-  }
+  })
 }

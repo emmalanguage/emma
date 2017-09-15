@@ -86,6 +86,24 @@ trait Compiler extends AlphaEq
     else Function.chain(List(print) ++ steps.flatMap(List(_, print)))
   }
 
+  implicit class TransformationOps(xfrm: u.Tree => u.Tree) {
+    def iff(k: String)(implicit cfg: Config): Is =
+      new Is(k)
+
+    class Is(k: String)(implicit cfg: Config) {
+      def is(v: Boolean): u.Tree => u.Tree =
+        if (cfg.getBoolean(k) == v) xfrm
+        else noop
+
+      def is(v: String): u.Tree => u.Tree =
+        if (cfg.getString(k) == v) xfrm
+        else noop
+    }
+
+  }
+
+  val noop: u.Tree => u.Tree = Predef.identity[u.Tree]
+
   // Turn this on to print the tree between every step in the pipeline (also before the first and after the last step).
   val printAllTrees = false
 
@@ -99,7 +117,7 @@ trait Compiler extends AlphaEq
   }
 
   /** Loads a sequence of resources (in decreasing priority). */
-  protected def loadConfig(paths: Seq[String]): Config = {
+  def loadConfig(paths: Seq[String]): Config = {
     val opts = ConfigParseOptions.defaults().setClassLoader(getClass.getClassLoader)
 
     val sPrp = ConfigFactory.systemProperties()
@@ -131,5 +149,5 @@ trait Compiler extends AlphaEq
       case _ => abort("The provided `config` path is not a string literal.")
     })
 
-  protected def baseConfig = Seq("reference.emma.conf")
+  def baseConfig = Seq("reference.emma.conf")
 }

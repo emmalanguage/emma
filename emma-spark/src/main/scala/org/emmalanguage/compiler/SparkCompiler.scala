@@ -19,11 +19,34 @@ package compiler
 import backend.SparkBackend
 import opt.SparkOptimizations
 
+import com.typesafe.config.Config
+
 trait SparkCompiler extends Compiler
   with SparkBackend
   with SparkOptimizations {
 
+  override val baseConfig = "reference.emma.onSpark.conf" +: super.baseConfig
+
   override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ SparkAPI.implicitTypes
+
+  def transformations(implicit cfg: Config): Seq[u.Tree => u.Tree] = Seq(
+    // lifting
+    Lib.expand,
+    Core.lift,
+    // optimizations
+    Core.cse iff "emma.compiler.opt.cse" is true,
+    Optimizations.foldFusion iff "emma.compiler.opt.fold-fusion" is true,
+    Optimizations.addCacheCalls iff "emma.compiler.opt.auto-cache" is true,
+    // backend
+    Comprehension.combine,
+    Core.unnest,
+    SparkBackend.transform,
+    SparkOptimizations.specializeOps iff "emma.compiler.spark.native-ops" is true,
+    // lowering
+    Core.trampoline iff "emma.compiler.lower" is "trampoline",
+    Core.dscfInv iff "emma.compiler.lower" is "dscfInv",
+    removeShadowedThis
+  ) filterNot (_ == noop)
 
   trait NtvAPI extends ModuleAPI {
     //@formatter:off

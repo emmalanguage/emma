@@ -25,10 +25,13 @@ import java.net.URLClassLoader
 import java.nio.file._
 
 /** A reflection-based [[Compiler]]. */
-class RuntimeCompiler(private var cgd: String = RuntimeCompiler.codeGenDir)
+class RuntimeCompiler(private var cgd: Path = RuntimeCompiler.codeGenDir)
   extends Compiler with JavaAST with Serializable {
 
-  def codeGenDir: String = cgd
+  // Make sure that generated class directory exists
+  Files.createDirectories(cgd)
+
+  def codeGenDir: Path = cgd
 
   /** The generating Scala toolbox. */
   override lazy val tb = {
@@ -52,12 +55,12 @@ class RuntimeCompiler(private var cgd: String = RuntimeCompiler.codeGenDir)
   //noinspection ScalaUnusedSymbol
   @throws(classOf[IOException])
   private def writeObject(out: ObjectOutputStream): Unit =
-    out.writeUTF(codeGenDir)
+    out.writeUTF(codeGenDir.toString)
 
   //noinspection ScalaUnusedSymbol
   @throws(classOf[IOException])
   private def readObject(in: ObjectInputStream): Unit =
-    cgd = in.readUTF()
+    cgd = Paths.get(in.readUTF())
 }
 
 object RuntimeCompiler {
@@ -69,16 +72,11 @@ object RuntimeCompiler {
 
     lazy val codeGenDir = Paths
       .get(sys.props("java.io.tmpdir"), "emma", "codegen")
-      .toAbsolutePath.toString
-
-    lazy val instance = new RuntimeCompiler()
+      .toAbsolutePath
   }
 
   /** Get the code-gen dir from system properties. */
-  def codeGenDir: String = {
-    val path = Paths.get(sys.props.getOrElse("emma.codegen.dir", default.codeGenDir))
-    // Make sure that generated class directory exists
-    Files.createDirectories(path)
-    path.toAbsolutePath.toString
-  }
+  def codeGenDir: Path = sys.props.get("emma.codegen.dir")
+    .map(s => Paths.get(s).toAbsolutePath)
+    .getOrElse(default.codeGenDir)
 }

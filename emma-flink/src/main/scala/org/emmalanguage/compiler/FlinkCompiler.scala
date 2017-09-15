@@ -20,10 +20,13 @@ import compiler.backend.FlinkBackend
 import compiler.opt.FlinkOptimizations
 
 import cats.implicits._
+import com.typesafe.config.Config
 
 trait FlinkCompiler extends Compiler
   with FlinkBackend
   with FlinkOptimizations {
+
+  override val baseConfig = "reference.emma.onFlink.conf" +: super.baseConfig
 
   override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ FlinkAPI.implicitTypes
 
@@ -101,6 +104,26 @@ trait FlinkCompiler extends Compiler
       q"org.emmalanguage.api.FlinkDataSet.memoizeTypeInfo[$tpe]($ttag, $info)"
     }
   }
+
+  def transformations(implicit cfg: Config): Seq[u.Tree => u.Tree] = Seq(
+    // lifting
+    Lib.expand,
+    Core.lift,
+    // optimizations
+    Core.cse iff "emma.compiler.opt.cse" is true,
+    FlinkOptimizations.specializeLoops iff "emma.compiler.flink.native-its" is true,
+    Optimizations.foldFusion iff "emma.compiler.opt.fold-fusion" is true,
+    Optimizations.addCacheCalls iff "emma.compiler.opt.auto-cache" is true,
+    // backend
+    Comprehension.combine,
+    Core.unnest,
+    FlinkBackend.transform,
+    // lowering
+    Core.trampoline iff "emma.compiler.lower" is "trampoline",
+    Core.dscfInv iff "emma.compiler.lower" is "dscfInv",
+    removeShadowedThis,
+    prependMemoizeTypeInfoCalls _
+  ) filterNot (_ == noop)
 
   trait NtvAPI extends ModuleAPI {
     //@formatter:off
