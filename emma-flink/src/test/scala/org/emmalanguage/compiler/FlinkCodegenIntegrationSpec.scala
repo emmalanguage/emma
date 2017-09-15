@@ -14,40 +14,46 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.spark.rdd
+package compiler
 
 import api._
-import api.spark._
-import compiler.BaseCodegenIntegrationSpec
-import compiler.RuntimeCompiler
-import compiler.SparkCompiler
+import api.flink._
 
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SparkSession
+import org.apache.flink.api.scala.DataSet
+import org.apache.flink.api.scala.ExecutionEnvironment
+import org.apache.flink.api.scala.createTypeInformation
 
-class SparkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with SparkAware {
-  override val compiler = new RuntimeCompiler with SparkCompiler
+class FlinkCodegenIntegrationSpec extends BaseCodegenIntegrationSpec with FlinkAware {
+  override val compiler = new RuntimeCompiler with FlinkCompiler
 
   import compiler._
   import u.reify
 
-  type Env = SparkSession
+  type Env = ExecutionEnvironment
 
-  override lazy val Env = api.Type[org.apache.spark.sql.SparkSession]
-  override lazy val env = defaultSparkSession
+  override lazy val Env = api.Type[org.apache.flink.api.scala.ExecutionEnvironment]
+  override lazy val env = defaultFlinkEnv
 
   override lazy val backendPipeline: u.Tree => u.Tree =
-    SparkBackend.transform
+    FlinkBackend.transform
+
+  override lazy val addContext: u.Tree => u.Tree = tree => {
+    import u._
+    q"(env: $Env) => { implicit val e: $Env = env; ..${memoizeTypeInfoCalls(tree)}; $tree }"
+  }
+
+  // FIXME: no idea why, but all tests require TypeInformation[(Int, Int, Int, Int)]
+  FlinkDataSet.memoizeTypeInfo[(Int, Int, Int, Int)]
 
   // --------------------------------------------------------------------------
   // Distributed collection conversion
   // --------------------------------------------------------------------------
 
-  "Convert from/to a Spark RDD" in {
+  "Convert from/to a Flink DataSet" in {
     implicit val e: Env = env
     verify(reify {
       val xs = DataBag(1 to 1000).withFilter(_ > 800)
-      val ys = xs.as[RDD].filter(_ < 200)
+      val ys = xs.as[DataSet].filter(_ < 200)
       val zs = DataBag.from(ys)
       zs.size
     })
