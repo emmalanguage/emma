@@ -17,6 +17,7 @@ package org.emmalanguage
 package compiler.spark
 
 import compiler.SparkCompiler
+import compiler.lang.backend.BCtx
 
 import scala.collection.breakOut
 
@@ -33,11 +34,8 @@ private[compiler] trait SparkSpecializeSupport {
   object SparkSpecializeSupport {
     /** Introduces [[org.emmalanguage.api.spark.SparkNtv native Spark operators]] whenever possible. */
     lazy val specializeOps: u.Tree => u.Tree = tree => {
-      val disRslt = Backend.disambiguate(tree)
-      val disTree = disRslt._1
-      val dparCtx = disRslt._2.toSet[u.Symbol]
-
-      val cfg = ControlFlow.cfg(disTree)
+      val cfg = ControlFlow.cfg(tree)
+      val ctx = Context.bCtxMap(cfg)
       val vds = cfg.data.labNodes.map(_.label)
 
       // specializable lambdas
@@ -54,7 +52,7 @@ private[compiler] trait SparkSpecializeSupport {
       val specOps = (for {
         core.ValDef(lhs, call) <- vds
         // don't specialize calls in a data-parallel context
-        if (dparCtx intersect api.Owner.chain(lhs).toSet).isEmpty
+        if ctx(lhs) == BCtx.Driver
         spec <- call match {
           // specialize `DataBag.withFilter` as `SparkOps.Native.select`
           case core.DefCall(Some(xs), DataBag.withFilter, _, Seq(Seq(core.Ref(p))))
@@ -122,7 +120,7 @@ private[compiler] trait SparkSpecializeSupport {
               }
             }
           } yield y, defs, expr)
-      }(disTree).tree
+      }(tree).tree
     }
 
     /** Specializes lambdas as [[org.emmalanguage.api.spark.SparkExp SparkExp]] expressions. */
