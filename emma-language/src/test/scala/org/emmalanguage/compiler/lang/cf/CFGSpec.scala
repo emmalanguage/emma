@@ -91,7 +91,8 @@ class CFGSpec extends BaseCompilerSpec {
         "e1", "e2", "src$1", "src$2", "dst$1", "dst$2")
       ctrl.successors("doWhile$1") should contain allOf ("doWhile$1", "suffix$1")
       ctrl.successors("suffix$1")  shouldBe 'empty
-      data.predecessors("closure") should contain ("paths$3")                  // comprehension
+      data.predecessors("closure") should not contain "paths$3"                // comprehension
+      data.predecessors("closure") should contain allOf ("dst$1", "src$2")     // comprehension
       data.predecessors("e1")      should contain ("paths$3")                  // generator
       data.predecessors("union$1") should contain allOf ("paths$3", "closure") // regular value
       data.predecessors("added$3") should contain allOf ("added$1", "added$2") // method parameter

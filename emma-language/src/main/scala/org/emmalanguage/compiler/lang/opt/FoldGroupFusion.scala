@@ -83,18 +83,20 @@ private[compiler] trait FoldGroupFusion extends Common {
      */
     lazy val foldGroupFusion: u.Tree => u.Tree = tree => {
       val cfg = ControlFlow.cfg(tree)
+      val dat = cfg.data
+      val nst = cfg.nest.tclose
 
       val ms = for {
-        GroupBy(x, y, k) <- cfg.data.labNodes.map(_.label)
+        GroupBy(x, y, k) <- dat.labNodes.map(_.label)
         if cfg.uses(x) == 1
-        xUses = cfg.data.outEdges(x).flatMap(e => cfg.data.label(e.to))
+        xUses = dat.successors(x).flatMap(nst.predecessors).flatMap(dat.label)
         GroupComprehension(c, g, `x`) <- xUses
-        gUses = cfg.data.outEdges(g).flatMap(e => cfg.data.label(e.to))
+        gUses = dat.successors(g).flatMap(dat.label)
         ProjValues(v, g) <- gUses
         if cfg.uses(v) == 1
-        vUses = cfg.data.outEdges(v).flatMap(e => cfg.data.label(e.to))
+        vUses = dat.successors(v).flatMap(dat.label)
         FoldValues(f, v, a) <- vUses
-        deps = cfg.data.reverse
+        deps = dat.reverse
         d = deps.reachable(a).toSet
         if !(d contains g)
       } yield {
@@ -106,7 +108,7 @@ private[compiler] trait FoldGroupFusion extends Common {
         val ds = for {
           v <- topoSort(dm).get
           if C contains v
-          w <- cfg.data.label(v)
+          w <- dat.label(v)
         } yield w
         Match(x, y, k, c, g, v, f, a, ds)
       }

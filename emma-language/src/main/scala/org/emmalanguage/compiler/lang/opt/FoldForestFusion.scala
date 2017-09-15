@@ -210,7 +210,7 @@ private[compiler] trait FoldForestFusion extends Common {
       valIndex: Index,
       cfg: FlowGraph[u.TermSymbol]
     ): Stream[Tree[u.TermSymbol]] = {
-      val FlowGraph(refCount, _, _, dataFlow) = cfg
+      val nst = cfg.nest.tclose
 
       // Initial fold forest - singleton trees of `xs` symbols in `xs.fold(...)` applications.
       var forest: Stream[Tree[u.TermSymbol]] = valIndex.collect {
@@ -243,12 +243,12 @@ private[compiler] trait FoldForestFusion extends Common {
 
           val independentSubForest = for {
             tree @ Tree.Node(fold, _) <- subForest
-            if (dataFlow.reachable(fold) intersect subForestRoots).size == 1
+            if (cfg.data.reachable(fold).flatMap(nst.predecessors) intersect subForestRoots).size == 1
           } yield tree
 
           // Target is a monadic DefCall called by exactly one sub-forest root.
           // => Prepend a root representing sequential (cata) fold-fusion.
-          if (refCount(target) == 1 && targetIsMonadicCall) {
+          if (cfg.uses(target) == 1 && targetIsMonadicCall) {
             forestDidGrow = true
             Stream(Tree.Node(target, subForest))
           }
@@ -327,10 +327,10 @@ private[compiler] trait FoldForestFusion extends Common {
      * }}}
      */
     lazy val foldForestFusion: u.Tree => u.Tree = tree => {
-      val cfg = ControlFlow.cfg(tree)
       api.BottomUp.withOwner.transformWith {
         // Fuse only folds within a single block.
         case Attr.inh(let@core.Let(vals, defs, expr), owner :: _) =>
+          val cfg = ControlFlow.cfg(let)
           val valIndex = lhs2rhs(vals)
 
           def fuse(root: u.TermSymbol, children: Stream[Node]): Node = children match {
