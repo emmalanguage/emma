@@ -17,7 +17,7 @@ package org.emmalanguage
 package compiler.spark
 
 import compiler.SparkCompiler
-import compiler.lang.backend.BCtx
+import compiler.backend.BCtx
 
 import scala.collection.breakOut
 
