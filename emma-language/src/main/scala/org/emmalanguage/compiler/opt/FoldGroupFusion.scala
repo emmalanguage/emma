@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.lang.opt
+package compiler.opt
 
 import compiler.Common
 import compiler.lang.cf.ControlFlow
@@ -32,7 +32,7 @@ private[compiler] trait FoldGroupFusion extends Common {
   self: Core with Comprehension with ControlFlow =>
 
   /** The fold-fusion optimization. */
-  object FoldGroupFusion {
+  private[compiler] object FoldGroupFusion {
 
     private type Node = LNode[u.TermSymbol, u.ValDef]
     private type MMap = Map[u.TermSymbol, Match]
