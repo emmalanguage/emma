@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.spark
+package compiler.opt
 
 import compiler.SparkCompiler
 import compiler.backend.BCtx
 
 import scala.collection.breakOut
 
-private[compiler] trait SparkSpecializeSupport {
+private[opt] trait SparkSpecializeOps {
   self: SparkCompiler =>
 
   import API.DataBag
@@ -31,7 +31,7 @@ private[compiler] trait SparkSpecializeSupport {
   import SparkAPI.Ops
   import UniverseImplicits._
 
-  object SparkSpecializeSupport {
+  private[opt] object SparkSpecializeOps {
     /** Introduces [[org.emmalanguage.api.spark.SparkNtv native Spark operators]] whenever possible. */
     lazy val specializeOps: u.Tree => u.Tree = tree => {
       val cfg = ControlFlow.cfg(tree)
