@@ -129,9 +129,17 @@ abstract class BaseCodegenIntegrationSpec extends BaseCompilerSpec with BeforeAn
 
   "Map" - {
     "primitives" in verify(reify {
-      val whiteList = DataBag(1 to 5)
-      for { even <- DataBag(2 to 10 by 2) }
-        yield if (whiteList exists { _ == even }) even else 0
+      val us = DataBag(1 to 3)
+      val vs = DataBag(4 to 6)
+      val ws = DataBag(7 to 9)
+      for {
+        x <- DataBag(2 to 20 by 2)
+      } yield {
+        if (us.exists(_ == x)) 9 * x
+        else if (vs.exists(_ == x)) 5 * x
+        else if (ws.exists(_ == x)) 1 * x
+        else 0
+      }
     })
 
     "tuples" in verify(reify {

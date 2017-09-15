@@ -51,15 +51,21 @@ class FlinkDataSetSpec extends DataBagSpec with FlinkAware {
   FlinkDataSet.memoizeTypeInfo[(String, Long)]
   FlinkDataSet.memoizeTypeInfo[DataBagSpec.CSVRecord]
 
-  "broadcast map" in withBackendContext(implicit env => {
-    val xs = FlinkDataSet(400 to 600)
-    val ys = FlinkDataSet(1 to 50)
+  "broadcast support" in withBackendContext(implicit env => {
+    val us = TestBag(400 to 410)
+    val vs = TestBag(440 to 450)
+    val ws = TestBag(480 to 490)
+    val xs = TestBag(1 to 50)
     val fn = (ctx: RuntimeContext) => {
-      val xs1 = flink.FlinkNtv.bag(ys)(ctx)
-      (y: Int) => xs1.exists(_ == y * y)
+      val us1 = flink.FlinkNtv.bag(us)(ctx)
+      val vs1 = flink.FlinkNtv.bag(vs)(ctx)
+      val ws1 = flink.FlinkNtv.bag(ws)(ctx)
+      (y: Int) => (us1 union vs1 union ws1).exists(_ == y * y)
     }
-    val zs1 = flink.FlinkNtv.map(fn)(xs)
-    val zs = flink.FlinkNtv.broadcast(zs1, ys)
-    print(zs.collect())
+    val rs = flink.FlinkNtv.filter(fn)(xs)
+    val b1 = flink.FlinkNtv.broadcast(rs, us)
+    val b2 = flink.FlinkNtv.broadcast(b1, vs)
+    val b3 = flink.FlinkNtv.broadcast(b2, ws)
+    b3.collect() should contain theSameElementsAs Seq(20, 21, 22)
   })
 }

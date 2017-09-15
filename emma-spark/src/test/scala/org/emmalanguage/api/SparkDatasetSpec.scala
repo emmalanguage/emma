@@ -28,4 +28,22 @@ class SparkDatasetSpec extends DataBagSpec with SparkAware {
 
   override def withBackendContext[T](f: BackendContext => T): T =
     f(defaultSparkSession)
+
+  "broadcast support" in withBackendContext(implicit env => {
+    val us = TestBag(400 to 410)
+    val bu = spark.SparkNtv.broadcast(us)
+    val vs = TestBag(440 to 450)
+    val bv = spark.SparkNtv.broadcast(vs)
+    val ws = TestBag(480 to 490)
+    val bw = spark.SparkNtv.broadcast(ws)
+    val xs = TestBag(1 to 50)
+    val fn = (x: Int) => {
+      val us = spark.SparkNtv.bag(bu)
+      val vs = spark.SparkNtv.bag(bv)
+      val ws = spark.SparkNtv.bag(bw)
+      (us union vs union ws).exists(_ == x * x)
+    }
+    val rs = xs.withFilter(fn)
+    rs.collect() should contain theSameElementsAs Seq(20, 21, 22)
+  })
 }
