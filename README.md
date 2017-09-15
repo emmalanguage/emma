@@ -34,15 +34,15 @@ Subterms of type `DataBag[A]` are thereby transformed and off-loaded to a parall
 The [emma-examples](emma-examples/emma-examples-library/src/main/scala/org/emmalanguage/examples) module contains examples from various fields.
 
 - Graph Analysis
-  - [Connected Components](emma-examples/emma-examples-library/src/main/scala/org/emmalanguage/examples/graphs/ConnectedComponents.scala)
-  - [Triangle Enumeration](emma-examples/emma-examples-library/src/main/scala/org/emmalanguage/examples/graphs/EnumerateTriangles.scala)
-  - [Transitive Closure](emma-examples/emma-examples-library/src/main/scala/org/emmalanguage/examples/graphs/TransitiveClosure.scala)
+  - [Connected Components](emma-examples/src/main/scala/org/emmalanguage/examples/graphs/ConnectedComponents.scala)
+  - [Triangle Enumeration](emma-examples/src/main/scala/org/emmalanguage/examples/graphs/EnumerateTriangles.scala)
+  - [Transitive Closure](emma-lib/src/main/scala/org/emmalanguage/lib/graphs/transitiveClosure.scala)
 - Supervised Learning
-  - [Naive Bayses Classification](emma-examples/emma-examples-library/src/main/scala/org/emmalanguage/examples/ml/classification/NaiveBayes.scala)
+  - [Naive Bayses Classification](emma-lib/src/main/scala/org/emmalanguage/lib/ml/classification/naiveBayes.scala)
 - Unsupervised Learning
-  - [k-Means Clustering](emma-examples/emma-examples-library/src/main/scala/org/emmalanguage/examples/ml/clustering/KMeans.scala)
+  - [k-Means Clustering](emma-lib/src/main/scala/org/emmalanguage/lib/ml/clustering/kMeans.scala)
 - Text Processing
-  - [Word Count](emma-examples/emma-examples-library/src/main/scala/org/emmalanguage/examples/text/WordCount.scala)
+  - [Word Count](emma-examples/src/main/scala/org/emmalanguage/examples/text/WordCount.scala)
 
 ## Learn More
 
