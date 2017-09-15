@@ -18,7 +18,6 @@ package compiler.backend
 
 import compiler.Common
 import compiler.FlinkCompiler
-import compiler.lang.backend.BCtx
 
 import scala.collection.breakOut
 

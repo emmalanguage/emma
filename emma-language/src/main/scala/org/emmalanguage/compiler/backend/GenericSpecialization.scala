@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package compiler.lang.backend
+package compiler.backend
 
 import compiler.Common
 import compiler.lang.core.Core

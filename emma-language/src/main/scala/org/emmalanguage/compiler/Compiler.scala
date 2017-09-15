@@ -16,8 +16,8 @@
 package org.emmalanguage
 package compiler
 
+import backend.GenericBackend
 import lang.AlphaEq
-import lang.backend.GenericBackend
 import lang.core.Core
 import lang.lib.Lib
 import lang.source.Source
