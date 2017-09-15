@@ -58,7 +58,7 @@ private[compiler] trait CFG extends Common {
       api.TopDown.withDefDefs.withBindUses.withBindDefs
         .inherit { case core.TermDef(encl) => Option(encl) } (last(None))
         .accumulateWith[Vector[UEdge[u.TermSymbol]]] { // Nesting
-          case Attr.inh(core.ValDef(lhs, _), Some(encl) :: _) =>
+          case Attr.inh(core.BindingDef(lhs, _), Some(encl) :: _) =>
             Vector(LEdge(encl, lhs, ()))
           case Attr.inh(core.DefDef(method, _, _, _), Some(encl) :: _) =>
             Vector(LEdge(encl, method, ()))
@@ -69,8 +69,8 @@ private[compiler] trait CFG extends Common {
               LEdge(f.asTerm, g.asTerm, ())
             }.toVector
         }.accumulateWith[Vector[UEdge[u.TermSymbol]]] { // Data flow
-          case Attr.syn(core.BindingDef(lhs, _), vals :: uses :: _) =>
-            uses.keySet.diff(vals.keySet).filterNot(_.isStatic).map(LEdge(_, lhs, ()))(breakOut)
+          case Attr.inh(core.BindingRef(from), Some(to) :: _) if !from.isStatic =>
+            Vector(LEdge(from, to, ()))
         }.accumulate { // Phi choices
           case core.DefCall(None, method, _, argss)
             if api.Sym.findAnn[continuation](method).isDefined => {
