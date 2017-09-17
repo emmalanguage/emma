@@ -54,7 +54,7 @@ private[opt] trait SparkSpecializeOps {
         // don't specialize calls in a data-parallel context
         if ctx(lhs) == BCtx.Driver
         spec <- call match {
-          // specialize `DataBag.withFilter` as `SparkOps.Native.select`
+          // specialize `DataBag.withFilter` as `SparkNtv.select`
           case core.DefCall(Some(xs), DataBag.withFilter, _, Seq(Seq(core.Ref(p))))
             if specLambdas contains p =>
             val tgt = Ntv.ref
@@ -62,20 +62,26 @@ private[opt] trait SparkSpecializeOps {
             val tas = Seq(api.Type.arg(1, xs.tpe))
             val ass = Seq(Seq(specLambdaRef(p)), Seq(xs))
             Some(core.ValDef(lhs, core.DefCall(Some(tgt), met, tas, ass)))
-          // specialize `DataBag.map` as `SparkOps.Native.project`
+          // specialize `DataBag.map` as `SparkNtv.project`
           case core.DefCall(Some(xs), DataBag.map, Seq(t), Seq(Seq(core.Ref(f))))
-            if specLambdas contains f =>
+            if supported(t) && (specLambdas contains f) =>
             val tgt = Ntv.ref
             val met = Ntv.project
             val tas = Seq(api.Type.arg(1, xs.tpe), t)
             val ass = Seq(Seq(specLambdaRef(f)), Seq(xs))
             Some(core.ValDef(lhs, core.DefCall(Some(tgt), met, tas, ass)))
-          // specialize `SparkOps.equiJoin` as `SparkOps.Native.equiJoin`
+          // specialize `SparkOps.equiJoin` as `SparkNtv.equiJoin`
           case core.DefCall(_, Ops.equiJoin, tas, JoinArgs(kx, ky, xs, ys))
-            if (specLambdas contains kx) && (specLambdas contains ky) =>
+            if supported(tas) && (specLambdas contains kx) && (specLambdas contains ky) =>
             val tgt = Ntv.ref
             val met = Ntv.equiJoin
             val ass = Seq(Seq(specLambdaRef(kx), specLambdaRef(ky)), Seq(core.Ref(xs), core.Ref(ys)))
+            Some(core.ValDef(lhs, core.DefCall(Some(tgt), met, tas, ass)))
+          // specialize `SparkOps.cross` as `SparkNtv.cross`
+          case core.DefCall(_, Ops.cross, tas, ass)
+            if supported(tas) =>
+            val tgt = Ntv.ref
+            val met = Ntv.cross
             Some(core.ValDef(lhs, core.DefCall(Some(tgt), met, tas, ass)))
           case _ =>
             None
@@ -227,6 +233,24 @@ private[opt] trait SparkSpecializeOps {
       case root =>
         root
     }
+
+    private[opt] def supported(tpes: Seq[u.Type]): Boolean =
+      tpes.forall(supported)
+
+    private[opt] def supported(tpe: u.Type): Boolean =
+      if (api.Type.isCaseClass(tpe)) {
+        val pars = api.Type.caseClassParamsOf(tpe)
+        val tpes = pars.values.toSeq
+        supported(tpes)
+      }
+      else tpe.dealias.widen.typeConstructor match {
+        case t if isSypportedTypeCtor(t.typeSymbol) =>
+          supported(api.Type.arg(1, tpe))
+        case t if isSupportedPrimType(t.typeSymbol) =>
+          true
+        case _ =>
+          false
+      }
   }
 
   private object JoinArgs {
@@ -236,6 +260,35 @@ private[opt] trait SparkSpecializeOps {
       case Seq(Seq(core.Ref(kx), core.Ref(ky)), Seq(core.Ref(xs), core.Ref(ys))) => Some(kx, ky, xs, ys)
     }
   }
+
+  private lazy val isSypportedTypeCtor = Set(
+    api.Type.option.typeSymbol,
+    api.Type.array.typeSymbol,
+    api.Type.seq.typeSymbol
+  )
+
+  private lazy val isSupportedPrimType = Set(
+    api.Type.bool.typeSymbol,
+    api.Type.byte.typeSymbol,
+    api.Type.short.typeSymbol,
+    api.Type.int.typeSymbol,
+    api.Type.long.typeSymbol,
+    api.Type.float.typeSymbol,
+    api.Type.double.typeSymbol,
+    api.Type.string.typeSymbol,
+    api.Type.bigInt.typeSymbol,
+    api.Type.bigDec.typeSymbol,
+    api.Type.Java.bool.typeSymbol,
+    api.Type.Java.byte.typeSymbol,
+    api.Type.Java.short.typeSymbol,
+    api.Type.Java.int.typeSymbol,
+    api.Type.Java.long.typeSymbol,
+    api.Type.Java.float.typeSymbol,
+    api.Type.Java.double.typeSymbol,
+    api.Type.Java.string.typeSymbol,
+    api.Type.Java.bigInt.typeSymbol,
+    api.Type.Java.bigDec.typeSymbol
+  )
 
   private lazy val isNumeric = Set(
     api.Type.char,

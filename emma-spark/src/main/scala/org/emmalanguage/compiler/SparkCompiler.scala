@@ -33,11 +33,12 @@ trait SparkCompiler extends Compiler
     val select            = op("select")
     val project           = op("project")
     val equiJoin          = op("equiJoin")
+    val cross             = op("cross")
 
     val broadcast         = op("broadcast")
     val bag               = op("bag")
 
-    override lazy val ops = Set(select, project, equiJoin, broadcast, bag)
+    override lazy val ops = Set(select, project, cross, equiJoin, broadcast, bag)
     //@formatter:on
   }
 

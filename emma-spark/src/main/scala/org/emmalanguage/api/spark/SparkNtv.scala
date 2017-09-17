@@ -19,6 +19,7 @@ package api.spark
 import api._
 
 import org.apache.spark.broadcast.Broadcast
+import org.apache.spark.sql.Dataset
 import org.apache.spark.sql.SparkSession
 
 object SparkNtv {
@@ -33,42 +34,51 @@ object SparkNtv {
     implicit s: SparkSession
   ): DataBag[A] = xs match {
     case SparkDataset(us) =>
-      val xs = us.as("x")
-      val cx = p(Root("x")).col
-      SparkDataset(xs.filter(cx))
+      val cx = p(Root(us.toDF())).col
+      SparkDataset(us.filter(cx))
   }
 
   def project[A: Meta, B: Meta](f: Root => Expr)(xs: DataBag[A])(
     implicit s: SparkSession
   ): DataBag[B] = xs match {
     case SparkDataset(us) =>
-      import s.sqlContext.implicits._
       val fs = encoderForType[B].schema.fields
-      val xs = us.as("x")
-      val cx = f(Root("x")) match {
-        case Chain(Seq(name)) =>
-          if (fs.length > 1) Seq($"$name.*")
-          else Seq($"$name.${fs(0).name}")
-        case Chain(names) =>
-          if (fs.length > 1) Seq($"${names.mkString(".")}.*")
-          else Seq($"${names.mkString(".")}")
+      val cx = f(Root(us.toDF())) match {
+        case Chain(df, Seq()) =>
+          fs.toSeq.map(f => df.col(f.name))
+        case Chain(df, chain) =>
+          if (fs.length < 2) Seq(df(chain.mkString(".")))
+          else fs.toSeq.map(f => df((chain :+ f.name).mkString(".")))
         case Struct(names, vals) =>
           for ((v, n) <- vals zip names) yield v.col.as(n)
         case expr =>
           Seq(expr.col)
       }
-      SparkDataset(xs.select(cx: _*).as[B])
+      SparkDataset(us.select(cx: _*).as[B])
   }
 
   def equiJoin[A: Meta, B: Meta, K: Meta](
     kx: Root => Expr, ky: Root => Expr)(xs: DataBag[A], ys: DataBag[B]
   )(implicit s: SparkSession): DataBag[(A, B)] = (xs, ys) match {
     case (SparkDataset(us), SparkDataset(vs)) =>
-      val xs = us.as("x")
-      val ys = vs.as("y")
-      val cx = kx(Root("x")).col
-      val cy = ky(Root("y")).col
-      SparkDataset(xs.joinWith(ys, cx === cy))
+      val (ss, ts) =
+        if (us != vs) (us, vs)
+        else (refresh(us), refresh(vs))
+      val cx = kx(Root(ss.toDF())).col
+      val cy = ky(Root(ts.toDF())).col
+      SparkDataset(ss.joinWith(ts, cx === cy))
+  }
+
+  def cross[A: Meta, B: Meta](
+    xs: DataBag[A], ys: DataBag[B]
+  )(implicit s: SparkSession): DataBag[(A, B)] = (xs, ys) match {
+    case (SparkDataset(us), SparkDataset(vs)) =>
+      SparkDataset(us.joinWith(vs, Lit(true).col, "cross"))
+  }
+
+  private def refresh[A: Meta](xs: Dataset[A]): Dataset[A] = {
+    import xs.sparkSession.implicits._
+    xs.select(xs.schema.fields.map(f => $"${f.name}".as(f.name)): _*).as[A]
   }
 
   //----------------------------------------------------------------------------
