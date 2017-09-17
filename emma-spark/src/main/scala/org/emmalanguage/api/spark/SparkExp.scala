@@ -17,6 +17,7 @@ package org.emmalanguage
 package api.spark
 
 import org.apache.spark.sql.Column
+import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.SparkSession
 import org.apache.spark.sql.{functions => fun}
 
@@ -30,7 +31,7 @@ object SparkExp {
     lazy val col: Column = eval(this)
   }
   // structural expressions
-  case class Root private(name: String)(implicit val spark: SparkSession) extends Expr
+  case class Root private(df: DataFrame)(implicit val spark: SparkSession) extends Expr
   case class Proj private(parent: Expr, name: String)(implicit val spark: SparkSession) extends Expr
   case class Struct private(names: Seq[String], vals: Seq[Expr])(implicit val spark: SparkSession) extends Expr
   // other expressions
@@ -53,21 +54,22 @@ object SparkExp {
   //@formatter:on
 
   object Chain {
-    def unapply(path: Expr): Option[Seq[String]] = path match {
-      case Root(name) => Some(Seq(name))
-      case Proj(Chain(xs), y) => Some(xs :+ y)
+    def unapply(path: Expr): Option[(DataFrame, Seq[String])] = path match {
+      case Root(df) => Some(df, Seq.empty)
+      case Proj(Chain(df, xs), y) => Some(df, xs :+ y)
       case _ => None
     }
   }
 
   private def eval(expr: Expr)(implicit spark: SparkSession): Column = {
-    import spark.sqlContext.implicits._
     expr match {
       // structural expressions
-      case Chain(names) =>
-        $"${names.mkString(".")}"
-      case Root(name) =>
-        $"$name"
+      case Chain(df, chain) if chain.nonEmpty =>
+        df(chain.mkString("."))
+      case Root(df) if df.schema.fields.length == 1 =>
+        df.col(df.schema.fields(0).name)
+      case Root(df) =>
+        fun.struct(df.schema.fields.map(field => df.col(field.name)): _*)
       case Proj(parent, name) =>
         parent.col.getField(name)
       case Struct(names, vals) =>
@@ -113,9 +115,6 @@ object SparkExp {
       case x: Expr => x
       case _ => Lit(x)
     }
-
-  def root(name: String)(implicit spark: SparkSession): Expr =
-    Root(name)
 
   def proj(parent: Expr, name: String)(implicit spark: SparkSession): Expr =
     Proj(parent, name)

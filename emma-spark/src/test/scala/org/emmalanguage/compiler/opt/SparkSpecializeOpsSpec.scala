@@ -19,12 +19,11 @@ package compiler.opt
 import api.DataBag
 import api.SparkDataset
 import api.backend.LocalOps
-import api.spark.SparkExp
-import api.spark.SparkNtv
-import api.spark.SparkOps
+import api.spark._
 import compiler.BaseCompilerSpec
 import compiler.RuntimeCompiler
 import compiler.SparkCompiler
+import test.schema.Literature._
 import test.schema.Graphs._
 
 import java.util.UUID
@@ -77,6 +76,40 @@ class SparkSpecializeOpsSpec extends BaseCompilerSpec with SparkAware {
   val seq4 = Seq((DataBag(seq1), DataBag(seq2)))
 
   val proj = (x: Seq3) => x.dst
+
+  "check for supported types" in {
+    SparkSpecializeOps.supported(api.Type[Book]) shouldBe true
+    SparkSpecializeOps.supported(api.Type[Character]) shouldBe true
+    SparkSpecializeOps.supported(api.Type[(Book, Option[Character])]) shouldBe true
+    SparkSpecializeOps.supported(api.Type[LabelledEdge[Book, Array[Character]]]) shouldBe true
+    SparkSpecializeOps.supported(api.Type[LabelledEdge[String, java.lang.Integer]]) shouldBe true
+    SparkSpecializeOps.supported(api.Type[LabelledEdge[java.lang.String, Int]]) shouldBe true
+    SparkSpecializeOps.supported(api.Type[Seq1]) shouldBe true
+    SparkSpecializeOps.supported(api.Type[Seq2]) shouldBe true
+    SparkSpecializeOps.supported(api.Type[Seq3]) shouldBe true
+    SparkSpecializeOps.supported(api.Type[(Seq2, Seq[Seq2])]) shouldBe true
+
+    SparkSpecializeOps.supported(api.Type[LabelledEdge[java.lang.Boolean, Char]]) shouldBe false
+    SparkSpecializeOps.supported(api.Type[(Range, Seq[Seq1])]) shouldBe false
+
+    assert(encoderForType[Book].isInstanceOf[AnyRef])
+    assert(encoderForType[Character].isInstanceOf[AnyRef])
+    assert(encoderForType[(Book, Option[Character])].isInstanceOf[AnyRef])
+    assert(encoderForType[LabelledEdge[Book, Array[Character]]].isInstanceOf[AnyRef])
+    assert(encoderForType[LabelledEdge[String, java.lang.Integer]].isInstanceOf[AnyRef])
+    assert(encoderForType[LabelledEdge[java.lang.String, Int]].isInstanceOf[AnyRef])
+    assert(encoderForType[Seq1].isInstanceOf[AnyRef])
+    assert(encoderForType[Seq2].isInstanceOf[AnyRef])
+    assert(encoderForType[Seq3].isInstanceOf[AnyRef])
+    assert(encoderForType[((Int, Double, String), Seq[Edge[Int]])].isInstanceOf[AnyRef])
+
+    assertThrows[UnsupportedOperationException] {
+      encoderForType[LabelledEdge[java.lang.Boolean, Char]].isInstanceOf[AnyRef]
+    }
+    assertThrows[Throwable] {
+      encoderForType[(Range, Seq[(String, Int)])].isInstanceOf[AnyRef]
+    }
+  }
 
   "specializeOps" - {
     "should specialize `withFilter` calls" in withDefaultSparkSession(implicit spark => {

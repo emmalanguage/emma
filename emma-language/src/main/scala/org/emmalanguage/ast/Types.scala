@@ -16,6 +16,8 @@
 package org.emmalanguage
 package ast
 
+import scala.collection.breakOut
+import scala.collection.immutable.ListMap
 import scala.language.higherKinds
 
 trait Types { this: AST =>
@@ -154,6 +156,11 @@ trait Types { this: AST =>
       lazy val bigInt = Type[BigInt]
       lazy val bigDec = Type[BigDecimal]
 
+      // Type constructors
+      lazy val option = Type[Option[Any]].typeConstructor
+      lazy val seq    = Type[Seq[Any]].typeConstructor
+      lazy val array  = Type[Array[Any]].typeConstructor
+
       // Java types
       object Java {
         lazy val void   = Type[java.lang.Void]
@@ -165,6 +172,7 @@ trait Types { this: AST =>
         lazy val long   = Type[java.lang.Long]
         lazy val float  = Type[java.lang.Float]
         lazy val double = Type[java.lang.Double]
+        lazy val string = Type[java.lang.String]
         lazy val bigInt = Type[java.math.BigInteger]
         lazy val bigDec = Type[java.math.BigDecimal]
       }
@@ -282,6 +290,30 @@ trait Types { this: AST =>
       /** Returns the type constructor of an applied type `tpe`. */
       def constructor(tpe: u.Type): u.Type =
         tpe.dealias.widen.typeConstructor
+
+      /** Ensures that a type represents a case class. */
+      def isCaseClass(tpe: u.Type): Boolean =
+        tpe.typeSymbol.asClass.isCaseClass
+
+      /**
+       * Returns a map from formal getter methods to types, containing one
+       * mapping for each argument in the primary constructor. The resulting map
+       * (a ListMap) preserves the order of the constructor's parameter list.
+       */
+      def caseClassParamsOf(tpe: u.Type): ListMap[u.MethodSymbol, u.Type] = {
+        val ctorSymb = tpe.decl(api.TermName.ctor)
+        val ctorPrim =
+          if (ctorSymb.isMethod) ctorSymb.asMethod
+          else ctorSymb.alternatives.map(_.asMethod).find(_.isPrimaryConstructor).get
+
+        ctorPrim.paramLists.flatMap(_.map(
+          sym => {
+            val get = tpe.member(sym.name).asMethod
+            val ret = tpe.member(sym.name).infoIn(tpe).resultType
+            get -> ret
+          })
+        )(breakOut)
+      }
 
       /** Returns the original type-tree corresponding to `tpe`. */
       def tree(tpe: u.Type): u.Tree = {

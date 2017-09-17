@@ -32,6 +32,7 @@ trait Terms { this: AST =>
       // Predefined term names
       lazy val anon      = apply("anon")
       lazy val app       = apply("apply")
+      lazy val ctor      = u.termNames.CONSTRUCTOR
       lazy val empty     = u.termNames.EMPTY
       lazy val exprOwner = u.TermName("<expression-owner>")
       lazy val foreach   = apply("foreach")

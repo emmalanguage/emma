@@ -60,6 +60,6 @@ package object spark {
       throw new RuntimeException(s"Cannot convert a DataBag of type ${bag.getClass.getSimpleName} to a Spark RDD")
   }
 
-  private[api] implicit def encoderForType[T: Meta]: Encoder[T] =
+  private[emmalanguage] implicit def encoderForType[T: Meta]: Encoder[T] =
     ExpressionEncoder[T]
 }
