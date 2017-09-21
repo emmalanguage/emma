@@ -23,15 +23,17 @@ import org.scalatest.Matchers
 
 class AmmoniumReplSpec extends FlatSpec with Matchers {
 
-  import AmmoniumReplSpec._
+  import AmmoniumReplSpec.cmd0.wrapper.wrapper._
+  import AmmoniumReplSpec.cmd1.wrapper.wrapper._
 
   "class-based Ammonium REPL" should "compile and evaluate properly" in {
-    cmd1.wrapper.wrapper.act should contain theSameElementsAs cmd0.wrapper.wrapper.exp
+    val act = zs.collect()
+    val exp = (xs union ys).collect()
+    act should contain theSameElementsAs exp
   }
 }
 
-
-object AmmoniumReplSpec extends SparkAware {
+object AmmoniumReplSpec extends SparkAware with SparkCompilerAware {
 
   object cmd0 {
     val wrapper = new cmd0Wrapper
@@ -41,7 +43,8 @@ object AmmoniumReplSpec extends SparkAware {
     val wrapper = new Helper
 
     final class Helper extends java.io.Serializable {
-      val exp = Seq(17)
+      val xs = DataBag(Seq(17))
+      val ys = DataBag(Seq(42))
     }
 
   }
@@ -55,13 +58,14 @@ object AmmoniumReplSpec extends SparkAware {
   final class cmd1Wrapper extends java.io.Serializable {
     lazy val cmd0: AmmoniumReplSpec.cmd0.wrapper.type = AmmoniumReplSpec.cmd0.wrapper
 
-    import cmd0.wrapper.exp
+    import cmd0.wrapper.xs
+    import cmd0.wrapper.ys
 
     val wrapper = new Helper
 
     final class Helper extends java.io.Serializable {
-      val act = withDefaultSparkSession(implicit spark => emma.onSpark {
-        DataBag(exp).collect()
+      val zs = withDefaultSparkSession(implicit spark => emma.onSpark {
+        xs union ys
       })
     }
 

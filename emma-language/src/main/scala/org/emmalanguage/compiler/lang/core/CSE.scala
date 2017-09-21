@@ -47,49 +47,60 @@ private[core] trait CSE extends Common {
      * @return The CSE transformation.
      */
     // FIXME: Is it possible to avoid explicit recursion?
-    def transform(revTab: Map[HKey, u.TermSymbol], aliases: Map[u.Symbol, u.Tree])
-      : u.Tree => u.Tree = api.TopDown.break.transform {
-        // Substitute aliases.
-        case core.Ref(target) if aliases contains target =>
-          aliases(target)
+    def transform(
+      revTab: Map[HKey, u.TermSymbol],
+      aliases: Map[u.Symbol, u.Tree]
+    ): u.Tree => u.Tree = api.TopDown.break.transform {
+      // Substitute aliases.
+      case core.Ref(target) if aliases contains target =>
+        aliases(target)
 
-        // Retain unique values, filter common subexpressions.
-        case core.Let(vals, defs, expr) =>
-          vals.foldLeft(revTab, aliases, Vector.empty[u.ValDef]) {
-            case ((tab, dict, uniq), value) => value match {
-              // Propagate copies.
-              case core.ValDef(x, rhs @ core.Ref(y)) =>
-                val alias = dict.getOrElse(y, rhs)
-                (tab, dict + (x -> alias), uniq)
+      // Retain unique values, filter common subexpressions.
+      case core.Let(vals, defs, expr) =>
+        vals.foldLeft(revTab, aliases, Vector.empty[u.ValDef]) {
+          case ((tab, dict, uniq), value) => value match {
+            // Propagate copies.
+            case core.ValDef(x, rhs @ core.Ref(y)) =>
+              val alias = dict.getOrElse(y, rhs)
+              (tab, dict + (x -> alias), uniq)
 
-              // Propagate constants.
-              case core.ValDef(x, core.Atomic(rhs)) =>
-                (tab, dict + (x -> rhs), uniq)
+            // Propagate constants.
+            case core.ValDef(x, core.Atomic(rhs)) =>
+              (tab, dict + (x -> rhs), uniq)
 
-              // Eliminate subexpressions.
-              case core.ValDef(x, rhs) =>
-                // Transform the RHS before hashing.
-                val xRhs = transform(tab, dict)(rhs)
-                val xVal = core.ValDef(x, xRhs)
-                val hKey = new HKey(hash(xRhs, dict), xVal)
-                tab.get(hKey) match {
-                  // Subexpression already seen, add new alias.
-                  case Some(y) => (tab, dict + (x -> core.ValRef(y)), uniq)
-                  // Subexpression unique, add new reverse table entry.
-                  case _ => (tab + (hKey -> x), dict, uniq :+ xVal)
-                }
-            }
-          } match { case (tab, dict, uniq) =>
-            // Transform the rest of the let block.
-            val xform = transform(tab, dict)
-            val xDefs = defs.map(xform).asInstanceOf[Seq[u.DefDef]]
-            core.Let(uniq, xDefs, xform(expr))
+            // Eliminate subexpressions.
+            case core.ValDef(x, rhs) =>
+              // Transform the RHS before hashing.
+              val xRhs = transform(tab, dict)(rhs)
+              val xVal = valDef(x, xRhs)(dict)
+              val hKey = new HKey(hash(xRhs, dict), xVal)
+              tab.get(hKey) match {
+                // Subexpression already seen, add new alias.
+                case Some(y) => (tab, dict + (x -> core.ValRef(y)), uniq)
+                // Subexpression unique, add new reverse table entry.
+                case _ => (tab + (hKey -> xVal.symbol.asTerm), dict, uniq :+ xVal)
+              }
           }
-      }.andThen(_.tree)
+        } match { case (tab, dict, uniq) =>
+          // Transform the rest of the let block.
+          val xform = transform(tab, dict)
+          val xDefs = defs.map(xform).asInstanceOf[Seq[u.DefDef]]
+          core.Let(uniq, xDefs, xform(expr))
+        }
+    } andThen (_.tree) andThen {
+      api.Tree.rename(for ((k, core.Ref(v)) <- aliases.toSeq) yield k -> v)
+    }
 
     // ---------------
     // Helper methods
     // ---------------
+
+    private def valDef(sym: u.TermSymbol, rhs: u.Tree)(aliases: Map[u.Symbol, u.Tree]): u.ValDef = {
+      val (from, to) = aliases.toList.map(kv => kv._1 -> kv._2.tpe).unzip
+      val tpe = sym.info.substituteTypes(from, to)
+      if (tpe == sym.info) core.ValDef(sym, rhs)
+      else core.ValDef(api.Sym.With(sym)(tpe = tpe), rhs)
+    }
 
     /** Hashes a `tree`, preserving alpha-equivalent `aliases`. */
     private def hash(tree: u.Tree, aliases: Map[u.Symbol, u.Tree]): Int =
