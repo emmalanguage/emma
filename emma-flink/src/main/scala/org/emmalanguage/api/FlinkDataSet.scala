@@ -265,15 +265,19 @@ object FlinkDataSet extends DataBagCompanion[FlinkEnv] {
 
   def empty[A: Meta](
     implicit flink: FlinkEnv
-  ): DataBag[A] = FlinkDataSet(flink.fromElements[A]())
+  ): DataBag[A] = FlinkDataSet(flink
+    .fromElements[A]())
 
   def apply[A: Meta](values: Seq[A])(
     implicit flink: FlinkEnv
-  ): DataBag[A] = FlinkDataSet(flink.fromCollection(values))
+  ): DataBag[A] = FlinkDataSet(flink
+    .fromCollection(values)
+    .setParallelism(flink.getParallelism))
 
   def readText(path: String)(
     implicit flink: FlinkEnv
-  ): DataBag[String] = FlinkDataSet(flink.readTextFile(path))
+  ): DataBag[String] = FlinkDataSet(flink
+    .readTextFile(path))
 
   def readCSV[A: Meta : CSVConverter](path: String, format: CSV)(
     implicit flink: FlinkEnv
