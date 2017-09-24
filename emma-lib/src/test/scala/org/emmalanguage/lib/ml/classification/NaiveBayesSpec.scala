@@ -38,7 +38,7 @@ class NaiveBayesSpec extends BaseLibSpec with BeforeAndAfter {
     file <- Seq("vote.csv", "model.txt")
   } yield () => materializeResource(s"$path/$file"): Unit
 
-  it should "create the correct model on Bernoulli house-votes-84 data set" in {
+  "naiveBayes" should "create the correct model on Bernoulli house-votes-84 data set" in {
     val expectedModel = for {
       line <- Source.fromFile(s"$temp/model.txt").getLines().toSet[String]
     } yield {

@@ -51,19 +51,19 @@ class EvalSpec extends lib.BaseLibSpec {
     LDPoint(i, dense(Array(x, y)), y >= 0.5)
   }
 
-  it should "compute precision" in {
+  "eval.precision" should "compute correct results" in {
     val act = actPrecision(h, ps)
     val exp = expPrecision(ps)
     act shouldEqual (exp +- e)
   }
 
-  it should "compute recall" in {
+  "eval.recall" should "compute correct results" in {
     val act = actRecall(h, ps)
     val exp = expRecall(ps)
     act shouldEqual (exp +- e)
   }
 
-  it should "compute f1score" in {
+  "eval.f1score" should "compute correct results" in {
     val act = actF1Score(h, ps)
     val exp = expF1Score(ps)
     act shouldEqual (exp +- e)

@@ -21,7 +21,7 @@ import lib.BaseLibSpec
 class MurmurHashSpec extends BaseLibSpec {
   val hasher = new MurmurHash(0)
 
-  it should "hash integer values" in {
+  "MurmurHash" should "hash integer values" in {
     hasher.hashInt(0) shouldBe 593689054
     hasher.hashInt(-42) shouldBe -189366624
     hasher.hashInt(42) shouldBe -1134849565

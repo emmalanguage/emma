@@ -30,13 +30,13 @@ class KFoldSpec extends BaseLibSpec {
   val xs = (1 to N).map(i =>LDPoint(i, dense(Array(i.toDouble)), i))
   val fs = Seq(0.3, 0.2, 0.5)
 
-  it should "returns the same assignment with a matching pdf and seed" in {
+  "kfold.split" should "return the same assignment with a matching pdf and seed" in {
     val rs1 = split(fs, s1, xs)
     val rs2 = split(fs, s1, xs)
     rs1 should contain theSameElementsAs rs2
   }
 
-  it should "assigns folds proportionally to PDF" in {
+  it should "assign folds proportionally to PDF" in {
     val rm1 = splitAndCount(fs, s1, xs)
     val rm2 = splitAndCount(fs, s2, xs)
     for ((p, i) <- fs.zipWithIndex) {
@@ -45,7 +45,7 @@ class KFoldSpec extends BaseLibSpec {
     }
   }
 
-  it should "produces non-overlapping folds" in {
+  it should "compute non-overlapping folds" in {
     val rs1 = splitAndProject(fs, s1, xs)
     val rs2 = splitAndProject(fs, s1, xs)
     for ((us, vs) <- rs1) {

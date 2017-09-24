@@ -36,7 +36,7 @@ trait TransitiveClosureSpec extends lib.BaseLibSpec {
     () => generateInput(s"$temp/edges.tsv"): Unit
   )
 
-  it should "compute the transitive closure of a directed graph" in {
+  "transitiveClosure" should "compute correct results" in {
     val act = run(s"$temp/edges.tsv", CSV())
     val exp = expectedClosure()
 

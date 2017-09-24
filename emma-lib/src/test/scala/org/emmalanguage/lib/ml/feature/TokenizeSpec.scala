@@ -21,7 +21,7 @@ import lib.ml.FPoint
 
 class TokenizeSpec extends FeatureSpec {
 
-  it should "tokenize gaps" in {
+  "tokenize.gaps" should "compute correct results" in {
     val exp = for {
       (f, i) <- tokenss.zipWithIndex
     } yield FPoint(i, f.map(_.toLowerCase).toSeq)
@@ -29,7 +29,7 @@ class TokenizeSpec extends FeatureSpec {
     act shouldEqual exp
   }
 
-  it should "tokenize tokens" in {
+  "tokenize.words" should "compute correct results" in {
     val exp = for {
       (f, i) <- tokenss.zipWithIndex
     } yield FPoint(i, f.map(_.toLowerCase).toSeq)

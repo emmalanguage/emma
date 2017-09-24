@@ -47,7 +47,7 @@ class LogRegSpec extends lib.BaseLibSpec {
     LDPoint(i, dense(Array(1.0, x)), if (x > 0.0) +1.0 else -1.0)
   }
 
-  "Logistic Regression" should "seperate two classes correctly" in {
+  "logreg.train" should "seperate two classes correctly" in {
     val model = run(instances)(weights, seed)
 
     val mispredicted = instances.map(x => {

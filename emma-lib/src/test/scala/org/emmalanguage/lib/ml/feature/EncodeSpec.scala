@@ -40,26 +40,26 @@ class EncodeSpec extends FeatureSpec {
     }
   }
 
-  it should "encode frequencies with a hash function" in {
+  "encode.freq" should "compute corred results with a hash function" in {
     val exp = expHash(false)
     val act = freq(tokenss.zipWithIndex)
     act.shouldEqual(exp)(SeqSPointIntEquality)
   }
 
-  it should "encode frequencies with a dictionary" in {
+  it should "compute corred results with a dictionary" in {
     val dic = dict(tokenss)
     val exp = expDict(dic, false)
     val act = freq(dic, tokenss.zipWithIndex)
     act shouldEqual exp
   }
 
-  it should "encode binary with a hash function" in {
+  "encode.bin" should "compute corred results with a hash function" in {
     val exp = expHash(true)
     val act = bin(tokenss.zipWithIndex)
     act shouldEqual exp
   }
 
-  it should "encode binary with a dictionary" in {
+  it should "compute corred results with a dictionary" in {
     val dic = dict(tokenss)
     val exp = expDict(dic, true)
     val act = bin(dic, tokenss.zipWithIndex)

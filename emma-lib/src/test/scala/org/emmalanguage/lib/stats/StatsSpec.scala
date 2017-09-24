@@ -32,7 +32,7 @@ class StatsSpec extends FeatureSpec {
     rows.map(row => dense(row))
   }
 
-  it should "compute basic stats" in {
+  "summarize" should "compute correct basic stats" in {
     val (act1, act2, act3, act4) = basic(seq1)
 
     val (exp1, exp2, exp3, exp4) = (
@@ -48,7 +48,7 @@ class StatsSpec extends FeatureSpec {
     act4 shouldEqual exp4
   }
 
-  it should "compute moments" in {
+  it should "compute correct moments" in {
     val (act1, act2, act3) = moments(seq1)
 
     val (exp1, exp2, exp3) = (
