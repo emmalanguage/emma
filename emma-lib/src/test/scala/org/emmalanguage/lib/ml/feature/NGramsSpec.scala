@@ -25,7 +25,7 @@ class NGramsSpec extends FeatureSpec {
 
   val `3-grams` = tokenss.map(_.sliding(3).map(_.mkString(" ")).toArray)
 
-  it should "build 2-grams" in {
+  "nGrams" should "compute correct 2-grams" in {
     val exp = for {
       (f, i) <- `2-grams`.zipWithIndex
     } yield FPoint(i, f.toSeq)
@@ -33,7 +33,7 @@ class NGramsSpec extends FeatureSpec {
     act.toList shouldEqual exp.toList
   }
 
-  it should "build 3-grams" in {
+  it should "compute correct 3-grams" in {
     val exp = for {
       (f, i) <- `3-grams`.zipWithIndex
     } yield FPoint(i, f.toSeq)

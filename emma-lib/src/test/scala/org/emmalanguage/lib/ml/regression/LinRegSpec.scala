@@ -48,7 +48,7 @@ class LinRegSpec extends lib.BaseLibSpec {
     LDPoint(i, dense(Array(1.0, x)), -7.0 + 3.0 * x)
   }
 
-  "Linear Regression" should "fit a linear function correctly" in {
+  "logreg.train" should "fit a linear function correctly" in {
     val exp = solve(instances)
     val act = run(instances)(weights, seed)
 
