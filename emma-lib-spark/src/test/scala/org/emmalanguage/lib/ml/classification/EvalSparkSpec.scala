@@ -16,7 +16,6 @@
 package org.emmalanguage
 package lib.ml.classification
 
-//import api.Meta.Projections._
 import api._
 import lib.linalg._
 

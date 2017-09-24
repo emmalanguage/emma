@@ -16,7 +16,6 @@
 package org.emmalanguage
 package compiler.integration.graphs
 
-//import api.Meta.Projections._
 import api._
 import compiler.integration.BaseCompilerIntegrationSpec
 import compiler.ir.ComprehensionSyntax._

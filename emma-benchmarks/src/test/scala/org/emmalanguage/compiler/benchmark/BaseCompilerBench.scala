@@ -16,7 +16,6 @@
 package org.emmalanguage
 package compiler.benchmark
 
-//import api.Meta.Projections._
 import api._
 import compiler.RuntimeCompiler
 import examples.graphs._
