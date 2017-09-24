@@ -66,16 +66,17 @@ private[comprehension] trait ReDeSugar extends Common {
         arg -> core.DefCall(tgt, app, argss = Seq(Seq(core.ValRef(arg))))
       }
 
-      api.TopDown.withOwner.accumulate(Attr.group {
+      api.BottomUp.withOwner.accumulate(Attr.group {
         // Accumulate a LHS -> (arg, body) Map from lambdas
         case core.ValDef(lhs, core.Lambda(_, Seq(core.ParDef(arg, _)), body)) =>
           lhs -> (arg, body)
       })(overwrite).transformWith { // Re-sugar comprehensions
         case Attr(cs.Map(xs, core.Ref(f)), lambdas :: _, owner :: _, _) =>
           val (sym, body) = lookup(f, owner, lambdas)
-          cs.Comprehension(Seq(
-            cs.Generator(sym, asLet(xs))),
-            cs.Head(asLet(body)))
+          api.Owner.at(owner)(
+            cs.Comprehension(Seq(
+              cs.Generator(sym, asLet(xs))),
+              cs.Head(asLet(body))))
 
         case Attr(cs.FlatMap(xs, core.Ref(f)), lambdas :: _, owner :: _, _) =>
           val (sym1, body1) = lookup(f, owner, lambdas)
@@ -85,18 +86,20 @@ private[comprehension] trait ReDeSugar extends Common {
             val sym = api.TermSym(sym1.owner, nme, tpe)
             sym -> core.Ref(sym)
           }
-          cs.Comprehension(Seq(
-            cs.Generator(sym1, asLet(xs)),
-            cs.Generator(sym2, asLet(body1))),
-            cs.Head(asLet(body2)))
+          api.Owner.at(owner)(
+            cs.Comprehension(Seq(
+              cs.Generator(sym1, asLet(xs)),
+              cs.Generator(sym2, asLet(body1))),
+              cs.Head(asLet(body2))))
 
         case Attr(cs.WithFilter(xs, core.Ref(p)), lambdas :: _, owner :: _, _) =>
           val (sym, body) = lookup(p, owner, lambdas)
-          cs.Comprehension(Seq(
-            cs.Generator(sym, asLet(xs)),
-            cs.Guard(asLet(body))),
-            cs.Head(core.Let(expr = core.Ref(sym))))
-      }.andThen(_.tree).andThen(Core.dce)
+          api.Owner.at(owner)(
+            cs.Comprehension(Seq(
+              cs.Generator(sym, asLet(xs)),
+              cs.Guard(asLet(body))),
+              cs.Head(core.Let(expr = core.Ref(sym)))))
+      }._tree andThen Core.dce
     }
 
     /**
