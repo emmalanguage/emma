@@ -16,7 +16,6 @@
 package org.emmalanguage
 package api
 
-//import api.Meta.Projections._
 
 import scala.collection.breakOut
 
