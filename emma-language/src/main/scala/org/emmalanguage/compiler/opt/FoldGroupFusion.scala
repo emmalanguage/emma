@@ -81,7 +81,7 @@ private[compiler] trait FoldGroupFusion extends Common {
      *   }
      * }}}
      */
-    lazy val foldGroupFusion: u.Tree => u.Tree = tree => {
+    lazy val foldGroupFusion: TreeTransform = TreeTransform("FoldGroupFusion.foldGroupFusion", tree => {
       val cfg = ControlFlow.cfg(tree)
       val dat = cfg.data
       val nst = cfg.nest.tclose
@@ -165,7 +165,7 @@ private[compiler] trait FoldGroupFusion extends Common {
           val mat = gMap(sym)
           core.Ref(mat.gNew)
       })._tree(tree)
-    }
+    })
 
     private val ordTermSymbol = Ordering.by((s: u.TermSymbol) => s.name.toString)
 

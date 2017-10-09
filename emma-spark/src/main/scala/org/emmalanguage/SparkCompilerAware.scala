@@ -31,6 +31,6 @@ trait SparkCompilerAware extends RuntimeCompilerAware {
 
   def Env: u.Type = SparkAPI.SparkSession
 
-  def transformations(cfg: Config): Seq[u.Tree => u.Tree] =
+  def transformations(cfg: Config): Seq[TreeTransform] =
     compiler.transformations(cfg)
 }

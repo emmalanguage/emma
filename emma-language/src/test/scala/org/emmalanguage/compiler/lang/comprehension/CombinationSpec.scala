@@ -43,7 +43,7 @@ class CombinationSpec extends BaseCompilerSpec {
   val combine: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lnf,
-      tree => time(Comprehension.combine(tree), "combine"),
+      (tree: u.Tree) => time(Comprehension.combine(tree), Comprehension.combine.name),
       Core.unnest
     ).compose(_.tree)
 
@@ -54,7 +54,7 @@ class CombinationSpec extends BaseCompilerSpec {
 
     pipeline(typeCheck = true)(
       Core.lnf,
-      tree => time(transform(tree), "match rule"),
+      (tree: u.Tree) => time(transform(tree), "match rule"),
       Core.unnest
     ).compose(_.tree)
   }

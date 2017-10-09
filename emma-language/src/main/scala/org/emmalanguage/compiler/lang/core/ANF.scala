@@ -35,7 +35,7 @@ private[core] trait ANF extends Common {
   private[core] object ANF {
 
     /** The ANF transformation. */
-    private lazy val anf: u.Tree => u.Tree =
+    private lazy val anf: TreeTransform = TreeTransform("ANF.anf",
       api.BottomUp.withParent.withOwner.transformWith {
         // lit | this | x
         case Attr.inh(src.Atomic(atom), _ :: parent :: _) => parent.collect {
@@ -155,7 +155,7 @@ private[core] trait ANF extends Common {
           }
 
           src.Block(stats ++ inner, expr)
-      }._tree.andThen(api.Owner.atEncl)
+      }._tree.andThen(api.Owner.atEncl))
 
     /**
      * Converts a tree into administrative normal form (ANF).
@@ -168,7 +168,7 @@ private[core] trait ANF extends Common {
      *
      * @return An ANF version of the input tree.
      */
-    lazy val transform: u.Tree => u.Tree =
+    lazy val transform: TreeTransform =
       resolveNameClashes andThen anf
 
     /**
@@ -180,7 +180,7 @@ private[core] trait ANF extends Common {
      * == Postconditions ==
      * - An ANF tree where all nested blocks have been flattened.
      */
-    lazy val unnest: u.Tree => u.Tree =
+    lazy val unnest: TreeTransform = TreeTransform("ANF.unnest",
       api.BottomUp.transform {
         case parent @ core.Let(vals, defs, expr) if hasNestedLets(parent) =>
           // Flatten nested let expressions in value position without control flow.
@@ -208,7 +208,7 @@ private[core] trait ANF extends Common {
 
           val (trimmedVals, trimmedExpr) = trimVals(flatVals ++ exprVals, flatExpr)
           core.Let(trimmedVals, flatDefs, trimmedExpr)
-      }._tree.andThen(api.Owner.atEncl)
+      }._tree.andThen(api.Owner.atEncl))
 
     // ---------------
     // Helper methods

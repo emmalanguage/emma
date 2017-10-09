@@ -52,7 +52,7 @@ trait Compiler extends AlphaEq
   /** Implicit types to be removed */
   lazy val implicitTypes: Set[u.Type] = API.implicitTypes
 
-  lazy val preProcess: Seq[u.Tree => u.Tree] = Seq(
+  lazy val preProcess: Seq[TreeTransform] = Seq(
     Source.removeImplicits(implicitTypes),
     fixSymbolTypes,
     stubTypeTrees,
@@ -61,8 +61,8 @@ trait Compiler extends AlphaEq
     Source.normalize
   )
 
-  lazy val postProcess: Seq[u.Tree => u.Tree] = Seq(
-    api.Owner.atEncl,
+  lazy val postProcess: Seq[TreeTransform] = Seq(
+    TreeTransform("api.Owner.atEncl", api.Owner.atEncl),
     qualifyStatics,
     restoreTypeTrees
   )
@@ -70,39 +70,39 @@ trait Compiler extends AlphaEq
   def pipeline(
     typeCheck: Boolean = false, withPre: Boolean = true, withPost: Boolean = true
   )(
-    transformations: (u.Tree => u.Tree)*
+    transformations: TreeTransform*
   ): u.Tree => u.Tree = {
 
-    val bld = Seq.newBuilder[u.Tree => u.Tree]
+    val bld = Seq.newBuilder[TreeTransform]
     //@formatter:off
-    if (typeCheck) bld += { this.typeCheck(_) }
+    if (typeCheck) bld += TreeTransform("Compiler.typeCheck", (tree: u.Tree) => this.typeCheck(tree))
     if (withPre)   bld ++= preProcess
     bld ++= transformations
     if (withPost)  bld ++= postProcess
     //@formatter:on
     val steps = bld.result()
 
-    if (!printAllTrees) Function.chain(steps)
-    else Function.chain(List(print) ++ steps.flatMap(List(_, print)))
+    if (!printAllTrees) Function.chain(steps.map(_.xfrm))
+    else Function.chain(List(print) ++ steps.map(tt => executeAndPrintTransform(tt)))
   }
 
-  implicit class TransformationOps(xfrm: u.Tree => u.Tree) {
+  implicit class TransformationOps(xfrm: TreeTransform) {
     def iff(k: String)(implicit cfg: Config): Is =
       new Is(k)
 
     class Is(k: String)(implicit cfg: Config) {
-      def is(v: Boolean): u.Tree => u.Tree =
+      def is(v: Boolean): TreeTransform =
         if (cfg.getBoolean(k) == v) xfrm
         else noop
 
-      def is(v: String): u.Tree => u.Tree =
+      def is(v: String): TreeTransform =
         if (cfg.getString(k) == v) xfrm
         else noop
     }
 
   }
 
-  val noop: u.Tree => u.Tree = Predef.identity[u.Tree]
+  val noop: TreeTransform = TreeTransform("Predef.identity", Predef.identity[u.Tree] _)
 
   // Turn this on to print the tree between every step in the pipeline (also before the first and after the last step).
   val printAllTrees = false
@@ -113,6 +113,18 @@ trait Compiler extends AlphaEq
       println(u.showCode(tree))
       println("=============================")
       tree
+    }
+  }
+
+  def executeAndPrintTransform(tt: TreeTransform): u.Tree => u.Tree = {
+    (tree: u.Tree) => {
+      val res = tt(tree)
+      println()
+      println("Transformation: " + tt.name)
+      println("=============================")
+      println(u.showCode(res))
+      println("=============================")
+      res
     }
   }
 

@@ -38,7 +38,7 @@ private[core] trait DCE extends Common {
      * == Postconditions ==
      * - All unused value definitions are pruned.
      */
-    lazy val transform: u.Tree => u.Tree =
+    lazy val transform: TreeTransform = TreeTransform("DCE.transform",
       api.BottomUp.withDefCalls.withValUses.transformSyn {
         case Attr(let @ core.Let(vals, defs, expr), _, _, syn) =>
           def refs(tree: u.Tree) = syn(tree).head.keySet
@@ -71,7 +71,7 @@ private[core] trait DCE extends Common {
           val liveVals = vals.filter(liveRefs.compose(_.symbol.asTerm))
           if (liveVals.size == vals.size && liveDefs.size == defs.size) let
           else core.Let(liveVals, liveDefs, expr)
-      }.andThen(_.tree)
+      }.andThen(_.tree))
 
     private def maybeMutable(method: u.MethodSymbol): Boolean = {
       method.returnType =:= api.Type[Unit]

@@ -28,10 +28,10 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
   import compiler._
   import u.reify
 
-  def testPipeline(prefix: u.Tree => u.Tree): u.Tree => u.Tree =
+  def testPipeline(prefix: TreeTransform): u.Tree => u.Tree =
     pipeline(typeCheck = true)(
       prefix,
-      tree =>time(FoldForestFusion.foldForestFusion(tree), "foldForestFusion")
+      (tree: u.Tree) =>time(FoldForestFusion.foldForestFusion(tree), FoldForestFusion.foldForestFusion.name)
     )
 
   val anfPipeline: u.Expr[Any] => u.Tree =

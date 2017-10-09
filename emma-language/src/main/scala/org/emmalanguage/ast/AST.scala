@@ -59,21 +59,21 @@ trait AST extends CommonAST
    * Populates the missing types of lambda symbols in a tree.
    * WARN: Mutates the symbol table in place.
    */
-  lazy val fixSymbolTypes = api.TopDown.traverse {
+  lazy val fixSymbolTypes = TreeTransform("AST.fixSymbolTypes", api.TopDown.traverse {
     case lambda @ api.Lambda(fun, _, _) =>
       setInfo(fun, lambda.tpe)
     case api.DefDef(method, tparams, paramss, _) =>
       val pss = paramss.map(_.map(_.symbol.asTerm))
       val res = method.info.finalResultType
       setInfo(method, api.Type.method(tparams, pss, res))
-  }.andThen(_.tree)
+  }.andThen(_.tree))
 
   /**
    * Replaces [[u.TypeTree]]s that have their `original` field set with stubs that only have their
    * `tpe` field set to the corresponding type. Type-trees of `val/var`s are left empty for the
    * compiler to infer.
    */
-  lazy val stubTypeTrees = api.TopDown.break
+  lazy val stubTypeTrees = TreeTransform("AST.stubTypeTrees", api.TopDown.break
     .withParent.transformWith {
       // Leave `val/var` types to be inferred by the compiler.
       case Attr.inh(api.TypeQuote(tpe), Some(api.BindingDef(lhs, rhs)) :: _)
@@ -81,12 +81,12 @@ trait AST extends CommonAST
         api.TypeQuote.empty
       case Attr.none(api.TypeQuote(tpe)) =>
         api.TypeQuote(tpe)
-    }.andThen(_.tree)
+    }.andThen(_.tree))
 
   /** Restores [[u.TypeTree]]s with their `original` field set. */
-  lazy val restoreTypeTrees = api.TopDown.break.transform {
+  lazy val restoreTypeTrees = TreeTransform("AST.restoreTypeTrees", api.TopDown.break.transform {
     case api.TypeQuote(tpe) => api.Type.tree(tpe)
-  }.andThen(_.tree)
+  }.andThen(_.tree))
 
   /**
    * Rewrites `A.this.x` as `x` if `A` is shadowed another symbol in the owner chain.
@@ -102,7 +102,7 @@ trait AST extends CommonAST
    * }
    * }}}
    */
-  lazy val removeShadowedThis =
+  lazy val removeShadowedThis = TreeTransform("AST.removeShadowedThis",
     if (shadowedOwners.isEmpty) identity[u.Tree] _
     else api.TopDown.transform {
       case api.BindingDef(x, api.Sel(api.This(encl), member))
@@ -111,14 +111,14 @@ trait AST extends CommonAST
         api.BindingDef(x, api.Id(member))
       case api.Sel(api.This(encl), member)
         if shadowedOwners(encl) => api.Id(member)
-    }.andThen(_.tree)
+    }.andThen(_.tree))
 
   /** Computes a set of owners whose name is shadowed in the current scope. */
   lazy val shadowedOwners = api.Owner.chain(api.Owner.encl)
     .filter(_.isClass).groupBy(_.name).values.flatMap(_.tail).toSet
 
   /** Normalizes all statements in term position by wrapping them in a block. */
-  lazy val normalizeStatements = {
+  lazy val normalizeStatements = TreeTransform("AST.normalizeStatements", {
     def isStat(tree: u.Tree) = tree match {
       case api.VarMut(_, _) => true
       case api.Loop(_, _)   => true
@@ -143,23 +143,23 @@ trait AST extends CommonAST
       case Attr.none(api.DoWhileBody(lbl, cond, stat)) =>
         api.DoWhileBody(lbl, cond, api.Block(Seq(stat)))
     }.andThen(_.tree)
-  }
+  })
 
   /** Removes the qualifiers from references to static symbols. */
-  lazy val unQualifyStatics = api.TopDown.break.transform {
+  lazy val unQualifyStatics = TreeTransform("AST.unQualifyStatics", api.TopDown.break.transform {
     case api.Sel(_, member) if member.isStatic && (member.isClass || member.isModule) =>
       api.Id(member)
-  }.andThen(_.tree)
+  }.andThen(_.tree))
 
   /** Fully qualifies references to static symbols. */
-  lazy val qualifyStatics = api.TopDown.break.transform {
+  lazy val qualifyStatics = TreeTransform("AST.qualifyStatics", api.TopDown.break.transform {
     case api.Ref(target) if target.isStatic && (target.isClass || target.isModule) =>
       api.Tree.resolveStatic(target)
-  }.andThen(_.tree)
+  }.andThen(_.tree))
 
   /** Ensures that all definitions within `tree` have unique names. */
-  lazy val resolveNameClashes: u.Tree => u.Tree =
-    tree => api.Tree.refresh(nameClashes(tree))(tree)
+  lazy val resolveNameClashes = TreeTransform("AST.resolveNameClashes",
+    tree => api.Tree.refresh(nameClashes(tree))(tree))
 
   /**
    * Prints `tree` for debugging.

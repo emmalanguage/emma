@@ -27,7 +27,7 @@ class FoldGroupFusionSpec extends BaseCompilerSpec {
   val testPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lift,
-      tree => time(FoldGroupFusion.foldGroupFusion(tree), "foldGroupFusion")
+      (tree: u.Tree) => time(FoldGroupFusion.foldGroupFusion(tree), FoldGroupFusion.foldGroupFusion.name)
     ) compose (_.tree)
 
   lazy val liftPipeline: u.Expr[Any] => u.Tree = {

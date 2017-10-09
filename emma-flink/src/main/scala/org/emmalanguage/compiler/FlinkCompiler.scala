@@ -33,13 +33,13 @@ trait FlinkCompiler extends Compiler
   import UniverseImplicits._
 
   /** Prepends `memoizeTypeInfo` calls for `TypeInformation[T]` instances requried in the given `tree`. */
-  def prependMemoizeTypeInfoCalls(tree: u.Tree): u.Tree = {
+  lazy val prependMemoizeTypeInfoCalls = TreeTransform("FlinkCompiler.prependMemoizeTypeInfoCalls", tree => {
     val pref = memoizeTypeInfoCalls(tree)
     tree match {
       case api.Block(stats, expr) => api.Block(pref ++ stats, expr)
       case _ => api.Block(pref, tree)
     }
-  }
+  })
 
   /** Generates `FlinkDataSet.memoizeTypeInfo[T]` calls for all required types `T` in the given `tree`. */
   def memoizeTypeInfoCalls(tree: u.Tree): Seq[u.Tree] = {
@@ -105,7 +105,7 @@ trait FlinkCompiler extends Compiler
     }
   }
 
-  def transformations(implicit cfg: Config): Seq[u.Tree => u.Tree] = Seq(
+  def transformations(implicit cfg: Config): Seq[TreeTransform] = Seq(
     // lifting
     Lib.expand,
     Core.lift,
@@ -122,7 +122,7 @@ trait FlinkCompiler extends Compiler
     Core.trampoline iff "emma.compiler.lower" is "trampoline",
     Core.dscfInv iff "emma.compiler.lower" is "dscfInv",
     removeShadowedThis,
-    prependMemoizeTypeInfoCalls _
+    prependMemoizeTypeInfoCalls
   ) filterNot (_ == noop)
 
   trait NtvAPI extends ModuleAPI {

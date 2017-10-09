@@ -37,7 +37,7 @@ class SparkSpecializeOpsSpec extends BaseCompilerSpec with SparkAware {
 
   lazy val testPipeline: u.Expr[Any] => u.Tree =
     pipeline(true)(Core.dscf,
-      tree => time(SparkSpecializeOps.specializeOps(tree), "specializeOps")
+      (tree: u.Tree) => time(SparkSpecializeOps.specializeOps(tree), SparkSpecializeOps.specializeOps.name)
     ).compose(_.tree)
 
   lazy val dscfPipeline: u.Expr[Any] => u.Tree =

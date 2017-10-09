@@ -57,7 +57,7 @@ private[compiler] trait SparkBackend extends Compiler {
     } yield srcOp -> tgtOp) (breakOut): Map[u.MethodSymbol, u.MethodSymbol]
 
     /** Specialize backend for Spark. */
-    val transform: u.Tree => u.Tree = tree => {
+    val transform: TreeTransform = TreeTransform("SparkBackend.transform", tree => {
       val G = ControlFlow.cfg(tree)
       val C = Context.bCtxGraph(G)
 
@@ -144,7 +144,7 @@ private[compiler] trait SparkBackend extends Compiler {
             else pref :+ api.Tree.rename(bcMap(lhs))(value).asInstanceOf[u.ValDef]
           }, defs, expr)
       })._tree(tree)
-    }
+    })
   }
 
 }

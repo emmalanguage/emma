@@ -50,7 +50,7 @@ private[core] trait CSE extends Common {
     def transform(
       revTab: Map[HKey, u.TermSymbol],
       aliases: Map[u.Symbol, u.Tree]
-    ): u.Tree => u.Tree = api.TopDown.break.transform {
+    ): TreeTransform = TreeTransform("CSE.transform", api.TopDown.break.transform {
       // Substitute aliases.
       case core.Ref(target) if aliases contains target =>
         aliases(target)
@@ -89,7 +89,7 @@ private[core] trait CSE extends Common {
         }
     } andThen (_.tree) andThen {
       api.Tree.rename(for ((k, core.Ref(v)) <- aliases.toSeq) yield k -> v)
-    }
+    })
 
     // ---------------
     // Helper methods

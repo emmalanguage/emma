@@ -19,6 +19,7 @@ package ast
 import scala.reflect.ClassTag
 import scala.reflect.api.Universe
 import scala.reflect.macros.Attachments
+import scala.language.implicitConversions
 
 /**
  * Implements various utility functions that mitigate and/or workaround deficiencies in Scala's
@@ -388,5 +389,28 @@ trait CommonAST {
   trait Node {
     override def toString: String =
       getClass.getSimpleName.dropRight(1)
+  }
+
+  // ----------------------------------------------------------------------------------------------
+  // Transformations
+  // ----------------------------------------------------------------------------------------------
+
+  class TreeTransform(val name: String, val xfrm: (u.Tree => u.Tree)) extends (u.Tree => u.Tree) {
+    def apply(tree: u.Tree): u.Tree =
+      xfrm(tree)
+
+    def andThen(that: TreeTransform): TreeTransform =
+      new TreeTransform(s"${this.name} · ${that.name}", tree => that(this (tree)))
+
+    def compose(that: TreeTransform): TreeTransform =
+      new TreeTransform(s"${that.name} · ${this.name}", tree => this (that(tree)))
+  }
+
+  object TreeTransform {
+    def apply(name: String, xfrm: (u.Tree => u.Tree)): TreeTransform =
+      new TreeTransform(name, xfrm)
+
+    implicit def apply(tt: (u.Tree => u.Tree)): TreeTransform =
+      new TreeTransform("anonymous", tt)
   }
 }

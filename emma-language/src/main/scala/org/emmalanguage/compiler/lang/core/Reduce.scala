@@ -49,9 +49,11 @@ private[core] trait Reduce extends Common {
      * == Postconditions ==
      * - All unused value definitions are pruned.
      */
-    lazy val transform: u.Tree => u.Tree = fixInlineLambdas _ andThen inlineTrivialValDefs
+    lazy val transform: TreeTransform =
+      TreeTransform("Reduce.fixInlineLambdas", (tree: u.Tree) => fixInlineLambdas(tree)) andThen
+      inlineTrivialValDefs
 
-    private lazy val inlineTrivialValDefs: u.Tree => u.Tree =
+    private lazy val inlineTrivialValDefs: TreeTransform = TreeTransform("Reduce.inlineTrivialValDefs",
       api.BottomUp.inherit({ // accumulate trivial ValDef bindings in scope
         case core.Let(vals, _, _) =>
           vals.foldLeft(Map.empty[u.Symbol, u.Tree])((valDefs, valDef) => valDef match {
@@ -67,7 +69,7 @@ private[core] trait Reduce extends Common {
             case core.Atomic(_) => false
             case _ => true
           }), defs, expr)
-      })._tree
+      })._tree)
 
     /** Merges two closed trivial ValDef maps preserving the closure. */
     private def mclose: Monoid[ValDefs] = new Monoid[ValDefs] {

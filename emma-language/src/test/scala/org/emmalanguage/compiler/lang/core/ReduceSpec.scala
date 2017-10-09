@@ -32,7 +32,7 @@ class ReduceSpec extends BaseCompilerSpec {
   val actPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lift,
-      tree => time(Reduce.transform(tree), "transform")
+      (tree: u.Tree) => time(Reduce.transform(tree), Reduce.transform.name)
     ).compose(_.tree)
 
   "propagates trivial value definitions" in {

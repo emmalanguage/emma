@@ -53,7 +53,7 @@ private[source] trait PatternMatching extends Common {
      *   }
      * }}}
      */
-    lazy val destruct: u.Tree => u.Tree =
+    lazy val destruct: TreeTransform = TreeTransform("PatternMatching.destruct",
       api.BottomUp.withOwner.transformWith {
         case Attr.inh(
           mat @ src.PatMat(target, Seq(src.PatCase(pat, src.Empty(_), body), _*)),
@@ -79,7 +79,7 @@ private[source] trait PatternMatching extends Common {
               assert(vals.isDefined, s"Unsupported refutable pattern matching:\n${api.Tree.show(mat)}")
               src.Block(src.ValDef(lhs, unascr) +: vals.get, body)
           }
-      }.andThen(_.tree)
+      }.andThen(_.tree))
 
     /**
      * Tests if `pattern` is irrefutable for the given selector, i.e. if it always matches. If it

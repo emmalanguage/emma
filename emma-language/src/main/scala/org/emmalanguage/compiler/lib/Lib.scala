@@ -37,8 +37,8 @@ private[compiler] trait Lib extends Common {
     // API
     // -------------------------------------------------------------------------
 
-    lazy val expand: u.Tree => u.Tree = tree =>
-      doExpand(tree, api.Owner.encl, Nil)
+    lazy val expand: TreeTransform = TreeTransform("Lib.expand",
+      tree => doExpand(tree, api.Owner.encl, Nil))
 
     // -------------------------------------------------------------------------
     // Helper methods & objects
@@ -169,7 +169,8 @@ private[compiler] trait Lib extends Common {
             // evaluate `objSym.fldSym` and grab the DefDef source
             val src = eval[String](sel)
             // parse the source and grab the DefDef AST
-            parse(Seq(_.collect(extractDef).head, fixDefDefSymbols(sym)))(src)
+            parse(Seq(TreeTransform("Lib.getOrLoad/collect(Lib.extractDef)", _.collect(extractDef).head),
+              TreeTransform("Lib.fixDefDefSymbols", fixDefDefSymbols(sym))))(src)
         }.collectFirst(extractDef)
       case _ =>
         None
@@ -181,7 +182,7 @@ private[compiler] trait Lib extends Common {
     }
 
     /** Parses a DefDef AST from a string. */
-    private val parse = (transformations: Seq[u.Tree => u.Tree]) =>
+    private val parse = (transformations: Seq[TreeTransform]) =>
       pipeline(typeCheck = true, withPost = false)(
         transformations: _*
       ).compose(self.parse)

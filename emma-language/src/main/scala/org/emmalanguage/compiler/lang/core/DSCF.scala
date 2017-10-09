@@ -104,7 +104,7 @@ private[core] trait DSCF extends Common {
       Ordering.by(_.name.toString)
 
     /** The Direct-Style Control-Flow (DSCF) transformation. */
-    lazy val transform: u.Tree => u.Tree = api.TopDown
+    lazy val transform: TreeTransform = TreeTransform("DSCF.transform", api.TopDown
       .withBindUses.withVarDefs.withOwnerChain
       .synthesize(Attr.collect[SortedSet, u.TermSymbol] {
         // Collect all variable assignments in a set sorted by name.
@@ -230,10 +230,10 @@ private[core] trait DSCF extends Common {
                       els = core.DefCall(None, suffMeth, argss = noArgs)))),
                 loopCall)
           }
-      }._tree
+    }._tree)
 
     /** The Direct-Style Control-Flow (DSCF) inverse transformation. */
-    lazy val inverse: u.Tree => u.Tree = (tree: u.Tree) => {
+    lazy val inverse: TreeTransform = TreeTransform("DSCF.inverse", tree => {
       // construct dataflow graph
       val cfg = ControlFlow.cfg(tree)
       // construct transitive closure of nesting graph
@@ -584,7 +584,7 @@ private[core] trait DSCF extends Common {
             suff.expr)
 
       }._tree.andThen(api.Tree.rename(varOf.toSeq))(tree)
-    }
+    })
 
     /** Applies `f` to the deepest suffix (i.e. without control flow) in a let block. */
     def mapSuffix(let: u.Block, res: Option[u.Type] = None)

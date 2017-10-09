@@ -33,8 +33,8 @@ class QuoteMacro(val c: blackbox.Context) extends MacroCompiler {
   lazy val quotePipeline: c.Expr[Any] => u.Tree =
     pipeline()(qualifyThis).compose(_.tree)
 
-  lazy val qualifyThis = api.BottomUp.transform {
+  lazy val qualifyThis = TreeTransform("qualifyThis", api.BottomUp.transform {
     case api.This(sym) if sym.isClass && sym.isStatic =>
       api.Ref(sym.asClass.module)
-  }._tree
+  }._tree)
 }

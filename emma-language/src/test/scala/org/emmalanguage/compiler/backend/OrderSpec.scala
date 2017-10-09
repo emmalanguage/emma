@@ -36,7 +36,7 @@ class OrderSpec extends BaseCompilerSpec {
   val disamb: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lnf,
-      tree => time(dis(tree), "disambiguate")
+      (tree: u.Tree) => time(dis(tree), "disambiguate")
     ).compose(_.tree)
 
   "order disambiguation" - {

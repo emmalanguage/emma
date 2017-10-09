@@ -45,7 +45,7 @@ trait RuntimeCompilerAware {
 
   def Env: u.Type
 
-  def transformations(cfg: Config): Seq[u.Tree => u.Tree]
+  def transformations(cfg: Config): Seq[TreeTransform]
 
   def execute[T](e: u.Expr[T]): Env => T =
     execute(loadConfig(baseConfig))(e)
@@ -55,7 +55,7 @@ trait RuntimeCompilerAware {
 
   def execute[T](cfg: Config)(e: u.Expr[T]): Env => T = {
     // construct the compilation pipeline
-    val xfms = transformations(cfg) :+ addContext _
+    val xfms = transformations(cfg) :+ addContext
     // apply the pipeline to the input tree
     val rslt = pipeline(typeCheck = true)(xfms: _*)(e.tree)
     // optionally, print the result
@@ -66,10 +66,10 @@ trait RuntimeCompilerAware {
     compiler.eval(rslt)
   }
 
-  protected def addContext(tree: u.Tree): u.Tree = {
+  protected lazy val addContext = TreeTransform("RuntimeCompilerAware.addContext", tree => {
     import u.Quasiquote
     q"(env: $Env) => { implicit val e: $Env = env; $tree }"
-  }
+  })
 
   /** Adds a [[File]] to the classpath. */
   protected def addToClasspath(f: File): Unit =
