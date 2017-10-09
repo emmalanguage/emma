@@ -25,11 +25,11 @@ class ExpandSpec extends LibExamples {
 
   val prePipeline: u.Expr[Any] => u.Tree = compiler
     .pipeline(typeCheck = true, withPost = false)(
-      api.Owner.atEncl
+      TreeTransform("ExpandSpec/api.Owner.atEncl", api.Owner.atEncl)
     ).compose(_.tree)
 
   val expand: u.Tree => u.Tree = tree =>
-    time(Lib.expand(tree), "expand")
+    time(Lib.expand(tree), Lib.expand.name)
 
   "Exampe A" in {
     val inp = prePipeline(`Example A (Emma Source)`)

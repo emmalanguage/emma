@@ -52,7 +52,7 @@ private[source] trait Foreach2Loop extends Common {
   private[source] object Foreach2Loop {
 
     /** The Foreach2Loop transformation. */
-    lazy val transform: u.Tree => u.Tree = {
+    lazy val transform: TreeTransform = TreeTransform("Foreach2Loop.transform", {
       val asInst = api.Type.any.member(api.TermName("asInstanceOf")).asTerm
       api.BottomUp.withOwner.withVarDefs.withAssignments
         .transformWith {
@@ -100,7 +100,7 @@ private[source] trait Foreach2Loop extends Common {
                 }))),
             api.Term.unit)
       }.andThen(_.tree)
-    }
+    })
 
     /** [[FilterMonadic]]. */
     private object FM {

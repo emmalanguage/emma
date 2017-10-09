@@ -31,6 +31,6 @@ trait FlinkCompilerAware extends RuntimeCompilerAware {
 
   def Env: u.Type = FlinkAPI.ExecutionEnvironment
 
-  def transformations(cfg: Config): Seq[u.Tree => u.Tree] =
+  def transformations(cfg: Config): Seq[TreeTransform] =
     compiler.transformations(cfg)
 }

@@ -59,7 +59,7 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
   protected def pipeline(
     typeCheck: Boolean = false, withPre: Boolean = true, withPost: Boolean = true
   )(
-    transformations: (u.Tree => u.Tree)*
+    transformations: TreeTransform*
   ): u.Tree => u.Tree = {
     compiler.pipeline(typeCheck, withPre, withPost)(transformations: _*)
   } andThen {

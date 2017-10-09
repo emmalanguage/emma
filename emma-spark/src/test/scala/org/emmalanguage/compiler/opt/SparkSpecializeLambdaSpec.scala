@@ -32,16 +32,19 @@ class SparkSpecializeLambdaSpec extends BaseCompilerSpec with SparkAware {
   import u.reify
 
   lazy val testPipeline: u.Expr[Any] => u.Tree =
-    pipeline(true)(Core.anf, collectFirstLambda,
-      tree => time(SparkSpecializeOps.specializeLambda(tree), "specializeLambda")
+    pipeline(true)(
+      Core.anf,
+      collectFirstLambda,
+      (tree: u.Tree) => time(SparkSpecializeOps.specializeLambda(tree), SparkSpecializeOps.specializeLambda.name)
     ).compose(_.tree)
 
   lazy val anfPipeline: u.Expr[Any] => u.Tree =
     pipeline(true)(Core.anf, collectFirstLambda).compose(_.tree)
 
-  lazy val collectFirstLambda: u.Tree => u.Tree = tree => (tree collect {
-    case t: u.Function => t
-  }).head
+  lazy val collectFirstLambda: TreeTransform = TreeTransform("SparkSpecializeLambdaSpec.collectFirstLambda", tree =>
+    (tree collect {
+      case t: u.Function => t
+    }).head)
 
   protected override def wrapInClass(tree: u.Tree): u.Tree = {
     import u.Quasiquote

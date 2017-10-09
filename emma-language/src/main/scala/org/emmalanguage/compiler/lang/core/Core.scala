@@ -300,15 +300,15 @@ private[compiler] trait Core extends Common
     // -------------------------------------------------------------------------
 
     /** Lifting. The canonical compiler frontend. */
-    lazy val lift: u.Tree => u.Tree = Function.chain(Seq(
-      lnf,
-      Comprehension.resugarDataBag,
-      Comprehension.normalizeDataBag,
+    lazy val lift: TreeTransform = {
+      lnf andThen
+      Comprehension.resugarDataBag andThen
+      Comprehension.normalizeDataBag andThen
       Reduce.transform
-    ))
+    }
 
     /** Chains [[ANF.transform]], and [[DSCF.transform]]. */
-    lazy val lnf: u.Tree => u.Tree = anf andThen dscf
+    lazy val lnf: TreeTransform = anf andThen dscf
 
     /** Delegates to [[DSCF.transform]]. */
     lazy val dscf = DSCF.transform
@@ -323,7 +323,7 @@ private[compiler] trait Core extends Common
     lazy val unnest = ANF.unnest
 
     /** Reduce an Emma Core term. */
-    lazy val reduce: u.Tree => u.Tree =
+    lazy val reduce: TreeTransform =
       Reduce.transform
 
     /** Delegates to [[DSCF.stripAnnotations]]. */
@@ -345,7 +345,7 @@ private[compiler] trait Core extends Common
     // -------------------------------------------------------------------------
 
     /** Delegates to [[CSE.transform()]]. */
-    lazy val cse: u.Tree => u.Tree =
+    lazy val cse: TreeTransform =
       CSE.transform(Map.empty, Map.empty)
 
     // -------------------------------------------------------------------------

@@ -44,19 +44,19 @@ private[compiler] trait Comprehension extends Common
     // -------------------------------------------------------------------------
 
     /** Delegates to [[ReDeSugar.resugar()]]. */
-    def resugar(monad: u.Symbol): u.Tree => u.Tree =
+    def resugar(monad: u.Symbol): TreeTransform =
       ReDeSugar.resugar(monad)
 
     /** Delegates to [[ReDeSugar.desugar()]]. */
-    def desugar(monad: u.Symbol): u.Tree => u.Tree =
+    def desugar(monad: u.Symbol): TreeTransform =
       ReDeSugar.desugar(monad)
 
     /** `resugar` the default [[DataBag]] monad. */
-    lazy val resugarDataBag: u.Tree => u.Tree =
+    lazy val resugarDataBag: TreeTransform =
       ReDeSugar.resugar(API.DataBag.sym)
 
     /** `desugar` the default [[DataBag]] monad. */
-    lazy val desugarDataBag: u.Tree => u.Tree =
+    lazy val desugarDataBag: TreeTransform =
       ReDeSugar.desugar(API.DataBag.sym)
 
     // -------------------------------------------------------------------------
@@ -68,7 +68,7 @@ private[compiler] trait Comprehension extends Common
       Normalize.normalize(monad)(tree)
 
     /** `normalize` the default [[DataBag]] monad. */
-    lazy val normalizeDataBag: u.Tree => u.Tree =
+    lazy val normalizeDataBag: TreeTransform =
       Normalize.normalize(API.DataBag.sym)
 
     // -------------------------------------------------------------------------

@@ -38,7 +38,7 @@ class SourceLangSpec extends BaseCompilerSpec {
   // ---------------------------------------------------------------------------
 
   /** Example pre-processing pipeline. */
-  lazy val pipeline = { compiler.typeCheck(_: u.Tree) }
+  lazy val pipeline = TreeTransform("SourceLangSpec.pipeline/compiler.typeCheck", { compiler.typeCheck(_: u.Tree) })
     .andThen(compiler.fixSymbolTypes)
     .andThen(compiler.unQualifyStatics)
     .andThen(compiler.normalizeStatements)

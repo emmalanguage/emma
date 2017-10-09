@@ -33,7 +33,7 @@ private[opt] trait SparkSpecializeOps {
 
   private[opt] object SparkSpecializeOps {
     /** Introduces [[org.emmalanguage.api.spark.SparkNtv native Spark operators]] whenever possible. */
-    lazy val specializeOps: u.Tree => u.Tree = tree => {
+    lazy val specializeOps: TreeTransform = TreeTransform("SparkSpecializeOps.specializeOps", tree => {
       val cfg = ControlFlow.cfg(tree)
       val ctx = Context.bCtxMap(cfg)
       val vds = cfg.data.labNodes.map(_.label)
@@ -127,10 +127,10 @@ private[opt] trait SparkSpecializeOps {
             }
           } yield y, defs, expr)
       }(tree).tree
-    }
+    })
 
     /** Specializes lambdas as [[org.emmalanguage.api.spark.SparkExp SparkExp]] expressions. */
-    lazy val specializeLambda: u.Tree => u.Tree = {
+    lazy val specializeLambda: TreeTransform = TreeTransform("SparkspecializeLambda.specializeLambda", {
       case lambda@core.Lambda(_, Seq(core.ParDef(p, _)), core.Let(vals, Seq(), core.Ref(r))) =>
 
         val valOf = vals.map(vd => {
@@ -232,7 +232,7 @@ private[opt] trait SparkSpecializeOps {
 
       case root =>
         root
-    }
+    })
 
     private[opt] def supported(tpes: Seq[u.Type]): Boolean =
       tpes.forall(supported)

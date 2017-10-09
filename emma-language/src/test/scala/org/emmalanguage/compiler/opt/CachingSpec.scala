@@ -34,7 +34,7 @@ class CachingSpec extends BaseCompilerSpec {
   val addCacheCalls: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lift,
-      tree => time(Caching.addCacheCalls(tree), "addCacheCalls")
+      (tree: u.Tree) => time(Caching.addCacheCalls(tree), Caching.addCacheCalls.name)
     ).compose(_.tree)
 
   "cache DataBag terms" - {

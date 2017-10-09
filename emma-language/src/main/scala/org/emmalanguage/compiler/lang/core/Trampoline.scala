@@ -52,7 +52,7 @@ private[core] trait Trampoline extends Common {
      * - The ANF shape of the input is NOT preserved.
      */
     // Unsafe: Return type of methods changes to TailRec[OriginalType].
-    lazy val transform: u.Tree => u.Tree = api.BottomUp.unsafe
+    lazy val transform: TreeTransform = TreeTransform("Trampoline.transform", api.BottomUp.unsafe
       .withAncestors.inherit { // Local method definitions.
         case core.Let(_, defs, _) =>
           (for (core.DefDef(method, tparams, paramss, _) <- defs) yield {
@@ -80,7 +80,7 @@ private[core] trait Trampoline extends Common {
             case _: u.DefDef => false
             case _ => true
           } => core.DefCall(Some(core.DefCall(None, local(cont), targs, argss)), result)
-      }.andThen(_.tree)
+      }.andThen(_.tree))
 
     /** Wraps the return value / tail call of a method in a trampoline. */
     private def wrap(expr: u.Tree, local: Map[u.MethodSymbol, u.MethodSymbol]): u.Tree =

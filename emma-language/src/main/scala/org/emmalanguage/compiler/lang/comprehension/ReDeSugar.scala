@@ -48,7 +48,7 @@ private[comprehension] trait ReDeSugar extends Common {
      * @param monad The symbol of the monad to be resugared.
      * @return A resugaring transformation for that particular monad.
      */
-    def resugar(monad: u.Symbol): u.Tree => u.Tree = {
+    def resugar(monad: u.Symbol): TreeTransform = TreeTransform("ReDeSugar.resugar", {
       // Construct comprehension syntax helper for the given monad
       val cs = Comprehension.Syntax(monad)
       // Handle the case when a lambda is defined externally
@@ -100,7 +100,7 @@ private[comprehension] trait ReDeSugar extends Common {
               cs.Guard(asLet(body))),
               cs.Head(core.Let(expr = core.Ref(sym)))))
       }._tree andThen Core.dce
-    }
+    })
 
     /**
      * Desugars mock-comprehension syntax into monad ops.
@@ -116,7 +116,7 @@ private[comprehension] trait ReDeSugar extends Common {
      * @param monad The symbol of the monad syntax to be desugared.
      * @return A desugaring transformation for that particular monad.
      */
-    def desugar(monad: u.Symbol): u.Tree => u.Tree = {
+    def desugar(monad: u.Symbol): TreeTransform = TreeTransform("ReDeSugar.desugar", {
       // construct comprehension syntax helper for the given monad
       val cs = Comprehension.Syntax(monad)
       api.TopDown.withOwner.transformWith {
@@ -176,6 +176,6 @@ private[comprehension] trait ReDeSugar extends Common {
               core.Let(allVals, Seq.empty, core.Ref(opSym))
           }
       }._tree.andThen(Core.unnest)
-    }
+    })
   }
 }

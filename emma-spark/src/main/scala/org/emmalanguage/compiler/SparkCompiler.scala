@@ -29,7 +29,7 @@ trait SparkCompiler extends Compiler
 
   override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ SparkAPI.implicitTypes
 
-  def transformations(implicit cfg: Config): Seq[u.Tree => u.Tree] = Seq(
+  def transformations(implicit cfg: Config): Seq[TreeTransform] = Seq(
     // lifting
     Lib.expand,
     Core.lift,
