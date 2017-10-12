@@ -24,7 +24,7 @@
     <parent>
         <artifactId>emma</artifactId>
         <groupId>org.emmalanguage</groupId>
-        <version>0.2.3</version>
+        <version>0.2-SNAPSHOT</version>
     </parent>
 
     <artifactId>emma-lib-flink</artifactId>
