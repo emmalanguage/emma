@@ -112,7 +112,7 @@ class SparkSpecializeOpsSpec extends BaseCompilerSpec with SparkAware {
   }
 
   "specializeOps" - {
-    "should specialize `withFilter` calls" in withDefaultSparkSession(implicit spark => {
+    "should specialize `withFilter` calls (1)" in withDefaultSparkSession(implicit spark => {
       val act = testPipeline(reify {
         val x1 = this.seq2
         val x2 = SparkDataset(x1)
@@ -121,8 +121,10 @@ class SparkSpecializeOpsSpec extends BaseCompilerSpec with SparkAware {
           val y2 = y._3
           val y3 = y1 > 1
           val y4 = y2 startsWith "a"
-          val y5 = y3 && y4
-          y5
+          val y5 = y2 contains "b"
+          val y6 = y3 && y4
+          val y7 = y5 && y6
+          y7
         }
         val x4 = x2.withFilter(f1)
         x4
@@ -136,8 +138,48 @@ class SparkSpecializeOpsSpec extends BaseCompilerSpec with SparkAware {
           val y2 = SparkExp.proj(y, "_3")
           val y3 = SparkExp.gt(y1, 1)
           val y4 = SparkExp.startsWith(y2, "a")
-          val y5 = SparkExp.and(y3, y4)
-          y5
+          val y5 = SparkExp.contains(y2, "b")
+          val y6 = SparkExp.and(y3, y4)
+          val y7 = SparkExp.and(y5, y6)
+          y7
+        }
+        val x4 = SparkNtv.select(p1)(x2)
+        x4
+      })
+
+      act shouldBe alphaEqTo(exp)
+    })
+
+    "should specialize `withFilter` calls (2)" in withDefaultSparkSession(implicit spark => {
+      val act = testPipeline(reify {
+        val x1 = this.seq2
+        val x2 = SparkDataset(x1)
+        val f1 = (y: Seq2) => {
+          val y1 = y._2
+          val y2 = y._3
+          val y3 = y1 <= 1
+          val y4 = y2 != null
+          val y5 = y2 == null
+          val y6 = y3 && y4
+          val y7 = y5 && y6
+          y7
+        }
+        val x4 = x2.withFilter(f1)
+        x4
+      })
+
+      val exp = dscfPipeline(reify {
+        val x1 = this.seq2
+        val x2 = SparkDataset(x1)
+        val p1 = (y: SparkExp.Root) => {
+          val y1 = SparkExp.proj(y, "_2")
+          val y2 = SparkExp.proj(y, "_3")
+          val y3 = SparkExp.leq(y1, 1)
+          val y4 = SparkExp.isNotNull(y2)
+          val y5 = SparkExp.isNull(y2)
+          val y6 = SparkExp.and(y3, y4)
+          val y7 = SparkExp.and(y5, y6)
+          y7
         }
         val x4 = SparkNtv.select(p1)(x2)
         x4
