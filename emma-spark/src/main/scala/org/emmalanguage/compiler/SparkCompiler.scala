@@ -75,9 +75,13 @@ trait SparkCompiler extends Compiler
     // projections
     val proj        = op("proj")
     val struct      = op("struct")
-    // comparisons
+    // null comparisons
+    val isNull      = op("isNull")
+    val isNotNull   = op("isNotNull")
+    // equality comparisons
     val eq          = op("eq", List(2, 1))
     val ne          = op("ne", List(2, 1))
+    // ordering comparisons
     val gt          = op("gt")
     val lt          = op("lt")
     val geq         = op("geq")
@@ -94,6 +98,7 @@ trait SparkCompiler extends Compiler
     val mod         = op("mod")
     // string
     val startsWith  = op("startsWith")
+    val contains    = op("contains")
 
     val structural  = Set(proj, struct)
     val comparisons = Set(eq, ne, lt, gt, leq, geq)
