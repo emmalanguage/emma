@@ -97,7 +97,7 @@ private[core] trait ANF extends Common {
           } yield stat
 
           val rhs = core.DefCall(expr, method, targs, exprss)
-          val nme = api.TermName.fresh(method)
+          val nme = api.TermName.fresh("anf")
           val lhs = api.ValSym(owner, nme, rhs.tpe)
           val tmp = core.ValDef(lhs, rhs)
           val ref = core.Ref(lhs)
@@ -115,7 +115,7 @@ private[core] trait ANF extends Common {
           } yield stat
 
           val rhs = core.Inst(cls, targs, exprss)
-          val nme = api.TermName.fresh(cls.typeSymbol)
+          val nme = api.TermName.fresh("anf")
           val lhs = api.ValSym(owner, nme, rhs.tpe)
           val tmp = core.ValDef(lhs, rhs)
           val ref = core.Ref(lhs)
@@ -123,7 +123,7 @@ private[core] trait ANF extends Common {
 
         // (params) => { ..stats; atom }
         case Attr.none(lambda @ src.Lambda(fun, _, _)) =>
-          val nme = api.TermName.fresh(api.TermName.lambda)
+          val nme = api.TermName.fresh("fun")
           val lhs = api.ValSym(fun.owner, nme, lambda.tpe)
           val tmp = core.ValDef(lhs, lambda)
           val ref = core.Ref(lhs)
@@ -132,7 +132,7 @@ private[core] trait ANF extends Common {
         // if ({ ..stats, cond }) thn else els
         case Attr.inh(src.Branch(AsBlock(stats, cond), thn, els), owner :: _) =>
           val rhs = src.Branch(cond, thn, els)
-          val nme = api.TermName.fresh("if")
+          val nme = api.TermName.fresh("anf")
           val lhs = api.ValSym(owner, nme, rhs.tpe)
           val tmp = core.ValDef(lhs, rhs)
           val ref = core.ValRef(lhs)

@@ -27,7 +27,7 @@ trait Terms { this: AST =>
     /** Term names. */
     object TermName extends Node {
 
-      private val regex = s"(.*)\\$$$freshNameSuffix(\\d+)".r
+      val regex = s"(.*)\\$$$freshNameSuffix(\\d+)".r
 
       // Predefined term names
       lazy val anon      = apply("anon")
@@ -71,7 +71,10 @@ trait Terms { this: AST =>
 
       /** Creates a fresh term name with the given `prefix`. */
       def fresh(prefix: u.Name): u.TermName =
-        if (is.defined(prefix)) fresh(prefix.toString) else fresh()
+        if (is.defined(prefix)) prefix match {
+          case u.TermName(regex(original, _)) => fresh(original.toString)
+          case _ => fresh(prefix.toString)
+        } else fresh()
 
       /** Creates a fresh term name with the given symbol's name as `prefix`. */
       def fresh(prefix: u.Symbol): u.TermName =
