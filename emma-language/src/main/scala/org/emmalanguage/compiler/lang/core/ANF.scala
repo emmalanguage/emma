@@ -168,8 +168,10 @@ private[core] trait ANF extends Common {
      *
      * @return An ANF version of the input tree.
      */
-    lazy val transform: TreeTransform =
-      resolveNameClashes andThen anf
+    lazy val transform = TreeTransform("ANF.transform", Seq(
+      resolveNameClashes,
+      anf
+    ))
 
     /**
      * Un-nests nested blocks.

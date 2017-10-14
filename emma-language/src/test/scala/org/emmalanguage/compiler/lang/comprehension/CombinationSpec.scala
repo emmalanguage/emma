@@ -43,18 +43,18 @@ class CombinationSpec extends BaseCompilerSpec {
   val combine: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lnf,
-      (tree: u.Tree) => time(Comprehension.combine(tree), Comprehension.combine.name),
+      Comprehension.combine.timed,
       Core.unnest
     ).compose(_.tree)
 
   def applyOnce(rule: (u.Symbol, u.Tree) => Option[u.Tree]): u.Expr[Any] => u.Tree = {
-    val transform = api.TopDown.withOwner.transformWith {
+    val transform = TreeTransform("match rule", api.TopDown.withOwner.transformWith {
       case Attr.inh(tree, owner :: _) => rule(owner, tree).getOrElse(tree)
-    }.andThen(_.tree)
+    }.andThen(_.tree))
 
     pipeline(typeCheck = true)(
       Core.lnf,
-      (tree: u.Tree) => time(transform(tree), "match rule"),
+      transform.timed,
       Core.unnest
     ).compose(_.tree)
   }

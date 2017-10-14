@@ -49,9 +49,10 @@ private[core] trait Reduce extends Common {
      * == Postconditions ==
      * - All unused value definitions are pruned.
      */
-    lazy val transform: TreeTransform =
-      TreeTransform("Reduce.fixInlineLambdas", (tree: u.Tree) => fixInlineLambdas(tree)) andThen
+    lazy val transform: TreeTransform = TreeTransform("Reduce.transform", Seq(
+      TreeTransform("Reduce.fixInlineLambdas", fixInlineLambdas _),
       inlineTrivialValDefs
+    ))
 
     private lazy val inlineTrivialValDefs = TreeTransform("Reduce.inlineTrivialValDefs",
       api.BottomUp.inherit({ // accumulate trivial ValDef bindings in scope

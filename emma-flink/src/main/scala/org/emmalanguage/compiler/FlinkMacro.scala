@@ -31,8 +31,13 @@ class FlinkMacro(val c: blackbox.Context) extends MacroCompiler with FlinkCompil
   def onFlink[T](cfg: Config)(e: c.Expr[T]): c.Expr[T] = {
     // construct the compilation pipeline
     val xfms = transformations(cfg)
+    // construct the eval function
+    val eval = cfg.getString("emma.compiler.eval") match {
+      case "naive" => NaiveEval(pipeline()(xfms: _*)) _
+      case "timer" => TimerEval(pipeline()(xfms: _*)) _
+    }
     // apply the pipeline to the input tree
-    val rslt = pipeline()(xfms: _*)(e.tree)
+    val rslt = eval(e.tree)
     // optionally, print the result
     if (cfg.getBoolean("emma.compiler.print-result")) {
       c.warning(e.tree.pos, api.Tree.show(rslt))

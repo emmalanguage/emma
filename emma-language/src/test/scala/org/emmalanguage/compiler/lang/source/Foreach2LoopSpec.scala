@@ -29,7 +29,7 @@ class Foreach2LoopSpec extends BaseCompilerSpec {
       fixSymbolTypes,
       unQualifyStatics,
       normalizeStatements,
-      (tree: u.Tree) => time(Foreach2Loop.transform(tree), Foreach2Loop.transform.name)
+      Foreach2Loop.transform.timed
     ).compose(_.tree)
 
   "foreach" - {

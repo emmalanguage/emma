@@ -31,8 +31,10 @@ trait Optimizations extends Common
   object Optimizations {
 
     /** Performs [[FoldForestFusion.foldForestFusion()]] followed by [[FoldGroupFusion.foldGroupFusion]]. */
-    lazy val foldFusion: TreeTransform =
-      FoldForestFusion.foldForestFusion andThen FoldGroupFusion.foldGroupFusion
+    lazy val foldFusion: TreeTransform = TreeTransform("foldFusion", Seq(
+      FoldForestFusion.foldForestFusion,
+      FoldGroupFusion.foldGroupFusion
+    ))
 
     /** Delegates to [[Caching.addCacheCalls]]. */
     lazy val addCacheCalls = Caching.addCacheCalls

@@ -56,8 +56,13 @@ trait RuntimeCompilerAware {
   def execute[T](cfg: Config)(e: u.Expr[T]): Env => T = {
     // construct the compilation pipeline
     val xfms = transformations(cfg) :+ addContext
+    // construct the eval function
+    val eval = cfg.getString("emma.compiler.eval") match {
+      case "naive" => NaiveEval(pipeline(typeCheck = true)(xfms: _*)) _
+      case "timer" => TimerEval(pipeline(typeCheck = true)(xfms: _*)) _
+    }
     // apply the pipeline to the input tree
-    val rslt = pipeline(typeCheck = true)(xfms: _*)(e.tree)
+    val rslt = eval(e.tree)
     // optionally, print the result
     if (cfg.getBoolean("emma.compiler.print-result")) {
       warning(Tree.show(rslt), e.tree.pos)

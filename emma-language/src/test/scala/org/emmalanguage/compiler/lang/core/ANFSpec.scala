@@ -30,7 +30,7 @@ class ANFSpec extends BaseCompilerSpec {
 
   val anfPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
-      (tree: u.Tree) => time(ANF.transform(tree), ANF.transform.name)
+      ANF.transform.timed
     ).compose(_.tree)
 
   val A = new A
