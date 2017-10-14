@@ -300,15 +300,18 @@ private[compiler] trait Core extends Common
     // -------------------------------------------------------------------------
 
     /** Lifting. The canonical compiler frontend. */
-    lazy val lift: TreeTransform = {
-      lnf andThen
-      Comprehension.resugarDataBag andThen
-      Comprehension.normalizeDataBag andThen
+    lazy val lift = TreeTransform("Core.lift", Seq(
+      lnf,
+      Comprehension.resugarDataBag,
+      Comprehension.normalizeDataBag,
       Reduce.transform
-    }
+    ))
 
     /** Chains [[ANF.transform]], and [[DSCF.transform]]. */
-    lazy val lnf: TreeTransform = anf andThen dscf
+    lazy val lnf = TreeTransform("Core.lnf", Seq(
+      anf,
+      dscf
+    ))
 
     /** Delegates to [[DSCF.transform]]. */
     lazy val dscf = DSCF.transform

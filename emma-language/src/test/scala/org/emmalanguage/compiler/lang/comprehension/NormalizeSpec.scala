@@ -44,7 +44,7 @@ class NormalizeSpec extends BaseCompilerSpec {
     pipeline(typeCheck = true)(
       Core.lnf,
       Comprehension.resugarDataBag,
-      (tree: u.Tree) => time(Comprehension.normalizeDataBag(tree), Comprehension.normalizeDataBag.name)
+      Comprehension.normalizeDataBag.timed
     ).compose(_.tree)
 
   // ---------------------------------------------------------------------------

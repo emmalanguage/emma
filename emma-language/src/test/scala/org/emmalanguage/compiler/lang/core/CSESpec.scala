@@ -30,7 +30,7 @@ class CSESpec extends BaseCompilerSpec {
   val csePipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lnf,
-      (tree: u.Tree) => time(Core.cse(tree), Core.cse.name)
+      Core.cse.timed
     ).compose(_.tree)
 
   val lnfPipeline: u.Expr[Any] => u.Tree =

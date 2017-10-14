@@ -35,7 +35,7 @@ class SparkSpecializeLambdaSpec extends BaseCompilerSpec with SparkAware {
     pipeline(true)(
       Core.anf,
       collectFirstLambda,
-      (tree: u.Tree) => time(SparkSpecializeOps.specializeLambda(tree), SparkSpecializeOps.specializeLambda.name)
+      SparkSpecializeOps.specializeLambda.timed
     ).compose(_.tree)
 
   lazy val anfPipeline: u.Expr[Any] => u.Tree =

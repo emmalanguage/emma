@@ -61,9 +61,54 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
   )(
     transformations: TreeTransform*
   ): u.Tree => u.Tree = {
-    compiler.pipeline(typeCheck, withPre, withPost)(transformations: _*)
+    TestEval(compiler.pipeline(typeCheck, withPre, withPost)(transformations: _*)) _
   } andThen {
     checkCompile
+  }
+
+  /** Evaluets the pipeline and prints the time for nodes marked with `time == true`. */
+  object TestEval extends XfrmEval {
+    type Dom = u.Tree => Res
+
+    case class Inf(name: String, time: Option[Long])
+
+    val showInf = scalaz.Show.shows[Inf](x => {
+      val name = x.name
+      val time = x.time.fold("")(t => s" (${t / 1e6}ms)")
+      name + time
+    })
+
+    val eval = Xfrm.fold(new XfrmAlg[Dom] {
+      def seq(name: String, seq: Seq[Dom], time: Boolean): Dom = tree => {
+        val tim1 = System.nanoTime
+        val rslt = seq.foldLeft(Acc(tree))((acc, fun) => {
+          val rslt = fun(acc.tree)
+          Acc(rslt.tree, acc.accx :+ rslt.xtra)
+        })
+        val tim2 = System.nanoTime
+        val info = Inf(name, if (time) Some(tim2 - tim1) else None)
+        Res(rslt.tree, scalaz.Tree.Node(info, rslt.accx))
+      }
+
+      def fun(name: String, fun: Xfrm.Fun, time: Boolean): Dom = tree => {
+        val tim1 = System.nanoTime
+        val rslt = fun(tree)
+        val tim2 = System.nanoTime
+        val info = Inf(name, if (time) Some(tim2 - tim1) else None)
+        Res(rslt, scalaz.Tree.Leaf(info))
+      }
+    }) _
+
+    def apply(xfrm: Xfrm)(tree: u.Tree): u.Tree = {
+      val rslt = eval(xfrm)(tree)
+
+      for {
+        info <- rslt.xtra.flatten
+        if info.time.isDefined
+      } println(showInf.shows(info))
+
+      rslt.tree
+    }
   }
 
   // ---------------------------------------------------------------------------
