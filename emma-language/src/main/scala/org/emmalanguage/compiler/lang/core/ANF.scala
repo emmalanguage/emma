@@ -35,7 +35,7 @@ private[core] trait ANF extends Common {
   private[core] object ANF {
 
     /** The ANF transformation. */
-    private lazy val anf: TreeTransform = TreeTransform("ANF.anf",
+    private lazy val anf = TreeTransform("ANF.anf",
       api.BottomUp.withParent.withOwner.transformWith {
         // lit | this | x
         case Attr.inh(src.Atomic(atom), _ :: parent :: _) => parent.collect {
@@ -180,7 +180,7 @@ private[core] trait ANF extends Common {
      * == Postconditions ==
      * - An ANF tree where all nested blocks have been flattened.
      */
-    lazy val unnest: TreeTransform = TreeTransform("ANF.unnest",
+    lazy val unnest = TreeTransform("ANF.unnest",
       api.BottomUp.transform {
         case parent @ core.Let(vals, defs, expr) if hasNestedLets(parent) =>
           // Flatten nested let expressions in value position without control flow.

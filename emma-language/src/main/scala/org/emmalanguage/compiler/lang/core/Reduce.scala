@@ -53,7 +53,7 @@ private[core] trait Reduce extends Common {
       TreeTransform("Reduce.fixInlineLambdas", (tree: u.Tree) => fixInlineLambdas(tree)) andThen
       inlineTrivialValDefs
 
-    private lazy val inlineTrivialValDefs: TreeTransform = TreeTransform("Reduce.inlineTrivialValDefs",
+    private lazy val inlineTrivialValDefs = TreeTransform("Reduce.inlineTrivialValDefs",
       api.BottomUp.inherit({ // accumulate trivial ValDef bindings in scope
         case core.Let(vals, _, _) =>
           vals.foldLeft(Map.empty[u.Symbol, u.Tree])((valDefs, valDef) => valDef match {

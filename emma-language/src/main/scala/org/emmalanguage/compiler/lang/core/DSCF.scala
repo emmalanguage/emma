@@ -104,7 +104,7 @@ private[core] trait DSCF extends Common {
       Ordering.by(_.name.toString)
 
     /** The Direct-Style Control-Flow (DSCF) transformation. */
-    lazy val transform: TreeTransform = TreeTransform("DSCF.transform", api.TopDown
+    lazy val transform = TreeTransform("DSCF.transform", api.TopDown
       .withBindUses.withVarDefs.withOwnerChain
       .synthesize(Attr.collect[SortedSet, u.TermSymbol] {
         // Collect all variable assignments in a set sorted by name.
@@ -233,7 +233,7 @@ private[core] trait DSCF extends Common {
     }._tree)
 
     /** The Direct-Style Control-Flow (DSCF) inverse transformation. */
-    lazy val inverse: TreeTransform = TreeTransform("DSCF.inverse", tree => {
+    lazy val inverse = TreeTransform("DSCF.inverse", tree => {
       // construct dataflow graph
       val cfg = ControlFlow.cfg(tree)
       // construct transitive closure of nesting graph

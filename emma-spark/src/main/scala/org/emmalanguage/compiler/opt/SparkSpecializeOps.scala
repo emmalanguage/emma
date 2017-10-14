@@ -130,7 +130,7 @@ private[opt] trait SparkSpecializeOps {
     })
 
     /** Specializes lambdas as [[org.emmalanguage.api.spark.SparkExp SparkExp]] expressions. */
-    lazy val specializeLambda: TreeTransform = TreeTransform("SparkspecializeLambda.specializeLambda", {
+    lazy val specializeLambda = TreeTransform("SparkspecializeLambda.specializeLambda", {
       case lambda@core.Lambda(_, Seq(core.ParDef(p, _)), core.Let(vals, Seq(), core.Ref(r))) =>
 
         val valOf = vals.map(vd => {

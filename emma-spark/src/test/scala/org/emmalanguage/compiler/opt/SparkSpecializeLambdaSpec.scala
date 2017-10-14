@@ -41,7 +41,7 @@ class SparkSpecializeLambdaSpec extends BaseCompilerSpec with SparkAware {
   lazy val anfPipeline: u.Expr[Any] => u.Tree =
     pipeline(true)(Core.anf, collectFirstLambda).compose(_.tree)
 
-  lazy val collectFirstLambda: TreeTransform = TreeTransform("SparkSpecializeLambdaSpec.collectFirstLambda", tree =>
+  lazy val collectFirstLambda = TreeTransform("SparkSpecializeLambdaSpec.collectFirstLambda", tree =>
     (tree collect {
       case t: u.Function => t
     }).head)

@@ -102,7 +102,7 @@ trait Compiler extends AlphaEq
 
   }
 
-  val noop: TreeTransform = TreeTransform("Predef.identity", Predef.identity[u.Tree] _)
+  val noop = TreeTransform("Predef.identity", Predef.identity[u.Tree] _)
 
   // Turn this on to print the tree between every step in the pipeline (also before the first and after the last step).
   val printAllTrees = false
