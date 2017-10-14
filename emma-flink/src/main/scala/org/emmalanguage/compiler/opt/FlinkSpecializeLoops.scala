@@ -43,7 +43,7 @@ private[opt] trait FlinkSpecializeLoops {
      * (i.e., it  should correspond to a dataflow consisting only of sources
      * and transformations) and should not depend on the iterator variable.
      */
-    lazy val specializeLoops: TreeTransform = TreeTransform("FlinkSpecializeLoops.specializeLoops", tree => {
+    lazy val specializeLoops = TreeTransform("FlinkSpecializeLoops.specializeLoops", tree => {
       val G = ControlFlow.cfg(tree)
       api.BottomUp.withValUses.transformWith({
         case Attr.syn(t@core.Let(

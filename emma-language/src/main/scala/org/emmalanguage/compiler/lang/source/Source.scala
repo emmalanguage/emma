@@ -284,7 +284,7 @@ private[compiler] trait Source extends Common
     }
 
     /** Removes implicit lists consisting of the following symbols. */
-    def removeImplicits(types: Set[u.Type]): TreeTransform = TreeTransform("Source.removeImplicits", {
+    def removeImplicits(types: Set[u.Type]) = TreeTransform("Source.removeImplicits", {
 
       object Matching {
 

@@ -326,7 +326,7 @@ private[compiler] trait FoldForestFusion extends Common {
      *   val x = xs.fold(alg.FlatMap(f, alg))
      * }}}
      */
-    lazy val foldForestFusion: TreeTransform = TreeTransform("FoldForestFusion.foldForestFusion", tree => {
+    lazy val foldForestFusion = TreeTransform("FoldForestFusion.foldForestFusion", tree => {
       api.BottomUp.withOwner.transformWith {
         // Fuse only folds within a single block.
         case Attr.inh(let@core.Let(vals, defs, expr), owner :: _) =>

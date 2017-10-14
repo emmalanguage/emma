@@ -81,7 +81,7 @@ private[compiler] trait FoldGroupFusion extends Common {
      *   }
      * }}}
      */
-    lazy val foldGroupFusion: TreeTransform = TreeTransform("FoldGroupFusion.foldGroupFusion", tree => {
+    lazy val foldGroupFusion = TreeTransform("FoldGroupFusion.foldGroupFusion", tree => {
       val cfg = ControlFlow.cfg(tree)
       val dat = cfg.data
       val nst = cfg.nest.tclose
