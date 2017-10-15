@@ -25,8 +25,6 @@ import java.util.UUID
 /** An abstraction for homogeneous distributed collections. */
 trait DataBag[A] extends Serializable {
 
-  //import Meta.Projections._
-
   implicit def m: Meta[A]
 
   val uuid: UUID = UUID.randomUUID()
