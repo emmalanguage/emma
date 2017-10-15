@@ -29,8 +29,6 @@ import scala.collection.Map
  */
 object LocalOps extends ComprehensionCombinators[LocalEnv] with Runtime[LocalEnv] {
 
-  //import Meta.Projections._
-
   //--------------------------------------------------------
   // ComprehensionCombinators
   //--------------------------------------------------------
