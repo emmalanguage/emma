@@ -368,6 +368,301 @@ private[comprehension] trait Combination extends Common {
       case _ => None
     }
 
+    // =======================================
+    // The following four rules transform guards for better join combination.
+    // We partially use rules for normalization into conjunctive normal form.
+    //
+    // 1. Eliminate double negation (!!x => x);
+    // 2. Move negation inside disjunction (!(x || y) => !x && !y)
+    // 3. Split guards that return a conjunction in two guards. Repeat from 1. in sub-guards.
+    // 4. Collect all mutually independent guards of the form fi(x) == gi(y) with x and y fixed, and replace with
+    //    ((f1(x), ... , fn(x)) == (g1(y), ... , gn(y)))
+    //
+    // We don't use full CNF, because once a non-negated disjunction is involved, it cannot be processed any
+    // further. Thus [!(x && y) => !x || !y] and demorgan [ x || (y && z) => (x || y) && (x || z) ] are not useful
+    // for joins.
+    // =======================================
+
+    /**
+     * Removes double negations from guards.
+     *
+     * ==Matching Pattern==
+     * {{{ [[ hd | qs1, ! (! expr), qs2 ]] }}}
+     * {{{
+     *   comprehension {
+     *     $qs1
+     *     guard {
+     *       $grdVals
+     *       val $neg1 = unary_! $Expr
+     *       val $neg2 = unary_! $neg1
+     *       $neg2
+     *     }
+     *     $qs2
+     *     $hd
+     *   }
+     * }}}
+     *
+     * ==Rewrite==
+     * {{{ [[ hd | qs1, expr, qs2 ]] }}}
+     * {{{
+     *   comprehension {
+     *     $qs1
+     *     guard {
+     *       $grdVals
+     *       $Expr
+     *     }
+     *     $qs2
+     *     $hd
+     *   }
+     * }}}
+     */
+    val MatchDoubleNegation: Rule = {
+      case (_, cs.Comprehension(qs, hd)) => (for {
+        guard @ cs.Guard(core.Let(grdVals, Seq(), core.Ref(retSym))) <- qs.view
+        (qs1, qs2) = splitAt(guard)(qs)
+        core.ValDef(condNeg, core.DefCall(Some(opd), negSym, _, _)) <- grdVals
+        if negSym.name.toString == "unary_$bang"
+        core.ValDef(`retSym`, core.DefCall(Some(core.Ref(`condNeg`)), `negSym`, _, _)) <- grdVals
+      } yield {
+        val newGuard = Core.dce(cs.Guard(core.Let(grdVals, Seq(), opd)))
+        val newTree = Seq.concat(qs1, Seq(newGuard), qs2)
+        val out = cs.Comprehension(newTree, hd)
+        out
+      }).headOption
+
+      case _ => None
+    }
+
+    /**
+     * De Morgan for negation of disjunction.
+     *
+     * ==Matching Pattern==
+     * {{{ [[ hd | qs1, ! (expr1 || expr2), qs2 ]] }}}
+     * {{{
+     *   comprehension {
+     *     $qs1
+     *     guard {
+     *       $grdVals
+     *       $disj = expr1 || expr2
+     *       $neg = ! $disj
+     *       $neg
+     *     }
+     *     $qs2
+     *     $hd
+     *   }
+     * }}}
+     *
+     * ==Rewrite==
+     * {{{ [[ hd | qs1, !expr1 && !expr2, qs2 ]] }}}
+     * {{{
+     *   comprehension {
+     *     $qs1
+     *     guard {
+     *       $grdVals
+     *       $neg1 = ! $expr1
+     *       $neg2 = ! $expr2
+     *       $conj = neg1 && neg2
+     *       $conj
+     *     }
+     *     $qs2
+     *     $hd
+     *   }
+     * }}}
+     */
+    val MatchDeMorgan: Rule = {
+      case (owner, cs.Comprehension(qs, hd)) => (for {
+        guard @ cs.Guard(core.Let(grdVals, Seq(), core.Ref(retSym))) <- qs.view
+        (qs1, qs2) = splitAt(guard)(qs)
+        core.ValDef(disjTS, core.DefCall(Some(disjLhs), disjMS, _, Seq(Seq(disjRhs)))) <- grdVals
+        if disjMS.name.toString == "$bar$bar"
+        core.ValDef(`retSym`, core.DefCall(Some(core.Ref(`disjTS`)), negMS, _, _)) <- grdVals
+        if negMS.name.toString == "unary_$bang"
+      } yield {
+        val negLhs = core.DefCall(Some(disjLhs), negMS)
+        val negRhs = core.DefCall(Some(disjRhs), negMS)
+        val (negLhsRef, negLhsDef) = valRefAndDef(owner, negMS.name.toString, negLhs)
+        val (negRhsRef, negRhsDef) = valRefAndDef(owner, negMS.name.toString, negRhs)
+
+        val andMS = disjTS.info.member(api.TermName("&&")).alternatives.collectFirst({
+          case api.DefSym(m) if m.isPublic => m
+        }).get
+
+        val result = core.DefCall(Some(negLhsRef), andMS, argss = Seq(Seq(negRhsRef)))
+        val (resultRef, resultDef) = valRefAndDef(owner, andMS.name.toString, result)
+        val newGrdVals = grdVals ++ Seq(negLhsDef, negRhsDef, resultDef)
+        val newGuard = Core.dce(cs.Guard(core.Let(newGrdVals, Seq(), resultRef)))
+        val newTree = Seq.concat(qs1, Seq(newGuard), qs2)
+        cs.Comprehension(newTree, hd)
+      }).headOption
+
+      case _ => None
+    }
+
+    /**
+     * Splits conjunctions within guards into two guards.
+     *
+     * ==Matching Pattern==
+     * {{{ [[ hd | qs1, expr1 && expr2, qs2 ]] }}}
+     * {{{
+     *   comprehension {
+     *     $qs1
+     *     guard {
+     *       $grdVals
+     *       $conj = $expr1 && $expr2
+     *       $conj
+     *     }
+     *   }
+     * }}}
+     *
+     * ==Rewrite==
+     * {{{ [[ hd | qs2, expr1, expr2, qs2 ]] }}}
+     * {{{
+     *   comprehension {
+     *     $qs1
+     *     guard {
+     *       $grdVals1
+     *       $expr1
+     *     }
+     *     guard {
+     *       $grdVals2
+     *       $expr2
+     *     }
+     *     $qs2
+     *     $hd
+     *   }
+     * }}}
+     */
+    val MatchSplitGuard: Rule = {
+      case (owner, cs.Comprehension(qs, hd)) => (for {
+        guard @ cs.Guard(core.Let(grdVals, Seq(), core.Ref(retSym))) <- qs.view
+        (qs1, qs2) = splitAt(guard)(qs)
+
+        core.ValDef(`retSym`, core.DefCall(Some(lhsRef), conjMs, _, Seq(Seq(rhsRef)))) <- grdVals
+        if conjMs.name.toString == "$amp$amp"
+      } yield {
+        val newGuard1 = Core.dce(cs.Guard(core.Let(grdVals, Seq(), lhsRef)))
+        val newGuard2 = Core.dce(cs.Guard(core.Let(grdVals, Seq(), rhsRef)))
+
+        val newTree = Seq.concat(qs1, Seq(newGuard1, newGuard2), qs2)
+        cs.Comprehension(newTree, hd)
+      }).headOption
+
+      case _ => None
+    }
+
+    /**
+     * Collects equality guards.
+     *
+     * ==Matching Pattern==
+     * {{{ [[ hd | qs1, expr1 == expr2, qs2, expr3 == expr4, qs3, ... , qsN ]] }}}
+     * {{{
+     *   comprehension {
+     *     $qs1
+     *     guard {
+     *       $grdVals1
+     *       $eq1 = expr1 == expr2
+     *       $eq1
+     *     }
+     *     $qs2
+     *     guard {
+     *       $grdVals2
+     *       $eq2 = expr3 == expr4
+     *       $eq2
+     *     }
+     *     $qs3
+     *     guard { ...
+     *     ...
+     *     $qsN
+     *     $hd
+     *   }
+     * }}}
+     *
+     * ==Rewrite==
+     * {{{ [[ hd | qs1, qs2, ..., qsN, (expr1, expr3, ...) == (expr2, expr4, ...) ]] }}}
+     * {{{
+     *   comprehension {
+     *     $qs1
+     *     $qs2
+     *     $qs3
+     *     ...
+     *     $qsN
+     *     guard {
+     *       $grdVals
+     *       $tuple1 = ($expr1, $expr3, ...)
+     *       $tuple2 = ($expr2, $expr4, ...)
+     *       $eq = $tuple1 && $tuple2
+     *       $eq
+     *     }
+     *     $hd
+     *   }
+     * }}}
+     */
+    val MatchCollectEqualityGuards: Rule = {
+      case (owner, cs.Comprehension(qs, hd)) => ( for {
+        xGen @ cs.Generator(x, xRhs) <- qs.view
+        (_, qs23) = splitAt[u.Tree](xGen)(qs)
+        yGen @ cs.Generator(y, yRhs) <- qs23.view
+        (_, qs3) = splitAt[u.Tree](yGen)(qs23)
+
+        guards = (for {
+          grd @ cs.Guard(core.Let(grdVals, Seq(), core.Ref(retSym))) <- qs3.view
+          if (api.Tree.refs(grd) intersect gens(qs)) == Set(x, y)
+          condVal @ core.ValDef(`retSym`, core.DefCall(Some(eqLhs), eqMs, _, Seq(Seq(eqRhs)))) <- grdVals
+          if eqMs.name.toString == "$eq$eq"
+
+          joinVals = grdVals.filter(_ != condVal)
+          (kxExpr, kyExpr) <- Seq((eqLhs, eqRhs), (eqRhs, eqLhs))
+          kxBody = Core.dce(core.Let(joinVals, Seq.empty, kxExpr))
+          if !api.Tree.refs(kxBody).contains(y)
+          kyBody = Core.dce(core.Let(joinVals, Seq.empty, kyExpr))
+          if !api.Tree.refs(kyBody).contains(x)
+
+        } yield {
+          (grd, eqLhs, eqRhs, grdVals)
+        }).toList
+
+        if guards.size > 1
+      } yield {
+        val guardsFull = guards.map(_._1)
+        val rest = qs.filter(!guardsFull.contains(_))
+
+        val lhsVals = guards.map { _._2 }
+        val rhsVals = guards.map { _._3 }
+        val valDefs = guards.flatMap { _._4 }
+
+        val n = lhsVals.size
+
+        val lhsTypes = lhsVals.map(t => t.tpe)
+        val lhsTuple = core.Ref(api.Sym.tuple(n).companion.asModule)
+        val lhsApp = lhsTuple.tpe.member(api.TermName.app).asMethod
+        val lhsT = core.DefCall(Some(lhsTuple), lhsApp, lhsTypes, Seq(lhsVals))
+        val (lhsRef, lhsDef) = valRefAndDef(owner, "tuple" + n.toString, lhsT)
+
+        val rhsTypes = rhsVals.map(t => t.tpe)
+        val rhsTuple = core.Ref(api.Sym.tuple(n).companion.asModule)
+        val rhsApp = rhsTuple.tpe.member(api.TermName.app).asMethod
+        val rhsT = core.DefCall(Some(rhsTuple), rhsApp, rhsTypes, Seq(rhsVals))
+        val (rhsRef, rhsDef) = valRefAndDef(owner, "tuple" + n.toString, rhsT)
+
+        val eqMs = api.Type.tupleOf(rhsTypes).member(api.TermName("==")).alternatives.collectFirst({
+          case api.DefSym(m) if m.isPublic => m
+        }).get
+
+        val result = core.DefCall(Some(lhsRef), eqMs, Seq(), Seq(Seq(rhsRef)))
+        val (resRef, resDef) = valRefAndDef(owner, eqMs.name.toString, result)
+        val newGuard = Core.dce(cs.Guard(core.Let(valDefs ++ Seq(lhsDef, rhsDef, resDef), Seq(), resRef)))
+
+        val newTree = Seq.concat(rest, Seq(newGuard))
+        cs.Comprehension(newTree, hd)
+      }).headOption
+
+      case _ => None
+    }
+
+    // =================================================
+    // end of guard transformations for join combination
+    // =================================================
+
     /**
      * Creates a join combinator.
      *
@@ -520,6 +815,7 @@ private[comprehension] trait Combination extends Common {
 
     private val rules = Seq(
       MatchFilter, MatchFlatMap1, MatchFlatMap2,
+      MatchDoubleNegation, MatchDeMorgan, MatchSplitGuard, MatchCollectEqualityGuards,
       MatchEquiJoin, MatchCross, MatchMap)
 
     /** Creates a ValDef, and returns its Ident on the left hand side. */

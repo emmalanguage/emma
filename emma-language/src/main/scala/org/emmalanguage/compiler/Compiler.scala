@@ -20,6 +20,7 @@ import backend.GenericBackend
 import lang.AlphaEq
 import lang.core.Core
 import lang.source.Source
+import lang.TreeNorm
 import lib.Lib
 import opt.Optimizations
 import tools.GraphTools
@@ -37,6 +38,7 @@ import scala.reflect.api.Universe
  * compile time reflection.
  */
 trait Compiler extends AlphaEq
+  with TreeNorm
   with Lib
   with Source
   with Core

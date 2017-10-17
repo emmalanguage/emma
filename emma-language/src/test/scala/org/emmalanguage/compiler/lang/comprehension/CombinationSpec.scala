@@ -201,6 +201,87 @@ class CombinationSpec extends BaseCompilerSpec {
       applyOnce(MatchCross)(inp) shouldBe alphaEqTo(liftPipeline(exp))
     }
 
+    "double negation" in {
+      val inp = reify(comprehension[(User, User), DataBag] {
+        val x = generator[User, DataBag] { users }
+        val y = generator[User, DataBag] { users }
+        guard { !(!(x.id == y.id)) }
+        head { (x, y) }
+      })
+
+      val exp = reify(comprehension[(User, User), DataBag] {
+        val x = generator[User, DataBag] { users }
+        val y = generator[User, DataBag] { users }
+        guard { x.id == y.id }
+        head { (x, y) }
+      })
+
+      applyOnce(MatchDoubleNegation)(inp) shouldBe alphaEqTo(liftPipeline(exp))
+    }
+
+    "demorgan" in {
+      val inp = reify(comprehension[(User, User), DataBag] {
+        val x = generator[User, DataBag] { users }
+        val y = generator[User, DataBag] { users }
+        guard { !((x.id == y.id) || (y.id == x.id))}
+        head { (x, y) }
+      })
+
+      val exp = reify(comprehension[(User, User), DataBag] {
+        val x = generator[User, DataBag] { users }
+        val y = generator[User, DataBag] { users }
+        guard { !(x.id == y.id) && !(y.id == x.id)}
+        head { (x, y) }
+      })
+      val inpNorm = compiler.treeNorm(applyOnce(MatchDeMorgan)(inp))
+      val expNorm = compiler.treeNorm(liftPipeline(exp))
+
+      inpNorm shouldBe alphaEqTo(expNorm)
+    }
+
+    "split guard" in {
+      val inp = reify(comprehension[(User, User, User), DataBag] {
+        val x = generator[User, DataBag] { users }
+        val y = generator[User, DataBag] { users }
+        val z = generator[User, DataBag] { users }
+        guard { (x.id == z.id) && (y.id == z.id)}
+        head { (x, y, z) }
+      })
+
+      val exp = reify(comprehension[(User, User, User), DataBag] {
+        val x = generator[User, DataBag] { users }
+        val y = generator[User, DataBag] { users }
+        val z = generator[User, DataBag] { users }
+        guard { x.id == z.id}
+        guard { y.id == z.id}
+        head { (x, y, z) }
+      })
+
+      applyOnce(MatchSplitGuard)(inp) shouldBe alphaEqTo(liftPipeline(exp))
+    }
+
+    "collect equality guards" in {
+      val inp = reify(comprehension[(User, User), DataBag] {
+        val x = generator[User, DataBag] { users }
+        val y = generator[User, DataBag] { users }
+        guard { x.id == y.id }
+        guard { x.id == y.id }
+        guard { x.id == y.id }
+        head { (x, y) }
+      })
+
+      val exp = reify(comprehension[(User, User), DataBag] {
+        val x = generator[User, DataBag] { users }
+        val y = generator[User, DataBag] { users }
+        guard { (x.id, x.id, x.id) == (y.id, y.id, y.id) }
+        head { (x, y) }
+      })
+
+      val inpNorm = compiler.treeNorm(applyOnce(MatchCollectEqualityGuards)(inp))
+      val expNorm = compiler.treeNorm(liftPipeline(exp))
+      inpNorm shouldBe alphaEqTo(expNorm)
+    }
+
     "equiJoin (simple)" in {
       val inp = reify(comprehension[(User, User), DataBag] {
         val x = generator[User, DataBag] { users }
@@ -400,6 +481,56 @@ class CombinationSpec extends BaseCompilerSpec {
       }
 
       combine(inp) shouldBe alphaEqTo(liftPipeline(exp))
+    }
+
+    "collect equality multiple" in {
+      val inp = reify(comprehension[(User, User), DataBag] {
+        val x = generator[User, DataBag] { users }
+        val y = generator[User, DataBag] { users }
+        val z = generator[User, DataBag] { users }
+        guard ( x.id == y.id )
+        guard ( x.id == z.id )
+        guard ( x.id == y.id )
+        guard ( x.id == z.id )
+        guard ( x.id == y.id )
+        guard ( x.id == z.id )
+        head { (x, y) }
+      })
+
+      val exp = reify(comprehension[(User, User), DataBag] {
+        val x = generator[User, DataBag] { users }
+        val y = generator[User, DataBag] { users }
+        val z = generator[User, DataBag] { users }
+        guard ( (x.id, x.id, x.id) == (y.id, y.id, y.id) )
+        guard ( (x.id, x.id, x.id) == (z.id, z.id, z.id) )
+        head { (x, y) }
+      })
+
+      compiler.treeNorm(combine(inp)) shouldBe alphaEqTo(compiler.treeNorm(combine(exp)))
+    }
+
+    "guard normalization complex" in {
+      val inp = reify(comprehension[(User, User), DataBag] {
+        val x = generator[User, DataBag] { users }
+        val y = generator[User, DataBag] { users }
+        val z = generator[User, DataBag] { users }
+        guard ( !(!(x.id == z.id)) )
+        guard ( !(!(x.id == y.id) || !((x.id == y.id) && (x.id == z.id))) )
+        guard ( (z.id == z.id) || (y.id == z.id) )  // <-- some rule that does not change
+        head { (x, y) }
+      })
+
+      val exp = reify(comprehension[(User, User), DataBag] {
+        val x = generator[User, DataBag] { users }
+        val y = generator[User, DataBag] { users }
+        val z = generator[User, DataBag] { users }
+        guard ( (z.id == z.id) || (y.id == z.id) )
+        guard ( (x.id, x.id) == (z.id, z.id) )
+        guard ( (x.id, x.id) == (y.id, y.id) )
+        head { (x, y) }
+      })
+
+      compiler.treeNorm(combine(inp)) shouldBe alphaEqTo(compiler.treeNorm(combine(exp)))
     }
   }
 
