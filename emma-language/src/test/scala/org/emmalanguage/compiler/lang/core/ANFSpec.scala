@@ -190,7 +190,7 @@ class ANFSpec extends BaseCompilerSpec {
 
   "bypass mock comprehensions" in {
     val act = anfPipeline(reify {
-      val res = comprehension {
+      comprehension {
         val u = generator(users)
         val a = generator(ads)
         val c = generator(clicks)
@@ -198,7 +198,6 @@ class ANFSpec extends BaseCompilerSpec {
         guard(a.id == c.adID)
         head(c.time, a.`class`)
       }
-      res
     })
 
     val exp = idPipeline(reify {

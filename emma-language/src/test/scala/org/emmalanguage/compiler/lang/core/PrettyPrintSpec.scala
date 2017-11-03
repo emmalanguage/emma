@@ -350,7 +350,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
         val clicks$1 = clicks
         val users$1 = users
         val ads$1 = ads
-        comprehension[(Instant, AdClass.Value), DataBag] {
+        val compr$r1 = comprehension[(Instant, AdClass.Value), DataBag] {
           val c = generator(clicks$1)
           val u = generator(users$1)
           guard {
@@ -373,6 +373,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
             tuple$1
           }
         }
+        compr$r1
       }))
 
       val exp = """
@@ -380,7 +381,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
         |  val clicks$1 = Marketing.clicks
         |  val users$1 = Marketing.users
         |  val ads$1 = Marketing.ads
-        |  for {
+        |  val compr$r1 = for {
         |    c <- {
         |      clicks$1
         |    }
@@ -408,6 +409,7 @@ class PrettyPrintSpec extends BaseCompilerSpec {
         |    val tuple$1 = (time, clas)
         |    tuple$1
         |  }
+        |  compr$r1
         |}""".stripMargin.trim
 
       act shouldEqual exp
