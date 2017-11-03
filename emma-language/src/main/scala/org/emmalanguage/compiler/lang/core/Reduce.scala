@@ -40,8 +40,8 @@ private[core] trait Reduce extends Common {
      * Reduces an Emma Core term as follows.
      *
      * - Inlines local lambda definitions (without local control-flow) which are
-     * used inly once in an application.
-     * - Propagades trivial assignments.
+     * used only once in an application.
+     * - Propagates trivial assignments.
      *
      * == Preconditions ==
      * - The input tree is in LNF (see [[Core.lnf]]).
