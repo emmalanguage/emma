@@ -29,6 +29,7 @@ private[core] trait ANF extends Common {
 
   import Core.{Lang => core}
   import Source.{Lang => src}
+  import API.{ComprehensionSyntax=>cs}
   import UniverseImplicits._
 
   /** Administrative Normal Form (ANF) bypassing control-flow and for-comprehensions. */
@@ -41,12 +42,17 @@ private[core] trait ANF extends Common {
         case Attr.inh(src.Atomic(atom), _ :: parent :: _) => parent.collect {
           // Convert atoms to trivial blocks in lambdas, comprehensions and continuations.
           case src.Lambda(_, _, _) =>
-          case core.Comprehension(_) =>
+          case core.DefCall(Some(core.Ref(cs.sym)), _, _, _) =>
           case core.DefDef(_, _, _, _) =>
         }.fold(atom)(const(src.Block(expr = atom)))
 
         // comprehension[T] { ... }
-        case Attr.none(compr @ core.Comprehension(_)) =>
+        case Attr.inh(compr @ core.DefCall(Some(core.Ref(cs.sym)), cs.comprehension, _, _), owner :: _) =>
+          val valSym = api.ValSym(owner, api.TermName.fresh("compr"), compr.tpe)
+          src.Block(Seq(core.ValDef(valSym, compr)), core.Ref(valSym))
+
+        // generator { ... } | guard { ... } | head { ... }
+        case Attr.none(compr @ core.DefCall(Some(core.Ref(cs.sym)), cs.generator | cs.guard | cs.head, _, _)) =>
           src.Block(expr = compr)
 
         // cont(..args) | if (cond) cont1(..args1) else cont2(..args2)

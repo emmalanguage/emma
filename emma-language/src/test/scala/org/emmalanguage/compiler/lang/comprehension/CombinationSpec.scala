@@ -314,7 +314,7 @@ class CombinationSpec extends BaseCompilerSpec {
       applyOnce(MatchEquiJoin)(inp) shouldBe alphaEqTo(liftPipeline(exp))
     }
 
-    "residual" in {
+    "map" in {
       val inp = reify(comprehension[User, DataBag] {
         val x = generator[User, DataBag] { users }
         head { x }
@@ -628,24 +628,46 @@ class CombinationSpec extends BaseCompilerSpec {
     }
 
     "map" in {
-      val inp = reify(comprehension[User, DataBag] {
+      val inp = reify(comprehension[(User, User), DataBag] {
         val x = generator[User, DataBag] {
           var us = users
           while (us.size < 100) us = us union us
           us
         }
-        head { x }
+        head { (x, x) }
       })
 
       val exp = reify {
-        var us = users
-        while (us.size < 100) us = us union us
-        us map { x => x }
+        val compr$r1 = {
+          val anf$r6: org.emmalanguage.test.schema.Marketing.users.type = users;
+          def while$r1(us$p$r1: DataBag[User]): DataBag[Tuple2[User, User]] = {
+            val anf$r7 = us$p$r1.size;
+            val anf$r8 = anf$r7.<(100);
+            def body$r1(): DataBag[Tuple2[User, User]] = {
+              val anf$r9 = us$p$r1.union(us$p$r1);
+              while$r1(anf$r9)
+            };
+            def suffix$r1(): DataBag[Tuple2[User, User]] = {
+              val f$r1 = (x: User) => {
+                val anf$r10 = Tuple2.apply[User, User](x, x);
+                anf$r10
+              };
+              val mapped$r1 = us$p$r1.map[Tuple2[User, User]](f$r1);
+              mapped$r1
+            };
+            if (anf$r8) {
+              body$r1()
+            } else {
+              suffix$r1()
+            }
+          };
+          while$r1(anf$r6)
+        };
+        compr$r1
       }
 
-      val lifted = liftPipeline(exp)
-      applyOnce(MatchMap)(inp) shouldBe alphaEqTo(lifted)
-      combine(inp) shouldBe alphaEqTo(lifted)
+      applyOnce(MatchMap)(inp) shouldBe alphaEqTo(idPipeline(exp))
+      combine(inp) shouldBe alphaEqTo(idPipeline(exp))
     }
   }
 }
