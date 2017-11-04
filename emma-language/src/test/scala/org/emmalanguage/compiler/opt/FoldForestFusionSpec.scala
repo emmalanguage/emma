@@ -31,7 +31,7 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
   def testPipeline(prefix: TreeTransform): u.Tree => u.Tree =
     pipeline(typeCheck = true)(
       prefix,
-      (tree: u.Tree) =>time(FoldForestFusion.foldForestFusion(tree), FoldForestFusion.foldForestFusion.name)
+      FoldForestFusion.foldForestFusion.timed
     )
 
   val anfPipeline: u.Expr[Any] => u.Tree =
@@ -119,51 +119,50 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
       }.tree)
 
       val exp = anfPipeline(reify {
-        val `_ != 0$r1`: this.`_ != 0`.type = this.`_ != 0`
-        val `_ > 0$r1`: this.`_ > 0`.type = this.`_ > 0`
-        val `_ < 0$r1`: this.`_ < 0`.type = this.`_ < 0`
-        val `_ % 2 == 0$r1`: this.`_ % 2 == 0`.type = this.`_ % 2 == 0`
-        val `_ * _ % 5$r1`: this.`_ * _ % 5`.type = this.`_ * _ % 5`
-        val `_.abs min _.abs$r1`: this.`_.abs min _.abs`.type = this.`_.abs min _.abs`
         val alg$Bottom$r1 = alg.Bottom(10, Ordering.Int)
         val alg$Max$r1 = alg.Max(Ordering.Int)
         val alg$Min$r1 = alg.Min(Ordering.Int)
         val alg$Product$r1 = alg.Product(Numeric.IntIsIntegral)
         val alg$Sum$r1 = alg.Sum(Numeric.IntIsIntegral)
         val alg$Top$r1 = alg.Top(10, Ordering.Int)
+        val anf$r1: this.`_ % 2 == 0`.type = this.`_ % 2 == 0`
+        val anf$r2: this.`_ < 0`.type = this.`_ < 0`
+        val anf$r3: this.`_ != 0`.type = this.`_ != 0`
+        val anf$r4: this.`_ > 0`.type = this.`_ > 0`
+        val anf$r5: this.`_ * _ % 5`.type = this.`_ * _ % 5`
+        val anf$r6: this.`_.abs min _.abs`.type = this.`_.abs min _.abs`
         val rands = this.rands
-        val alg$Count$r1 = alg.Count(`_ % 2 == 0$r1`)
-        val alg$Exists$r1 = alg.Exists(`_ < 0$r1`)
-        val alg$Find$r1 = alg.Find(`_ > 0$r1`)
-        val alg$Forall$r1 = alg.Forall(`_ != 0$r1`)
-        val alg$Reduce$r1 = alg.Reduce(0, `_ * _ % 5$r1`)
-        val alg$ReduceOpt$r1 = alg.ReduceOpt(`_.abs min _.abs$r1`)
+        val alg$Count$r1 = alg.Count(anf$r1)
+        val alg$Exists$r1 = alg.Exists(anf$r2)
+        val alg$Find$r1 = alg.Find(anf$r4)
+        val alg$Forall$r1 = alg.Forall(anf$r3)
+        val alg$Reduce$r1 = alg.Reduce(0, anf$r5)
+        val alg$ReduceOpt$r1 = alg.ReduceOpt(anf$r6)
         val alg$Alg15$r1 = alg.Alg15(
-          alg$Max$r1, alg$Min$r1, alg$Bottom$r1, alg$Count$r1, alg$Exists$r1, alg$Find$r1,
-          alg$Forall$r1, alg.IsEmpty, alg.NonEmpty, alg$Product$r1, alg$Reduce$r1, alg$ReduceOpt$r1, alg.Size,
-          alg$Sum$r1, alg$Top$r1)
+          alg.IsEmpty, alg.NonEmpty, alg.Size, alg$Sum$r1, alg$Product$r1, alg$Count$r1, alg$Exists$r1, alg$Forall$r1,
+          alg$Find$r1, alg$Bottom$r1, alg$Top$r1, alg$Reduce$r1, alg$ReduceOpt$r1, alg$Max$r1, alg$Min$r1)
         val app$Alg15$r1 = rands fold alg$Alg15$r1
-        val app$Max$r1 = app$Alg15$r1._1
-        val app$Min$r1 = app$Alg15$r1._2
-        val bottom$r1 = app$Alg15$r1._3
-        val count$r1 = app$Alg15$r1._4
-        val exists$r1 = app$Alg15$r1._5
-        val find$r1 = app$Alg15$r1._6
-        val forall$r1 = app$Alg15$r1._7
-        val isEmpty$r1 = app$Alg15$r1._8
-        val nonEmpty$r1 = app$Alg15$r1._9
-        val product$r1 = app$Alg15$r1._10
-        val reduce$r1 = app$Alg15$r1._11
-        val reduceOption$r1 = app$Alg15$r1._12
-        val size$r1 = app$Alg15$r1._13
-        val sum$r1 = app$Alg15$r1._14
-        val top$r1 = app$Alg15$r1._15
-        val max$r1 = app$Max$r1.get
-        val min$r1 = app$Min$r1.get
-        val apply$r1 = (
-          isEmpty$r1, nonEmpty$r1, size$r1, min$r1, max$r1, sum$r1, product$r1, count$r1, exists$r1,
-          forall$r1, find$r1, bottom$r1, top$r1, reduce$r1, reduceOption$r1)
-        apply$r1
+        val anf$r45 = app$Alg15$r1._1;
+        val anf$r46 = app$Alg15$r1._2;
+        val anf$r47 = app$Alg15$r1._3;
+        val anf$r50 = app$Alg15$r1._4;
+        val anf$r51 = app$Alg15$r1._5;
+        val anf$r53 = app$Alg15$r1._6;
+        val anf$r55 = app$Alg15$r1._7;
+        val anf$r57 = app$Alg15$r1._8;
+        val anf$r59 = app$Alg15$r1._9;
+        val anf$r60 = app$Alg15$r1._10;
+        val anf$r61 = app$Alg15$r1._11;
+        val anf$r63 = app$Alg15$r1._12;
+        val anf$r65 = app$Alg15$r1._13;
+        val app$Max$r1 = app$Alg15$r1._14;
+        val app$Min$r1 = app$Alg15$r1._15;
+        val anf$r48 = app$Min$r1.get;
+        val anf$r49 = app$Max$r1.get;
+        val anf$r66 = (
+          anf$r45, anf$r46, anf$r47, anf$r48, anf$r49, anf$r50, anf$r51, anf$r53,
+          anf$r55, anf$r57, anf$r59, anf$r60, anf$r61, anf$r63, anf$r65)
+        anf$r66
       })
 
       act shouldBe alphaEqTo(exp)
@@ -181,10 +180,10 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
       """)
 
       val exp = anfPipeline(reify {
+        val anf$r1 = Predef intWrapper 1
         val id = (x: Int) => {
           x
         }
-        val intWrapper$r1 = Predef intWrapper 1
         val sum = (x$r1: Int, y: Int) => {
           val plus$r1 = Numeric.IntIsIntegral.plus(x$r1, y)
           plus$r1
@@ -214,7 +213,7 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
         val alg$fold$r23 = alg.Fold(23, id, sum)
         val alg$fold$r24 = alg.Fold(24, id, sum)
         val alg$fold$r25 = alg.Fold(25, id, sum)
-        val to$r1 = intWrapper$r1 to 100
+        val to$r1 = anf$r1 to 100
         val alg$Alg22$r1 = alg.Alg22(
           alg$fold$r1, alg$fold$r2, alg$fold$r3, alg$fold$r4, alg$fold$r5, alg$fold$r6, alg$fold$r7, alg$fold$r8,
           alg$fold$r9, alg$fold$r10, alg$fold$r11, alg$fold$r12, alg$fold$r13, alg$fold$r14, alg$fold$r15,
@@ -369,15 +368,15 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
 
       "in Emma LNF" in {
         val exp = anfPipeline(reify {
-          val `+/- 5$r1`: this.`+/- 5`.type = this.`+/- 5`
-          val `_ > 0$r2`: this.`_ > 0`.type = this.`_ > 0`
           val alg$Min$r2 = alg.Min(Ordering.Int)
           val alg$Sum$r2 = alg.Sum(Numeric.IntIsIntegral)
+          val square$r1: this.square.type = this.square
           val `is prime$r1`: this.`is prime`.type = this.`is prime`
+          val `_ > 0$r2`: this.`_ > 0`.type = this.`_ > 0`
+          val `+/- 5$r1`: this.`+/- 5`.type = this.`+/- 5`
           val rds1 = this.rands
           val rds2 = this.rands
           val rds3 = this.rands
-          val square$r1: this.square.type = this.square
           val alg$Count$r2 = alg.Count(`is prime$r1`)
           val alg$FlatMap$r1 = alg.FlatMap(`+/- 5$r1`, alg$Sum$r2)
           val alg$WithFilter$r1 = alg.WithFilter(`_ > 0$r2`, alg$Min$r2)
@@ -395,15 +394,15 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
 
       "in Emma Core" in {
         val exp = anfPipeline(reify {
-          val `+/- 5$r3` : this.`+/- 5`.type = this.`+/- 5`
-          val `_ > 0$r4` : this.`_ > 0`.type = this.`_ > 0`
           val alg$Min$r3 = alg.Min(scala.math.Ordering.Int)
           val alg$Sum$r3 = alg.Sum(scala.math.Numeric.IntIsIntegral)
+          val square$r3: this.square.type = this.square
           val `is prime$r3` : this.`is prime`.type = this.`is prime`
+          val `_ > 0$r4` : this.`_ > 0`.type = this.`_ > 0`
+          val `+/- 5$r3` : this.`+/- 5`.type = this.`+/- 5`
           val rds1 = this.rands
           val rds2 = this.rands
           val rds3 = this.rands
-          val square$r3: this.square.type = this.square
           val alg$Count$r3 = alg.Count(`is prime$r3`)
           val alg$WithFilter$r2 = alg.WithFilter(`_ > 0$r4`, alg$Min$r3)
           val fun$FlatMap$r1 = (x$r6: scala.Int) => {
@@ -439,9 +438,9 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
 
       "in Emma LNF" in {
         val exp = anfPipeline(reify {
-          val `_ > 0$r3`: this.`_ > 0`.type = this.`_ > 0`
           val alg$Sum$r3 = alg.Sum(Numeric.IntIsIntegral)
           val rands$r5: this.rands.type = this.rands
+          val `_ > 0$r3`: this.`_ > 0`.type = this.`_ > 0`
           val `x => x * x$r1`: this.`x => x * x`.type = this.`x => x * x`
           val alg$Map$r2 = alg.Map(`x => x * x$r1`, alg$Sum$r3)
           val alg$WithFilter$r2 = alg.WithFilter(`_ > 0$r3`, alg$Map$r2)
@@ -454,9 +453,9 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
 
       "in Emma Core" in {
         val exp = anfPipeline(reify {
-          val `_ > 0$r1` : this.`_ > 0`.type = this.`_ > 0`
           val alg$Sum$r1 = alg.Sum(Numeric.IntIsIntegral)
           val rands$r1: this.rands.type = this.rands
+          val `_ > 0$r1` : this.`_ > 0`.type = this.`_ > 0`
           val `x => x * x$r1` : this.`x => x * x`.type = this.`x => x * x`
           val fun$FlatMap$r1 = (x$r1: scala.Int) => {
             val ss$1 = Seq(x$r1)
@@ -498,13 +497,13 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
       }.tree
 
       val exp = anfPipeline(reify {
-        val `_ > 0$r8` : this.`_ > 0`.type = this.`_ > 0`
-        val `_ + 1$r1` : this.`_ + 1`.type = this.`_ + 1`
         val alg$Min$r4 = alg.Min(Ordering.Int)
         val alg$Sum$r6 = alg.Sum(Numeric.IntIsIntegral)
-        val `is prime$r4` : this.`is prime`.type = this.`is prime`
-        val rands = this.rands
         val `x => x * x$r4` : this.`x => x * x`.type = this.`x => x * x`
+        val `_ + 1$r1` : this.`_ + 1`.type = this.`_ + 1`
+        val `is prime$r4` : this.`is prime`.type = this.`is prime`
+        val `_ > 0$r8` : this.`_ > 0`.type = this.`_ > 0`
+        val rands = this.rands
         val alg$Count$r4 = alg.Count(`is prime$r4`)
         val alg$WithFilter$r4 = alg.WithFilter(`_ > 0$r8`, alg$Min$r4)
         val alg$Map$r4 = alg.Map(`_ + 1$r1`, alg$Count$r4)
@@ -539,10 +538,10 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
       }.tree
 
       val exp = anfPipeline(reify {
-        val `_ > 0.5$r1` : this.`_ > 0.5`.type = this.`_ > 0.5`
-        val `_ <= 0.5$r1` : this.`_ <= 0.5`.type = this.`_ <= 0.5`
         val alg$Max$r2 = alg.Max(Ordering.Int)
         val alg$Min$r6 = alg.Min(Ordering.Int)
+        val `_ <= 0.5$r1` : this.`_ <= 0.5`.type = this.`_ <= 0.5`
+        val `_ > 0.5$r1` : this.`_ > 0.5`.type = this.`_ > 0.5`
         val rands: this.rands.type = this.rands
         val alg$Alg2$r6 = alg.Alg2(alg$Max$r2, alg$Min$r6)
         val alg$Count$r6 = alg.Count(`_ <= 0.5$r1`)
@@ -553,14 +552,14 @@ class FoldForestFusionSpec extends BaseCompilerSpec {
         val app$Min$r6 = app$Alg2$r6._2
         val max = app$Max$r2.get
         val min = app$Min$r6.get
-        val anonfun$r7 = (x: scala.Int) => {
+        val fun$r7 = (x: scala.Int) => {
           val `-$r1` = x - min
           val `-$r2` = max - min
           val toDouble$r1 = `-$r2`.toDouble
           val `/$r1` = `-$r1` / toDouble$r1
           `/$r1`
         }
-        val alg$Map$r8 = alg.Map(anonfun$r7, alg$Alg2$r5)
+        val alg$Map$r8 = alg.Map(fun$r7, alg$Alg2$r5)
         val app$Alg2$r5 = rands.fold(alg$Map$r8)
         val c1 = app$Alg2$r5._1
         val c2 = app$Alg2$r5._2

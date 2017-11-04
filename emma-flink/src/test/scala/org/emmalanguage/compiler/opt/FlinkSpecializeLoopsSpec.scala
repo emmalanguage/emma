@@ -37,7 +37,7 @@ class FlinkSpecializeLoopsSpec extends BaseCompilerSpec with FlinkAware {
   lazy val testPipeline: u.Expr[Any] => u.Tree =
     pipeline(true)(
       Core.lift,
-      (tree: u.Tree) => time(FlinkSpecializeLoops.specializeLoops(tree), FlinkSpecializeLoops.specializeLoops.name)
+      FlinkSpecializeLoops.specializeLoops.timed
     ).compose(_.tree)
 
   lazy val dscfPipeline: u.Expr[Any] => u.Tree =

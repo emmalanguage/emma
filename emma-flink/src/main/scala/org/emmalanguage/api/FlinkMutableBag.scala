@@ -17,7 +17,6 @@ package org.emmalanguage
 package api
 
 import FlinkMutableBag.State
-//import Meta.Projections._
 import flink._
 
 import org.apache.flink.api.scala.DataSet

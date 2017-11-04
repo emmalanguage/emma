@@ -31,7 +31,7 @@ class PatternMatchingSpec extends BaseCompilerSpec {
       fixSymbolTypes,
       unQualifyStatics,
       normalizeStatements,
-      (tree: u.Tree) => time(PatternMatching.destruct(tree), PatternMatching.destruct.name)
+      PatternMatching.destruct.timed
     ).compose(_.tree)
 
   val noopPipeline: u.Expr[Any] => u.Tree =

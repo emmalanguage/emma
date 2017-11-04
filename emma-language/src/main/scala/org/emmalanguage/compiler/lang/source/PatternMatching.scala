@@ -53,7 +53,7 @@ private[source] trait PatternMatching extends Common {
      *   }
      * }}}
      */
-    lazy val destruct: TreeTransform = TreeTransform("PatternMatching.destruct",
+    lazy val destruct = TreeTransform("PatternMatching.destruct",
       api.BottomUp.withOwner.transformWith {
         case Attr.inh(
           mat @ src.PatMat(target, Seq(src.PatCase(pat, src.Empty(_), body), _*)),

@@ -29,24 +29,30 @@ private[core] trait ANF extends Common {
 
   import Core.{Lang => core}
   import Source.{Lang => src}
+  import API.{ComprehensionSyntax=>cs}
   import UniverseImplicits._
 
   /** Administrative Normal Form (ANF) bypassing control-flow and for-comprehensions. */
   private[core] object ANF {
 
     /** The ANF transformation. */
-    private lazy val anf: TreeTransform = TreeTransform("ANF.anf",
+    private lazy val anf = TreeTransform("ANF.anf",
       api.BottomUp.withParent.withOwner.transformWith {
         // lit | this | x
         case Attr.inh(src.Atomic(atom), _ :: parent :: _) => parent.collect {
           // Convert atoms to trivial blocks in lambdas, comprehensions and continuations.
           case src.Lambda(_, _, _) =>
-          case core.Comprehension(_) =>
+          case core.DefCall(Some(core.Ref(cs.sym)), _, _, _) =>
           case core.DefDef(_, _, _, _) =>
         }.fold(atom)(const(src.Block(expr = atom)))
 
         // comprehension[T] { ... }
-        case Attr.none(compr @ core.Comprehension(_)) =>
+        case Attr.inh(compr @ core.DefCall(Some(core.Ref(cs.sym)), cs.comprehension, _, _), owner :: _) =>
+          val valSym = api.ValSym(owner, api.TermName.fresh("compr"), compr.tpe)
+          src.Block(Seq(core.ValDef(valSym, compr)), core.Ref(valSym))
+
+        // generator { ... } | guard { ... } | head { ... }
+        case Attr.none(compr @ core.DefCall(Some(core.Ref(cs.sym)), cs.generator | cs.guard | cs.head, _, _)) =>
           src.Block(expr = compr)
 
         // cont(..args) | if (cond) cont1(..args1) else cont2(..args2)
@@ -97,7 +103,7 @@ private[core] trait ANF extends Common {
           } yield stat
 
           val rhs = core.DefCall(expr, method, targs, exprss)
-          val nme = api.TermName.fresh(method)
+          val nme = api.TermName.fresh("anf")
           val lhs = api.ValSym(owner, nme, rhs.tpe)
           val tmp = core.ValDef(lhs, rhs)
           val ref = core.Ref(lhs)
@@ -115,7 +121,7 @@ private[core] trait ANF extends Common {
           } yield stat
 
           val rhs = core.Inst(cls, targs, exprss)
-          val nme = api.TermName.fresh(cls.typeSymbol)
+          val nme = api.TermName.fresh("anf")
           val lhs = api.ValSym(owner, nme, rhs.tpe)
           val tmp = core.ValDef(lhs, rhs)
           val ref = core.Ref(lhs)
@@ -123,7 +129,7 @@ private[core] trait ANF extends Common {
 
         // (params) => { ..stats; atom }
         case Attr.none(lambda @ src.Lambda(fun, _, _)) =>
-          val nme = api.TermName.fresh(api.TermName.lambda)
+          val nme = api.TermName.fresh("fun")
           val lhs = api.ValSym(fun.owner, nme, lambda.tpe)
           val tmp = core.ValDef(lhs, lambda)
           val ref = core.Ref(lhs)
@@ -132,7 +138,7 @@ private[core] trait ANF extends Common {
         // if ({ ..stats, cond }) thn else els
         case Attr.inh(src.Branch(AsBlock(stats, cond), thn, els), owner :: _) =>
           val rhs = src.Branch(cond, thn, els)
-          val nme = api.TermName.fresh("if")
+          val nme = api.TermName.fresh("anf")
           val lhs = api.ValSym(owner, nme, rhs.tpe)
           val tmp = core.ValDef(lhs, rhs)
           val ref = core.ValRef(lhs)
@@ -168,8 +174,10 @@ private[core] trait ANF extends Common {
      *
      * @return An ANF version of the input tree.
      */
-    lazy val transform: TreeTransform =
-      resolveNameClashes andThen anf
+    lazy val transform = TreeTransform("ANF.transform", Seq(
+      resolveNameClashes,
+      anf
+    ))
 
     /**
      * Un-nests nested blocks.
@@ -180,7 +188,7 @@ private[core] trait ANF extends Common {
      * == Postconditions ==
      * - An ANF tree where all nested blocks have been flattened.
      */
-    lazy val unnest: TreeTransform = TreeTransform("ANF.unnest",
+    lazy val unnest = TreeTransform("ANF.unnest",
       api.BottomUp.transform {
         case parent @ core.Let(vals, defs, expr) if hasNestedLets(parent) =>
           // Flatten nested let expressions in value position without control flow.

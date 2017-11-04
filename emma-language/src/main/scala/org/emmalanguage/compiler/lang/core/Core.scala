@@ -159,14 +159,6 @@ private[compiler] trait Core extends Common
         }
       }
 
-      // Matcher for comprehensions
-      object Comprehension {
-        import API.ComprehensionSyntax._
-        def unapply(tree: u.Tree): Option[u.Tree] = tree match {
-          case DefCall(Some(Ref(`sym`)), _, _, _) => Some(tree)
-          case _ => None
-        }
-      }
 
       // Matcher for continuations (local method calls and branches)
       object Continuation {
@@ -300,15 +292,18 @@ private[compiler] trait Core extends Common
     // -------------------------------------------------------------------------
 
     /** Lifting. The canonical compiler frontend. */
-    lazy val lift: TreeTransform = {
-      lnf andThen
-      Comprehension.resugarDataBag andThen
-      Comprehension.normalizeDataBag andThen
+    lazy val lift = TreeTransform("Core.lift", Seq(
+      lnf,
+      Comprehension.resugarDataBag,
+      Comprehension.normalizeDataBag,
       Reduce.transform
-    }
+    ))
 
     /** Chains [[ANF.transform]], and [[DSCF.transform]]. */
-    lazy val lnf: TreeTransform = anf andThen dscf
+    lazy val lnf = TreeTransform("Core.lnf", Seq(
+      anf,
+      dscf
+    ))
 
     /** Delegates to [[DSCF.transform]]. */
     lazy val dscf = DSCF.transform

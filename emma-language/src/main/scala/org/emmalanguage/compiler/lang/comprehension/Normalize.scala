@@ -41,7 +41,7 @@ private[comprehension] trait Normalize extends Common {
      * @param monad The symbol of the monad syntax to be normalized.
      * @return The normalized input tree.
      */
-    def normalize(monad: u.Symbol): TreeTransform = TreeTransform("Normalize.normalize", {
+    def normalize(monad: u.Symbol) = TreeTransform("Normalize.normalize", {
       // construct comprehension syntax helper for the given monad
       val cs = Syntax(monad)
       val nr = NormalizationRules(cs)

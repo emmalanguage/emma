@@ -40,8 +40,8 @@ private[core] trait Reduce extends Common {
      * Reduces an Emma Core term as follows.
      *
      * - Inlines local lambda definitions (without local control-flow) which are
-     * used inly once in an application.
-     * - Propagades trivial assignments.
+     * used only once in an application.
+     * - Propagates trivial assignments.
      *
      * == Preconditions ==
      * - The input tree is in LNF (see [[Core.lnf]]).
@@ -49,11 +49,12 @@ private[core] trait Reduce extends Common {
      * == Postconditions ==
      * - All unused value definitions are pruned.
      */
-    lazy val transform: TreeTransform =
-      TreeTransform("Reduce.fixInlineLambdas", (tree: u.Tree) => fixInlineLambdas(tree)) andThen
+    lazy val transform: TreeTransform = TreeTransform("Reduce.transform", Seq(
+      TreeTransform("Reduce.fixInlineLambdas", fixInlineLambdas _),
       inlineTrivialValDefs
+    ))
 
-    private lazy val inlineTrivialValDefs: TreeTransform = TreeTransform("Reduce.inlineTrivialValDefs",
+    private lazy val inlineTrivialValDefs = TreeTransform("Reduce.inlineTrivialValDefs",
       api.BottomUp.inherit({ // accumulate trivial ValDef bindings in scope
         case core.Let(vals, _, _) =>
           vals.foldLeft(Map.empty[u.Symbol, u.Tree])((valDefs, valDef) => valDef match {

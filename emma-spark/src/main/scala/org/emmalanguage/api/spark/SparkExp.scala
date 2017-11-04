@@ -36,6 +36,8 @@ object SparkExp {
   case class Struct private(names: Seq[String], vals: Seq[Expr])(implicit val spark: SparkSession) extends Expr
   // other expressions
   case class Lit private(x: Any)(implicit val spark: SparkSession) extends Expr
+  case class IsNull private(x: Expr)(implicit val spark: SparkSession) extends Expr
+  case class IsNotNull private(x: Expr)(implicit val spark: SparkSession) extends Expr
   case class Eq private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
   case class Ne private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
   case class Gt private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
@@ -51,6 +53,7 @@ object SparkExp {
   case class Divide private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
   case class Mod private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
   case class StartsWith private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
+  case class Contains private(x: Expr, y: Expr)(implicit val spark: SparkSession) extends Expr
   //@formatter:on
 
   object Chain {
@@ -77,6 +80,10 @@ object SparkExp {
       // other expressions
       case Lit(x) =>
         fun.lit(x)
+      case IsNull(x) =>
+        x.col.isNull
+      case IsNotNull(x) =>
+        x.col.isNotNull
       case Eq(x, y) =>
         x.col eqNullSafe y.col
       case Ne(x, y) =>
@@ -107,6 +114,8 @@ object SparkExp {
         x.col mod y.col
       case StartsWith(x, y) =>
         x.col startsWith y.col
+      case Contains(x, y) =>
+        x.col contains y.col
     }
   }
 
@@ -121,6 +130,12 @@ object SparkExp {
 
   def struct(names: String*)(vals: Any*)(implicit spark: SparkSession): Expr =
     Struct(names, vals.map(anyToExpr))
+
+  def isNull(x: Any)(implicit spark: SparkSession): Expr =
+    IsNull(x)
+
+  def isNotNull(x: Any)(implicit spark: SparkSession): Expr =
+    IsNotNull(x)
 
   def eq(x: Any, y: Any)(implicit spark: SparkSession): Expr =
     Eq(x, y)
@@ -166,4 +181,7 @@ object SparkExp {
 
   def startsWith(x: Any, y: Any)(implicit spark: SparkSession): Expr =
     StartsWith(x, y)
+
+  def contains(x: Any, y: Any)(implicit spark: SparkSession): Expr =
+    Contains(x, y)
 }

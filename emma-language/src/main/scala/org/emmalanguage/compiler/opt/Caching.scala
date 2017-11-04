@@ -71,7 +71,7 @@ private[opt] trait Caching extends Common {
      *
      * - A tree where DataBag have been wrapped in `cache(...)` calls if needed.
      */
-    lazy val addCacheCalls: TreeTransform = TreeTransform("Caching.addCacheCalls", tree => {
+    lazy val addCacheCalls = TreeTransform("Caching.addCacheCalls", tree => {
       // Per DataBag reference, collect flag for access in a loop and ref count.
       val refs = api.TopDown.withOwnerChain.accumulateWith[CacheFlags] {
         // Increment counter and set flag if referenced in a loop.

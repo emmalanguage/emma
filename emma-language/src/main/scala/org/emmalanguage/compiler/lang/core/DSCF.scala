@@ -104,7 +104,7 @@ private[core] trait DSCF extends Common {
       Ordering.by(_.name.toString)
 
     /** The Direct-Style Control-Flow (DSCF) transformation. */
-    lazy val transform: TreeTransform = TreeTransform("DSCF.transform", api.TopDown
+    lazy val transform = TreeTransform("DSCF.transform", api.TopDown
       .withBindUses.withVarDefs.withOwnerChain
       .synthesize(Attr.collect[SortedSet, u.TermSymbol] {
         // Collect all variable assignments in a set sorted by name.
@@ -118,7 +118,7 @@ private[core] trait DSCF extends Common {
           }))
         case Attr.none(core.DefDef(method, _, paramss, _)) =>
           paramss.flatten.map { case core.ParDef(p, _) =>
-            (method, api.TermName.original(p.name)._1) -> core.Ref(p)
+            (method, ParName.orig(p)) -> core.Ref(p)
           } (breakOut)
       } (overwrite).transformSyn {
         // Eliminate variables
@@ -233,7 +233,7 @@ private[core] trait DSCF extends Common {
     }._tree)
 
     /** The Direct-Style Control-Flow (DSCF) inverse transformation. */
-    lazy val inverse: TreeTransform = TreeTransform("DSCF.inverse", tree => {
+    lazy val inverse = TreeTransform("DSCF.inverse", tree => {
       // construct dataflow graph
       val cfg = ControlFlow.cfg(tree)
       // construct transitive closure of nesting graph
@@ -456,22 +456,20 @@ private[core] trait DSCF extends Common {
             core.Branch(cond,
               core.DefCall(None, m1, _, Seq(argsthn)),
               core.DefCall(None, m2, _, Seq(argsels)))
-          ), _, owner :: _, _)
+          ), _, _ :: _, _)
             if s == m1
             && s == m2
             && is[continuation](s) =>
           //@formatter:off
           val vars = mkCondValDefs(pars, cond, argsthn, argsels)
 
-          val rslt = src.Block(
+          src.Block(
             Seq.concat(
               pref,
               vars,
               suff.stats
             ),
             suff.expr)
-
-          rslt
 
         // a let block with nested `if($cond) $thn` control-flow
         //@formatter:off
@@ -627,9 +625,9 @@ private[core] trait DSCF extends Common {
         m -> api.Sym.With(m)(ans = Seq.empty)
       } (breakOut))(tree)
 
-    // ---------------
-    // Helper methods
-    // ---------------
+    // ------------------------
+    // Helper methods & objects
+    // ------------------------
 
     /** Creates a monomorphic method symbol (no type arguments, one parameter list). */
     private def monomorphic(own: u.Symbol, nme: u.TermName,
@@ -642,7 +640,7 @@ private[core] trait DSCF extends Common {
 
     /** Converts a sequence of variable symbols to a parameter list. */
     private def varPars(vars: Seq[u.TermSymbol]) =
-      for (x <- vars) yield api.ParSym(x.owner, api.TermName.fresh(x), x.info)
+      for (x <- vars) yield api.ParSym(x.owner, ParName.from(x), x.info)
 
     /** Looks up the current state of a variable, given an environment and the owner chain. */
     private def currentState(x: u.TermSymbol,
@@ -667,5 +665,21 @@ private[core] trait DSCF extends Common {
 
     private lazy val _asInstanceOf =
       api.Type[Any].member(api.TermName("asInstanceOf")).asMethod
+
+    object ParName {
+      import api.TermName.regex
+
+      private val suff = "$p"
+
+      def from(x: u.Symbol): u.TermName = x.name match {
+        case u.TermName(name) => api.TermName.fresh(name + suff)
+      }
+
+      def orig(x: u.Symbol): u.TermName = x.name match {
+        case u.TermName(regex(name, _)) => u.TermName(name.stripSuffix(suff))
+        case u.TermName(name) => u.TermName(name.stripSuffix(suff))
+      }
+    }
+
   }
 }

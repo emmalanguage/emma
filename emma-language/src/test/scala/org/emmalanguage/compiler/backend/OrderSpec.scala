@@ -31,12 +31,12 @@ class OrderSpec extends BaseCompilerSpec {
       Core.lnf
     ).compose(_.tree)
 
-  val dis: u.Tree => u.Tree = tree => Order.disambiguate(tree)._1
+  val dis= TreeTransform("disambiguate", tree => Order.disambiguate(tree)._1)
 
   val disamb: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lnf,
-      (tree: u.Tree) => time(dis(tree), "disambiguate")
+      dis.timed
     ).compose(_.tree)
 
   "order disambiguation" - {

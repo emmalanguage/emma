@@ -57,7 +57,7 @@ private[compiler] trait FlinkBackend extends Common {
     } yield srcOp -> tgtOp) (breakOut): Map[u.MethodSymbol, u.MethodSymbol]
 
     /** Specialize backend for Flink. */
-    val transform: TreeTransform = TreeTransform("FlinkBackend.transform", tree => {
+    val transform = TreeTransform("FlinkBackend.transform", tree => {
       val G = ControlFlow.cfg(tree)
       val C = Context.bCtxGraph(G)
       val V = G.data.labNodes.map(_.label)

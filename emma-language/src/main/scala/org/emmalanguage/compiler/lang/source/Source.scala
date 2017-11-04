@@ -277,14 +277,13 @@ private[compiler] trait Source extends Common
      * - [[PatternMatching.destruct]]
      * - [[Foreach2Loop.transform]]
      */
-    lazy val normalize = {
-      PatternMatching.destruct
-    } andThen {
+    lazy val normalize = TreeTransform("Source.normalize", Seq(
+      PatternMatching.destruct,
       Foreach2Loop.transform
-    }
+    ))
 
     /** Removes implicit lists consisting of the following symbols. */
-    def removeImplicits(types: Set[u.Type]): TreeTransform = TreeTransform("Source.removeImplicits", {
+    def removeImplicits(types: Set[u.Type]) = TreeTransform("Source.removeImplicits", {
 
       object Matching {
 

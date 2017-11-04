@@ -30,7 +30,7 @@ class ANFSpec extends BaseCompilerSpec {
 
   val anfPipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
-      (tree: u.Tree) => time(ANF.transform(tree), ANF.transform.name)
+      ANF.transform.timed
     ).compose(_.tree)
 
   val A = new A
@@ -190,7 +190,7 @@ class ANFSpec extends BaseCompilerSpec {
 
   "bypass mock comprehensions" in {
     val act = anfPipeline(reify {
-      val res = comprehension {
+      comprehension {
         val u = generator(users)
         val a = generator(ads)
         val c = generator(clicks)
@@ -198,7 +198,6 @@ class ANFSpec extends BaseCompilerSpec {
         guard(a.id == c.adID)
         head(c.time, a.`class`)
       }
-      res
     })
 
     val exp = idPipeline(reify {

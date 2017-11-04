@@ -130,7 +130,7 @@ private[opt] trait SparkSpecializeOps {
     })
 
     /** Specializes lambdas as [[org.emmalanguage.api.spark.SparkExp SparkExp]] expressions. */
-    lazy val specializeLambda: TreeTransform = TreeTransform("SparkspecializeLambda.specializeLambda", {
+    lazy val specializeLambda = TreeTransform("SparkspecializeLambda.specializeLambda", _ match {
       case lambda@core.Lambda(_, Seq(core.ParDef(p, _)), core.Let(vals, Seq(), core.Ref(r))) =>
 
         val valOf = vals.map(vd => {
@@ -143,6 +143,56 @@ private[opt] trait SparkSpecializeOps {
             && t.companion.info.baseClasses.contains(api.Sym[Product]) => true
           case _ => false
         }
+
+        val nullComparisonOf = Map(
+          //@formatter:off
+          api.TermName("==") -> Exp.isNull,
+          api.TermName("eq") -> Exp.isNull,
+          api.TermName("!=") -> Exp.isNotNull,
+          api.TermName("ne") -> Exp.isNotNull
+          //@formatter:on
+        )
+
+        val eqComparisonOf = Map(
+          //@formatter:off
+          api.TermName("==") -> Exp.eq,
+          api.TermName("eq") -> Exp.eq,
+          api.TermName("!=") -> Exp.ne,
+          api.TermName("ne") -> Exp.ne
+          //@formatter:on
+        )
+
+        val ordComparisonOf = Map(
+          //@formatter:off
+          api.TermName(">" ) -> Exp.gt,
+          api.TermName(">=") -> Exp.geq,
+          api.TermName("<" ) -> Exp.lt,
+          api.TermName("<=") -> Exp.leq
+          //@formatter:on
+        )
+
+        val booleanOf = Map(
+          //@formatter:off
+          api.TermName("unary_!" ) -> Exp.not,
+          api.TermName("&&")       -> Exp.and,
+          api.TermName("||" )      -> Exp.or
+          //@formatter:on
+        )
+
+        val arithmeticOf = Map(
+          //@formatter:off
+          api.TermName("+")  -> Exp.plus,
+          api.TermName("-")  -> Exp.minus,
+          api.TermName("*" ) -> Exp.multiply,
+          api.TermName("/")  -> Exp.divide,
+          api.TermName("%")  -> Exp.mod
+          //@formatter:on
+        )
+
+        val stringOf = Map(
+          api.TermName("startsWith") -> Exp.startsWith,
+          api.TermName("contains") -> Exp.contains
+        )
 
         if (p == r || valOf.contains(r)) {
           val mapSym = Map(
@@ -185,11 +235,29 @@ private[opt] trait SparkSpecializeOps {
               val rhs = core.DefCall(Some(tgt), met, Seq(), Seq(as1, as2))
               Some(core.ValDef(mapSym(x), rhs))
 
-            // translate comparisons
-            case core.DefCall(Some(y), method, _, zs)
-              if isNumeric(y.tpe.widen) && (comparisonOf contains method.name) =>
+            // translate `null` comparisons
+            case core.DefCall(Some(y), method, _, Seq(Seq(core.Lit(null))))
+              if nullComparisonOf contains method.name =>
               val tgt = Exp.ref
-              val met = comparisonOf(method.name)
+              val met = nullComparisonOf(method.name)
+              val ags = mapArgs(Seq(y))
+              val rhs = core.DefCall(Some(tgt), met, Seq(), Seq(ags))
+              Some(core.ValDef(mapSym(x), rhs))
+
+            // translate normal comparisons
+            case core.DefCall(Some(y), method, _, zs)
+              if eqComparisonOf contains method.name =>
+              val tgt = Exp.ref
+              val met = eqComparisonOf(method.name)
+              val ags = mapArgs(y +: zs.flatten)
+              val rhs = core.DefCall(Some(tgt), met, Seq(), Seq(ags))
+              Some(core.ValDef(mapSym(x), rhs))
+
+            // translate ordering comparisons
+            case core.DefCall(Some(y), method, _, zs)
+              if isNumeric(y.tpe.widen) && (ordComparisonOf contains method.name) =>
+              val tgt = Exp.ref
+              val met = ordComparisonOf(method.name)
               val ags = mapArgs(y +: zs.flatten)
               val rhs = core.DefCall(Some(tgt), met, Seq(), Seq(ags))
               Some(core.ValDef(mapSym(x), rhs))
@@ -306,40 +374,5 @@ private[opt] trait SparkSpecializeOps {
     api.Type.Java.long,
     api.Type.Java.float,
     api.Type.Java.double
-  )
-
-  private lazy val booleanOf = Map(
-    //@formatter:off
-    api.TermName("unary_!" ) -> Exp.not,
-    api.TermName("&&")       -> Exp.and,
-    api.TermName("||" )      -> Exp.or
-    //@formatter:on
-  )
-
-  private lazy val comparisonOf = Map(
-    //@formatter:off
-    api.TermName(">" ) -> Exp.gt,
-    api.TermName(">=") -> Exp.geq,
-    api.TermName("<" ) -> Exp.lt,
-    api.TermName("<=") -> Exp.leq,
-    api.TermName("==") -> Exp.eq,
-    api.TermName("eq") -> Exp.eq,
-    api.TermName("!=") -> Exp.ne,
-    api.TermName("ne") -> Exp.ne
-    //@formatter:on
-  )
-
-  private lazy val arithmeticOf = Map(
-    //@formatter:off
-    api.TermName("+")  -> Exp.plus,
-    api.TermName("-")  -> Exp.minus,
-    api.TermName("*" ) -> Exp.multiply,
-    api.TermName("/")  -> Exp.divide,
-    api.TermName("%")  -> Exp.mod
-    //@formatter:on
-  )
-
-  private lazy val stringOf = Map(
-    api.TermName("startsWith") -> Exp.startsWith
   )
 }

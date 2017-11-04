@@ -28,9 +28,9 @@ import scala.annotation.tailrec
  * The following identities must hold forall `x`, `y`, `z`:
  *
  * {{{
- *          merge x zero == x == merge zero x
- *   merge x (merge y z) == merge (merge x y) z
- *             merge x y == merge y x
+ *         plus x zero == x == plus zero x
+ *   plus x (plus y z) == plus (plus x y) z
+ *            plus x y == plus y x
  * }}}
  *
  * Instances of this type model parallel computations.
@@ -98,7 +98,7 @@ case object Size extends Alg[Any, Long] {
 /** Constructed by `xs.count(p)`. */
 case class Count[A](p: A => Boolean) extends Alg[A, Long] {
   val zero: Long = 0
-  val init: A => Long = p(_) compare false
+  val init: A => Long = x => if (p(x)) 1 else 0
   val plus: (Long, Long) => Long = _ + _
 }
 

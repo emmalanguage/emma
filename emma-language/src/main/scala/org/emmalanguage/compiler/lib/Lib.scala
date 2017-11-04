@@ -37,7 +37,7 @@ private[compiler] trait Lib extends Common {
     // API
     // -------------------------------------------------------------------------
 
-    lazy val expand: TreeTransform = TreeTransform("Lib.expand",
+    lazy val expand = TreeTransform("Lib.expand",
       tree => doExpand(tree, api.Owner.encl, Nil))
 
     // -------------------------------------------------------------------------

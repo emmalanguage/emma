@@ -31,7 +31,7 @@ class TrampolineSpec extends BaseCompilerSpec {
     pipeline(typeCheck = true)(
       Core.anf,
       Core.dscf,
-      (tree: u.Tree) => time(Core.trampoline(tree), Core.trampoline.name),
+      Core.trampoline.timed,
       Core.anf
     ).compose(_.tree)
 

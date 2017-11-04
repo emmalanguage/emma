@@ -27,7 +27,7 @@ class DCESpec extends BaseCompilerSpec {
   val dcePipeline: u.Expr[Any] => u.Tree =
     pipeline(typeCheck = true)(
       Core.lnf,
-      (tree: u.Tree) => time(DCE.transform(tree), DCE.transform.name)
+      DCE.transform.timed
     ).compose(_.tree)
 
   "eliminate unused valdefs" - {
