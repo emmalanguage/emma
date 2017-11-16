@@ -9,7 +9,10 @@ This page was created by the [TU Berlin, Database Systems and Information Manage
 
 ## Funding and Collaborators
 
-This project is partly funded by the [DFG](http://www.dfg.de/en/) as [FOR 1306 Stratosphere](http://stratosphere.eu) and by the [Berlin Big Data Center](http://bbdc.berlin).
+This project is funded by
+the [Berlin Big Data Center](http://bbdc.berlin),
+the [DFG](http://www.dfg.de/en/) as [FOR 1306 Stratosphere](http://stratosphere.eu),
+and the [Horizon 2020 EU Research and Innovation Programme](https://ec.europa.eu/programmes/horizon2020/) as [STREAMLINE (Project ID: 688191)](http://h2020-streamline-project.eu/).
 
 <div class="text-center" style="margin: 3ex 0">
     <a href="http://www.tu-berlin.de" target="_blank" style="margin: 0 2ex">
