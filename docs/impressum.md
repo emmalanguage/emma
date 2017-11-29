@@ -21,6 +21,9 @@ and the [Horizon 2020 EU Research and Innovation Programme](https://ec.europa.eu
     <a href="http://bbdc.berlin" target="_blank" style="margin: 0 2ex">
         <img style="height:50px;" src="{{ site.baseurl }}/img/logo/bbdc-logo.png" alt="Berlin Big Data Center">
     </a>
+    <a href="https://www.dfki.de" target="_blank" style="margin: 0 2ex">
+        <img style="height:50px;" src="{{ site.baseurl }}img/logo/dfkilogo_truncated.jpg" alt="DFKI">
+    </a>
     <a href="http://stratosphere.eu" target="_blank" style="margin: 0 2ex">
         <img style="height:50px;" src="{{ site.baseurl }}/img/logo/stratosphere_logo.png" alt="Stratosphere">
     </a>
