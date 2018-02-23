@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package jobsold;
+package org.emmalanguage.labyrinth.jobsold;
 
 import org.emmalanguage.labyrinth.BagOperatorHost;
-import org.emmalanguage.labyrinth.ElementOrEvent;
 import org.emmalanguage.labyrinth.operators.Bagify;
 import org.emmalanguage.labyrinth.operators.IdMap;
 import org.emmalanguage.labyrinth.partitioners.Always0;
 import org.emmalanguage.labyrinth.partitioners.RoundRobin;
 import org.emmalanguage.labyrinth.CFLConfig;
+import org.emmalanguage.labyrinth.ElementOrEvent;
 import org.emmalanguage.labyrinth.KickoffSource;
 import org.emmalanguage.labyrinth.operators.AssertBagEquals;
 import org.emmalanguage.labyrinth.partitioners.FlinkPartitioner;
@@ -36,7 +36,7 @@ import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
 
 import java.util.Arrays;
 
-public class EmptyBags {
+public class NoCF {
 
 	private static TypeSerializer<String> stringSer = TypeInformation.of(String.class).createSerializer(new ExecutionConfig());
 
@@ -54,17 +54,24 @@ public class EmptyBags {
 		env.addSource(kickoffSrc).addSink(new DiscardingSink<>());
         final int para = env.getParallelism();
 
-		String[] words = new String[]{};
+		String[] words = new String[]{"alma", "korte", "alma", "b", "b", "b", "c", "d", "d"};
+
+//		DataStream<ElementOrEvent<String>> input = env.fromElements(
+//				new ElementOrEvent<String>((byte)0, new ElementOrEvent.Event(ElementOrEvent.Event.Type.START, 1)),
+//				new ElementOrEvent<String>((byte)0, "alma"),
+//				new ElementOrEvent<String>((byte)0, new ElementOrEvent.Event(ElementOrEvent.Event.Type.END, 1))
+//		);
 
 
 		DataStream<ElementOrEvent<String>> input =
-				env.fromCollection(Arrays.asList(words), TypeInformation.of(String.class))
+				env.fromCollection(Arrays.asList(words))
 						.transform("bagify", Util.tpe(), new Bagify<>(new RoundRobin<>(para), 0))
                         .setConnectionType(new FlinkPartitioner<>());
 
 		System.out.println(input.getParallelism());
 
 		DataStream<ElementOrEvent<String>> output = input
+				//.setConnectionType(new Forward<>())
 				.bt("id-map",input.getType(),
 				new BagOperatorHost<String, String>(new IdMap<>(), 0, 1, stringSer)
 						.addInput(0, 0, true, 0)
@@ -72,12 +79,14 @@ public class EmptyBags {
 				.setConnectionType(new FlinkPartitioner<>());
 
 		output
-				.bt("assert", Util.tpe(), new BagOperatorHost<>(new AssertBagEquals<String>(), 0, 2, stringSer)
+				//.setConnectionType(new Forward<>())
+				.bt("assert", Util.tpe(), new BagOperatorHost<>(new AssertBagEquals<>("alma", "korte", "alma", "b", "b", "b", "c", "d", "d"), 0, 2, stringSer)
 						.addInput(0, 0, true, 1))
 				.setParallelism(1);
 
 		CFLConfig.getInstance().setNumToSubscribe();
 
+		System.out.println(env.getExecutionPlan());
 		env.execute();
 	}
 }

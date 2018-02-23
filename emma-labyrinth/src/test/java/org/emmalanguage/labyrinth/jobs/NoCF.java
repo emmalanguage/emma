@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package jobs;
+package org.emmalanguage.labyrinth.jobs;
 
 import org.emmalanguage.labyrinth.CFLConfig;
 import org.emmalanguage.labyrinth.ElementOrEvent;

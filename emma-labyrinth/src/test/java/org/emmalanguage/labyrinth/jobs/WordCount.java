@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-package jobs;
+package org.emmalanguage.labyrinth.jobs;
 
-import org.emmalanguage.labyrinth.operators.*;
 import org.emmalanguage.labyrinth.*;
 import org.emmalanguage.labyrinth.partitioners.Always0;
 import org.emmalanguage.labyrinth.partitioners.RoundRobin;
