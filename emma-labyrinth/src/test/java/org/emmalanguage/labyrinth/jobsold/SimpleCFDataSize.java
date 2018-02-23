@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package jobsold;
+package org.emmalanguage.labyrinth.jobsold;
 
 import org.emmalanguage.labyrinth.CondOutputSelector;
 import org.emmalanguage.labyrinth.operators.IncMap;

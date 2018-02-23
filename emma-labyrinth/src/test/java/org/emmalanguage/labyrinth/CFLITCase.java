@@ -16,14 +16,15 @@
 
 package org.emmalanguage.labyrinth;
 
-import jobs.ClickCountDiffsScala;
-import jobsold.NoCF;
-import jobsold.SimpleCF;
-import inputgen.ClickCountDiffsInputGen;
-import jobsold.ConnectedComponents;
-import jobsold.ConnectedComponentsMB;
-import jobsold.EmptyBags;
-import jobsold.SimpleCFDataSize;
+import org.emmalanguage.labyrinth.jobs.ClickCountDiffs;
+import org.emmalanguage.labyrinth.jobs.ClickCountDiffsScala;
+import org.emmalanguage.labyrinth.jobsold.NoCF;
+import org.emmalanguage.labyrinth.jobsold.SimpleCF;
+import org.emmalanguage.labyrinth.inputgen.ClickCountDiffsInputGen;
+import org.emmalanguage.labyrinth.jobsold.ConnectedComponents;
+import org.emmalanguage.labyrinth.jobsold.ConnectedComponentsMB;
+import org.emmalanguage.labyrinth.jobsold.EmptyBags;
+import org.emmalanguage.labyrinth.jobsold.SimpleCFDataSize;
 import org.apache.commons.io.FileUtils;
 import org.apache.flink.runtime.client.JobCancellationException;
 import org.junit.Test;
@@ -41,7 +42,7 @@ public class CFLITCase {
     @Test(expected=JobCancellationException.class)
     public void testNoCFNew() throws Exception {
         LabyNode.labyNodes.clear();
-        jobs.NoCF.main(null);
+        org.emmalanguage.labyrinth.jobs.NoCF.main(null);
     }
 
     @Test(expected=JobCancellationException.class)
@@ -57,7 +58,7 @@ public class CFLITCase {
     @Test(expected=JobCancellationException.class)
     public void testSimpleCFNew() throws Exception {
         LabyNode.labyNodes.clear();
-        jobs.SimpleCF.main(new String[]{"100"});
+        org.emmalanguage.labyrinth.jobs.SimpleCF.main(new String[]{"100"});
     }
 
     @Test(expected=JobCancellationException.class)
@@ -79,13 +80,43 @@ public class CFLITCase {
     public void testClickCountDiffs() throws Exception {
         LabyNode.labyNodes.clear();
 
-        String path = "/tmp/ClickCountITCase/";
-        FileUtils.deleteQuietly(new File(path));
+        String basePath = "/tmp/ClickCountITCase/";
+        FileUtils.deleteQuietly(new File(basePath));
 
         int size = 100000;
         int numDays = 30;
 
-        path = ClickCountDiffsInputGen.generate(size, numDays, path, new Random(1234), 0.01);
+        String path = ClickCountDiffsInputGen.generate(size, numDays, basePath, new Random(1234), 0.01);
+
+        boolean exceptionReceived = false;
+        try {
+            ClickCountDiffs.main(new String[]{path, Integer.toString(numDays), "true"});
+        } catch (JobCancellationException ex) {
+            exceptionReceived = true;
+        }
+        if (!exceptionReceived) {
+            throw new RuntimeException("testClickCountDiffs job failed");
+        }
+
+        int[] exp = new int[]{1010, 1032, 981, 977, 978, 981, 988, 987, 958, 997, 985, 994, 1001, 987, 1007, 971, 960, 976, 1025, 1022, 971, 993, 997, 996, 1038, 985, 974, 999, 1020};
+        ClickCountDiffsInputGen.checkLabyOut(path, numDays, exp);
+
+        int nocflNumDays = numDays/10;
+        org.emmalanguage.labyrinth.jobsnolaby.ClickCountDiffs.main(new String[]{path, Integer.toString(nocflNumDays)});
+        ClickCountDiffsInputGen.checkNocflOut(path, nocflNumDays, exp);
+    }
+
+    @Test()
+    public void testClickCountDiffsScala() throws Exception {
+        LabyNode.labyNodes.clear();
+
+        String basePath = "/tmp/ClickCountITCase/";
+        FileUtils.deleteQuietly(new File(basePath));
+
+        int size = 100000;
+        int numDays = 30;
+
+        String path = ClickCountDiffsInputGen.generate(size, numDays, basePath, new Random(1234), 0.01);
 
         boolean exceptionReceived = false;
         try {
@@ -99,10 +130,6 @@ public class CFLITCase {
 
         int[] exp = new int[]{1010, 1032, 981, 977, 978, 981, 988, 987, 958, 997, 985, 994, 1001, 987, 1007, 971, 960, 976, 1025, 1022, 971, 993, 997, 996, 1038, 985, 974, 999, 1020};
         ClickCountDiffsInputGen.checkLabyOut(path, numDays, exp);
-
-        int nocflNumDays = numDays/6;
-        nolaby.ClickCountDiffs.main(new String[]{"/tmp/ClickCountITCase/" + size, Integer.toString(nocflNumDays)});
-        ClickCountDiffsInputGen.checkNocflOut(path, nocflNumDays, exp);
     }
 
 //    @Test()

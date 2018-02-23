@@ -14,11 +14,10 @@
  * limitations under the License.
  */
 
-package jobsold;
+package org.emmalanguage.labyrinth.jobsold;
 
 import org.emmalanguage.labyrinth.CondOutputSelector;
 import org.emmalanguage.labyrinth.operators.IncMap;
-import org.emmalanguage.labyrinth.operators.*;
 import org.emmalanguage.labyrinth.CFLConfig;
 import org.emmalanguage.labyrinth.KickoffSource;
 import org.emmalanguage.labyrinth.PhiNode;
