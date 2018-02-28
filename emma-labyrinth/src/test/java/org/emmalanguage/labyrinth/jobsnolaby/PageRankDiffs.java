@@ -51,6 +51,9 @@ public class PageRankDiffs {
 	private static final Logger LOG = LoggerFactory.getLogger(PageRankDiffs.class);
 
 	public static void main(String[] args) throws Exception {
+
+		long startTime = System.nanoTime();
+
 		ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 
 		//env.getConfig().setParallelism(1);
@@ -58,7 +61,7 @@ public class PageRankDiffs {
 		env.getConfig().enableObjectReuse();
 
 		final double d = 0.85;
-		final double epsilon = 0.0000000001;
+		final double epsilon = 0.0001;
 
 		String pref = args[0] + "/";
 		final String yesterdayPRTmpFilename = pref + "tmp/yesterdayCounts";
@@ -70,10 +73,31 @@ public class PageRankDiffs {
 
 			LOG.info("### Day " + day);
 
-			DataSet<Tuple2<IntValue, IntValue>> edges = env.readCsvFile(pref + "/input/" + day)
+			DataSet<Tuple2<IntValue, IntValue>> edges0 = env.readCsvFile(pref + "/input/" + day)
 					.fieldDelimiter("\t")
 					.lineDelimiter("\n")
 					.types(IntValue.class, IntValue.class);
+
+			DataSet<IntValue> pages = edges0.flatMap(new FlatMapFunction<Tuple2<IntValue, IntValue>, IntValue>() {
+				@Override
+				public void flatMap(Tuple2<IntValue, IntValue> value, Collector<IntValue> out) throws Exception {
+					out.collect(value.f0);
+					out.collect(value.f1);
+				}
+			}).distinct();
+
+			DataSet<Tuple2<IntValue, IntValue>> loopEdges = pages.map(new MapFunction<IntValue, Tuple2<IntValue, IntValue>>() {
+
+				Tuple2<IntValue, IntValue> reuse = Tuple2.of(new IntValue(-1), new IntValue(-2));
+
+				@Override
+				public Tuple2<IntValue, IntValue> map(IntValue p) throws Exception {
+					reuse.setFields(p,p);
+					return reuse;
+				}
+			});
+
+			DataSet<Tuple2<IntValue, IntValue>> edges = edges0.union(loopEdges);
 
 			// (from, to, degree) triples
 			DataSet<Tuple3<IntValue, IntValue, IntValue>> edgesWithDeg =
@@ -99,14 +123,6 @@ public class PageRankDiffs {
 							return reuse;
 						}
 					});
-
-			DataSet<IntValue> pages = edges.flatMap(new FlatMapFunction<Tuple2<IntValue, IntValue>, IntValue>() {
-				@Override
-				public void flatMap(Tuple2<IntValue, IntValue> value, Collector<IntValue> out) throws Exception {
-					out.collect(value.f0);
-					out.collect(value.f1);
-				}
-			}).distinct();
 
 			DataSet<Double> initWeight = pages.map(new MapFunction<IntValue, Tuple1<IntValue>>() {
 				Tuple1<IntValue> reuse = Tuple1.of(new IntValue(1));
@@ -163,10 +179,9 @@ public class PageRankDiffs {
 				}
 			}).groupBy(0).sum(1);
 
-			DataSet<Tuple2<IntValue, DoubleValue>> newPR = msgs.rightOuterJoin(PR).where(0).equalTo(0)
-					.with(new RichJoinFunction<Tuple2<IntValue, DoubleValue>, Tuple2<IntValue, DoubleValue>, Tuple2<IntValue, DoubleValue>>() {
+			DataSet<Tuple2<IntValue, DoubleValue>> newPR = msgs.map(new RichMapFunction<Tuple2<IntValue, DoubleValue>, Tuple2<IntValue, DoubleValue>>() {
 
-				private double jump = -1;
+				private double jump = -1; // will be set to (1-d)/N
 
 				private Tuple2<IntValue, DoubleValue> reuse = Tuple2.of(new IntValue(), new DoubleValue());
 
@@ -179,17 +194,12 @@ public class PageRankDiffs {
 				}
 
 				@Override
-				public Tuple2<IntValue, DoubleValue> join(Tuple2<IntValue, DoubleValue> first, Tuple2<IntValue, DoubleValue> second) throws Exception {
-					// first:  (id, newRank)
-					// second: (id, oldRank)
-					if (first == null) {
-						return second;
-					} else {
-						// d * newrank + (1-d) * initWeight)
-						reuse.f0.setValue(first.f0);
-						reuse.f1.setValue(d * first.f1.getValue() + jump);
-						return reuse;
-					}
+				public Tuple2<IntValue, DoubleValue> map(Tuple2<IntValue, DoubleValue> in) throws Exception {
+					// in:  (id, msgsSummed)
+					// d * newrank + (1-d) * initWeight)
+					reuse.f0.setValue(in.f0);
+					reuse.f1.setValue(d * in.f1.getValue() + jump);
+					return reuse;
 				}
 			}).withBroadcastSet(initWeight, "initWeight");
 
@@ -211,6 +221,14 @@ public class PageRankDiffs {
 							}
 						}
 					});
+
+//			DataSet<Tuple2<IntValue, DoubleValue>> empty = PR.sum(1).flatMap(new FlatMapFunction<Tuple2<IntValue,DoubleValue>, Tuple2<IntValue,DoubleValue>>() {
+//				@Override
+//				public void flatMap(Tuple2<IntValue, DoubleValue> in, Collector<Tuple2<IntValue,DoubleValue>> collector) throws Exception {
+//					System.out.println("*** " + in.f1);
+//				}
+//			});
+//			newPR = newPR.union(empty);
 
 			DataSet<Tuple2<IntValue, DoubleValue>> finalPR = PR.closeWith(newPR, termCrit);
 
@@ -244,7 +262,8 @@ public class PageRankDiffs {
 				diffs.sum(0).map(new MapFunction<Tuple1<DoubleValue>, String>() {
 					@Override
 					public String map(Tuple1<DoubleValue> dv) throws Exception {
-						return dv.f0.toString();
+						Double rounded = (double)Math.round(dv.f0.getValue() * 100d) / 100d;
+						return rounded.toString();
 					}
 				}).setParallelism(1).writeAsText(pref + "out/expected/diff_" + day, FileSystem.WriteMode.OVERWRITE);
 			}
@@ -261,5 +280,8 @@ public class PageRankDiffs {
 			fs.delete(new Path(yesterdayPRTmpFilename), true);
 			fs.rename(new Path(todayPRTmpFilename), new Path(yesterdayPRTmpFilename));
 		}
+
+		long endTime = System.nanoTime();
+		System.out.println("Time: " + (endTime-startTime)/1000000000);
 	}
 }
