@@ -17,18 +17,14 @@
 package org.emmalanguage.labyrinth.operators;
 
 import org.apache.flink.api.java.tuple.Tuple2;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.HashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
-public abstract class Join<IN, OUT> extends BagOperator<Tuple2<Integer, IN>, OUT> implements ReusingBagOperator {
+public abstract class JoinTupleIntX<IN, OUT> extends BagOperator<Tuple2<Integer, IN>, OUT> implements ReusingBagOperator {
 
-    private static final Logger LOG = LoggerFactory.getLogger(Join.class);
-
-    private HashMap<Integer, ArrayList<Tuple2<Integer,IN>>> ht;
-    private ArrayList<Tuple2<Integer, IN>> probeBuffered;
+    private Int2ObjectOpenHashMap<ArrayList<Tuple2<Integer,IN>>> ht;
+    private ArrayList<Tuple2<Integer, IN>> probeBuffered; // Could be a SerializedBuffer
     private boolean buildDone;
     private boolean probeDone;
 
@@ -55,7 +51,7 @@ public abstract class Join<IN, OUT> extends BagOperator<Tuple2<Integer, IN>, OUT
         if (logicalInputId == 0) {
             // build side
             if (!reuse) {
-                ht = new HashMap<>(8192);
+                ht = new Int2ObjectOpenHashMap<>(262144);
             }
         }
     }
@@ -65,11 +61,11 @@ public abstract class Join<IN, OUT> extends BagOperator<Tuple2<Integer, IN>, OUT
         super.pushInElement(e, logicalInputId);
         if (logicalInputId == 0) { // build side
             assert !buildDone;
-            ArrayList<Tuple2<Integer,IN>> l = ht.get(e.f0);
+            ArrayList<Tuple2<Integer,IN>> l = ht.get((int)e.f0);
             if (l == null) {
                 l = new ArrayList<>();
                 l.add(e);
-                ht.put(e.f0,l);
+                ht.put((int)e.f0,l);
             } else {
                 l.add(e);
             }
@@ -107,7 +103,7 @@ public abstract class Join<IN, OUT> extends BagOperator<Tuple2<Integer, IN>, OUT
     }
 
     private void probe(Tuple2<Integer, IN> e) {
-        ArrayList<Tuple2<Integer, IN>> l = ht.get(e.f0);
+        ArrayList<Tuple2<Integer, IN>> l = ht.get((int)e.f0);
         if (l != null) {
             for (Tuple2<Integer, IN> b: l) {
                 udf(b, e);

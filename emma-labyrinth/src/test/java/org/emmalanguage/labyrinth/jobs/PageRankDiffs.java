@@ -19,17 +19,7 @@ package org.emmalanguage.labyrinth.jobs;
 import org.emmalanguage.labyrinth.ElementOrEvent;
 import org.emmalanguage.labyrinth.LabyNode;
 import org.emmalanguage.labyrinth.LabySource;
-import org.emmalanguage.labyrinth.operators.CFAwareFileSinkGen;
-import org.emmalanguage.labyrinth.operators.DistinctInt;
-import org.emmalanguage.labyrinth.operators.GroupBy0Sum1TupleIntInt;
-import org.emmalanguage.labyrinth.operators.IdMap;
-import org.emmalanguage.labyrinth.operators.IncMap;
-import org.emmalanguage.labyrinth.operators.Join;
-import org.emmalanguage.labyrinth.operators.LargerThan;
-import org.emmalanguage.labyrinth.operators.OpWithSingletonSide;
-import org.emmalanguage.labyrinth.operators.SumDouble;
-import org.emmalanguage.labyrinth.operators.Union;
-import org.emmalanguage.labyrinth.operators.UpdateJoinTupleIntDouble;
+import org.emmalanguage.labyrinth.operators.*;
 import org.emmalanguage.labyrinth.partitioners.Always0;
 import org.emmalanguage.labyrinth.partitioners.Broadcast;
 import org.emmalanguage.labyrinth.partitioners.RoundRobin;
@@ -38,18 +28,6 @@ import org.emmalanguage.labyrinth.util.TupleIntDouble;
 import org.emmalanguage.labyrinth.util.TupleIntIntInt;
 import org.emmalanguage.labyrinth.CFLConfig;
 import org.emmalanguage.labyrinth.KickoffSource;
-import org.emmalanguage.labyrinth.operators.ClickLogReader2;
-import org.emmalanguage.labyrinth.operators.ConditionNode;
-import org.emmalanguage.labyrinth.operators.CountCombiner;
-import org.emmalanguage.labyrinth.operators.FlatMap;
-import org.emmalanguage.labyrinth.operators.GroupBy0ReduceTupleIntDouble;
-import org.emmalanguage.labyrinth.operators.JoinTupleIntDouble;
-import org.emmalanguage.labyrinth.operators.JoinTupleIntInt;
-import org.emmalanguage.labyrinth.operators.OuterJoinTupleIntDouble;
-import org.emmalanguage.labyrinth.operators.SingletonBagOperator;
-import org.emmalanguage.labyrinth.operators.SmallerThan;
-import org.emmalanguage.labyrinth.operators.Sum;
-import org.emmalanguage.labyrinth.operators.SumCombinerDouble;
 import org.emmalanguage.labyrinth.partitioners.Forward;
 import org.emmalanguage.labyrinth.partitioners.IntegerBy0;
 import org.emmalanguage.labyrinth.partitioners.Tuple2by0;
@@ -385,7 +363,7 @@ public class PageRankDiffs {
         // PR_2_Joined = PR_2 join edgesWithDeg
         // msgs = PR_2_Joined.map((from, to, degree, rank) => (to, rank/degree))
         LabyNode<Tuple2<Integer, Either<Double, TupleIntInt>>, TupleIntDouble> msgs =
-            new LabyNode<>("msgs", new Join<Either<Double, TupleIntInt>, TupleIntDouble>() {
+            new LabyNode<>("msgs", new JoinTupleIntX<Either<Double, TupleIntInt>, TupleIntDouble>() {
                 @Override
                 protected void udf(Tuple2<Integer, Either<Double, TupleIntInt>> b, Tuple2<Integer, Either<Double, TupleIntInt>> a) {
                     // vigyazat, meg van cserelve az a es a b
