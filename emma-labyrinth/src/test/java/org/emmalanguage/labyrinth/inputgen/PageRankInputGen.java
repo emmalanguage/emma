@@ -70,19 +70,19 @@ public class PageRankInputGen {
         final int blockSize = 63;
         for (int i = 0; i < numDays / blockSize; i++) {
             for (int j = 0; j < blockSize; j++) {
-                doBlock(fullGraph, clicksPerDayRatio, inputPath, day);
+                doDay(fullGraph, clicksPerDayRatio, inputPath, day);
                 day++;
             }
             env.execute();
         }
         for (int j = 0; j < numDays % blockSize; j++) {
-            doBlock(fullGraph, clicksPerDayRatio, inputPath, day);
+            doDay(fullGraph, clicksPerDayRatio, inputPath, day);
             day++;
         }
         env.execute();
     }
 
-    private static void doBlock(DataSet<Tuple2<Integer, Integer>> fullGraph, int clicksPerDayRatio, String inputPath, Integer day) {
+    private static void doDay(DataSet<Tuple2<Integer, Integer>> fullGraph, int clicksPerDayRatio, String inputPath, Integer day) {
         DataSet<Tuple2<Integer, Integer>> filtered = fullGraph.filter(new RichFilterFunction<Tuple2<Integer, Integer>>() {
 
             Random rnd;
