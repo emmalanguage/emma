@@ -685,7 +685,7 @@ public class BagOperatorHost<IN, OUT>
 
 	private enum OutState {IDLE, DAMMING, WAITING, FORWARDING}
 
-	protected class Out implements Serializable {
+	public final class Out implements Serializable {
 
 		// Egyelore nem csinalunk kulon BB elerese altal kivaltott discardot. (Amugy ha uj out bag van, akkor eldobodik a reginek a buffere igy is.)
 
@@ -709,7 +709,7 @@ public class BagOperatorHost<IN, OUT>
 		private byte splitId = -1;
 		private int targetBbId = -1;
 		public boolean normal = false; // jelzi ha nem conditional
-		private final Partitioner<OUT> partitioner;
+		public final Partitioner<OUT> partitioner;
 
 		private ArrayList<OUT> buffer = null;
 		private OutState state = OutState.IDLE;
