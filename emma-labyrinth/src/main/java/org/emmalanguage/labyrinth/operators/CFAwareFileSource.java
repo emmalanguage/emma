@@ -25,8 +25,10 @@ import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-// Can have >1 para. Set partitioning to RoundRobin.
-// However, it reads a single file non-parallel.
+/**
+ * Can have >1 para. Set partitioning to RoundRobin.
+ * However, it reads a single file non-parallel.
+ */
 public abstract class CFAwareFileSource<T> extends BagOperator<Integer, T> {
 
     private static final Logger LOG = LoggerFactory.getLogger(CFAwareFileSource.class);

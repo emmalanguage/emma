@@ -16,7 +16,6 @@
 
 package org.emmalanguage.labyrinth;
 
-//TODO what is stratosphere, what is emmalanguage???
 import eu.stratosphere.labyrinth.BagID;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
