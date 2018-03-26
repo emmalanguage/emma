@@ -220,11 +220,15 @@ public class PageRankDiffs {
                 .addInput(day_1, false)
                 .setParallelism(1);
 
+        // --- File reading ---
+
 //        LabyNode<Integer, TupleIntInt> edges_read =
 //                new LabyNode<>("edges_read", new ClickLogReader2(pref + "/input/"), 1, new RoundRobin<>(para), integerSer, typeInfoTupleIntInt)
 //                        .addInput(day_2, true, false);
-
-        // --- File reading ---
+//
+//        LabyNode<TupleIntInt, TupleIntInt> edges0 =
+//                new LabyNode<>("edges0", new IdMap<>(), 1, new RoundRobin<>(para), tupleIntIntSer, typeInfoTupleIntInt)
+//                        .addInput(edges_read, true, false);
 
         LabyNode<Integer, String> edges_filename =
                 new LabyNode<>("edges_filename", new FlatMap<Integer, String>() {
@@ -244,7 +248,7 @@ public class PageRankDiffs {
                 TypeInformation.of(new TypeHint<InputFormatWithInputSplit<Tuple2<Integer, Integer>, FileInputSplit>>(){}).createSerializer(new ExecutionConfig());
 
         LabyNode<String, InputFormatWithInputSplit<Tuple2<Integer, Integer>, FileInputSplit>> edges_input_splits =
-                new LabyNode<>("edges_read", new CFAwareFileSourcePara<Tuple2<Integer, Integer>, FileInputSplit>() {
+                new LabyNode<>("edges_input_splits", new CFAwareFileSourcePara<Tuple2<Integer, Integer>, FileInputSplit>() {
                     @Override
                     protected InputFormat<Tuple2<Integer, Integer>, FileInputSplit> getInputFormatFromFilename(String filename) {
                         return new TupleCsvInputFormat<>(new Path(filename), "\n", "\t", typeInfoTuple2IntegerInteger0);
@@ -254,11 +258,11 @@ public class PageRankDiffs {
                 .setParallelism(1);
 
         LabyNode<InputFormatWithInputSplit<Tuple2<Integer, Integer>, FileInputSplit>, Tuple2<Integer, Integer>> edges_read0 =
-                new LabyNode<InputFormatWithInputSplit<Tuple2<Integer, Integer>, FileInputSplit>, Tuple2<Integer, Integer>>("edges_read0", new CFAwareFileSourceParaReader<Tuple2<Integer, Integer>, FileInputSplit>(typeInfoTuple2IntegerInteger0), 1, new RoundRobin<InputFormatWithInputSplit<Tuple2<Integer, Integer>, FileInputSplit>>(para), inputFormatWithInputSplitSer, typeInfoTuple2IntegerInteger)
+                new LabyNode<>("edges_read0", new CFAwareFileSourceParaReader<>(typeInfoTuple2IntegerInteger0), 1, new RoundRobin<>(para), inputFormatWithInputSplitSer, typeInfoTuple2IntegerInteger)
                 .addInput(edges_input_splits, true, false);
 
-        LabyNode<Tuple2<Integer, Integer>, TupleIntInt> edges_read =
-                new LabyNode<>("edges_read", new FlatMap<Tuple2<Integer, Integer>, TupleIntInt>() {
+        LabyNode<Tuple2<Integer, Integer>, TupleIntInt> edges0 =
+                new LabyNode<>("edges0", new FlatMap<Tuple2<Integer, Integer>, TupleIntInt>() {
                     @Override
                     public void pushInElement(Tuple2<Integer, Integer> e, int logicalInputId) {
                         super.pushInElement(e, logicalInputId);
@@ -268,10 +272,6 @@ public class PageRankDiffs {
                 .addInput(edges_read0, true, false);
 
         // --- End of file reading ---
-
-        LabyNode<TupleIntInt, TupleIntInt> edges0 =
-                new LabyNode<>("edges0", new IdMap<>(), 1, new RoundRobin<>(para), tupleIntIntSer, typeInfoTupleIntInt)
-                .addInput(edges_read, true, false);
 
         LabyNode<TupleIntInt, Integer> edgesFromToFlatMapped =
                 new LabyNode<>("edgesFromToFlatMapped", new FlatMap<TupleIntInt, Integer>() {
