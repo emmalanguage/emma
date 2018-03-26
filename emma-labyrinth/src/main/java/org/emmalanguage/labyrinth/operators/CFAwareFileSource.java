@@ -49,7 +49,7 @@ public abstract class CFAwareFileSource<T> extends BagOperator<Integer, T> {
             LOG.info("Reading file " + path);
 
             FileSystem fs = FileSystem.get(new URI(path));
-            BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(new Path(path))), 131072);
+            BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(new Path(path))), 1024*1024);
 
             String line;
             line = br.readLine();
