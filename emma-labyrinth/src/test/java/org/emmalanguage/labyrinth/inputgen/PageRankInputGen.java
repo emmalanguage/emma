@@ -67,7 +67,7 @@ public class PageRankInputGen {
         }
 
         int day = 1;
-        final int blockSize = 63;
+        final int blockSize = 10;
         for (int i = 0; i < numDays / blockSize; i++) {
             for (int j = 0; j < blockSize; j++) {
                 doDay(fullGraph, clicksPerDayRatio, inputPath, day);
