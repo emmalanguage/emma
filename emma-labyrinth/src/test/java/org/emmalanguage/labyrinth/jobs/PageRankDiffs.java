@@ -268,7 +268,7 @@ public class PageRankDiffs {
                         super.pushInElement(e, logicalInputId);
                         out.collectElement(TupleIntInt.of(e.f0, e.f1));
                     }
-                }, 1, new Forward<>(para), typeInfoTuple2IntegerIntegerSer, typeInfoTupleIntInt)
+                }, 1, new RoundRobin<>(para), typeInfoTuple2IntegerIntegerSer, typeInfoTupleIntInt)
                 .addInput(edges_read0, true, false);
 
         // --- End of file reading ---
