@@ -30,9 +30,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 
-public class ClickCountDiffs {
+public class ClickCountDiffsNoJoin {
 
-	private static final Logger LOG = LoggerFactory.getLogger(ClickCountDiffs.class);
+	private static final Logger LOG = LoggerFactory.getLogger(ClickCountDiffsNoJoin.class);
 
 	public static void main(String[] args) throws Exception {
 		ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
@@ -44,11 +44,6 @@ public class ClickCountDiffs {
 		String pref = args[0] + "/";
 		String yesterdayCountsTmpFilename = pref + "tmp/yesterdayCounts";
 
-		DataSet<Tuple2<IntValue, IntValue>> pageAttributes = env.readCsvFile(pref + "in/pageAttributes.tsv")
-				.fieldDelimiter("\t")
-				.lineDelimiter("\n")
-				.types(IntValue.class, IntValue.class);
-
 		final int days = Integer.parseInt(args[1]); // 365
 		for (int day = 1; day <= days; day++) {
 
@@ -59,25 +54,13 @@ public class ClickCountDiffs {
 					.lineDelimiter("\n")
 					.types(IntValue.class);
 
-			DataSet<IntValue> visitsFiltered = visits.join(pageAttributes).where(0).equalTo(0).with(new FlatJoinFunction<Tuple1<IntValue>, Tuple2<IntValue, IntValue>, IntValue>() {
-
-				IntValue zero = new IntValue(0);
-
-				@Override
-				public void join(Tuple1<IntValue> first, Tuple2<IntValue, IntValue> second, Collector<IntValue> out) throws Exception {
-					if (second.f1.equals(zero)) {
-						out.collect(first.f0);
-					}
-				}
-			});
-
-			DataSet<Tuple2<IntValue, IntValue>> counts = visitsFiltered.map(new MapFunction<IntValue, Tuple2<IntValue, IntValue>>() {
+			DataSet<Tuple2<IntValue, IntValue>> counts = visits.map(new MapFunction<Tuple1<IntValue>, Tuple2<IntValue, IntValue>>() {
 
 				Tuple2<IntValue, IntValue> reuse = Tuple2.of(new IntValue(-1),new IntValue(1));
 
 				@Override
-				public Tuple2<IntValue, IntValue> map(IntValue value) throws Exception {
-					reuse.f0 = value;
+				public Tuple2<IntValue, IntValue> map(Tuple1<IntValue> value) throws Exception {
+					reuse.f0 = value.f0;
 					return reuse;
 				}
 			}).groupBy(0).sum(1);
@@ -110,7 +93,7 @@ public class ClickCountDiffs {
 					public String map(Tuple1<IntValue> integerTuple1) throws Exception {
 						return integerTuple1.f0.toString();
 					}
-				}).setParallelism(1).writeAsText(pref + "out/expected/diff_" + day, FileSystem.WriteMode.OVERWRITE);
+				}).setParallelism(1).writeAsText(pref + "out_nojoin/expected/diff_" + day, FileSystem.WriteMode.OVERWRITE);
 			}
 
 			counts.writeAsCsv(yesterdayCountsTmpFilename, FileSystem.WriteMode.OVERWRITE);
