@@ -18,13 +18,16 @@ package org.emmalanguage.labyrinth.jobs;
 
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.io.TupleCsvInputFormat;
+import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.PojoTypeInfo;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
+import org.apache.flink.core.fs.FileInputSplit;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
@@ -40,10 +43,15 @@ import java.util.Collections;
 public class ClickCountDiffsNoJoin {
 
     private static TupleTypeInfo<Tuple2<Integer, Integer>> typeInfoTupleIntInt = new TupleTypeInfo<>(TypeInformation.of(Integer.class), TypeInformation.of(Integer.class));
+    private static TupleTypeInfo<Tuple1<Integer>> typeInfoTuple1Integer0 = new TupleTypeInfo<>(TypeInformation.of(Integer.class));
+    private static TypeInformation<ElementOrEvent<Tuple1<Integer>>> typeInfoTuple1Integer = TypeInformation.of(new TypeHint<ElementOrEvent<Tuple1<Integer>>>(){});
+    private static TypeInformation<ElementOrEvent<Integer>> typeInfoInteger = TypeInformation.of(new TypeHint<ElementOrEvent<Integer>>(){});
 
     private static TypeSerializer<Integer> integerSer = TypeInformation.of(Integer.class).createSerializer(new ExecutionConfig());
     private static TypeSerializer<Boolean> booleanSer = TypeInformation.of(Boolean.class).createSerializer(new ExecutionConfig());
     private static TypeSerializer<TupleIntInt> tupleIntIntSer = new TupleIntInt.TupleIntIntSerializer();
+    private static TypeSerializer<String> stringSer = TypeInformation.of(String.class).createSerializer(new ExecutionConfig());
+    private static TypeSerializer<Tuple1<Integer>> typeInfoTuple1IntegerSer = typeInfoTuple1Integer0.createSerializer(new ExecutionConfig());
 
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
@@ -85,10 +93,55 @@ public class ClickCountDiffsNoJoin {
                 .addInput(day_1, false)
                 .setParallelism(1);
 
-        LabyNode<Integer, Integer> visits_1 =
-                new LabyNode<>("visits_1", new ClickLogReader(pref + "in/clickLog_"), 1, new RoundRobin<>(para), integerSer, TypeInformation.of(new TypeHint<ElementOrEvent<Integer>>(){}))
-                        .addInput(day_2, true, false);
-                        //.setParallelism(1);
+        // --- File reading ---
+
+//        LabyNode<Integer, Integer> visits_1 =
+//                new LabyNode<>("visits_1", new ClickLogReader(pref + "in/clickLog_"), 1, new RoundRobin<>(para), integerSer, TypeInformation.of(new TypeHint<ElementOrEvent<Integer>>(){}))
+//                        .addInput(day_2, true, false);
+//                        //.setParallelism(1);
+
+        LabyNode<Integer, String> visits_filename =
+                new LabyNode<>("visits_filename", new FlatMap<Integer, String>() {
+                    @Override
+                    public void pushInElement(Integer e, int logicalInputId) {
+                        super.pushInElement(e, logicalInputId);
+                        out.collectElement(pref + "/in/clickLog_" + e);
+                    }
+                }, 1, new Always0<>(1), integerSer, TypeInformation.of(new TypeHint<ElementOrEvent<String>>(){}))
+                        .addInput(day_2, true, false)
+                        .setParallelism(1);
+
+        TypeInformation<ElementOrEvent<InputFormatWithInputSplit<Tuple1<Integer>, FileInputSplit>>> inputFormatWithInputSplitTypeInfo =
+                TypeInformation.of(new TypeHint<ElementOrEvent<InputFormatWithInputSplit<Tuple1<Integer>, FileInputSplit>>>(){});
+
+        TypeSerializer<InputFormatWithInputSplit<Tuple1<Integer>, FileInputSplit>> inputFormatWithInputSplitSer =
+                TypeInformation.of(new TypeHint<InputFormatWithInputSplit<Tuple1<Integer>, FileInputSplit>>(){}).createSerializer(new ExecutionConfig());
+
+        LabyNode<String, InputFormatWithInputSplit<Tuple1<Integer>, FileInputSplit>> visits_input_splits =
+                new LabyNode<>("visits_input_splits", new CFAwareFileSourcePara<Tuple1<Integer>, FileInputSplit>() {
+                    @Override
+                    protected InputFormat<Tuple1<Integer>, FileInputSplit> getInputFormatFromFilename(String filename) {
+                        return new TupleCsvInputFormat<>(new Path(filename), "\n", "\t", typeInfoTuple1Integer0);
+                    }
+                }, 1, new Always0<>(1), stringSer, inputFormatWithInputSplitTypeInfo)
+                        .addInput(visits_filename, true, false)
+                        .setParallelism(1);
+
+        LabyNode<InputFormatWithInputSplit<Tuple1<Integer>, FileInputSplit>, Tuple1<Integer>> visits_read0 =
+                new LabyNode<>("edges_read0", new CFAwareFileSourceParaReader<>(typeInfoTuple1Integer0), 1, new RoundRobin<>(para), inputFormatWithInputSplitSer, typeInfoTuple1Integer)
+                        .addInput(visits_input_splits, true, false);
+
+        LabyNode<Tuple1<Integer>, Integer> visits_1 =
+                new LabyNode<>("edges0", new FlatMap<Tuple1<Integer>, Integer>() {
+                    @Override
+                    public void pushInElement(Tuple1<Integer> e, int logicalInputId) {
+                        super.pushInElement(e, logicalInputId);
+                        out.collectElement(e.f0);
+                    }
+                }, 1, new RoundRobin<>(para), typeInfoTuple1IntegerSer, typeInfoInteger)
+                        .addInput(visits_read0, true, false);
+
+        // --- End of file reading ---
 
         LabyNode<Integer, TupleIntInt> visitsMapped =
                 new LabyNode<>("visitsMapped", new FlatMap<Integer, TupleIntInt>() {
