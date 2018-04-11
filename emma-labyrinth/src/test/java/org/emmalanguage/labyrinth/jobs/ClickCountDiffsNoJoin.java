@@ -128,7 +128,7 @@ public class ClickCountDiffsNoJoin {
                         .setParallelism(1);
 
         LabyNode<InputFormatWithInputSplit<Tuple1<Integer>, FileInputSplit>, Tuple1<Integer>> visits_read =
-                new LabyNode<>("visits_read", new CFAwareFileSourceParaReader<>(typeInfoTuple1Integer0), 1, new RoundRobin<>(para), inputFormatWithInputSplitSer, typeInfoTuple1Integer)
+                new LabyNode<>("visits_read", new CFAwareFileSourceParaReader<>(typeInfoTuple1Integer0), 1, new Random<>(para), inputFormatWithInputSplitSer, typeInfoTuple1Integer) // Random partitioning is better here in the case when we don't have enough splits to give work to all machines. In this case, RoundRobin tends to fill up some machines and not give any work to others.
                         .addInput(visits_input_splits, true, false);
 
         LabyNode<Tuple1<Integer>, Integer> visits_1 =
