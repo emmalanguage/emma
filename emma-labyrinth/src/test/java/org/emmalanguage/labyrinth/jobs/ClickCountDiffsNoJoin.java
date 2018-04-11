@@ -127,19 +127,19 @@ public class ClickCountDiffsNoJoin {
                         .addInput(visits_filename, true, false)
                         .setParallelism(1);
 
-        LabyNode<InputFormatWithInputSplit<Tuple1<Integer>, FileInputSplit>, Tuple1<Integer>> visits_read0 =
-                new LabyNode<>("edges_read0", new CFAwareFileSourceParaReader<>(typeInfoTuple1Integer0), 1, new RoundRobin<>(para), inputFormatWithInputSplitSer, typeInfoTuple1Integer)
+        LabyNode<InputFormatWithInputSplit<Tuple1<Integer>, FileInputSplit>, Tuple1<Integer>> visits_read =
+                new LabyNode<>("visits_read", new CFAwareFileSourceParaReader<>(typeInfoTuple1Integer0), 1, new RoundRobin<>(para), inputFormatWithInputSplitSer, typeInfoTuple1Integer)
                         .addInput(visits_input_splits, true, false);
 
         LabyNode<Tuple1<Integer>, Integer> visits_1 =
-                new LabyNode<>("edges0", new FlatMap<Tuple1<Integer>, Integer>() {
+                new LabyNode<>("visits_1", new FlatMap<Tuple1<Integer>, Integer>() {
                     @Override
                     public void pushInElement(Tuple1<Integer> e, int logicalInputId) {
                         super.pushInElement(e, logicalInputId);
                         out.collectElement(e.f0);
                     }
                 }, 1, new RoundRobin<>(para), typeInfoTuple1IntegerSer, typeInfoInteger)
-                        .addInput(visits_read0, true, false);
+                        .addInput(visits_read, true, false);
 
         // --- End of file reading ---
 
