@@ -237,6 +237,7 @@ public class ClickCountDiffsNoJoin {
 
         // Itt nincs semmi operator. (A kiirast a BB 2-ben csinaljuk.)
 
+        LabyNode.printOperatorIDNameMapping();
         LabyNode.translateAll();
 
         env.execute();

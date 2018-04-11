@@ -408,11 +408,12 @@ public class BagOperatorHost<IN, OUT>
 		} else {
 			assert !outCFLSizes.isEmpty();
 			int outCFLSize = outCFLSizes.peek();
-			if (outCFLSize <= barrierAllReachedCFLSize + 1) {
-				if (CFLConfig.vlog) LOG.info("startOutBagCheckBarrier starting a bag. {" + name + "} outCFLSize = " + outCFLSize + ", barrierAllReachedCFLSize + 1 = " + (barrierAllReachedCFLSize + 1));
+			int plus = 3; // This is needed because in some cases the next iteration step is not one block away. For example, in ClickCount we have an if in the loop body, so it's 3.
+			if (outCFLSize <= barrierAllReachedCFLSize + plus) {
+				if (CFLConfig.vlog) LOG.info("startOutBagCheckBarrier starting a bag. {" + name + "} outCFLSize = " + outCFLSize + ", barrierAllReachedCFLSize + plus = " + (barrierAllReachedCFLSize + plus));
 				startOutBag();
 			} else {
-				if (CFLConfig.vlog) LOG.info("startOutBagCheckBarrier not starting a bag. {" + name + "} outCFLSize = " + outCFLSize + ", barrierAllReachedCFLSize + 1 = " + (barrierAllReachedCFLSize + 1));
+				if (CFLConfig.vlog) LOG.info("startOutBagCheckBarrier not starting a bag. {" + name + "} outCFLSize = " + outCFLSize + ", barrierAllReachedCFLSize + plus = " + (barrierAllReachedCFLSize + plus));
 			}
 		}
 	}
@@ -648,16 +649,25 @@ public class BagOperatorHost<IN, OUT>
 
 		@Override
 		public void notifyBarrierAllReached(int cflSize) {
-			synchronized (BagOperatorHost.this) {
-				assert CFLManager.barrier;
-				barrierAllReachedCFLSize = cflSize;
-				if (CFLConfig.vlog) LOG.info("notifyBarrierAllReached {" + name + "} cflSize = " + cflSize + ", workInProgress = " + workInProgress);
-				if (!workInProgress) {
-					if (!outCFLSizes.isEmpty()) {
-						if (CFLConfig.vlog) LOG.info("notifyBarrierAllReached {" + name + "} calling startOutBagCheckBarrier");
-						startOutBagCheckBarrier();
+			synchronized (es) {
+				es.submit(new Runnable() {
+					@Override
+					public void run() {
+						synchronized (BagOperatorHost.this) {
+							assert CFLManager.barrier;
+							barrierAllReachedCFLSize = cflSize;
+							if (CFLConfig.vlog)
+								LOG.info("notifyBarrierAllReached {" + name + "} cflSize = " + cflSize + ", workInProgress = " + workInProgress);
+							if (!workInProgress) {
+								if (!outCFLSizes.isEmpty()) {
+									if (CFLConfig.vlog)
+										LOG.info("notifyBarrierAllReached {" + name + "} calling startOutBagCheckBarrier");
+									startOutBagCheckBarrier();
+								}
+							}
+						}
 					}
-				}
+				});
 			}
 		}
 
