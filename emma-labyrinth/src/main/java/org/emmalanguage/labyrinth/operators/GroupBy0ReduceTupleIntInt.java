@@ -16,21 +16,23 @@
 
 package org.emmalanguage.labyrinth.operators;
 
-import it.unimi.dsi.fastutil.ints.Int2IntRBTreeMap;
 import org.emmalanguage.labyrinth.util.TupleIntInt;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
-//import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
+//import it.unimi.dsi.fastutil.ints.Int2IntRBTreeMap;
 
 import java.util.function.Consumer;
 
 public abstract class GroupBy0ReduceTupleIntInt extends BagOperator<TupleIntInt, TupleIntInt> {
 
-    protected Int2IntRBTreeMap hm;
+    protected Int2IntOpenHashMap hm;
+    //protected Int2IntRBTreeMap hm;
 
     @Override
     public void openOutBag() {
         super.openOutBag();
-        hm = new Int2IntRBTreeMap();
+        hm = new Int2IntOpenHashMap(1024, Int2IntOpenHashMap.VERY_FAST_LOAD_FACTOR);
+        //hm = new Int2IntRBTreeMap();
         hm.defaultReturnValue(Integer.MIN_VALUE);
     }
 
@@ -50,8 +52,8 @@ public abstract class GroupBy0ReduceTupleIntInt extends BagOperator<TupleIntInt,
     public void closeInBag(int inputId) {
         super.closeInBag(inputId);
 
-        //hm.int2IntEntrySet().fastForEach(new Consumer<Int2IntMap.Entry>() {
-        hm.int2IntEntrySet().forEach(new Consumer<Int2IntMap.Entry>() {
+        hm.int2IntEntrySet().fastForEach(new Consumer<Int2IntMap.Entry>() {
+        //hm.int2IntEntrySet().forEach(new Consumer<Int2IntMap.Entry>() {
             @Override
             public void accept(Int2IntMap.Entry e) {
                 out.collectElement(TupleIntInt.of(e.getIntKey(), e.getIntValue()));

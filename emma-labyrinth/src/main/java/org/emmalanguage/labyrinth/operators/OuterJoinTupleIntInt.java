@@ -32,7 +32,8 @@ public abstract class OuterJoinTupleIntInt<T> extends BagOperator<TupleIntInt, T
 
     private static final Logger LOG = LoggerFactory.getLogger(OuterJoinTupleIntInt.class);
 
-    private Int2ObjectRBTreeMap<HashMapElem> ht;
+    private Int2ObjectOpenHashMap<HashMapElem> ht;
+    //private Int2ObjectRBTreeMap<HashMapElem> ht;
     private SerializedBuffer<TupleIntInt> probeBuffered;
     private boolean buildDone;
     private boolean probeDone;
@@ -60,8 +61,8 @@ public abstract class OuterJoinTupleIntInt<T> extends BagOperator<TupleIntInt, T
         if (logicalInputId == 0) {
             // build side
             if (!reuse) {
-                //ht = new Int2ObjectOpenHashMap<>(8192);
-                ht = new Int2ObjectRBTreeMap<>();
+                ht = new Int2ObjectOpenHashMap<>(1024, Int2ObjectOpenHashMap.VERY_FAST_LOAD_FACTOR);
+                //ht = new Int2ObjectRBTreeMap<>();
             }
         }
     }
