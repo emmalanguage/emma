@@ -53,6 +53,7 @@ public class ClickCountDiffsNoJoin {
     private static TypeSerializer<String> stringSer = TypeInformation.of(String.class).createSerializer(new ExecutionConfig());
     private static TypeSerializer<Tuple1<Integer>> typeInfoTuple1IntegerSer = typeInfoTuple1Integer0.createSerializer(new ExecutionConfig());
 
+    // /home/ggevay/Dropbox/cfl_testdata/ClickCount 4
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 

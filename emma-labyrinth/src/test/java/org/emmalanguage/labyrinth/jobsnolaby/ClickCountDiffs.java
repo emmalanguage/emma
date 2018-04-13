@@ -35,6 +35,10 @@ public class ClickCountDiffs {
 	private static final Logger LOG = LoggerFactory.getLogger(ClickCountDiffs.class);
 
 	public static void main(String[] args) throws Exception {
+
+		if (true) throw new RuntimeException("Jelenleg hibas lehet. Majd ebbe is at kell hozni a yesterday-today delete-es trukkozest"); // TODO
+
+
 		ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 
 		//env.getConfig().setParallelism(1);
