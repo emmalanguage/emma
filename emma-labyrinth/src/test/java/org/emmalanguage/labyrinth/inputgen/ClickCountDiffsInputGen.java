@@ -29,7 +29,7 @@ import java.util.Random;
 public class ClickCountDiffsInputGen {
 
     /**
-     * args: path, numProducts
+     * args: path, numProducts, clicksPerDayRatio
      */
     public static void main(String[] args) throws Exception {
         final String pref = args[0] + "/";

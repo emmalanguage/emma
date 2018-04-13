@@ -34,6 +34,7 @@ public class ClickCountDiffsNoJoin {
 
 	private static final Logger LOG = LoggerFactory.getLogger(ClickCountDiffsNoJoin.class);
 
+	// /home/ggevay/Dropbox/cfl_testdata/ClickCount 4
 	public static void main(String[] args) throws Exception {
 		ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 
