@@ -21,7 +21,8 @@ import org.emmalanguage.labyrinth.util.TupleIntInt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+//import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectRBTreeMap;
 
 /**
  * Joins (key,b) (build) with (key,c) (probe), giving (b, key, c) to the udf.
@@ -31,7 +32,7 @@ public abstract class JoinTupleIntInt<OUT> extends BagOperator<TupleIntInt, OUT>
 
     private static final Logger LOG = LoggerFactory.getLogger(JoinTupleIntInt.class);
 
-    private Int2ObjectOpenHashMap<IntArrayList> ht;
+    private Int2ObjectRBTreeMap<IntArrayList> ht;
     private SerializedBuffer<TupleIntInt> probeBuffered;
     private boolean buildDone;
     private boolean probeDone;
@@ -59,7 +60,8 @@ public abstract class JoinTupleIntInt<OUT> extends BagOperator<TupleIntInt, OUT>
         if (logicalInputId == 0) {
             // build side
             if (!reuse) {
-                ht = new Int2ObjectOpenHashMap<>(8192);
+                //ht = new Int2ObjectOpenHashMap<>(8192);
+                ht = new Int2ObjectRBTreeMap<>();
             }
         }
     }

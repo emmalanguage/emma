@@ -16,10 +16,11 @@
 
 package org.emmalanguage.labyrinth.operators;
 
+import it.unimi.dsi.fastutil.ints.Int2DoubleRBTreeMap;
 import org.emmalanguage.labyrinth.util.SerializedBuffer;
 import org.emmalanguage.labyrinth.util.TupleIntDouble;
 import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
-import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
+//import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +33,7 @@ public class UpdateJoinTupleIntDouble extends BagOperator<TupleIntDouble, TupleI
 
     private static final Logger LOG = LoggerFactory.getLogger(UpdateJoinTupleIntDouble.class);
 
-    private Int2DoubleOpenHashMap ht;
+    private Int2DoubleRBTreeMap ht;
     private SerializedBuffer<TupleIntDouble> probeBuffered;
     private boolean buildDone;
     private boolean probeDone;
@@ -43,7 +44,8 @@ public class UpdateJoinTupleIntDouble extends BagOperator<TupleIntDouble, TupleI
     @Override
     public void openOutBag() {
         super.openOutBag();
-        ht = new Int2DoubleOpenHashMap(4096);
+        //ht = new Int2DoubleOpenHashMap(4096);
+        ht = new Int2DoubleRBTreeMap();
         ht.defaultReturnValue(Double.MIN_VALUE);
         probeBuffered = new SerializedBuffer<>(new TupleIntDouble.TupleIntDoubleSerializer());
         buildDone = false;
@@ -100,7 +102,8 @@ public class UpdateJoinTupleIntDouble extends BagOperator<TupleIntDouble, TupleI
     }
 
     private void emitAndClose() {
-        ht.int2DoubleEntrySet().fastForEach(new Consumer<Int2DoubleMap.Entry>() {
+        //ht.int2DoubleEntrySet().fastForEach(new Consumer<Int2DoubleMap.Entry>() {
+        ht.int2DoubleEntrySet().forEach(new Consumer<Int2DoubleMap.Entry>() {
             @Override
             public void accept(Int2DoubleMap.Entry e) {
                 out.collectElement(TupleIntDouble.of(e.getIntKey(), e.getDoubleValue()));
