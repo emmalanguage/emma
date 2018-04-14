@@ -32,7 +32,7 @@
 //
 //    private static final Logger LOG = LoggerFactory.getLogger(OuterJoinGeneric.class);
 //
-//    private Int2ObjectOpenHashMap<HashMapElem> ht;
+//    private Int2ObjectRBTreeMap<HashMapElem> ht;
 //    private SerializedBuffer<IN> probeBuffered;
 //    private boolean buildDone;
 //    private boolean probeDone;

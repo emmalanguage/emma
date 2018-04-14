@@ -19,11 +19,12 @@ package org.emmalanguage.labyrinth.operators;
 import org.apache.flink.api.java.tuple.Tuple2;
 
 import java.util.ArrayList;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+//import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectRBTreeMap;
 
 public abstract class JoinTupleIntX<IN, OUT> extends BagOperator<Tuple2<Integer, IN>, OUT> implements ReusingBagOperator {
 
-    private Int2ObjectOpenHashMap<ArrayList<Tuple2<Integer,IN>>> ht;
+    private Int2ObjectRBTreeMap<ArrayList<Tuple2<Integer,IN>>> ht;
     private ArrayList<Tuple2<Integer, IN>> probeBuffered; // Could be a SerializedBuffer
     private boolean buildDone;
     private boolean probeDone;
@@ -51,7 +52,8 @@ public abstract class JoinTupleIntX<IN, OUT> extends BagOperator<Tuple2<Integer,
         if (logicalInputId == 0) {
             // build side
             if (!reuse) {
-                ht = new Int2ObjectOpenHashMap<>(262144);
+                //ht = new Int2ObjectOpenHashMap<>(262144);
+                ht = new Int2ObjectRBTreeMap<>();
             }
         }
     }

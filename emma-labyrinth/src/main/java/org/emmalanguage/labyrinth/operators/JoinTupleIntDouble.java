@@ -19,7 +19,8 @@ package org.emmalanguage.labyrinth.operators;
 import org.emmalanguage.labyrinth.util.TupleIntDouble;
 import org.emmalanguage.labyrinth.util.SerializedBuffer;
 import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+//import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectRBTreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +32,8 @@ public abstract class JoinTupleIntDouble<OUT> extends BagOperator<TupleIntDouble
 
     private static final Logger LOG = LoggerFactory.getLogger(JoinTupleIntDouble.class);
 
-    private Int2ObjectOpenHashMap<DoubleArrayList> ht;
+    //private Int2ObjectOpenHashMap<DoubleArrayList> ht;
+    private Int2ObjectRBTreeMap<DoubleArrayList> ht;
     private SerializedBuffer<TupleIntDouble> probeBuffered;
     private boolean buildDone;
     private boolean probeDone;
@@ -59,7 +61,8 @@ public abstract class JoinTupleIntDouble<OUT> extends BagOperator<TupleIntDouble
         if (logicalInputId == 0) {
             // build side
             if (!reuse) {
-                ht = new Int2ObjectOpenHashMap<>(8192);
+                //ht = new Int2ObjectOpenHashMap<>(8192);
+                ht = new Int2ObjectRBTreeMap<>();
             }
         }
     }

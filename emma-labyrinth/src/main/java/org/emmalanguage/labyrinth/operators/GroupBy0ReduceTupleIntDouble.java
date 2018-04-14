@@ -18,18 +18,20 @@ package org.emmalanguage.labyrinth.operators;
 
 import org.emmalanguage.labyrinth.util.TupleIntDouble;
 import it.unimi.dsi.fastutil.ints.Int2DoubleMap;
-import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
+//import it.unimi.dsi.fastutil.ints.Int2DoubleOpenHashMap;
+import it.unimi.dsi.fastutil.ints.Int2DoubleRBTreeMap;
 
 import java.util.function.Consumer;
 
 public abstract class GroupBy0ReduceTupleIntDouble extends BagOperator<TupleIntDouble, TupleIntDouble> {
 
-    protected Int2DoubleOpenHashMap hm;
+    //protected Int2DoubleOpenHashMap hm;
+    protected Int2DoubleRBTreeMap hm;
 
     @Override
     public void openOutBag() {
         super.openOutBag();
-        hm = new Int2DoubleOpenHashMap();
+        hm = new Int2DoubleRBTreeMap();
         hm.defaultReturnValue(Double.MIN_VALUE);
     }
 
@@ -49,7 +51,8 @@ public abstract class GroupBy0ReduceTupleIntDouble extends BagOperator<TupleIntD
     public void closeInBag(int inputId) {
         super.closeInBag(inputId);
 
-        hm.int2DoubleEntrySet().fastForEach(new Consumer<Int2DoubleMap.Entry>() {
+        //hm.int2DoubleEntrySet().fastForEach(new Consumer<Int2DoubleMap.Entry>() {
+        hm.int2DoubleEntrySet().forEach(new Consumer<Int2DoubleMap.Entry>() {
             @Override
             public void accept(Int2DoubleMap.Entry e) {
                 out.collectElement(TupleIntDouble.of(e.getIntKey(), e.getDoubleValue()));
