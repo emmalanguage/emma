@@ -24,10 +24,13 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.types.IntValue;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.net.URI;
 
 
 public class ClickCountDiffs {
@@ -35,10 +38,6 @@ public class ClickCountDiffs {
 	private static final Logger LOG = LoggerFactory.getLogger(ClickCountDiffs.class);
 
 	public static void main(String[] args) throws Exception {
-
-		if (true) throw new RuntimeException("Jelenleg hibas lehet. Majd ebbe is at kell hozni a yesterday-today delete-es trukkozest"); // TODO
-
-
 		ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 
 		//env.getConfig().setParallelism(1);
@@ -47,6 +46,8 @@ public class ClickCountDiffs {
 
 		String pref = args[0] + "/";
 		String yesterdayCountsTmpFilename = pref + "tmp/yesterdayCounts";
+		String todayCountsTmpFilename = pref + "tmp/todayCounts";
+		FileSystem fs = FileSystem.get(new URI(pref));
 
 		DataSet<Tuple2<IntValue, IntValue>> pageAttributes = env.readCsvFile(pref + "in/pageAttributes.tsv")
 				.fieldDelimiter("\t")
@@ -117,9 +118,16 @@ public class ClickCountDiffs {
 				}).setParallelism(1).writeAsText(pref + "out/expected/diff_" + day, FileSystem.WriteMode.OVERWRITE);
 			}
 
-			counts.writeAsCsv(yesterdayCountsTmpFilename, FileSystem.WriteMode.OVERWRITE);
+			// Workaround for https://issues.apache.org/jira/browse/FLINK-1268
+			fs.delete(new Path(todayCountsTmpFilename), true);
+
+			counts.writeAsCsv(todayCountsTmpFilename, FileSystem.WriteMode.OVERWRITE);
 
 			env.execute();
+
+			// yesterdayPRTmpFilename and todayPRTmpFilename has to be different, because the reading and writing can overlap
+			fs.delete(new Path(yesterdayCountsTmpFilename), true);
+			fs.rename(new Path(todayCountsTmpFilename), new Path(yesterdayCountsTmpFilename));
 		}
 	}
 }

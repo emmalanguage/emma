@@ -24,10 +24,13 @@ import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.types.IntValue;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.net.URI;
 
 
 public class ClickCountDiffsNoJoin {
@@ -44,6 +47,8 @@ public class ClickCountDiffsNoJoin {
 
 		String pref = args[0] + "/";
 		String yesterdayCountsTmpFilename = pref + "tmp/yesterdayCounts";
+		String todayCountsTmpFilename = pref + "tmp/todayCounts";
+		FileSystem fs = FileSystem.get(new URI(pref));
 
 		final int days = Integer.parseInt(args[1]); // 365
 		for (int day = 1; day <= days; day++) {
@@ -97,9 +102,16 @@ public class ClickCountDiffsNoJoin {
 				}).setParallelism(1).writeAsText(pref + "out_nojoin/expected/diff_" + day, FileSystem.WriteMode.OVERWRITE);
 			}
 
-			counts.writeAsCsv(yesterdayCountsTmpFilename, FileSystem.WriteMode.OVERWRITE);
+			// Workaround for https://issues.apache.org/jira/browse/FLINK-1268
+			fs.delete(new Path(todayCountsTmpFilename), true);
+
+			counts.writeAsCsv(todayCountsTmpFilename, FileSystem.WriteMode.OVERWRITE);
 
 			env.execute();
+
+			// yesterdayPRTmpFilename and todayPRTmpFilename has to be different, because the reading and writing can overlap
+			fs.delete(new Path(yesterdayCountsTmpFilename), true);
+			fs.rename(new Path(todayCountsTmpFilename), new Path(yesterdayCountsTmpFilename));
 		}
 	}
 }
