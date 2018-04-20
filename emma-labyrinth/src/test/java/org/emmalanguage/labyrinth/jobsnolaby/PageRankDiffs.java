@@ -16,11 +16,8 @@
 
 package org.emmalanguage.labyrinth.jobsnolaby;
 
-import org.apache.flink.api.common.functions.FlatMapFunction;
-import org.apache.flink.api.common.functions.JoinFunction;
-import org.apache.flink.api.common.functions.MapFunction;
-import org.apache.flink.api.common.functions.RichJoinFunction;
-import org.apache.flink.api.common.functions.RichMapFunction;
+import org.apache.flink.api.common.functions.*;
+import org.apache.flink.api.common.operators.base.ReduceOperatorBase;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
 import org.apache.flink.api.java.operators.IterativeDataSet;
@@ -170,14 +167,23 @@ public class PageRankDiffs {
 					.with(new JoinFunction<Tuple2<IntValue,DoubleValue>, Tuple3<IntValue,IntValue,IntValue>, Tuple2<IntValue, DoubleValue>>() {
 				private Tuple2<IntValue, DoubleValue> reuse = Tuple2.of(new IntValue(), new DoubleValue());
 				@Override
-				public Tuple2<IntValue, DoubleValue> join(Tuple2<IntValue, DoubleValue> first, Tuple3<IntValue, IntValue, IntValue> second) throws Exception {
+				public Tuple2<IntValue, DoubleValue> join(Tuple2<IntValue, DoubleValue> first, Tuple3<IntValue, IntValue, IntValue> second) {
 					// first:  (id, rank)
 					// second: (from, to, degree)
 					reuse.f0.setValue(second.f1);
 					reuse.f1.setValue(first.f1.getValue() / second.f2.getValue());
 					return reuse;
 				}
-			}).groupBy(0).sum(1);
+			//}).groupBy(0).sum(1);
+			}).groupBy(0).reduce(new ReduceFunction<Tuple2<IntValue, DoubleValue>>() {
+				Tuple2<IntValue, DoubleValue> reuse = Tuple2.of(new IntValue(), new DoubleValue());
+				@Override
+				public Tuple2<IntValue, DoubleValue> reduce(Tuple2<IntValue, DoubleValue> a, Tuple2<IntValue, DoubleValue> b) {
+					reuse.f0 = a.f0;
+					reuse.f1.setValue(a.f1.getValue() + b.f1.getValue());
+					return reuse;
+				}
+			}).setCombineHint(ReduceOperatorBase.CombineHint.NONE);
 
 			DataSet<Tuple2<IntValue, DoubleValue>> newPR = msgs.map(new RichMapFunction<Tuple2<IntValue, DoubleValue>, Tuple2<IntValue, DoubleValue>>() {
 
@@ -203,20 +209,28 @@ public class PageRankDiffs {
 				}
 			}).withBroadcastSet(initWeight, "initWeight");
 
-			DataSet<Tuple1<DoubleValue>> termCrit = newPR.join(PR).where(0).equalTo(0)
-					.with(new JoinFunction<Tuple2<IntValue, DoubleValue>, Tuple2<IntValue, DoubleValue>, Tuple1<DoubleValue>>() {
-						private Tuple1<DoubleValue> reuse = Tuple1.of(new DoubleValue());
+			DataSet<DoubleValue> termCrit = newPR.join(PR).where(0).equalTo(0)
+					.with(new JoinFunction<Tuple2<IntValue, DoubleValue>, Tuple2<IntValue, DoubleValue>, DoubleValue>() {
+						private DoubleValue reuse = new DoubleValue();
 						@Override
-						public Tuple1<DoubleValue> join(Tuple2<IntValue, DoubleValue> first, Tuple2<IntValue, DoubleValue> second) throws Exception {
-							reuse.f0.setValue(Math.abs(first.f1.getValue() - second.f1.getValue()));
+						public DoubleValue join(Tuple2<IntValue, DoubleValue> first, Tuple2<IntValue, DoubleValue> second) throws Exception {
+							reuse.setValue(Math.abs(first.f1.getValue() - second.f1.getValue()));
 							return reuse;
 						}
-					}).sum(0)
-					.flatMap(new FlatMapFunction<Tuple1<DoubleValue>, Tuple1<DoubleValue>>() {
+					})//.sum(0)
+					.reduce(new ReduceFunction<DoubleValue>() {
+						DoubleValue reuse = new DoubleValue();
 						@Override
-						public void flatMap(Tuple1<DoubleValue> value, Collector<Tuple1<DoubleValue>> out) throws Exception {
-							System.out.println("=== Delta in PageRank: " + value.f0.getValue());
-							if (value.f0.getValue() > epsilon) {
+						public DoubleValue reduce(DoubleValue a, DoubleValue b) throws Exception {
+							reuse.setValue(a.getValue() + b.getValue());
+							return reuse;
+						}
+					})
+					.flatMap(new FlatMapFunction<DoubleValue, DoubleValue>() {
+						@Override
+						public void flatMap(DoubleValue value, Collector<DoubleValue> out) throws Exception {
+							System.out.println("=== Delta in PageRank: " + value.getValue());
+							if (value.getValue() > epsilon) {
 								out.collect(value);
 							}
 						}
