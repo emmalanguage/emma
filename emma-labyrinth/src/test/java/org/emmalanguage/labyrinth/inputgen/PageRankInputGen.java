@@ -75,11 +75,14 @@ public class PageRankInputGen {
             }
             env.execute();
         }
-        for (int j = 0; j < numDays % blockSize; j++) {
+        int j;
+        for (j = 0; j < numDays % blockSize; j++) {
             doDay(fullGraph, clicksPerDayRatio, inputPath, day);
             day++;
         }
-        env.execute();
+        if (j > 0) {
+            env.execute();
+        }
     }
 
     private static void doDay(DataSet<Tuple2<Integer, Integer>> fullGraph, int clicksPerDayRatio, String inputPath, Integer day) {
