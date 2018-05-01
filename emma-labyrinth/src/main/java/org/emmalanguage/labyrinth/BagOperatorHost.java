@@ -67,6 +67,7 @@ public class BagOperatorHost<IN, OUT>
 	// ---------------------- Initialized in setup (i.e., on TM):
 
 	public short subpartitionId = -25;
+	private short para;
 
 	private CFLManager cflMan;
 	private MyCFLCallback cb;
@@ -148,6 +149,9 @@ public class BagOperatorHost<IN, OUT>
 		super.setup(containingTask, config, output);
 
 		this.subpartitionId = (short)getRuntimeContext().getIndexOfThisSubtask();
+
+		assert getRuntimeContext().getNumberOfParallelSubtasks() <= Short.MAX_VALUE;
+		this.para = (short)getRuntimeContext().getNumberOfParallelSubtasks();
 
 		//LOG.info("subpartitionId [" + name + "]: " + subpartitionId);
 
@@ -253,7 +257,7 @@ public class BagOperatorHost<IN, OUT>
 			ElementOrEvent.Event ev = eleOrEvent.event;
 			switch (eleOrEvent.event.type) {
 				case START:
-					assert eleOrEvent.event.assumedTargetPara == getRuntimeContext().getNumberOfParallelSubtasks();
+					assert eleOrEvent.event.assumedTargetPara == para;
 					assert sp.status == InputSubpartition.Status.CLOSED;
 					sp.status = InputSubpartition.Status.OPEN;
 					sp.addNewBuffer(ev.bagID);
@@ -276,7 +280,7 @@ public class BagOperatorHost<IN, OUT>
 					}
 					break;
 				case END:
-					assert eleOrEvent.event.assumedTargetPara == getRuntimeContext().getNumberOfParallelSubtasks();
+					assert eleOrEvent.event.assumedTargetPara == para;
 					assert sp.status == InputSubpartition.Status.OPEN;
 					sp.status = InputSubpartition.Status.CLOSED;
 					InputSubpartition.Buffer lastBuffer = sp.buffers.get(sp.buffers.size()-1);
@@ -342,7 +346,7 @@ public class BagOperatorHost<IN, OUT>
 				// (az elejen levo (s.inputs.size() == 0) if miatt)
 				if (!(BagOperatorHost.this instanceof MutableBagCC && ((MutableBagCC.MutableBagOperator)op).inpID == 2)) {
 					numElements = correctBroadcast(numElements);
-					cflMan.producedLocal(outBagID, inputBagIDsArr, numElements, getRuntimeContext().getNumberOfParallelSubtasks(), subpartitionId, opID);
+					cflMan.producedLocal(outBagID, inputBagIDsArr, numElements, para, subpartitionId, opID);
 				}
 			}
 
