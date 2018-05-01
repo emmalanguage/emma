@@ -105,7 +105,7 @@ public class Bagify<T>
     public void close() throws Exception {
         super.close();
 
-        cflMan.producedLocal(new BagID(outCflSize, opID), new BagID[]{}, numElements, getRuntimeContext().getNumberOfParallelSubtasks(),subpartitionId,opID);
+        cflMan.producedLocal(new BagID(outCflSize, opID), new BagID[]{}, numElements, (short)getRuntimeContext().getNumberOfParallelSubtasks(),subpartitionId,opID);
 
         for(short i=0; i<sentStart.length; i++) {
             if (sentStart[i]) {
