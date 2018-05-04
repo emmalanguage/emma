@@ -41,6 +41,9 @@ import java.util.List;
  * args: path, numDays
  *
  * The input is at path/input in tab-separated edge-list files named 1, 2, ..., numDays
+ *
+ * !! Ugyebar a cikkben most nem ez a valtozat van, hanem a 66430ec130f385e307582d6665e39dbcccfa2b67 elotti,
+ * mivel az jobban illeszkedik a Laby-shoz
  */
 
 public class PageRankDiffs {
