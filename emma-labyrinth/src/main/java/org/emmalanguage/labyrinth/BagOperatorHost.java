@@ -62,7 +62,7 @@ public class BagOperatorHost<IN, OUT>
 	private int terminalBBId = -2;
 	private CFLConfig cflConfig;
 	public int opID = -1;
-	private TypeSerializer<IN> inSer;
+	public TypeSerializer<IN> inSer;
 
 	// ---------------------- Initialized in setup (i.e., on TM):
 
