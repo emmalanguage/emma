@@ -140,7 +140,7 @@ public class ElementOrEvent<T> implements Serializable, CanForceFlush {
 
 	public static final class ElementOrEventSerializer<T> extends TypeSerializer<ElementOrEvent<T>> {
 
-		final TypeSerializer<T> elementSerializer;
+		public final TypeSerializer<T> elementSerializer;
 
 		public ElementOrEventSerializer(TypeSerializer<T> elementSerializer) {
 			this.elementSerializer = elementSerializer;
