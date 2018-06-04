@@ -19,18 +19,18 @@ package compiler
 import api._
 import lang.TreeMatchers
 
-import org.scalatest.FreeSpec
-import org.scalatest.Matchers
+import org.scalatest._
 import org.scalatest.prop.PropertyChecks
 
-import java.util.Properties
 import java.util.UUID
 
 /**
  * Common methods and mixins for all compier specs
  */
-trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with TreeMatchers {
+trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with TreeMatchers
+  with BeforeAndAfterEachTestData {
 
+  private var compileSpecPipelines = false
   val compiler = new RuntimeCompiler()
   import compiler._
 
@@ -39,8 +39,8 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
   // ---------------------------------------------------------------------------
 
   /** Checks if the given tree compiles, and returns the given tree. */
-  lazy val checkCompile: u.Tree => u.Tree = (tree: u.Tree) => {
-    if (BaseCompilerSpec.compileSpecPipelines) {
+  lazy val checkCompile: u.Tree => u.Tree = tree => {
+    if (compileSpecPipelines) {
       val wrapped = wrapInClass(tree)
       val showed = u.showCode(wrapped)
       compiler.compile(parse(showed))
@@ -151,27 +151,10 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
     }
     """
   }
-}
 
-object BaseCompilerSpec {
-
-  import resource._
-
-  val configLocation = "/test_config.properties"
-
-  /**
-   * Whether spec pipelines should try a toolbox compilation at the end, to potentially catch more bugs.
-   * (Set by the IT maven profile; makes specs run about 5 times slower.)
-   */
-  lazy val compileSpecPipelines = props
-    .getProperty("compile-spec-pipelines")
-    .toBoolean
-
-  lazy val props = {
-    val p = new Properties()
-    for {
-      r <- managed(classOf[BaseCompilerSpec].getResourceAsStream(configLocation))
-    } p.load(r)
-    p
+  override def beforeEach(testData: TestData): Unit = {
+    for (csp <- testData.configMap.getOptional[String]("compile-spec-pipelines"))
+      compileSpecPipelines = csp.toBoolean
+    super.beforeEach(testData)
   }
 }

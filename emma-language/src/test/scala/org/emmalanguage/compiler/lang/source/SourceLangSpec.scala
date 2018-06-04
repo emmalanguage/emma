@@ -24,6 +24,8 @@ import test.schema.Marketing._
 import org.example.foo.Bar
 import org.example.foo.Baz
 
+import org.scalatest.matchers.Matcher
+
 /** A spec defining the core fragment of Scala supported by Emma. */
 class SourceLangSpec extends BaseCompilerSpec {
 
@@ -44,15 +46,15 @@ class SourceLangSpec extends BaseCompilerSpec {
     .andThen(compiler.normalizeStatements)
 
   /** Extracts examples from a reified expression. */
-  def extractFrom[A](expr: u.Expr[A]) =
+  def extractFrom[A](expr: u.Expr[A]): List[u.Tree] =
     pipeline(expr.tree) match {
       case u.Apply(_, args) => args
       case u.Block(stats, _) => stats
     }
 
   /** Tree [[Validator]] matcher. */
-  def satisfy(validator: Validator) =
-    be (good) compose { (tree: u.Tree) =>
+  def satisfy(validator: Validator): Matcher[u.Tree] =
+    be (good) compose { tree =>
       time(validateAs(validator, tree), "validate")
     }
 
