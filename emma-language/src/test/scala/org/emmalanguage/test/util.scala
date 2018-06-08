@@ -49,7 +49,7 @@ object util {
     outputPath.toString
   }).acquireAndGet(identity)
 
-  /** Creates a demp output path with the given `suffix`. */
+  /** Creates a temp output path with the given `suffix`. */
   def tempPath(suffix: String) = FilenameUtils
     .separatorsToUnix(Paths.get(s"$basePath/$suffix").toString)
 

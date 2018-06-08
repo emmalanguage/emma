@@ -21,7 +21,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
- * A holder for the name of the field in the enclosing object, where a serialized code of a an
+ * A holder for the name of the field in the enclosing object, where a serialized code of an
  * annotated method can be found.
  * <p>
  * For example
@@ -37,7 +37,7 @@ import java.lang.annotation.Target;
  * Implies that `foo` contains a field named `applyQ$01` which returns the code of `apply` as
  * a string.
  * <p>
- * Instances of this annotation are placed by by the `emma.lib` macro, please do not use this
+ * Instances of this annotation are placed by the `emma.lib` macro, please do not use this
  * directly.
  */
 @Retention(RetentionPolicy.RUNTIME)

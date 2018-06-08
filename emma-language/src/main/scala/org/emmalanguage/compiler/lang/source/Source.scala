@@ -282,7 +282,7 @@ private[compiler] trait Source extends Common
       Foreach2Loop.transform
     ))
 
-    /** Removes implicit lists consisting of the following symbols. */
+    /** Removes implicit parameter lists having the given types. */
     def removeImplicits(types: Set[u.Type]) = TreeTransform("Source.removeImplicits", {
 
       object Matching {
