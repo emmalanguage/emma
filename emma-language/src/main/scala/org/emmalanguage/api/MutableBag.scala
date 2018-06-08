@@ -43,7 +43,7 @@ trait MutableBag[K, V] {
    */
   def update[M: Meta](ms: DataBag[Group[K, M]])(f: UpdateFunction[M]): DataBag[(K, V)]
 
-  /** Returns the underluing data of this `MutableBag` as an (immutable) `DataBag`. */
+  /** Returns the underlying data of this `MutableBag` as an (immutable) `DataBag`. */
   def bag(): DataBag[(K, V)]
 
   /** Creates a copy of this `MutableBag`. Can be used for by-value assignment. */

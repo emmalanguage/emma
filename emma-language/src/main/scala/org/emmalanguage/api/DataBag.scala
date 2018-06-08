@@ -340,7 +340,7 @@ trait DataBag[A] extends Serializable {
    *
    * @param n number of elements to return
    * @param o the implicit [[Ordering]] of elements
-   * @return an ordered (descending) [[List]] of the bottom `n` elements
+   * @return an ordered (descending) [[List]] of the top `n` elements
    */
   def top(n: Int)(implicit o: Ordering[A]): List[A] =
     fold(Top(n, o))

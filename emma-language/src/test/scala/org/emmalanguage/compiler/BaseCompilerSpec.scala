@@ -54,7 +54,8 @@ trait BaseCompilerSpec extends FreeSpec with Matchers with PropertyChecks with T
 
   /**
    * Combines a sequence of `transformations` into a pipeline with pre- and post-processing.
-   * If the IT maven profile is set, then it also checks if the resulting code is valid by compiling it.
+   * If the compile-spec-pipelines maven profile is set, then it also checks if the resulting code is
+   * valid by compiling it.
    */
   protected def pipeline(
     typeCheck: Boolean = false, withPre: Boolean = true, withPost: Boolean = true
@@ -161,7 +162,7 @@ object BaseCompilerSpec {
 
   /**
    * Whether spec pipelines should try a toolbox compilation at the end, to potentially catch more bugs.
-   * (Set by the IT maven profile; makes specs run about 5 times slower.)
+   * (Set by the compile-spec-pipelines maven profile; makes specs run about 5 times slower.)
    */
   lazy val compileSpecPipelines = props
     .getProperty("compile-spec-pipelines")

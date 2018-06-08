@@ -43,8 +43,6 @@ private[comprehension] trait Combination extends Common {
       for (i <- 1 to 2) yield tuple2.member(api.TermName(s"_$i")).asTerm
     }
 
-    // TODO: Split conjunctive filter predicates.
-
     /**
      * Introduces combinators instead of comprehensions.
      * In addition to the monad ops, it recognizes crosses and equi joins.
