@@ -825,9 +825,31 @@ private[compiler] trait FoldForestFusion extends Common {
           // Build a new data-flow graph to determine the topological order of vals.
           if (fusedIndex.isEmpty) let else {
             val index = valIndex ++ fusedIndex -- fusedMonadOps
-            val dataFlow = index.mapValues(_.collect {
+            val dataFlow0 = index.mapValues(_.collect {
               case core.Ref(x) if index.contains(x) => x
             }.toSet)
+
+            // We add edges from all non-implicit ValDef to all implicit ValDefs.
+            // This is necessary, because implicits are not resolved at this point in the pipeline,
+            // so we don't see the real dependencies from just looking at the refs.
+            // Note that unfortunately this can still go wrong in certain cases:
+            //  - implicit dependencies between implicit ValDefs
+            //  - an implicit ValDef has a dependency on a non-implicit ValDef
+            // But it works for common cases, e.g., with addContext.
+            val implicitValSyms = vals.filter(_.symbol.isImplicit).map(_.symbol.asTerm)
+            val dataFlow =
+              if (implicitValSyms.isEmpty) {
+                dataFlow0
+              } else {
+                dataFlow0.map { case (vdsym, edges) =>
+                  if (vdsym.isImplicit) {
+                    (vdsym, edges)
+                  } else {
+                    (vdsym, edges ++ implicitValSyms.toSet)
+                  }
+                }
+              }
+
             val sortedVals = for {
               lhs <- topoSort(dataFlow).get
             } yield core.ValDef(lhs, index(lhs))
