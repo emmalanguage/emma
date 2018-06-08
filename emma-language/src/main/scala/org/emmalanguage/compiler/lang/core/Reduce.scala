@@ -58,18 +58,18 @@ private[core] trait Reduce extends Common {
       api.BottomUp.inherit({ // accumulate trivial ValDef bindings in scope
         case core.Let(vals, _, _) =>
           vals.foldLeft(Map.empty[u.Symbol, u.Tree])((valDefs, valDef) => valDef match {
-            case core.ValDef(x, a@core.Ref(y)) => valDefs + (x -> valDefs.getOrElse(y, a))
-            case core.ValDef(x, a@core.Atomic(_)) => valDefs + (x -> a)
+            case core.ValDef(x, a@core.Ref(y)) if !x.isImplicit => valDefs + (x -> valDefs.getOrElse(y, a))
+            case core.ValDef(x, a@core.Atomic(_)) if !x.isImplicit => valDefs + (x -> a)
             case _ => valDefs
           })
       })(mclose).transformWith({
         case Attr.inh(core.Ref(x), valDefs :: _)
           if valDefs contains x => valDefs(x)
         case Attr.none(core.Let(vals, defs, expr)) =>
-          core.Let(vals.filter(_.rhs match {
+          core.Let(vals.filter((vd: u.ValDef) => vd.symbol.isImplicit || (vd.rhs match {
             case core.Atomic(_) => false
             case _ => true
-          }), defs, expr)
+          })), defs, expr)
       })._tree)
 
     /** Merges two closed trivial ValDef maps preserving the closure. */

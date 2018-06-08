@@ -68,6 +68,22 @@ class ReduceSpec extends BaseCompilerSpec {
     act shouldBe alphaEqTo(exp)
   }
 
+  "does not eliminate implicit ValDefs" in {
+    val act = actPipeline(reify {
+      val xs = this.xs
+      implicit val i = 8
+      xs
+    })
+
+    val exp = expPipeline(reify {
+      val xs = this.xs
+      implicit val i = 8
+      xs
+    })
+
+    act shouldBe alphaEqTo(exp)
+  }
+
   "inlines" - {
     "lambdas in the enclosing let block" in {
       val act = actPipeline(reify {
