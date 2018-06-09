@@ -93,9 +93,12 @@ trait Bindings { this: AST =>
        * Creates a type-checked binding definition.
        * @param lhs Must be a binding symbol.
        * @param rhs The value of this binding (empty by default), owned by `lhs`.
+       * @param alwaysSetTpt If false, then we only set tpt if the type of `lhs` is different than
+       *                     what would be inferred from the `rhs` later. If true, we always write
+       *                     out the type (this is necessary when passing a tree to Squid).
        * @return `[val|var] lhs [= rhs]`.
        */
-      def apply(lhs: u.TermSymbol, rhs: u.Tree = Empty()): u.ValDef = {
+      def apply(lhs: u.TermSymbol, rhs: u.Tree = Empty(), alwaysSetTpt: Boolean = false): u.ValDef = {
         assert(is.defined(lhs), s"$this LHS is not defined")
         assert(is.binding(lhs), s"$this LHS $lhs is not a binding")
         assert(has.nme(lhs),    s"$this LHS $lhs has no name")
@@ -109,7 +112,10 @@ trait Bindings { this: AST =>
             |(lhs: `$lhs`, rhs:\n`${u.showCode(rhs)}`\n)
             |""".stripMargin.trim)
           (Owner.at(lhs)(rhs),
-            if (lhs.info =:= rhs.tpe.dealias.widen) TypeQuote.empty
+            // We don't want ValDefs to write out the type if it can be inferred, because of the
+            // "inaccessible types made explicit issue".
+            // See https://github.com/emmalanguage/emma/issues/234#issuecomment-260111399
+            if (lhs.info =:= rhs.tpe.dealias.widen && !alwaysSetTpt) TypeQuote.empty
             else TypeQuote(lhs.info))
         } else {
           assert(lhs.isParameter, s"$this RHS cannot be empty")
