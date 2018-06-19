@@ -108,7 +108,7 @@ object WordCountScala {
       .addInput(reduceNode, true, false)
       .setParallelism(1)
 
-    LabyNode.translateAll()
+    LabyNode.translateAll(env.getJavaEnv)
     System.out.println(env.getExecutionPlan)
     env.execute
   }
