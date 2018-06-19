@@ -16,6 +16,7 @@
 
 package org.emmalanguage.labyrinth;
 
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.emmalanguage.labyrinth.partitioners.Always0;
 import org.emmalanguage.labyrinth.operators.BagOperator;
 import org.emmalanguage.labyrinth.partitioners.FlinkPartitioner;
@@ -137,9 +138,9 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
         return this;
     }
 
-    public static void translateAll() {
+    public static void translateAll(StreamExecutionEnvironment env) {
         for (AbstractLabyNode<?> ln: labyNodes) {
-            ln.translate();
+            ln.translate(env);
         }
 
         int totalPara = 0;
@@ -153,7 +154,7 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
 
     @Override
     @SuppressWarnings("unchecked")
-    protected void translate() {
+    protected void translate(StreamExecutionEnvironment env) {
 
         List<AbstractLabyNode<?>> inpNodes = new ArrayList<>();
         for (Input in: inputs) {
@@ -170,14 +171,13 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
 
         // Determine input parallelism (and make sure all inputs have the same para)
         Integer inputPara = null;
-        assert !inpNodes.isEmpty();
         for (AbstractLabyNode<?> inp : inpNodes) {
             if (inp.getFlinkStream() != null) {
                 assert inputPara == null || inputPara.equals(inp.getFlinkStream().getParallelism());
                 inputPara = inp.getFlinkStream().getParallelism();
             }
         }
-        bagOpHost.setInputPara(inputPara);
+        bagOpHost.setInputPara(inputPara != null ? inputPara : -2);
 
         DataStream<ElementOrEvent<IN>> inputStream = null;
 
@@ -185,12 +185,14 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
             boolean needUnion = inputs.size() > 1;
 
             if (!needUnion) {
-                Input inp = inputs.get(0);
-                if (inp.node.getFlinkStream() instanceof SplitStream) {
-                    inputStream = ((SplitStream<ElementOrEvent<IN>>) inp.node.getFlinkStream())
-                            .select(((Integer)inp.splitID).toString());
-                } else {
-                    inputStream = inp.node.getFlinkStream();
+                if (!inputs.isEmpty()) {
+                    Input inp = inputs.get(0);
+                    if (inp.node.getFlinkStream() instanceof SplitStream) {
+                        inputStream = ((SplitStream<ElementOrEvent<IN>>) inp.node.getFlinkStream())
+                                .select(((Integer) inp.splitID).toString());
+                    } else {
+                        inputStream = inp.node.getFlinkStream();
+                    }
                 }
             } else {
                 int i = 0;
@@ -242,6 +244,10 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
                     ((LabyNode)inp.node).closeTo.add(new Close(iterativeStream, inp.splitID, inp.index));
                 }
             }
+        }
+
+        if (inputStream == null) {
+            inputStream = env.fromElements((Class<ElementOrEvent<IN>>)(Class<?>)ElementOrEvent.class);
         }
 
         if (bagOpHost.inSer == null) {

@@ -17,6 +17,7 @@
 package org.emmalanguage.labyrinth;
 
 import org.apache.flink.streaming.api.datastream.DataStream;
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,5 +29,5 @@ abstract class AbstractLabyNode<OUT> {
 
     abstract protected DataStream<ElementOrEvent<OUT>> getFlinkStream();
 
-    abstract protected void translate();
+    abstract protected void translate(StreamExecutionEnvironment env);
 }

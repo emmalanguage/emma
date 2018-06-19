@@ -263,7 +263,7 @@ public class ClickCountDiffs {
 
         // Itt nincs semmi operator. (A kiirast a BB 2-ben csinaljuk.)
 
-        LabyNode.translateAll();
+        LabyNode.translateAll(env);
 
         env.execute();
     }

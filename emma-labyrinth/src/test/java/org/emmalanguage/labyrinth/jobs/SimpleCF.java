@@ -173,7 +173,7 @@ public class SimpleCF {
 
 //		CFLConfig.getInstance().setNumToSubscribe();
 
-		LabyNode.translateAll();
+		LabyNode.translateAll(env);
 
 		System.out.println(env.getExecutionPlan());
 		env.execute();

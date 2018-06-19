@@ -633,7 +633,7 @@ public class PageRankDiffs {
 
         LabyNode.printOperatorIDNameMapping();
 
-        LabyNode.translateAll();
+        LabyNode.translateAll(env);
 
         System.out.println(env.getExecutionPlan());
         env.execute();

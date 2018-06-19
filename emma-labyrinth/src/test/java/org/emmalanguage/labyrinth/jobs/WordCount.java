@@ -135,7 +135,7 @@ public class WordCount {
 				.addInput(reduceNode, true, false)
 				.setParallelism(1);
 
-		LabyNode.translateAll();
+		LabyNode.translateAll(env);
 
 		System.out.println(env.getExecutionPlan());
 		env.execute();

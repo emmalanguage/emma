@@ -298,7 +298,7 @@ object ClickCountDiffsScala {
 
     // -- Iteration ends here   BB 4
     // Itt nincs semmi operator. (A kiirast a BB 2-ben csinaljuk.)
-    LabyNode.translateAll()
+    LabyNode.translateAll(env.getJavaEnv)
     env.execute
   }
 }

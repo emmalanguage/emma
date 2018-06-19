@@ -94,7 +94,7 @@ public class NoCF {
 						.addInput(output, true, false)
 						.setParallelism(1);
 
-		LabyNode.translateAll();
+		LabyNode.translateAll(env);
 
 		//CFLConfig.getInstance().setNumToSubscribe(); //translateAll does this
 

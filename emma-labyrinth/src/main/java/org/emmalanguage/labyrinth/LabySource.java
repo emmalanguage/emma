@@ -16,6 +16,7 @@
 
 package org.emmalanguage.labyrinth;
 
+import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.emmalanguage.labyrinth.operators.Bagify;
 import org.emmalanguage.labyrinth.util.Util;
 import org.emmalanguage.labyrinth.partitioners.FlinkPartitioner;
@@ -59,7 +60,7 @@ public class LabySource<T> extends AbstractLabyNode<T> {
     }
 
     @Override
-    protected void translate() {
+    protected void translate(StreamExecutionEnvironment env) {
         flinkStream = inputStream
                 .transform("bagify", Util.tpe(), bagify)
                 .returns(typeInfo);
