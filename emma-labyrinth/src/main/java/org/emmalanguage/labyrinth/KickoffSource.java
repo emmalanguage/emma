@@ -44,7 +44,7 @@ public class KickoffSource implements SourceFunction<Unit> {
 		LOG.info("KickoffSource kicking off");
 		CFLManager cflManager = CFLManager.getSing();
 
-		//cflManager.resetCFL(); // Ezt atmozgattam a TaskManager.scala-ba
+		//cflManager.resetCFL(); // I moved this to TaskManager.scala
 		cflManager.specifyTerminalBB(terminalBBId);
 
 		assert cflConfig.numToSubscribe != -10;

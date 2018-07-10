@@ -35,14 +35,14 @@ public class MutableBagCC extends BagOperatorHost<TupleIntInt, TupleIntInt> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(MutableBagCC.class);
 
-	// Inputok:
-	//  -1: semmi (ez a toBag-nel van)
+	// Inputs:
+	//  -1: nothing (this is for toBag)
 	//  0: toMutable
 	//  1: join
 	//  2: update
 
-	// Outok:
-	//  0, 1, 2: a joinbol a harom kimeno
+	// Outs:
+	//  0, 1, 2: the three outgoing from join
 	//  3: toBag
 
 	// These change together with outCFLSizes, and show which input/output to activate.
@@ -56,8 +56,8 @@ public class MutableBagCC extends BagOperatorHost<TupleIntInt, TupleIntInt> {
 	@Override
 	protected boolean updateOutCFLSizes(List<Integer> cfl) {
 		int addedBB = cfl.get(cfl.size() - 1);
-		outCFLSizes.add(cfl.size()); // mert minden BB-ben van egy muvelet
-		if (addedBB == 1) { // mert BB 1-ben ket muvelet is van ra
+		outCFLSizes.add(cfl.size()); // because all BBs have at least one operation
+		if (addedBB == 1) { // because BB 1 has two operations
 			outCFLSizes.add(cfl.size());
 		}
 		switch (addedBB) {
@@ -79,7 +79,7 @@ public class MutableBagCC extends BagOperatorHost<TupleIntInt, TupleIntInt> {
 
 	@Override
 	protected void outCFLSizesRemove() {
-		super.outCFLSizesRemove(); // itt kell ez a super hivas
+		super.outCFLSizesRemove(); // important
 		whichInput.remove();
 	}
 
@@ -174,13 +174,13 @@ public class MutableBagCC extends BagOperatorHost<TupleIntInt, TupleIntInt> {
 						assert inpID == 1;
 
 //						TupleIntInt g = hm.get(e.f0);
-//						assert g != null; // az altalanos interface-nel nem, de a CC-nel mindig benne kell lennie
+//						assert g != null; // this is not needed in the general interface, but always needed in CC
 //						if (g.f1 > e.f1) {
 //							out.collectElement(e);
 //						}
 
 						int g = hm.get(e.f0);
-						assert g != hm.defaultReturnValue(); // az altalanos interface-nel nem, de a CC-nel mindig benne kell lennie
+						assert g != hm.defaultReturnValue(); // this is not needed in the general interface, but always needed in CC
 						if (g > e.f1) {
 							out.collectElement(e);
 						}
@@ -190,7 +190,7 @@ public class MutableBagCC extends BagOperatorHost<TupleIntInt, TupleIntInt> {
 				case 2: // update
 					assert inpID == 2;
 					int present = hm.replace(e.f0, e.f1);
-					assert present != hm.defaultReturnValue(); // az altalanos interface-nel nem, de a CC-nel mindig benne kell lennie
+					assert present != hm.defaultReturnValue(); // this is not needed in the general interface, but always needed in CC
 					break;
 				default:
 					assert false;

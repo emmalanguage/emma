@@ -32,17 +32,17 @@ import java.io.Serializable;
 
 public class ElementOrEvent<T> implements Serializable, CanForceFlush {
 
-	public short subPartitionId; // az input operator melyik physical instance-erol jott
+	public short subPartitionId; // which physical instance of the input operator did this element come from
 	public T element;
 	public Event event;
 
-	public byte splitId; // Ementen kell majd splittelni a conditional outputokhoz
+	public byte splitId; // Split based on this field (for conditional outputs)
 
 	public byte logicalInputId = -1;
 
-	public short targetPart; // A FlinkPartitioner ezt hasznalja
+	public short targetPart; // FlinkPartitioner uses this
 
-	// ! Vigyazni, hogy ha ide folveszek vmi field-et, akkor azt beirjam a copy-ba is !
+	// ! Warning: when I add a field here, also add it to copy and to the serializer !
 
 	public ElementOrEvent() {}
 

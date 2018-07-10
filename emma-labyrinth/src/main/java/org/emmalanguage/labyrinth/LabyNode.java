@@ -88,8 +88,8 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
         labyNodes.add(this);
     }
 
-    // Az insideBlock ugy ertve, hogy ugyanabban a blockban van, es elotte a kodban.
-    // Azaz ha ugyanabban a blockban van, de utana, akkor "block-ot lepunk".
+    // insideBlock is meant as in the same block PLUS before in the code
+    // So if it is in the same block, but after, then we "step a block"
     public LabyNode<IN, OUT> addInput(LabyNode<?, IN> inputLabyNode, boolean insideBlock, boolean condOut) {
         assert !(insideBlock && condOut); // This case is impossible, right?
         bagOpHost.addInput(inputs.size(), inputLabyNode.bagOpHost.bbId, insideBlock, inputLabyNode.bagOpHost.opID);
@@ -277,8 +277,8 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
 //                    break;
 //                }
 //            }
-            needSplit = true;  //todo: el kene donteni, hogy ez hogy legyen. Az a baj, hogy itt mar tul keso eldonteni, mert ha az addInput-ban mar tobb out-ot hozunk letre, akkor mindenkeppen splittelni kell. Viszont ez ugyebar igy esetleg lassithat kicsit a regi jobokhoz kepest, bar remelhetoleg nem sokat. Le kene majd merni, hogy mennyit.
-                // De varjunk: el tudjuk donteni az addInput-ban! Szoval a needSplit member variable lenne, amit az addInputban settelnenk, es minden nem conditional out egyetlen out-ban lenne. (Csak le kell ellenorizni, hogy a splitteles logikaja tudja-e ezt a setupot kezelni megfeleloen)
+            // todo: we should decide this more accurately. The problem is that it is too late to decide here, because if addInput created more outs, then we need to split. Hm, but wait: we can decide in addInput! needSplit would be a member variable, which we would set in addInput, and all non-conditional outs would be in one out. (But we have to check that the logic if splitting can handle this setup correctly.)
+            needSplit = true;
         }
         if (needSplit) {
             flinkStream = flinkStream.split(new CondOutputSelector<>());

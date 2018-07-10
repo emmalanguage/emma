@@ -40,7 +40,7 @@ public class LabySource<T> extends AbstractLabyNode<T> {
     private final TypeInformation<ElementOrEvent<T>> typeInfo;
 
     public LabySource(DataStream<T> inputStream, int bbId, TypeInformation<ElementOrEvent<T>> typeInfo) {
-        assert bbId == 0; // ezt majd akkor lehet kivenni, hogyha megcsinaltam, hogy a Bagify tudjon tobbszor kuldeni (bar ezt kozben maskepp csinalom, ld. CFAwareFileSource)
+        assert bbId == 0; // because Bagify always sends only once
         this.bbId = bbId;
         this.opID = labyNodes.size();
         this.inputStream = inputStream;

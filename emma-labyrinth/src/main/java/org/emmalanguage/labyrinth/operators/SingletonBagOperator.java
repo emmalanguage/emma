@@ -41,7 +41,7 @@ public abstract class SingletonBagOperator<IN, OUT> extends BagOperator<IN, OUT>
 	@Override
 	public void closeInBag(int inputId) {
 		super.closeInBag(inputId);
-		assert c == 1; // Each of our input bags should contain exactly one element.  (ez elszurodhat ha pl. nem 1 a parallelismje egy SingletonBagOperatornak)
+		assert c == 1; // Each of our input bags should contain exactly one element.  (This can go wrong, for example, when the para is not 1)
 		c = closedC;
 		out.closeBag();
 	}

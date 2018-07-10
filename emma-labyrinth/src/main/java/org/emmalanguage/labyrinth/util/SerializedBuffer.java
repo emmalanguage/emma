@@ -37,11 +37,10 @@ public class SerializedBuffer<T> implements Iterable<T> {
 
     private final SimpleCollectingOutputView outView = new SimpleCollectingOutputView(segs, new ConjuringSegmentSource(), segSize);
 
-    // Vigyazat, ez mar nem teljesen azt jelenti, mint amit eredetileg akartam, hogy meghivtak az iteratorat. Mostmar
-    // olyankor is true-ra allitodik, ha nem  volt dammelve egyaltalan a subpartition. (Mivelhogy ilyenkor is lenyegeben
-    // consume-olta az operator az elemeit, csak nem az iteratoron keresztul, hanem a processElement kozvetlenul
-    // beadta az operatornak. (Ez ugyebar azert kell, mert attol, hogy nem dammelt egyaltalan, meg elofordulhat, hogy
-    // kesobb is szukseg lesz az inputra)
+    // Note that this doesn't mean what it used to mean (that the iterator was called). Now it is set to true also when
+    // the subpartition was not dammed at all. (Since the operator essentially consumed the elements, but not through
+    // the iterator but through processElement. (This is needed, because it can happen that the input will be needed
+    // later even when it didn't dam.))
     public boolean consumeStarted = false;
 
     private int numWritten = 0;
@@ -51,7 +50,7 @@ public class SerializedBuffer<T> implements Iterable<T> {
     }
 
     public void add(T e) {
-        //assert !consumeStarted; //ez ugyebar azert nem igaz, mert a processElement meg siman pakol bele, miutan consumoltunk
+        //assert !consumeStarted; // this doesn't work, because processElement adds more stuff after consume
         numWritten++;
         try {
             ser.serialize(e, outView);
