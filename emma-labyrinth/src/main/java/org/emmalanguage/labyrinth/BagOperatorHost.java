@@ -76,8 +76,8 @@ public class BagOperatorHost<IN, OUT>
 
 	// ----------------------
 
-	protected List<Integer> latestCFL; //majd vigyazni, hogy ez valszeg ugyanaz az objektumpeldany, mint ami a CFLManagerben van
-	protected Queue<Integer> outCFLSizes; // ha nem ures, akkor epp az elson dolgozunk; ha ures, akkor nem dolgozunk
+	protected List<Integer> latestCFL; // note that this is the same object instance as in CFLManager
+	protected Queue<Integer> outCFLSizes; // if not empty, then we are working on the first one; if empty, then we are not working
 
 	public ArrayList<Out> outs = new ArrayList<>(); // conditional and normal outputs
 
@@ -238,7 +238,7 @@ public class BagOperatorHost<IN, OUT>
 			assert eleOrEvent.logicalInputId == -1 || eleOrEvent.logicalInputId == 0;
 			eleOrEvent.logicalInputId = 0; // This is to avoid having to have an extra map to set this for even one-input operators
 		}
-		assert eleOrEvent.logicalInputId != -1; // (kell egy extra map, ami kitolti (ha nem egyinputos))
+		assert eleOrEvent.logicalInputId != -1; // (there is an extra map needed, which fills this (if not one-input))
 		Input input = inputs.get(eleOrEvent.logicalInputId);
 		InputSubpartition<IN> sp = input.inputSubpartitions[eleOrEvent.subPartitionId];
 
@@ -262,10 +262,10 @@ public class BagOperatorHost<IN, OUT>
 					sp.status = InputSubpartition.Status.OPEN;
 					sp.addNewBuffer(ev.bagID);
 					assert input.opID == ev.bagID.opID;
-					//assert input.currentBagID == null || input.currentBagID.equals(ev.bagID); // ezt azert kellett kicommentezni, mert a null-ra allitast kivettem, mert rossz helyen volt
-					//assert input.currentBagID.equals(ev.bagID); // Ez meg azert nem igaz, mert van, hogy az activateLogicalInput meg nem fut le, amikor a start mar megerkezik
-					// A kov ertekadas azert nem jo, mert igy a notifyCloseInput azt hinne, hogy mar aktivalva lett.
-					// De lehet, hogy csak kesobb lesz aktivalva (es akkor majd persze megnezzuk, hogy kaptunk-e mar notifyCloseInput-ot ra).
+					//assert input.currentBagID == null || input.currentBagID.equals(ev.bagID); // I had to comment this out, because the null resetting was removed, because it was at a bad spot
+					//assert input.currentBagID.equals(ev.bagID); // This does not work, because it happens that activateLogicalInput has not yet run when a start arrives
+					// The next assignment doesn't work, because notifyCloseInput would think that it is already activated.
+					// But it is possible that it will be activated only later (and then we of course check whether we have already received a notifyCloseInput for it).
 					//input.currentBagID = ev.bagID;
 					// Note: Sometimes the buffer would not be really needed: we could check some tricky condition on the
 					// control flow graph, but this is not so important for the experiments in the paper.
@@ -323,15 +323,15 @@ public class BagOperatorHost<IN, OUT>
 
 			ArrayList<BagID> inputBagIDs = new ArrayList<>();
 			for (Input inp: inputs) {
-				// a kov. assert akkor mondjuk elromolhat, ha ilyen short-circuit-es jellegu az operator, hogy van, hogy mar akkor
-				// lezarja az output bag-et, amikor meg nem kezdodott el minden inputon az input bag, de kesobb meg fog onnan jonni.
-				//assert inp.currentBagID != null; // PhiNode-nal nem fasza
+				// This assert can fail when we have a kind of a short-circuit-style operator, which sometimes closes
+				// the output bag before the input bag started on all inputs, but elements will come from there later.
+				//assert inp.currentBagID != null; // Doesn't work for PhiNode
 				if (inp.activeFor.contains(outCFLSizes.peek())) {
 					assert inp.currentBagID != null;
 					inputBagIDs.add(inp.currentBagID);
 				}
 
-				// Ez megint csak elvileg elromolhat olyan short-circuit-es operatornal, ami nem varja meg, hogy minden inputja lezarodjon, mielott lezarna az out-ot.
+				// This can also fail for such short-circuit-style operators which don't wait for input bag closures before closing out.
 				assert inp.inputCFLSize == -1;
 			}
 			BagID[] inputBagIDsArr = new BagID[inputBagIDs.size()];
@@ -342,8 +342,8 @@ public class BagOperatorHost<IN, OUT>
 
 			BagID outBagID = new BagID(outCFLSizes.peek(), opID);
 			if (numElements > 0 || consumed || inputBagIDs.size() == 0) {
-				// inputBagIDs.size() == 0 esetben azert kell kuldenunk, mert ilyenkor a checkForClosingProduced mindenhonnan var
-				// (az elejen levo (s.inputs.size() == 0) if miatt)
+				// In the inputBagIDs.size() == 0 case we have to send, because in this case checkForClosingProduced expects from everywhere
+				// (because of the s.inputs.size() == 0) at its beginning)
 				if (!(BagOperatorHost.this instanceof MutableBagCC && ((MutableBagCC.MutableBagOperator)op).inpID == 2)) {
 					numElements = correctBroadcast(numElements);
 					cflMan.producedLocal(outBagID, inputBagIDsArr, numElements, para, subpartitionId, opID);
@@ -354,13 +354,14 @@ public class BagOperatorHost<IN, OUT>
 
 			outCFLSizesRemove();
 			workInProgress = false;
-			if(outCFLSizes.size() > 0) { // ha van jelenleg varakozo munka
+			if(outCFLSizes.size() > 0) { // if there is pending work
 				if (CFLConfig.vlog) LOG.info("Out.closeBag starting a new out bag {" + name + "}");
-				// Note: ettol el fog dobodni az Outok buffere, de ez nem baj, mert aminek el kellett mennie az mar elment
+				// Note: outs' buffers will be discarded from this, but this is not a problem, because everything that has to be sent
+				// has been already sent
 				startOutBagCheckBarrier();
 			} else {
 				if (CFLConfig.vlog) LOG.info("Out.closeBag not starting a new out bag {" + name + "}");
-				if (terminalBBReached) { // ha nincs jelenleg varakozo munka es mar nem is jon tobb
+				if (terminalBBReached) { // if there is no pending work, and none would come later
 					cflMan.unsubscribe(cb);
 					es.shutdown();
 				}
@@ -375,7 +376,7 @@ public class BagOperatorHost<IN, OUT>
 		private int correctBroadcast(int numElements) {
 			if (outs.size() > 0 && outs.get(0).partitioner instanceof Broadcast) {
 				for (Out o: outs) {
-					// most van egy ilyen limitation-unk, hogy ha egy output broadcast output, akkor az osszesnek annak kell lennie
+					// We have a limitation that if an output is a broadcast output, then all of them has to be broadcast
 					assert o.partitioner instanceof Broadcast;
 				}
 				return numElements * outs.get(0).partitioner.targetPara;
@@ -434,7 +435,7 @@ public class BagOperatorHost<IN, OUT>
 
 		shouldLogStart = true;
 
-		chooseOuts(); // Ez csak a MutableBag-nel kell
+		chooseOuts(); // This is only needed for MutableBag
 
 		// Treat outputs
 		for(Out o: outs) {
@@ -445,8 +446,8 @@ public class BagOperatorHost<IN, OUT>
 		int outCFLSizesSize = outCFLSizes.size();
 		op.openOutBag();
 		if (outCFLSizes.size() < outCFLSizesSize) {
-			// Ez a mokolas itt azert kell, mert ha mar esetleg az openOutBag kivaltotta az elemek kikuldeset es a bag lezarasat, akkor a
-			// kesobbiekben elszallnank vmi asserten. (Ez a MutableBag.toBag-nel tortenik pl.)
+			// This hack is needed here because if openOutBag has already triggered the sending of elements and closing the bag,
+			// then we would fail on some later assert. (For example, MutableBag.toBag, fromNothing)
 			return;
 		}
 
@@ -455,7 +456,8 @@ public class BagOperatorHost<IN, OUT>
 			assert input.inputCFLSize == -1;
 
 			for (InputSubpartition<IN> sp : input.inputSubpartitions) {
-				sp.damming = true; // ezek kozul ugyebar nemelyiket majd false-ra allitja az activateLogicalInput mindjart
+				// Some of these will be set to false by activateLogicalInput soon
+				sp.damming = true;
 			}
 		}
 
@@ -530,7 +532,7 @@ public class BagOperatorHost<IN, OUT>
 			}
 		}
 
-		// Asszem itt kell majd a remove buffer if bonyolult CFG-s condition
+		// I think the "remove buffer if complicated CFG condition" will be needed here
 	}
 
 	protected boolean updateOutCFLSizes(List<Integer> cfl) {
@@ -555,8 +557,8 @@ public class BagOperatorHost<IN, OUT>
 
 								if (CFLConfig.vlog) LOG.info("CFL notification: " + latestCFL + " {" + name + "}");
 
-								// Note: figyelni kell, hogy itt hamarabb legyen az out-ok kezelese, mint a startOutBag hivas, mert az el fogja dobni a buffereket,
-								// es van olyan, hogy ugyanannak a BB-nek az elerese mindket dolgot kivaltja
+								// Note: the handling of outs has to be before the startOutBag call, because that will throw away buffers
+								// (and it often happens that reaching a BB triggers both of these things).
 
 								for (Out o : outs) {
 									o.notifyAppendToCFL(cfl);
@@ -583,8 +585,9 @@ public class BagOperatorHost<IN, OUT>
 
 		@Override
 		public void notifyTerminalBB() {
-			// ha ez nem az es-en keresztul megy, akkor az a gond, hogy subscribe-nal a notify submittel,
-			// es ennek a notify-nak kene beraknia vmit az outCFLSizes-ba, de meg nem rakta be, amikor mar elerjuk a itt az outCFLSizes checket
+			// If this doesn't go through es, then we have the problem that notify submits on subscribe,
+			// and this notify would have to insert something into outCFLSizes, but it hasn't inserted it yet
+			// when we reach the outCFLSizes check here.
 			synchronized (es) {
 				es.submit(new Runnable() {
 					@Override
@@ -594,8 +597,8 @@ public class BagOperatorHost<IN, OUT>
 							synchronized (BagOperatorHost.this) {
 								terminalBBReached = true;
 								if (outCFLSizes.isEmpty()) {
-									// azert kell elobb unsubscribe-olni, mint shutdown-olni, mert a olyankor is kapunk mindenfele
-									// broadcast jellegu notificationoket, amikor mi mar vegeztunk, de a tobbiek meg dolgoznak.
+									// We have to unsubscribe before shutdown, because we get broadcast notifications
+									// even when we are finished, when others are still working.
 									cflMan.unsubscribe(cb);
 									es.shutdown();
 								}
@@ -627,12 +630,12 @@ public class BagOperatorHost<IN, OUT>
 									}
 
 									for (Input inp : inputs) {
-										//assert inp.currentBagID != null; // Ez kozben megsem lesz igaz, mert mostmar broadcastoljuk a closeInput-ot
+										//assert inp.currentBagID != null; // This no longer works, because we broadcast closeInput
 										if (bagID.equals(inp.currentBagID)) {
 
 											if (opID == CFLManager.CloseInputBag.emptyBag) {
-												// Itt az EmptyFromEmpty marker interface azert nem kell, mert nem rontja ez el a dolgokat a consumed = true
-												// akkor sem, ha nem empty lesz az eredmeny bag.
+												// The EmptyFromEmpty marker interface is not needed here, because consumed = true doesn't mess up things
+												// even when the result bag will not be empty.
 												consumed = true;
 											}
 
@@ -701,28 +704,29 @@ public class BagOperatorHost<IN, OUT>
 
 	public final class Out implements Serializable {
 
-		// Egyelore nem csinalunk kulon BB elerese altal kivaltott discardot. (Amugy ha uj out bag van, akkor eldobodik a reginek a buffere igy is.)
+		// For the time being, we don't do discard triggered by reaching a BB.
+		// (But note that when there is a new out bag, then the old one's buffer is discarded anyway.)
 
-		// 4 esetben tortenik valami:
+		// There is action in 4 situations:
 		//  - startOutBag:
-		//    - ha nem erte el a targetet, akkor DAMMING, es new Buffer
-		//    - ha elerte a targetet vagy normal, akkor sendStart es FORWARDING
-		//  - elem jon a BagOperatorbol
-		//    - assert DAMMING or FORWARDING, es aztan tesszuk a megfelelot
-		//  - vege van a BagOperatorbol jovo bagnek
-		//    - IDLE nem lehet
-		//    - ha DAMMING, akkor WAITING-re valtunk
-		//    - WAITING nem lehet
-		//    - ha FORWARDING, akkor megnezzuk, hogy van-e buffer, es ha igen, akkor kuldjuk, es IDLE-re valtunk (ugye ekkor kozben volt D->F valtas)
-		//  - a CFL eleri a targetet
-		//    - IDLE akkor semmi
-		//    - ha DAMMING, akkor sendStart es FORWARDING-ra valtunk
-		//    - ha WAITING, akkor elkuldjuk a buffert, es IDLE-re valtunk
-		//    - FORWARDING akkor semmi
+		//    - if it hasn't yet reached target, then DAMMING, and new Buffer
+		//    - if it reached target or nornmal, then sendStart and FORWARDING
+		//  - element comes from BagOperatorbol
+		//    - assert DAMMING or FORWARDING, and then we do the corresponding thing
+		//  - end of the bag that is coming from the BagOperator
+		//    - IDLE cannot be
+		//    - if DAMMING, then we switch to WAITING
+		//    - WAITING cannot be
+		//    - if FORWARDING, then we check, whether there is a buffer, and if yes, then we send it, and switch to IDLE (there was a D->F switch in this case)
+		//  - if the CFL reaches the target
+		//    - if IDLE then nothing
+		//    - if DAMMING, then sendStart and we switch to FORWARDING
+		//    - if WAITING, then we send the buffer, and swtich to IDLE
+		//    - if FORWARDING then nothing
 
 		private byte splitId = -1;
 		private int targetBbId = -1;
-		public boolean normal = false; // jelzi ha nem conditional
+		public boolean normal = false; // not conditional
 		public final Partitioner<OUT> partitioner;
 
 		private ArrayList<OUT> buffer = null;
@@ -787,14 +791,14 @@ public class BagOperatorHost<IN, OUT>
 				if (normal) {
 					targetReached = true;
 				} else {
-					// Azert nem kell +1 az outCFLSize-nak, mert ugye az outCFL _utani_ elem igy is
+					// We don't need +1 for outCFLSize, because it is already the element _after_ outCFL like this
 					for (int i = outCFLSize; i < latestCFL.size(); i++) {
 						int cfli = latestCFL.get(i);
 						if (cfli == targetBbId) {
 							targetReached = true;
 						}
 						if (cfli == bbId || overwriters.contains(cfli)) {
-							break; // Merthogy akkor egy kesobbi bag folul fogja irni a mostanit.
+							break; // Because a later bag will override the current one.
 						}
 					}
 				}
@@ -804,17 +808,17 @@ public class BagOperatorHost<IN, OUT>
 					buffer = new ArrayList<>();
 				} else {
 					startBag();
-					buffer = null; // Ez azert kell, mert vannak ilyen buffer != null checkek, es azok elkuldenek a regit
+					buffer = null; // This is needed because we have some "buffer != null" checks, which would send the old one.
 					state = OutState.FORWARDING;
 				}
 			}
 		}
 
 		void notifyAppendToCFL(List<Integer> cfl) {
-			// Itt azert nem jo az isActive, mert van, hogy egy korabban aktivat kene meg csak most elkuldeni a notify hatasara.
+			// isActive would not be good here, because it happens that a formerly active should be sent only now because of a notify.
 			if (!normal && (state == OutState.DAMMING || state == OutState.WAITING)) {
 				if (cfl.get(cfl.size() - 1).equals(targetBbId)) {
-					// Leellenorizzuk, hogy nem irodik-e felul, mielott meg a jelenleg hozzaadottat elerne
+					// We check that it is not overwritten before reaching the currently added one
 					boolean overwritten = false;
 					for (int i = outCFLSize; i < cfl.size() - 1; i++) {
 						int cfli = cfl.get(i);
@@ -825,7 +829,7 @@ public class BagOperatorHost<IN, OUT>
 					if (!overwritten) {
 						switch (state) {
 							case IDLE:
-								assert false; // Csak azert, mert a fentebbi if kizarja
+								assert false; // Because the above if makes sure that this doesn't happen
 								break;
 							case DAMMING:
 								assert outCFLSizes.size() > 0;
@@ -844,7 +848,7 @@ public class BagOperatorHost<IN, OUT>
 								state = OutState.IDLE;
 								break;
 							case FORWARDING:
-								assert false; // Csak azert, mert a fentebbi if kizarja
+								assert false; // Because the above if makes sure that this doesn't happen
 								break;
 						}
 					}
@@ -860,7 +864,7 @@ public class BagOperatorHost<IN, OUT>
 		void sendElement(OUT e) {
 			short part = partitioner.getPart(e, subpartitionId);
 			if (part != -1) {
-				// (Amugy ez a logika meg van duplazva a Bagify-ban is most, de ott nincs berakva a -1 (broadcast) kezelese)
+				// Note that this logic is duplicated on Bagify, but without the -1 (broadcast) handling
 				if (!sentStart[part]) {
 					sendStart(part);
 				}
@@ -911,12 +915,12 @@ public class BagOperatorHost<IN, OUT>
 	// Logical input
 	final class Input implements Serializable {
 
-		int id; // marmint sorszam az inputs tombben
+		int id; // index in the inputs array
 		int bbId;
-		boolean inputInSameBlock; // marmint ugy ertve, hogy a kodban elotte (szoval ha utana van ugyanabban a blockban, akkor ez false)
+		boolean inputInSameBlock; // before in the code (so if it is after in the same block, then this is false)
 		InputSubpartition<IN>[] inputSubpartitions;
 		int inputCFLSize = -1; // always -1 when not working on an output bag or when we are not taking part in the computation of the current out bag (PhiNode)
-		BagID currentBagID = null; // marmint ugy current, hogy amibol epp dolgozunk
+		BagID currentBagID = null; // which we are workign from
 		int opID = -1;
 		Set<Integer> activeFor = new HashSet<>(); // outCFLSizes for which this Input is active
 
@@ -929,7 +933,7 @@ public class BagOperatorHost<IN, OUT>
 
 		void closeCurrentInBag() {
 			inputCFLSize = -1;
-			//currentBagID = null; // ez itt rossz lenne, mert meg szuksegunk van ra kov hivasbol jovo dolgoknal
+			//currentBagID = null; // This would be bad here, because we need it in the below call
 			op.closeInBag(id);
 		}
 	}

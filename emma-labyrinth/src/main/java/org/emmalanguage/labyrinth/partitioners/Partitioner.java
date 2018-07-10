@@ -23,7 +23,7 @@ public abstract class Partitioner<T> implements Serializable {
     public short targetPara = 0;
 
     /**
-     * Ugyebar a targetPara a kov operator parallelismje!
+     * targetPara is the parallelism of the downstream operator!
      */
     public Partitioner(short targetPara) {
         this.targetPara = targetPara;

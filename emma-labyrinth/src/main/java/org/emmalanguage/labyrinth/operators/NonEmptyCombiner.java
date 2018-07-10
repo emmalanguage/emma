@@ -19,7 +19,7 @@ package org.emmalanguage.labyrinth.operators;
 /**
  * Don't forget to either set the parallelism to 1, or put an Or with para 1 after this.
  *
- * Abban kulonbozik a NonEmpty-tol, hogy nem kuld olyankor, ha nem jott be elem
+ * The difference to NonEmpty is that we don't send output when we haven't got input element.
  */
 public class NonEmptyCombiner<T> extends BagOperator<T, Boolean> {
 

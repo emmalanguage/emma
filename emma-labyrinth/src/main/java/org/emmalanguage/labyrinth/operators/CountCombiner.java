@@ -35,7 +35,7 @@ public class CountCombiner<T> extends BagOperator<T, Integer> {
     @Override
     public void closeInBag(int inputId) {
         super.closeInBag(inputId);
-        if (count != 0) { // asszem fontos, hogy csak akkor kuldjunk, ha jott input elem
+        if (count != 0) { // it's important that we send output only if we got input
             out.collectElement(count);
         }
         out.closeBag();

@@ -60,7 +60,7 @@ public class Bagify<T>
 
     public void setPartitioner(Partitioner<T> partitioner) {
         assert partitioner != null;
-        assert this.partitioner == null; // Ez pl. olyankor durranhat el, ha ketszer akarnank hasznalni a jobban. Ilyenkor inkabb be kell rakni egy kozbulso LabyNode-ot
+        assert this.partitioner == null; // This can fail, for example, when we try to use it twice. (We should insert an intermediate LabyNode in this case.)
         this.partitioner = partitioner;
     }
 
@@ -80,7 +80,7 @@ public class Bagify<T>
     public void processElement(StreamRecord<T> e) throws Exception {
         numElements++;
         short part = partitioner.getPart(e.getValue(), subpartitionId);
-        // (ez a logika ugyanez a BagOperatorHost-ban)
+        // (this is the same logic as in BagOperatorHost)
         if (!sentStart[part]) {
             sentStart[part] = true;
             ElementOrEvent.Event event = new ElementOrEvent.Event(ElementOrEvent.Event.Type.START, partitioner.targetPara, new BagID(outCflSize, opID));
