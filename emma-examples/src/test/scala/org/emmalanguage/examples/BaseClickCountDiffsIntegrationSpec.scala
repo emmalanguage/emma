@@ -16,7 +16,6 @@
 package org.emmalanguage
 package examples
 
-//import api._
 import test.util._
 
 import org.scalatest.BeforeAndAfter
@@ -31,14 +30,18 @@ trait BaseClickCountDiffsIntegrationSpec extends FlatSpec with Matchers with Bef
   val codegenDir = tempPath("codegen")
   val tmpDir = tempPath(resourceDir)
 
+  val numDays = 4
+
   before {
     new File(codegenDir).mkdirs()
     new File(tmpDir).mkdirs()
     addToClasspath(new File(codegenDir))
-    materializeResource(s"$resourceDir/clickLog_1")
-    materializeResource(s"$resourceDir/clickLog_2")
-    materializeResource(s"$resourceDir/clickLog_3")
-    materializeResource(s"$resourceDir/clickLog_4")
+    (1 to numDays).foreach { day =>
+      materializeResource(s"$resourceDir/clickLog_" + day)
+    }
+    (2 to numDays).foreach { day =>
+      materializeResource(s"$resourceDir/clickLog_" + day + ".exp")
+    }
   }
 
   after {
@@ -46,11 +49,15 @@ trait BaseClickCountDiffsIntegrationSpec extends FlatSpec with Matchers with Bef
     deleteRecursive(new File(tmpDir))
   }
 
-  it should "xxxx" in {
-    clickCountDiffs(s"$tmpDir/clickLog_", 4)
+  it should "compare click counts" in {
+    clickCountDiffs(s"$tmpDir/clickLog_", numDays)
 
-    //todo: check output
+    (2 to numDays).foreach { day =>
+      scala.reflect.io.File(s"$tmpDir/clickLog_" + day + ".out").slurp() should equal (
+        scala.reflect.io.File(s"$tmpDir/clickLog_" + day + ".exp").slurp()
+      )
+    }
   }
 
-  def clickCountDiffs(baseInName: String, numDays: Int): Unit
+  def clickCountDiffs(baseName: String, numDays: Int): Unit
 }

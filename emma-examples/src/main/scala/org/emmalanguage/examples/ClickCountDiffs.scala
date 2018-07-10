@@ -21,7 +21,9 @@ import api._
 @emma.lib
 object ClickCountDiffs {
 
-  def apply(baseInName: String, numDays: Int): Unit = {
+  def apply(baseName: String, numDays: Int): Unit = {
+
+    val baseInName = baseName
 
     // (no join with pageAttributes yet)
     var yesterdayCounts: DataBag[(Int, Int)] = null
@@ -42,7 +44,8 @@ object ClickCountDiffs {
             if c._1 == y._1
           } yield Math.abs(c._2 - y._2)
         val sum = diffs.reduce(0)((x: Int, y: Int) => x + y)
-        println(sum) //TODO: use writeFile instead
+        //println(sum)
+        scala.tools.nsc.io.File(baseName + day + ".out").writeAll(sum.toString)
       }
       yesterdayCounts = counts
     }

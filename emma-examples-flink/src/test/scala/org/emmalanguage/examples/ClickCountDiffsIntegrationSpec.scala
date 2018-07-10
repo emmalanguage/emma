@@ -20,8 +20,8 @@ import api._
 
 class ClickCountDiffsIntegrationSpec extends BaseClickCountDiffsIntegrationSpec with FlinkAware {
 
-  override def clickCountDiffs(baseInName: String, numDays: Int): Unit =
+  override def clickCountDiffs(baseName: String, numDays: Int): Unit =
     withDefaultFlinkEnv(implicit flink => emma.onFlink {
-      ClickCountDiffs(baseInName, numDays)
+      ClickCountDiffs(baseName, numDays)
     })
 }
