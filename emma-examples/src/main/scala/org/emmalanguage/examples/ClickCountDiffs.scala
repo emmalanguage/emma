@@ -26,7 +26,7 @@ object ClickCountDiffs {
     val baseInName = baseName
 
     // (no join with pageAttributes yet)
-    var yesterdayCounts: DataBag[(Int, Int)] = null
+    var yesterdayCounts: DataBag[(Int, Int)] = DataBag.empty // should be null, but the compilation doesn't handle it
     for(day <- 1 to numDays) {
       // Read all page-visits for this day
       val visits: DataBag[Int] = DataBag.readText(baseInName + day).map(Integer.parseInt) // integer pageIDs
