@@ -191,6 +191,7 @@ trait LabyrinthCompilerBase extends Compiler {
     val cross = op("cross")
     val empty = op("empty")
     val flatMapDataBagHelper = op("flatMapDataBagHelper")
+    val withFilter = op("withFilter")
     val fold = op("fold")
     val foldAlgHelper = op("foldAlgHelper")
     val foldGroupAlgHelper = op("foldGroupAlgHelper")

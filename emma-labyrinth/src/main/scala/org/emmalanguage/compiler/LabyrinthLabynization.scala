@@ -256,7 +256,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
               replacements += (lhs -> finalNode._3)
               skip(dc)
 
-            // ref map to LabyNode
+            // ref.map to LabyNode
             case dc @ core.DefCall(Some(core.Ref(tgtSym)), DataBag.map, Seq(outTpe), Seq(Seq(lbdaRef))) =>
 
               val tgtReplSym = replacements(tgtSym)
@@ -292,7 +292,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
               replacements += (lhs -> finalNode._3)
               skip(dc)
 
-            // flatmap to LabyNode
+            // ref.flatmap to LabyNode
             case dc @ core.DefCall(Some(core.Ref(tgtSym)), DataBag.flatMap, Seq(outTpe), Seq(Seq(lbdaRef))) =>
 
               val tgtReplSym = replacements(tgtSym)
@@ -317,6 +317,42 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 1,
                 Seq((tgtReplSym, tgtReplRef)),
                 "flatMap",
+                1,
+                bbIdMap
+              )
+              val defs = refDefs._1.map(_._2)
+              val finalNode = refDefs._2
+
+              // put everything into a block
+              valDefsFinal = valDefsFinal ++ Seq(bagOpRefDef._2) ++ defs :+ finalNode._2
+              replacements += (lhs -> finalNode._3)
+              skip(dc)
+
+            // ref.withFilter to LabyNode
+            case dc @ core.DefCall(Some(core.Ref(tgtSym)), DataBag.withFilter, Seq(), Seq(Seq(lbdaRef))) =>
+
+              val tgtReplSym = replacements(tgtSym)
+              val tgtReplRef = core.ValRef(tgtReplSym)
+
+              val inTpe = tgtSym.info.typeArgs.head
+
+              // bagoperator
+              val bagOpVDrhs = core.DefCall(
+                Some(ScalaOps$.ref),
+                ScalaOps$.withFilter,
+                Seq(inTpe),
+                Seq(Seq(lbdaRef))
+              )
+              val bagOpRefDef = valRefAndDef(owner, "filter", bagOpVDrhs)
+
+              val refDefs = generateLabyNode[Always0[Any]](
+                owner,
+                bagOpRefDef._1,
+                inTpe,
+                inTpe,
+                1,
+                Seq((tgtReplSym, tgtReplRef)),
+                "filter",
                 1,
                 bbIdMap
               )
