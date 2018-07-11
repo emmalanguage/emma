@@ -32,6 +32,7 @@ import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
+import org.emmalanguage.labyrinth.util.Util;
 
 import java.util.Arrays;
 
@@ -99,6 +100,7 @@ public class NoCF {
 		//CFLConfig.getInstance().setNumToSubscribe(); //translateAll does this
 
 		System.out.println(env.getExecutionPlan());
-		env.execute();
+		//env.execute();
+		Util.executeWithCatch(env);
 	}
 }

@@ -271,6 +271,7 @@ trait LabyrinthCompilerBase extends Compiler {
     val setTerminalBbid = op("setTerminalBbid")
     val translateAll = op("translateAll")
     val executeAndGetCollected = op("executeAndGetCollected")
+    val executeWithCatch = op("executeWithCatch")
 
     override def ops = Set()
 

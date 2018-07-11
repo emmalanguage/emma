@@ -462,7 +462,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
         val a = () => 1
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
         LabyStatics.translateAll
-        val exec = env.execute
+        val exec = LabyStatics.executeWithCatch(env)
         exec
       }
 
@@ -492,7 +492,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
         LabyStatics.translateAll
-        env.execute
+        LabyStatics.executeWithCatch(env)
       }
 
       applyLabynization()(inp) shouldBe alphaEqTo(anfPipeline(exp))
@@ -535,7 +535,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
         LabyStatics.translateAll
-        env.execute
+        LabyStatics.executeWithCatch(env)
       }
 
       applyLabynization()(inp) shouldBe alphaEqTo(anfPipeline(exp))
@@ -590,7 +590,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
         LabyStatics.translateAll
-        env.execute
+        LabyStatics.executeWithCatch(env)
       }
 
       applyLabynization()(inp) shouldBe alphaEqTo(anfPipeline(exp))
@@ -746,7 +746,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
         LabyStatics.translateAll
-        env.execute
+        LabyStatics.executeWithCatch(env)
 
       }
       applyLabynization()(inp) shouldBe alphaEqTo(anfPipeline(exp))
@@ -855,7 +855,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
         LabyStatics.translateAll
-        env.execute
+        LabyStatics.executeWithCatch(env)
 
       }
       applyLabynization()(inp) shouldBe alphaEqTo(anfPipeline(exp))
@@ -913,7 +913,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
         LabyStatics.translateAll
-        env.execute
+        LabyStatics.executeWithCatch(env)
       }
 
       applyLabynization()(inp) shouldBe alphaEqTo(anfPipeline(exp))
@@ -968,7 +968,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
         LabyStatics.translateAll
-        env.execute
+        LabyStatics.executeWithCatch(env)
       }
 
       applyLabynization()(inp) shouldBe alphaEqTo(anfPipeline(exp))
@@ -1024,7 +1024,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
         LabyStatics.translateAll
-        env.execute
+        LabyStatics.executeWithCatch(env)
       }
 
       applyLabynization()(inp) shouldBe alphaEqTo(anfPipeline(exp))
@@ -1147,7 +1147,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
         LabyStatics.translateAll
-        env.execute
+        LabyStatics.executeWithCatch(env)
 
       }
 
@@ -1265,7 +1265,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
         LabyStatics.translateAll
-        env.execute
+        LabyStatics.executeWithCatch(env)
 
       }
 
