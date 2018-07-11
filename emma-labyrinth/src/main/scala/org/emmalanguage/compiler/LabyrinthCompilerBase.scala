@@ -205,7 +205,6 @@ trait LabyrinthCompilerBase extends Compiler {
     val toCsvString = op("toCsvString")
     val writeString = op("writeString")
 
-
     override def ops = Set()
   }
 
