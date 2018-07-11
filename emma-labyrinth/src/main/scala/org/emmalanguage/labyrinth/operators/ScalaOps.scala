@@ -44,7 +44,6 @@ import java.util
 object ScalaOps {
 
   def map[IN, OUT](f: IN => OUT): FlatMap[IN, OUT] = {
-
     new FlatMap[IN, OUT]() {
       override def pushInElement(e: IN, logicalInputId: Int): Unit = {
         super.pushInElement(e, logicalInputId)
@@ -54,7 +53,6 @@ object ScalaOps {
   }
 
   def flatMap[IN, OUT](f: (IN, BagOperatorOutputCollector[OUT]) => Unit): FlatMap[IN, OUT] = {
-
     new FlatMap[IN, OUT]() {
       override def pushInElement(e: IN, logicalInputId: Int): Unit = {
         super.pushInElement(e, logicalInputId)
@@ -87,7 +85,6 @@ object ScalaOps {
   }
 
   def fromNothing[OUT](f: () => OUT ): BagOperator[org.emmalanguage.labyrinth.util.Nothing,OUT] = {
-
     new BagOperator[org.emmalanguage.labyrinth.util.Nothing,OUT]() {
       override def openOutBag() : Unit = {
         super.openOutBag()
@@ -98,7 +95,6 @@ object ScalaOps {
   }
 
   def empty[OUT]: BagOperator[org.emmalanguage.labyrinth.util.Nothing, OUT] = {
-
     new BagOperator[org.emmalanguage.labyrinth.util.Nothing,OUT]() {
       override def openOutBag() : Unit = {
         super.openOutBag()
@@ -108,7 +104,6 @@ object ScalaOps {
   }
 
   def fromSingSrcApply[IN](): SingletonBagOperator[Seq[IN], IN] = {
-
     new SingletonBagOperator[Seq[IN], IN] {
       override def pushInElement(e: Seq[IN], logicalInputId: Int): Unit = {
         super.pushInElement(e, logicalInputId)
