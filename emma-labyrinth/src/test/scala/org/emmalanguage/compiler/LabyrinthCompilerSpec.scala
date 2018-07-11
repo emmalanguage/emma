@@ -634,7 +634,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
           .setParallelism(1)
 
         val n3 = new LabyNode[Int, Int](
-          "map",
+          "flatMap",
           ScalaOps.flatMapDataBagHelper(x => DataBag(Seq(0, add1(x)))),
           0,
           new Always0[Int](1),
@@ -644,10 +644,12 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
           .addInput(n2, true, false)
           .setParallelism(1)
 
-        LabyStatics.translateAll
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
-        env.execute
+        LabyStatics.translateAll
+        LabyStatics.executeWithCatch(env)
       }
+
+      applyLabynization()(inp) shouldBe alphaEqTo(anfPipeline(exp))
     }
 
     "cross" in {
