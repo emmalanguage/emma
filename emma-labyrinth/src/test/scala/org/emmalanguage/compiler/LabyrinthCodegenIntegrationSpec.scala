@@ -25,10 +25,6 @@ class LabyrinthCodegenIntegrationSpec extends BaseCodegenIntegrationSpec
   def withBackendContext[T](f: Env => T): T =
     withDefaultFlinkStreamEnv(f)
 
-  // --------------------------------------------------------------------------
-  // Distributed collection conversion
-  // --------------------------------------------------------------------------
-
   "test simple" in withBackendContext(implicit env => {
     verify(u.reify {
       val xs = 1
