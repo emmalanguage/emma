@@ -77,6 +77,15 @@ object ScalaOps {
 
   }
 
+  def withFilter[T](f: T => Boolean): FlatMap[T, T] = {
+    new FlatMap[T, T]() {
+      override def pushInElement(e: T, logicalInputId: Int): Unit = {
+        super.pushInElement(e, logicalInputId)
+        if (f(e)) out.collectElement(e)
+      }
+    }
+  }
+
   def fromNothing[OUT](f: () => OUT ): BagOperator[org.emmalanguage.labyrinth.util.Nothing,OUT] = {
 
     new BagOperator[org.emmalanguage.labyrinth.util.Nothing,OUT]() {
