@@ -151,6 +151,7 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
             }
         }
         CFLConfig.getInstance().setNumToSubscribe(totalPara);
+        labyNodes.clear();
     }
 
     @Override
