@@ -32,16 +32,6 @@ trait LabyrinthNormalization extends LabyrinthCompilerBase {
     // println(tree)
     // println("==0tree END==")
 
-    def asdf(vd: u.Tree, lhs: u.TermSymbol, rhs: u.Tree, owner: u.Symbol) = {
-      val mett = !meta(vd).all.all.contains(SkipTraversal)
-      val seen = refsSeen(rhs, replacements)
-      val funn = !isFun(lhs)
-      val fun2 = !isFun(owner)
-      val allg = !isAlg(rhs)
-      val tmp = mett && seen && funn && fun2 && allg
-      true
-    }
-
     // first traversal does the labyrinth normalization. second for block type correction.
     val firstRun = api.TopDown.unsafe
       .withOwner
@@ -49,7 +39,7 @@ trait LabyrinthNormalization extends LabyrinthCompilerBase {
 
         // find a valdef - according to the rhs we have to do different transformations
         case Attr.inh(vd @ core.ValDef(lhs, rhs), owner :: _)
-          if asdf(vd, lhs, rhs, owner) && !meta(vd).all.all.contains(SkipTraversal)
+          if !meta(vd).all.all.contains(SkipTraversal)
             && refsSeen(rhs, replacements) && !isFun(lhs) && !isFun(owner) && !isAlg(rhs) =>
 
           // helper function to make sure that arguments in a "fromSingSrc"-method are indeed singSources
