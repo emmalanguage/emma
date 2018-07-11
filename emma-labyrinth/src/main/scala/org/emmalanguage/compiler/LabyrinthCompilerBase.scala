@@ -399,6 +399,7 @@ object Memo {
     memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[labyrinth.util.Nothing]],                createTypeInformation)
     memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[Seq[Int]]],                              createTypeInformation)
     memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[Seq[String]]],                           createTypeInformation)
+    memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[List[String]]],                          createTypeInformation)
     memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[(String, Long)]],                        createTypeInformation)
     memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[labyrinth.util.Unit]],                   createTypeInformation)
     memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[org.emmalanguage.api.CSV]],              createTypeInformation)

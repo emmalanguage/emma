@@ -226,16 +226,16 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
               val singSrcDBReplSym = replacements(singSrcDBsym)
               val singSrcDBReplRef = core.ValRef(singSrcDBReplSym)
 
+              val inTpe = singSrcDBsym.info.typeArgs.head
+
               // bagoperator
               val bagOpVDrhs = core.DefCall(
                 Some(ScalaOps$.ref),
                 ScalaOps$.fromSingSrcApply,
-                Seq(targ),
+                Seq(targ, inTpe),
                 Seq(Seq())
               )
               val bagOpRefDef = valRefAndDef(owner, "fromSingSrcApplyOp", bagOpVDrhs)
-
-              val inTpe = singSrcDBsym.info.typeArgs.head
 
               val refDefs = generateLabyNode[Always0[Any]](
                 owner,
