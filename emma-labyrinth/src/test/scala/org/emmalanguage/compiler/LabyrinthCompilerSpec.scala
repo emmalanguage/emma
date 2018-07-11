@@ -523,7 +523,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val n2 = new LabyNode[Seq[Int], Int](
           "fromSingSrcApply",
-          ScalaOps.fromSingSrcApply[Int](),
+          ScalaOps.fromSingSrcApply[Int, Seq[Int]](),
           0,
           new Always0[Seq[Int]](1),
           null,
@@ -568,7 +568,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val n2 = new LabyNode[Seq[Int], Int](
           "fromSingSrcApply",
-          ScalaOps.fromSingSrcApply[Int](),
+          ScalaOps.fromSingSrcApply[Int, Seq[Int]](),
           0,
           new Always0[Seq[Int]](1),
           null,
@@ -624,7 +624,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val n2 = new LabyNode[Seq[Int], Int](
           "fromSingSrcApply",
-          ScalaOps.fromSingSrcApply[Int](),
+          ScalaOps.fromSingSrcApply[Int, Seq[Int]](),
           0,
           new Always0[Seq[Int]](1),
           null,
@@ -678,7 +678,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val n1_2 = new LabyNode[Seq[Int], Int](
           "fromSingSrcApply",
-          ScalaOps.fromSingSrcApply[Int](),
+          ScalaOps.fromSingSrcApply[Int, Seq[Int]](),
           0,
           new Always0[Seq[Int]](1),
           null,
@@ -701,7 +701,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val n2_2 = new LabyNode[Seq[String], String](
           "fromSingSrcApply",
-          ScalaOps.fromSingSrcApply[String](),
+          ScalaOps.fromSingSrcApply[String, Seq[String]](),
           0,
           new Always0[Seq[String]](1),
           null,
@@ -783,7 +783,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val n1_2 = new LabyNode[Seq[String], String](
           "fromSingSrcApply",
-          ScalaOps.fromSingSrcApply[String](),
+          ScalaOps.fromSingSrcApply[String, Seq[String]](),
           0,
           new Always0[Seq[String]](1),
           null,
@@ -807,7 +807,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val n2_2 = new LabyNode[Seq[Int], Int](
           "fromSingSrcApply",
-          ScalaOps.fromSingSrcApply[Int](),
+          ScalaOps.fromSingSrcApply[Int, Seq[Int]](),
           0,
           new Always0[Seq[Int]](1),
           null,
@@ -889,7 +889,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val n2 = new LabyNode[Seq[Int], Int](
           "fromSingSrcApply",
-          ScalaOps.fromSingSrcApply[Int](),
+          ScalaOps.fromSingSrcApply[Int, Seq[Int]](),
           0,
           new Always0[Seq[Int]](1),
           null,
@@ -946,7 +946,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val n2 = new LabyNode[Seq[String], String](
           "fromSingSrcApply",
-          ScalaOps.fromSingSrcApply[String](),
+          ScalaOps.fromSingSrcApply[String, Seq[String]](),
           0,
           new Always0[Seq[String]](1),
           null,
@@ -1062,7 +1062,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val nDataFSS = new LabyNode[Seq[Int], Int](
           "fromSingSrcApply",
-          ScalaOps.fromSingSrcApply[Int](),
+          ScalaOps.fromSingSrcApply[Int, Seq[Int]](),
           0,
           new Always0[Seq[Int]](1),
           null,

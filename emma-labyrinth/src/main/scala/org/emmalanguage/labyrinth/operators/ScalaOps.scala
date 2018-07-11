@@ -103,9 +103,9 @@ object ScalaOps {
     }
   }
 
-  def fromSingSrcApply[IN](): SingletonBagOperator[Seq[IN], IN] = {
-    new SingletonBagOperator[Seq[IN], IN] {
-      override def pushInElement(e: Seq[IN], logicalInputId: Int): Unit = {
+  def fromSingSrcApply[IN, T <: Seq[IN]](): SingletonBagOperator[T, IN] = {
+    new SingletonBagOperator[T, IN] {
+      override def pushInElement(e: T, logicalInputId: Int): Unit = {
         super.pushInElement(e, logicalInputId)
         e.foreach(x => out.collectElement(x))
       }

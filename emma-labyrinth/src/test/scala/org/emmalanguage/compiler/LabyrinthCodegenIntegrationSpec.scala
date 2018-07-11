@@ -16,6 +16,10 @@
 package org.emmalanguage
 package compiler
 
+import Memo.memoizeTypeInfo
+
+import org.apache.flink.api.scala.createTypeInformation
+
 class LabyrinthCodegenIntegrationSpec extends BaseCodegenIntegrationSpec
   with LabyrinthCompilerAware
   with LabyrinthAware {
@@ -24,6 +28,9 @@ class LabyrinthCodegenIntegrationSpec extends BaseCodegenIntegrationSpec
 
   def withBackendContext[T](f: Env => T): T =
     withDefaultFlinkStreamEnv(f)
+
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[test.schema.Movies.ImdbMovie]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[Seq[test.schema.Movies.ImdbMovie]]], createTypeInformation)
 
   "test simple" in withBackendContext(implicit env => {
     verify(u.reify {
