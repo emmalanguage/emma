@@ -29,6 +29,8 @@ import labyrinth.ElementOrEvent
 import labyrinth.KickoffSource
 import labyrinth.LabyNode
 import labyrinth.partitioners.Partitioner
+import labyrinth.util.SocketCollector
+import org.emmalanguage.api.Meta
 
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.common.typeutils.TypeSerializer
@@ -37,8 +39,10 @@ import org.apache.flink.core.fs.FileInputSplit
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 
+import scala.collection.JavaConverters
 import scala.util.Either
 
+import java.util
 import java.util
 
 object ScalaOps {
@@ -318,6 +322,10 @@ object ScalaOps {
   : BagOperator[Boolean, org.emmalanguage.labyrinth.util.Unit] = {
     new ConditionNodeScalaReally(trueBbIds.toArray, falseBbIds.toArray)
   }
+
+  def collectToClient[T](env: StreamExecutionEnvironment, in: LabyNode[_, T], bbId: Int) = {
+    labyrinth.util.Util.collect(env.getJavaEnv, in, bbId)
+  }
 }
 
 
@@ -352,4 +360,9 @@ object LabyStatics {
   def phi[T](name: String, bbId: Int, inputPartitioner: Partitioner[T],
     inSer: TypeSerializer[T], typeInfo: TypeInformation[ElementOrEvent[T]]) =
     LabyNode.phi(name, bbId, inputPartitioner, inSer, typeInfo)
+
+  def executeAndGetCollected[T: Meta](env: StreamExecutionEnvironment, socColl: SocketCollector[T]): DataBag[T] = {
+    val arrayList: util.ArrayList[T] = labyrinth.util.Util.executeAndGetCollected(env.getJavaEnv, socColl)
+    DataBag(JavaConverters.asScalaIteratorConverter(arrayList.iterator).asScala.toSeq)
+  }
 }

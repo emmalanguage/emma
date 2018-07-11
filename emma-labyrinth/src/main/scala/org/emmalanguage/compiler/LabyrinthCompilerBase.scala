@@ -204,6 +204,7 @@ trait LabyrinthCompilerBase extends Compiler {
     val textSource = op("textSource")
     val toCsvString = op("toCsvString")
     val writeString = op("writeString")
+    val collectToClient = op("collectToClient")
 
     override def ops = Set()
   }
@@ -262,13 +263,14 @@ trait LabyrinthCompilerBase extends Compiler {
   }
 
   object LabyStatics$ extends ModuleAPI {
-    lazy val sym = api.Sym[org.emmalanguage.labyrinth.operators.LabyStatics.type ].asModule
+    lazy val sym = api.Sym[org.emmalanguage.labyrinth.operators.LabyStatics.type].asModule
 
     val phi = op("phi")
     val registerCustomSerializer = op("registerCustomSerializer")
     val setKickoffSource = op("setKickoffSource")
     val setTerminalBbid = op("setTerminalBbid")
     val translateAll = op("translateAll")
+    val executeAndGetCollected = op("executeAndGetCollected")
 
     override def ops = Set()
 

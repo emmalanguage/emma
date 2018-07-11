@@ -460,8 +460,8 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
         LabyStatics.setTerminalBbid(0)
         LabyStatics.setKickoffSource(0)
         val a = () => 1
-        LabyStatics.translateAll
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
+        LabyStatics.translateAll
         val exec = env.execute
         exec
       }
@@ -490,8 +490,8 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
           .setParallelism(1)
 
 
-        LabyStatics.translateAll
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
+        LabyStatics.translateAll
         env.execute
       }
 
@@ -533,8 +533,8 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
           .setParallelism(1)
 
 
-        LabyStatics.translateAll
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
+        LabyStatics.translateAll
         env.execute
       }
 
@@ -588,8 +588,8 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
           .addInput(n2, true, false)
           .setParallelism(1)
 
-        LabyStatics.translateAll
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
+        LabyStatics.translateAll
         env.execute
       }
 
@@ -744,8 +744,8 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
           .addInput(n2_3, true, false)
           .setParallelism(1)
 
-        LabyStatics.translateAll
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
+        LabyStatics.translateAll
         env.execute
 
       }
@@ -853,8 +853,8 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
           .addInput(n2_3, true, false)
           .setParallelism(1)
 
-        LabyStatics.translateAll
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
+        LabyStatics.translateAll
         env.execute
 
       }
@@ -911,8 +911,8 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
           .addInput(n2, true, false)
           .setParallelism(1)
 
-        LabyStatics.translateAll
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
+        LabyStatics.translateAll
         env.execute
       }
 
@@ -966,8 +966,8 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
           .addInput(n2, true, false)
           .setParallelism(1)
 
-        LabyStatics.translateAll
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
+        LabyStatics.translateAll
         env.execute
       }
 
@@ -1022,8 +1022,8 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
           .addInput(n2, true, false)
           .setParallelism(1)
 
-        LabyStatics.translateAll
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
+        LabyStatics.translateAll
         env.execute
       }
 
@@ -1145,8 +1145,8 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
           .addInput(nToCsvString, true, false)
           .setParallelism(1)
 
-        LabyStatics.translateAll
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
+        LabyStatics.translateAll
         env.execute
 
       }
@@ -1263,8 +1263,8 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
         val addInp2 = iPhi.addInput(n1, false, true)
 
-        LabyStatics.translateAll
         val env = implicitly[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment]
+        LabyStatics.translateAll
         env.execute
 
       }
