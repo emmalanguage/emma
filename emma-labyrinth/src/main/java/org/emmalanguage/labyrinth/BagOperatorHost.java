@@ -192,8 +192,6 @@ public class BagOperatorHost<IN, OUT>
 
 		cb = new MyCFLCallback();
 		cflMan.subscribe(cb);
-
-		System.out.println("===Name: " + this.name);
 	}
 
 	private int getMul() {

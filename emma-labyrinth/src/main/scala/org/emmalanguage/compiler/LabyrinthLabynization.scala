@@ -31,6 +31,11 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
 
   val labyrinthLabynize: TreeTransform = TreeTransform("labyrinthLabynize", (tree: u.Tree) => {
 
+    val exprSymOpt = tree match {
+      case core.Let(_,_,core.Ref(sym)) => Some(sym)
+      case _ => None
+    }
+
     // println("!!!!!!!!!!!!!!!!!!!!!! 0tree Labynization !!!!!!!!!!!!!!!!!!!!!!!")
     // println(tree)
     // println("!!!!!!!!!!!!!!!!!!!!!! 0tree End !!!!!!!!!!!!!!!!!!!!!!!")
@@ -292,7 +297,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
               replacements += (lhs -> finalNode._3)
               skip(dc)
 
-            // ref.flatmap to LabyNode
+            // ref.flatMap to LabyNode
             case dc @ core.DefCall(Some(core.Ref(tgtSym)), DataBag.flatMap, Seq(outTpe), Seq(Seq(lbdaRef))) =>
 
               val tgtReplSym = replacements(tgtSym)
@@ -824,8 +829,8 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
     // create a flat LetBlock with all ValDefs without any nesting or control flow
     val flatTrans = core.Let(valDefsFinal)
 
-    // add Labyrinth statics to beginning and end of code respectively
-    // kickoffsources, rgister custom serializer, terminal basic block, call translateAll, execute
+    // add Labyrinth statics to beginning and end of code
+    // kickoffsources, register custom serializer, terminal basic block, call translateAll, execute
     val labyStaticsTrans = flatTrans match {
       case core.Let(valdefs, _, _) => {
         val owner = enclosingOwner
@@ -861,12 +866,38 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
         )
         val envImplDCRefDef = valRefAndDef(owner, "implEnv", envImplDC)
 
-        val execDC = core.DefCall(Some(envImplDCRefDef._1), StreamExecutionEnvironment$.execute, Seq(), Seq(Seq()))
-        val execDCRefDef = valRefAndDef(owner, "envExecute", execDC)
+        val collValDef = scala.collection.mutable.ArrayBuffer[u.ValDef]()
+
+        // If there is no exprSym, then we just need to call execute;
+        // otherwise we need to call collectToClient (to add a LabyNode) and call executeAndGetCollected.
+        val execDCRefDef = exprSymOpt match {
+
+          case None =>
+            val execDC = core.DefCall(Some(envImplDCRefDef._1), StreamExecutionEnvironment$.execute, Seq(), Seq(Seq()))
+            valRefAndDef(owner, "envExecute", execDC)
+
+          case Some(exprSym) =>
+            val (socCollRef, socCollDef) =
+              valRefAndDef(owner, "socColl", core.DefCall(Some(ScalaOps$.ref), ScalaOps$.collectToClient,
+                Seq(exprSym.info.typeArgs.head), // exprSym: DataBag[T]
+                Seq(Seq(envImplDCRefDef._1, core.Ref(replacements(exprSym)), core.Lit(terminalBbid)))))
+
+            collValDef.append(socCollDef)
+
+            val execDC = core.DefCall(Some(LabyStatics$.ref), LabyStatics$.executeAndGetCollected, Seq(),
+              Seq(Seq(
+                envImplDCRefDef._1,
+                socCollRef
+              )))
+            valRefAndDef(owner, "envExecuteAndGetCollected", execDC)
+        }
 
         val newVals = Seq(customSerDCRefDef._2, termIdDCRefDef._2, kickOffWorldCup2018SourceDCRefDef._2) ++
           valdefs ++
-          Seq(transAllDCRefDef._2, envImplDCRefDef._2, execDCRefDef._2)
+          Seq(envImplDCRefDef._2) ++
+          collValDef ++
+          Seq(transAllDCRefDef._2) ++
+          Seq(execDCRefDef._2)
 
         core.Let(newVals, Seq(), execDCRefDef._1)
       }

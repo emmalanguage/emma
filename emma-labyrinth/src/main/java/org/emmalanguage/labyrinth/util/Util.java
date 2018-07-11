@@ -16,6 +16,12 @@
 
 package org.emmalanguage.labyrinth.util;
 
+import org.apache.flink.api.common.typeinfo.TypeHint;
+import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.runtime.client.JobCancellationException;
+import org.apache.flink.runtime.net.ConnectionUtils;
+import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
+import org.apache.flink.streaming.api.environment.RemoteStreamEnvironment;
 import org.emmalanguage.labyrinth.ElementOrEvent;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.functions.MapFunction;
@@ -28,9 +34,17 @@ import org.apache.flink.core.fs.Path;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.util.Collector;
+import org.emmalanguage.labyrinth.LabyNode;
+import org.emmalanguage.labyrinth.operators.CollectToClient;
+import org.emmalanguage.labyrinth.partitioners.Always0;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Arrays;
 
 public class Util {
@@ -40,6 +54,59 @@ public class Util {
 
 	public static <T> TypeInformation<ElementOrEvent<T>> tpe() {
 		return TypeInformation.of((Class<ElementOrEvent<T>>)(Class)ElementOrEvent.class);
+	}
+
+
+	public static <IN> SocketCollector<IN> collect(StreamExecutionEnvironment env, LabyNode<?, IN> in, int bbId) {
+
+		SocketCollector<IN> resultColl;
+		try {
+			resultColl = new SocketCollector<>();
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		}
+
+		//Find out what IP of us should be given to CollectSink, that it will be able to connect to
+		InetAddress clientAddress;
+
+		// copy-paste from DataStreamUtils.collect
+		if (env instanceof RemoteStreamEnvironment) {
+			String host = ((RemoteStreamEnvironment) env).getHost();
+			int port = ((RemoteStreamEnvironment) env).getPort();
+			try {
+				clientAddress = ConnectionUtils.findConnectingAddress(new InetSocketAddress(host, port), 2000, 400);
+			}
+			catch (Exception e) {
+				throw new RuntimeException("Could not determine an suitable network address to " +
+						"receive back data from the streaming program.", e);
+			}
+		} else if (env instanceof LocalStreamEnvironment) {
+			clientAddress = InetAddress.getLoopbackAddress();
+		} else {
+			try {
+				clientAddress = InetAddress.getLocalHost();
+			} catch (UnknownHostException e) {
+				throw new RuntimeException("Could not determine this machines own local address to " +
+						"receive back data from the streaming program.", e);
+			}
+		}
+
+		LabyNode<IN, Nothing> collectNode =
+				new LabyNode<IN, Nothing>("Collect", new CollectToClient<>(clientAddress, resultColl.getPort()), bbId, new Always0<>(1), null, TypeInformation.of(new TypeHint<ElementOrEvent<Nothing>>(){}))
+						.addInput(in, true, false)
+				.setParallelism(1);
+
+		return resultColl;
+	}
+
+	public static <T> ArrayList<T> executeAndGetCollected(StreamExecutionEnvironment env, SocketCollector<T> socColl) throws Exception {
+		try {
+			env.execute();
+		} catch (JobCancellationException ex) {
+			socColl.finishLatch.await();
+			return socColl.getElements();
+		}
+		throw new RuntimeException(); // The job has to finish with JobCancellationException.
 	}
 
 
