@@ -41,13 +41,6 @@ trait LabyrinthCompiler
     Core.unnest,
     labyrinthLabynize,
     Core.unnest
-
-    // lowering
-    //    Core.trampoline iff "emma.compiler.lower" is "trampoline"
-    //
-    //    // Core.dscfInv iff "emma.compiler.lower" is "dscfInv",
-    //
-    //    removeShadowedThis
   ) filterNot (_ == noop)
 
 }

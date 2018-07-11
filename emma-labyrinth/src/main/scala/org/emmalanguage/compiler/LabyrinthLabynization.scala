@@ -35,7 +35,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
     // println(tree)
     // println("!!!!!!!!!!!!!!!!!!!!!! 0tree End !!!!!!!!!!!!!!!!!!!!!!!")
 
-    // Define a name for the enclosing block ("enclosingOwner"). This is a little hack the easily get all basic block
+    // Define a name for the enclosing block ("enclosingOwner"). This is a little hack to easily get all basic block
     // dependencies.
     val outerTermName = api.TermName.fresh("OUTER")
     val outerToEncl = Map(outerTermName.toString -> enclosingOwner.name.toString)
@@ -799,7 +799,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
         val terminalBbid = if (bbParents.isEmpty) bbIdMap(enclosingOwner.name.toString) else bbIdMap(terminalSet.head)
 
         // before code
-        val custSerDC = core.DefCall(Some(LabyStatics$.ref), LabyStatics$.registerCustomSerializer, Seq(), Seq())
+        val custSerDC = core.DefCall(Some(LabyStatics$.ref), LabyStatics$.registerCustomSerializer, Seq(), Seq(Seq()))
         val customSerDCRefDef = valRefAndDef(owner, "registerCustomSerializer", custSerDC)
 
         val termIdDC = core.DefCall(Some(LabyStatics$.ref), LabyStatics$.setTerminalBbid, Seq(),

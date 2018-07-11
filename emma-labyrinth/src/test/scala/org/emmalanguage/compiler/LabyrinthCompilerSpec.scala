@@ -23,17 +23,14 @@ import api.alg.Count
 import labyrinth._
 import labyrinth.operators._
 import labyrinth.partitioners._
-import org.emmalanguage.api.backend.LocalOps
-import org.emmalanguage.compiler.ir.DSCFAnnotations.loopBody
-import org.emmalanguage.compiler.ir.DSCFAnnotations.suffix
-import org.emmalanguage.compiler.ir.DSCFAnnotations.whileLoop
+import ir.DSCFAnnotations.loopBody
+import ir.DSCFAnnotations.suffix
+import ir.DSCFAnnotations.whileLoop
 
 import org.apache.flink.core.fs.FileInputSplit
 
 import java.util.UUID
 
-import org.apache.flink.api.common.ExecutionConfig
-import org.apache.flink.api.java.tuple.Tuple2
 
 class TestInt(var v: Int) {
   def addd(u: Int, w: Int, x: Int)(m: Int, n: Int)(s: Int, t: Int) : Int =
@@ -459,7 +456,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
       }
 
       val exp = reify {
-        LabyStatics.registerCustomSerializer
+        LabyStatics.registerCustomSerializer()
         LabyStatics.setTerminalBbid(0)
         LabyStatics.setKickoffSource(0)
         val a = () => 1
@@ -479,7 +476,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
       val exp = reify {
 
-        LabyStatics.registerCustomSerializer
+        LabyStatics.registerCustomSerializer()
         LabyStatics.setTerminalBbid(0)
         LabyStatics.setKickoffSource(0)
         val a = new LabyNode[labyrinth.util.Nothing, Int](
@@ -509,7 +506,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
       val exp = reify {
 
-        LabyStatics.registerCustomSerializer
+        LabyStatics.registerCustomSerializer()
         LabyStatics.setTerminalBbid(0)
         LabyStatics.setKickoffSource(0)
         val n1 = new LabyNode[labyrinth.util.Nothing, Seq[Int]](
@@ -553,7 +550,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
       val exp = reify {
 
-        LabyStatics.registerCustomSerializer
+        LabyStatics.registerCustomSerializer()
         LabyStatics.setTerminalBbid(0)
         LabyStatics.setKickoffSource(0)
 
@@ -608,7 +605,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
       val exp = reify {
 
-        LabyStatics.registerCustomSerializer
+        LabyStatics.registerCustomSerializer()
         LabyStatics.setTerminalBbid(0)
         LabyStatics.setKickoffSource(0)
 
@@ -662,7 +659,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
       val exp = reify {
 
-        LabyStatics.registerCustomSerializer
+        LabyStatics.registerCustomSerializer()
         LabyStatics.setTerminalBbid(0)
         LabyStatics.setKickoffSource(0)
 
@@ -766,7 +763,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
       val exp = reify {
 
-        LabyStatics.registerCustomSerializer
+        LabyStatics.registerCustomSerializer()
         LabyStatics.setTerminalBbid(0)
         LabyStatics.setKickoffSource(0)
 
@@ -874,7 +871,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
       val exp = reify {
 
-        LabyStatics.registerCustomSerializer
+        LabyStatics.registerCustomSerializer()
         LabyStatics.setTerminalBbid(0)
         LabyStatics.setKickoffSource(0)
 
@@ -931,7 +928,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
       val exp = reify {
 
-        LabyStatics.registerCustomSerializer
+        LabyStatics.registerCustomSerializer()
         LabyStatics.setTerminalBbid(0)
         LabyStatics.setKickoffSource(0)
 
@@ -985,7 +982,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
       val exp = reify {
 
-        LabyStatics.registerCustomSerializer
+        LabyStatics.registerCustomSerializer()
         LabyStatics.setTerminalBbid(0)
         LabyStatics.setKickoffSource(0)
 
@@ -1047,7 +1044,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
 
       val exp = reify {
 
-        LabyStatics.registerCustomSerializer
+        LabyStatics.registerCustomSerializer()
         LabyStatics.setTerminalBbid(0)
         LabyStatics.setKickoffSource(0)
 
@@ -1194,7 +1191,7 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
         // terminal: 3
 
 
-        LabyStatics.registerCustomSerializer
+        LabyStatics.registerCustomSerializer()
         LabyStatics.setTerminalBbid(3)
         LabyStatics.setKickoffSource(0, 1)
 

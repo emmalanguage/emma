@@ -342,7 +342,7 @@ object LabyStatics {
     env.addSource(kickoffSrc)(org.apache.flink.api.scala.createTypeInformation[org.emmalanguage.labyrinth.util.Unit])
       .addSink(new DiscardingSink[org.emmalanguage.labyrinth.util.Unit])
   }
-  def registerCustomSerializer: Unit = PojoTypeInfo.registerCustomSerializer(classOf[ElementOrEvent[_]],
+  def registerCustomSerializer(): Unit = PojoTypeInfo.registerCustomSerializer(classOf[ElementOrEvent[_]],
     new ElementOrEvent.ElementOrEventSerializerFactory)
 
   def phi[T](name: String, bbId: Int, inputPartitioner: Partitioner[T],
