@@ -109,6 +109,15 @@ public class Util {
 		throw new RuntimeException(); // The job has to finish with JobCancellationException.
 	}
 
+	public static void executeWithCatch(StreamExecutionEnvironment env) throws Exception {
+		try {
+			env.execute();
+		} catch (JobCancellationException ex) {
+			return; // OK
+		}
+		throw new RuntimeException(); // The job has to finish with JobCancellationException.
+	}
+
 
 	public static DataStream<Tuple2<Integer, Integer>> getGraph(StreamExecutionEnvironment env, String[] args) {
 		@SuppressWarnings("unchecked")

@@ -43,7 +43,6 @@ import scala.collection.JavaConverters
 import scala.util.Either
 
 import java.util
-import java.util
 
 object ScalaOps {
 
@@ -364,5 +363,9 @@ object LabyStatics {
   def executeAndGetCollected[T: Meta](env: StreamExecutionEnvironment, socColl: SocketCollector[T]): DataBag[T] = {
     val arrayList: util.ArrayList[T] = labyrinth.util.Util.executeAndGetCollected(env.getJavaEnv, socColl)
     DataBag(JavaConverters.asScalaIteratorConverter(arrayList.iterator).asScala.toSeq)
+  }
+
+  def executeWithCatch(env: StreamExecutionEnvironment): Unit = {
+    labyrinth.util.Util.executeWithCatch(env.getJavaEnv)
   }
 }

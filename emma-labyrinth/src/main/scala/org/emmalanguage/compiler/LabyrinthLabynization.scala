@@ -873,8 +873,9 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
         val execDCRefDef = exprSymOpt match {
 
           case None =>
-            val execDC = core.DefCall(Some(envImplDCRefDef._1), StreamExecutionEnvironment$.execute, Seq(), Seq(Seq()))
-            valRefAndDef(owner, "envExecute", execDC)
+            val execDC =
+              core.DefCall(Some(LabyStatics$.ref), LabyStatics$.executeWithCatch, Seq(), Seq(Seq(envImplDCRefDef._1)))
+            valRefAndDef(owner, "envExecuteWithCatch", execDC)
 
           case Some(exprSym) =>
             val (socCollRef, socCollDef) =
