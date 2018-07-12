@@ -19,12 +19,17 @@ package compiler
 
 import com.typesafe.config.Config
 
+import scala.collection.generic.CanBuildFrom
+
 trait LabyrinthCompiler
   extends LabyrinthNormalization
     with LabyrinthLabynization {
 
-  override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++ //todo: like in FlinkCompiler.FlinkAPI
-    Seq(api.Type[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment])
+  override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++
+    Seq(
+      api.Type[org.apache.flink.streaming.api.scala.StreamExecutionEnvironment],
+      api.Type[CanBuildFrom[Any,Any,Any]].typeConstructor // Because of https://github.com/emmalanguage/emma/issues/234
+    )
 
   def transformations(implicit cfg: Config): Seq[TreeTransform] = Seq(
     // lifting
