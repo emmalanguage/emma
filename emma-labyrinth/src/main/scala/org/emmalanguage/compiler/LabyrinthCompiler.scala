@@ -20,10 +20,14 @@ package compiler
 import com.typesafe.config.Config
 
 import scala.collection.generic.CanBuildFrom
+import cats.implicits._
+
 
 trait LabyrinthCompiler
   extends LabyrinthNormalization
     with LabyrinthLabynization {
+
+  import UniverseImplicits._
 
   override lazy val implicitTypes: Set[u.Type] = API.implicitTypes ++
     Seq(
@@ -45,7 +49,39 @@ trait LabyrinthCompiler
     labyrinthNormalize,
     Core.unnest,
     labyrinthLabynize,
-    Core.unnest
+    Core.unnest,
+    prependMemoizeTypeInfoCalls
   ) filterNot (_ == noop)
 
+  // This is partly copy-paste from FlinkCompiler
+  /** Prepends `memoizeTypeInfo` calls for `TypeInformation[T]` instances requried in the given `tree`. */
+  lazy val prependMemoizeTypeInfoCalls = TreeTransform("LabyrinthCompiler.prependMemoizeTypeInfoCalls", tree => {
+    val pref = memoizeTypeInfoCalls(tree)
+    tree match {
+      case api.Block(stats, expr) => api.Block(pref ++ stats, expr)
+      case _ => api.Block(pref, tree)
+    }
+  })
+
+  /** Generates `Memo.memoizeTypeInfo[T]` calls for all required types `T` in the given `tree`. */
+  def memoizeTypeInfoCalls(tree: u.Tree): Seq[u.Tree] = {
+    import u.Quasiquote
+    for (tpe <- requiredTypeInfos(tree).toSeq.sortBy(_.toString)) yield {
+      val ttag = q"implicitly[scala.reflect.runtime.universe.TypeTag[$tpe]]"
+      val info = q"org.apache.flink.api.scala.`package`.createTypeInformation[$tpe]"
+      q"org.emmalanguage.compiler.Memo.memoizeTypeInfo[$tpe]($ttag, $info)"
+    }
+  }
+
+  /**
+   * Infers types `T` in the given `tree` for which a Flink `TypeInformation[T]` might be required.
+   * This is simplified from the version in FlinkCompiler, by getting _all_ the types that appear in the tree. This
+   * doesn't introduce too many superflous memoizeTypeInfo calls, because almost everything appears in the job after
+   * normalization anyway.
+   */
+  def requiredTypeInfos(tree: u.Tree): Set[u.Type] =
+    api.BottomUp.synthesize({
+      case api.TypeQuote(tpe) =>
+        Set(tpe.widen)
+    }).traverseAny._syn(tree).head
 }
