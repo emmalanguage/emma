@@ -86,10 +86,15 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
       else { gDependencies(name(n.from)) = gDependencies(name(n.from)) :+ name(n.to) }
     )
     val gBbDependencies = scala.collection.mutable.Map[Int, Seq[Int]]()
-    gDependencies.keys.foreach(k => gBbDependencies += (bbIdMap(k) -> gDependencies(k).map(bbIdMap(_))) )
+    gDependencies.keys.foreach(k => if (bbIdMap.contains(k)) {
+      // This if is needed when there is a DefCall in a higher-order context
+      gBbDependencies += (bbIdMap(k) -> gDependencies(k).map(bbIdMap(_)))
+    })
     // count number of outgoing edges for each basic block
     val bbIdNumOut = scala.collection.mutable.Map[Int, Int]()
-    gDependencies.keys.foreach(n => bbIdNumOut += (bbIdMap(n) -> gDependencies(n).size))
+    gDependencies.keys.foreach(n => if (bbIdMap.contains(n)) { // Same as above
+      bbIdNumOut += (bbIdMap(n) -> gDependencies(n).size)
+    })
 
     def bbIdShortcut(start: Int): Seq[Int] = {
       if (!bbIdNumOut.keys.toList.contains(start) || bbIdNumOut(start) != 1) {
@@ -116,7 +121,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
         case Attr.inh(vd @ core.ValDef(_, core.Lambda(_,_,_)), _) => valDefsFinal = valDefsFinal :+ vd
         case Attr.inh(vd @ core.ValDef(_, rhs), _) if isAlg(rhs) => valDefsFinal = valDefsFinal :+ vd
         case Attr.inh(vd @ core.ValDef(lhs, rhs), owner :: _)
-          if !isFun(lhs) && !isFun(owner) && !isAlg(rhs) => {
+          if !isFun(lhs) && !hasFunInOwnerChain(lhs) && !isAlg(rhs) => {
 
           rhs match {
             case dc @ core.DefCall(_,  DataBag$.empty, Seq(targ), _) =>
@@ -681,7 +686,8 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
           }
         }
 
-        case Attr.inh(dd @ core.DefDef(_, _, pars, core.Let(_,_,_)), owner::_) =>
+        case Attr.inh(dd @ core.DefDef(ddSym, _, pars, core.Let(_,_,_)), owner::_)
+            if !hasFunInOwnerChain(ddSym) =>
 
           val bbid = bbIdMap(dd.symbol.name.toString)
 
@@ -750,7 +756,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
         case Attr.inh(cnd @ core.Branch(cond @ core.ValRef(condSym),
         thn @ core.DefCall(_, thnSym, _, _),
         els @ core.DefCall(_, elsSym, _, _)
-        ), owner::_) =>
+        ), owner::_) if !hasFunInOwnerChain(owner) =>
 
           val condReplSym = replacements(condSym)
           val condReplRef = core.ValRef(condReplSym)
@@ -790,13 +796,12 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
             valDefsFinal ++ Seq(thnIdsDCRefDef._2, elsIdsDCRefDef._2, condOpRefDef._2) ++ defs :+ finalNode._2
 
         // add inputs to phi nodes when encountering defcalls
-        case Attr.inh(dc @ core.DefCall(_, _, _, args), owner :: _)
-          if !meta(dc).all.all.contains(SkipTraversal) && !isFun(owner) && /*TODO verify this:*/ !isFun(owner.owner) &&
-        !(args.size == 1 && args.head.isEmpty) /*skip if no arguments*/ && args.nonEmpty && !isAlg(dc) =>
+        case Attr.inh(dc @ core.DefCall(_, ddSym, _, args), owner :: _)
+          if !meta(dc).all.all.contains(SkipTraversal) && !hasFunInOwnerChain(ddSym) &&
+            G.ctrl.nodes.contains(ddSym) && // if this is false, then it's a call to some external Def instead of ctrlfl
+            !(args.size == 1 && args.head.isEmpty) /*skip if no arguments*/ && args.nonEmpty && !isAlg(dc) =>
 
           val insideBlock = false
-
-          // var addInputRefs = Seq[u.Ident]()
 
           // phiNode refs according to the arg positions of the def are stored in defSymNameToPhiRef. Iterate through
           // phiNode refs and add the according input

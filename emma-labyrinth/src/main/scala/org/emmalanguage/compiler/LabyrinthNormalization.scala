@@ -40,7 +40,7 @@ trait LabyrinthNormalization extends LabyrinthCompilerBase {
         // find a valdef - according to the rhs we have to do different transformations
         case Attr.inh(vd @ core.ValDef(lhs, rhs), owner :: _)
           if !meta(vd).all.all.contains(SkipTraversal)
-            && refsSeen(rhs, replacements) && !isFun(lhs) && !isFun(owner) && !isAlg(rhs) =>
+            && refsSeen(rhs, replacements) && !isFun(lhs) && !hasFunInOwnerChain(lhs) && !isAlg(rhs) =>
 
           // helper function to make sure that arguments in a "fromSingSrc"-method are indeed singSources
           def defcallargBecameSingSrc(s: u.TermSymbol) : Boolean = {
@@ -484,7 +484,8 @@ trait LabyrinthNormalization extends LabyrinthCompilerBase {
 
         // if valdef rhs is not of type DataBag, turn it into a databag
         case Attr.inh(vd @ core.ValDef(lhs, rhs), owner :: _) if !meta(vd).all.all.contains(SkipTraversal)
-            && !refsSeen(rhs, replacements) && !isDatabag(rhs) && !isFun(lhs) && !isFun(owner) && !isAlg(rhs) =>
+            && !refsSeen(rhs, replacements) && !isDatabag(rhs) && !isFun(lhs) && !hasFunInOwnerChain(lhs)
+            && !isAlg(rhs) =>
 
           // create lambda () => rhs
           val rhsSym = newValSym(owner, "tmp", rhs)
@@ -517,7 +518,8 @@ trait LabyrinthNormalization extends LabyrinthCompilerBase {
 
         // if we encounter a ParDef whose type is not DataBag (e.g. Int), databagify (e.g. DataBag[Int])
         case Attr.inh(pd @ core.ParDef(ts, _), owner::_) if !(ts.info.typeConstructor =:= API.DataBag.tpe)
-            && !meta(pd).all.all.contains(SkipTraversal) && !isFun(owner) =>
+            && !meta(pd).all.all.contains(SkipTraversal)
+            && !hasFunInOwnerChain(ts) =>
           val nts = api.ParSym(
             owner,
             api.TermName.fresh("arg"),

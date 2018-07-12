@@ -120,6 +120,18 @@ trait LabyrinthCompilerBase extends Compiler {
   def isFun(sym: u.TermSymbol) = api.Sym.funs(sym.info.dealias.widen.typeSymbol)
   def isFun(sym: u.Symbol) = api.Sym.funs(sym.info.dealias.widen.typeSymbol)
 
+  /**
+   * Computes whether the given symbol has a function symbol in its owner chain (including itself!).
+   */
+  def hasFunInOwnerChain(sym: u.Symbol): Boolean = {
+    var s = sym
+    while (s != enclosingOwner && s != api.Sym.none) {
+      if (isFun(s)) return true
+      s = s.owner
+    }
+    false
+  }
+
   def newValSym(own: u.Symbol, name: String, rhs: u.Tree): u.TermSymbol = {
     api.ValSym(own, api.TermName.fresh(name), rhs.tpe.widen)
   }
