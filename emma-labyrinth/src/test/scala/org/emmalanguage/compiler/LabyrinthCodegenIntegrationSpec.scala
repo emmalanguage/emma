@@ -38,6 +38,11 @@ class LabyrinthCodegenIntegrationSpec extends BaseCodegenIntegrationSpec
   memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[org.emmalanguage.api.Group[Int,Int]]], createTypeInformation)
   memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[(String, Long, Double, Double, Double)]], createTypeInformation)
   memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[(Int, Int, Long)]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[scala.util.Either[Int,Int]]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[(Int, Int, Int)]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[scala.collection.immutable.Range]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[scala.util.Either[(Int, Int),Int]]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[((Int, Int), Int)]], createTypeInformation)
   memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[
     org.emmalanguage.api.Group[Int,(Int, Option[Double], Option[Double], Long)]]], createTypeInformation)
   memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[org.emmalanguage.api.Group[(Int, Int),Long]]],
