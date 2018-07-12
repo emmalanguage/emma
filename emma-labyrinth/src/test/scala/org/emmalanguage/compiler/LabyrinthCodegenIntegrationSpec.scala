@@ -31,6 +31,17 @@ class LabyrinthCodegenIntegrationSpec extends BaseCodegenIntegrationSpec
 
   memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[test.schema.Movies.ImdbMovie]], createTypeInformation)
   memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[Seq[test.schema.Movies.ImdbMovie]]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[List[(String, Int)]]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[(String, Int)]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[scala.collection.immutable.IndexedSeq[(Int, Int)]]],
+    createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[org.emmalanguage.api.Group[Int,Int]]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[(String, Long, Double, Double, Double)]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[(Int, Int, Long)]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[
+    org.emmalanguage.api.Group[Int,(Int, Option[Double], Option[Double], Long)]]], createTypeInformation)
+  memoizeTypeInfo(implicitly[org.emmalanguage.api.Meta[org.emmalanguage.api.Group[(Int, Int),Long]]],
+    createTypeInformation)
 
   "test simple" in withBackendContext(implicit env => {
     verify(u.reify {
