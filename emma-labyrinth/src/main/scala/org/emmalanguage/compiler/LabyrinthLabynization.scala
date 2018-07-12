@@ -866,7 +866,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
         )
         val envImplDCRefDef = valRefAndDef(owner, "implEnv", envImplDC)
 
-        val collValDef = scala.collection.mutable.ArrayBuffer[u.ValDef]()
+        val collValDef = scala.collection.mutable.ArrayBuffer[u.ValDef]() // collectToClient call
 
         // If there is no exprSym, then we just need to call execute;
         // otherwise we need to call collectToClient (to add a LabyNode) and call executeAndGetCollected.

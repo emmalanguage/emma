@@ -106,6 +106,7 @@ object ScalaOps {
     }
   }
 
+  // This should be variant in the input type, to allow for more specific types than Seq[IN], such as List[IN].
   def fromSingSrcApply[IN, T <: Seq[IN]](): SingletonBagOperator[T, IN] = {
     new SingletonBagOperator[T, IN] {
       override def pushInElement(e: T, logicalInputId: Int): Unit = {

@@ -451,7 +451,7 @@ object Memo {
     else throw new RuntimeException(
       s"""
         |Cannot find TypeInformation for type $tpe.
-        |Try calling `FlinkDataSet.memoizeTypeInfo[$tpe]` explicitly before the `emma.onFlink` quote.
+        |Try calling `Memo.memoizeTypeInfo for this type` explicitly before the `emma.onLabyrinth` quote.
       """.stripMargin.trim
     )
   }

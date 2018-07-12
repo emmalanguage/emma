@@ -140,18 +140,21 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
     }
 
     public static void translateAll(StreamExecutionEnvironment env) {
-        for (AbstractLabyNode<?> ln: labyNodes) {
-            ln.translate(env);
-        }
-
-        int totalPara = 0;
-        for (AbstractLabyNode<?> ln: labyNodes) {
-            if (ln instanceof LabyNode) {
-                totalPara += ln.getFlinkStream().getParallelism();
+        try {
+            for (AbstractLabyNode<?> ln : labyNodes) {
+                ln.translate(env);
             }
+
+            int totalPara = 0;
+            for (AbstractLabyNode<?> ln : labyNodes) {
+                if (ln instanceof LabyNode) {
+                    totalPara += ln.getFlinkStream().getParallelism();
+                }
+            }
+            CFLConfig.getInstance().setNumToSubscribe(totalPara);
+        } finally {
+            labyNodes.clear();
         }
-        CFLConfig.getInstance().setNumToSubscribe(totalPara);
-        labyNodes.clear();
     }
 
     @Override
