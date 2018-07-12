@@ -80,7 +80,11 @@ trait LabyrinthNormalization extends LabyrinthCompilerBase {
                 val dbRhs = core.DefCall(
                   Some(DB$.ref),
                   DB$.fromSingSrcApply,
-                  Seq(argReplRef.tpe.widen.typeArgs.head.typeArgs.head),
+                  Seq(
+                    argReplRef.tpe.widen // something like DataBag[Seq[A]]
+                    .typeArgs.head // e.g., Seq[A], but beware that it can be a descendant, such as Range.Inclusive
+                    .baseType(api.Type.seq.typeSymbol) // get Seq[Int] from Range.Inclusive
+                    .typeArgs.head),
                   Seq(Seq(argReplRef))
                 )
                 val dbSym = newValSym(owner, "db", dbRhs)
