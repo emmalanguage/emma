@@ -16,7 +16,6 @@
 
 package org.emmalanguage.labyrinth.operators;
 
-import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.memory.DataOutputViewStreamWrapper;
 import org.emmalanguage.labyrinth.util.Nothing;
 
