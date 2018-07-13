@@ -103,16 +103,24 @@ trait LabyrinthCompilerBase extends Compiler {
   }
 
   // check if a tree is of type databag
-  def isDatabag(tree: u.Tree) : Boolean = {
-    tree.tpe.widen.typeConstructor =:= API.DataBag.tpe
+  def isDatabag(tree: u.Tree): Boolean = {
+    isDatabag(tree.tpe)
   }
 
-  def isAlg(tree: u.Tree) : Boolean = {
+  def isDatabag(sym: u.Symbol): Boolean = {
+    isDatabag(sym.info)
+  }
+
+  def isDatabag(tpe: u.Type): Boolean = {
+    tpe.widen.typeConstructor =:= API.DataBag.tpe
+  }
+
+  def isAlg(tree: u.Tree): Boolean = {
     val out = tree.tpe.widen.typeConstructor.baseClasses.contains(Alg$.sym)
     out
   }
 
-  def isAlg(sTree: Option[u.Tree]) : Boolean = {
+  def isAlg(sTree: Option[u.Tree]): Boolean = {
     if (sTree.nonEmpty) isAlg(sTree.get) else false
   }
 
@@ -195,6 +203,8 @@ trait LabyrinthCompilerBase extends Compiler {
   def skip(t: u.Tree): Unit = {
     meta(t).update(SkipTraversal)
   }
+
+  case class OrigReturnType(isBag: Boolean)
 
   object ScalaOps$ extends ModuleAPI {
     lazy val sym = api.Sym[ScalaOps.type].asModule
@@ -282,7 +292,8 @@ trait LabyrinthCompilerBase extends Compiler {
     val setKickoffSource = op("setKickoffSource")
     val setTerminalBbid = op("setTerminalBbid")
     val translateAll = op("translateAll")
-    val executeAndGetCollected = op("executeAndGetCollected")
+    val executeAndGetCollectedBag = op("executeAndGetCollectedBag")
+    val executeAndGetCollectedNonBag = op("executeAndGetCollectedNonBag")
     val executeWithCatch = op("executeWithCatch")
 
     override def ops = Set()

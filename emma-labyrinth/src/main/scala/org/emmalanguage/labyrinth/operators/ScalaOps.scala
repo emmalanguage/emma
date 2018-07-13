@@ -361,7 +361,13 @@ object LabyStatics {
     inSer: TypeSerializer[T], typeInfo: TypeInformation[ElementOrEvent[T]]) =
     LabyNode.phi(name, bbId, inputPartitioner, inSer, typeInfo)
 
-  def executeAndGetCollected[T: Meta](env: StreamExecutionEnvironment, socColl: SocketCollector[T]): DataBag[T] = {
+  def executeAndGetCollectedNonBag[T: Meta](env: StreamExecutionEnvironment, socColl: SocketCollector[T]): T = {
+    val arrayList: util.ArrayList[T] = labyrinth.util.Util.executeAndGetCollected(env.getJavaEnv, socColl)
+    assert(arrayList.size() == 1)
+    arrayList.get(0)
+  }
+
+  def executeAndGetCollectedBag[T: Meta](env: StreamExecutionEnvironment, socColl: SocketCollector[T]): DataBag[T] = {
     val arrayList: util.ArrayList[T] = labyrinth.util.Util.executeAndGetCollected(env.getJavaEnv, socColl)
     DataBag(JavaConverters.asScalaIteratorConverter(arrayList.iterator).asScala.toSeq)
   }

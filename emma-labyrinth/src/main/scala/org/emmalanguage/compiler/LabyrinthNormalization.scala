@@ -587,8 +587,15 @@ trait LabyrinthNormalization extends LabyrinthCompilerBase {
           nlb
       }._tree(firstRun)
 
-    // postPrint(thirdRun)
-    secondRun
+    val unnested = Core.unnest(secondRun)
+
+    meta(unnested).update(tree match {
+      case core.Let(_,_,core.Ref(sym)) if isDatabag(sym) => OrigReturnType(true)
+      case _ => OrigReturnType(false)
+    })
+
+    // postPrint(unnested)
+    unnested
 
   })
 
