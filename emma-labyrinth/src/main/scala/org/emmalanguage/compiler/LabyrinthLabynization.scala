@@ -151,7 +151,6 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
 
             case dc @ core.DefCall(_, DB$.fromSingSrcReadText, _, Seq(Seq(core.ValRef(dbPathSym)))) =>
               val dbPathSymRepl = replacements(dbPathSym)
-              val dbPathSymReplRef = core.ValRef(dbPathSymRepl)
 
               //// get splits
               // bagoperator
@@ -170,7 +169,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 dbPathSym.info.typeArgs.head,
                 tpeOutSplits,
                 1,
-                Seq((dbPathSymRepl, dbPathSymReplRef)),
+                Seq(dbPathSymRepl),
                 "inputSplits",
                 1,
                 bbIdMap
@@ -189,7 +188,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 tpeOutSplits,
                 u.typeOf[String],
                 1,
-                Seq((finalNodeSplits._3, finalNodeSplits._1)),
+                Seq(finalNodeSplits._3),
                 "readSplits",
                 1,
                 bbIdMap
@@ -234,7 +233,6 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
             case dc @ core.DefCall(_, DB$.fromSingSrcApply, Seq(targ), Seq(Seq(core.ValRef(singSrcDBsym)))) =>
 
               val singSrcDBReplSym = replacements(singSrcDBsym)
-              val singSrcDBReplRef = core.ValRef(singSrcDBReplSym)
 
               val inTpe = singSrcDBsym.info.typeArgs.head
 
@@ -253,7 +251,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 inTpe,
                 targ,
                 1,
-                Seq((singSrcDBReplSym, singSrcDBReplRef)),
+                Seq(singSrcDBReplSym),
                 "fromSingSrcApply",
                 1,
                 bbIdMap
@@ -270,7 +268,6 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
             case dc @ core.DefCall(Some(core.Ref(tgtSym)), DataBag.map, Seq(outTpe), Seq(Seq(lbdaRef))) =>
 
               val tgtReplSym = replacements(tgtSym)
-              val tgtReplRef = core.ValRef(tgtReplSym)
 
               val inTpe = tgtSym.info.typeArgs.head
 
@@ -289,7 +286,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 inTpe,
                 outTpe,
                 1,
-                Seq((tgtReplSym, tgtReplRef)),
+                Seq(tgtReplSym),
                 "map",
                 1,
                 bbIdMap
@@ -306,7 +303,6 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
             case dc @ core.DefCall(Some(core.Ref(tgtSym)), DataBag.flatMap, Seq(outTpe), Seq(Seq(lbdaRef))) =>
 
               val tgtReplSym = replacements(tgtSym)
-              val tgtReplRef = core.ValRef(tgtReplSym)
 
               val inTpe = tgtSym.info.typeArgs.head
 
@@ -325,7 +321,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 inTpe,
                 outTpe,
                 1,
-                Seq((tgtReplSym, tgtReplRef)),
+                Seq(tgtReplSym),
                 "flatMap",
                 1,
                 bbIdMap
@@ -342,7 +338,6 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
             case dc @ core.DefCall(Some(core.Ref(tgtSym)), DataBag.withFilter, Seq(), Seq(Seq(lbdaRef))) =>
 
               val tgtReplSym = replacements(tgtSym)
-              val tgtReplRef = core.ValRef(tgtReplSym)
 
               val inTpe = tgtSym.info.typeArgs.head
 
@@ -361,7 +356,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 inTpe,
                 inTpe,
                 1,
-                Seq((tgtReplSym, tgtReplRef)),
+                Seq(tgtReplSym),
                 "filter",
                 1,
                 bbIdMap
@@ -398,7 +393,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 tpe,
                 tpe,
                 1,
-                Seq((lhsReplSym, core.Ref(lhsReplSym)), (rhsReplSym, core.Ref(rhsReplSym))),
+                Seq(lhsReplSym, rhsReplSym),
                 "union",
                 1,
                 bbIdMap
@@ -450,7 +445,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 inTpe,
                 outTpe,
                 1,
-                Seq((refsDefsLeft._8._3, refsDefsLeft._8._1), (refsDefsRight._8._3, refsDefsRight._8._1)),
+                Seq(refsDefsLeft._8._3, refsDefsRight._8._3),
                 "cross",
                 1,
                 bbIdMap
@@ -516,7 +511,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 inTpe,
                 outTpe,
                 1,
-                Seq((db1refDefs._8._3, db1refDefs._8._1), (db2refDefs._8._3, db2refDefs._8._1)),
+                Seq(db1refDefs._8._3, db2refDefs._8._3),
                 "join",
                 1,
                 bbIdMap
@@ -542,7 +537,6 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
             case dc @ core.DefCall(_, DB$.fold1, targs @ Seq(tpeA, tpeB), Seq(Seq(core.ValRef(dbSym), alg))) =>
 
               val dbReplSym = replacements(dbSym)
-              val dbReplRef = core.ValRef(dbReplSym)
 
               // bagoperator
               val bagOpVDrhs = core.DefCall(Some(ScalaOps$.ref), ScalaOps$.foldAlgHelper, targs, Seq(Seq(alg)))
@@ -554,7 +548,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 tpeA,
                 tpeB,
                 1,
-                Seq((dbReplSym, dbReplRef)),
+                Seq(dbReplSym),
                 "fold1",
                 1,
                 bbIdMap
@@ -571,7 +565,6 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
               (_, DB$.fold2, targs @ Seq(tpeA, tpeB), Seq(Seq(core.ValRef(dbSym), zero, init, plus))) =>
 
               val dbReplSym = replacements(dbSym)
-              val dbReplRef = core.ValRef(dbReplSym)
 
               // bagoperator
               val bagOpVDrhs = core.DefCall(Some(ScalaOps$.ref), ScalaOps$.fold, targs, Seq(Seq(zero, init, plus)))
@@ -583,7 +576,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 tpeA,
                 tpeB,
                 1,
-                Seq((dbReplSym, dbReplRef)),
+                Seq(dbReplSym),
                 "fold2",
                 1,
                 bbIdMap
@@ -601,7 +594,6 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
               Seq(Seq(core.ValRef(dbSym), extrRef @ core.ValRef(_), alg))) =>
 
               val dbReplSym = replacements(dbSym)
-              val dbReplRef = core.ValRef(dbReplSym)
 
               // bagoperator
               val bagOpVDrhs = core.DefCall(
@@ -619,7 +611,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 tpeA,
                 tpeOut,
                 1,
-                Seq((dbReplSym, dbReplRef)),
+                Seq(dbReplSym),
                 "foldGroup",
                 1,
                 bbIdMap
@@ -639,7 +631,6 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
               val pathReplSym = replacements(pathSym)
               val csvReplSym = replacements(csvSym)
               val dbReplRef = core.ValRef(dbReplSym)
-              val pathReplRef = core.ValRef(pathReplSym)
               val csvReplRef = core.ValRef(csvReplSym)
 
               val csvTpe = csvSym.info.typeArgs.head
@@ -670,7 +661,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 inTpeCsvString,
                 pathTpe,
                 1,
-                Seq((dbRefDefs._8._3, dbRefDefs._8._1), (csvRefDefs._8._3, csvRefDefs._8._1)),
+                Seq(dbRefDefs._8._3, csvRefDefs._8._3),
                 "toCsvString",
                 1,
                 bbIdMap
@@ -697,7 +688,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
                 pathTpe,
                 outTpeWriteString,
                 1,
-                Seq((pathReplSym, pathReplRef), (finalNodeCsvString._3, finalNodeCsvString._1)),
+                Seq(pathReplSym, finalNodeCsvString._3),
                 "stringFileSink",
                 1,
                 bbIdMap
@@ -796,7 +787,6 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
         ), owner::_) if !hasFunInOwnerChain(owner) =>
 
           val condReplSym = replacements(condSym)
-          val condReplRef = core.ValRef(condReplSym)
 
           val thnIds = bbIdShortcut(bbIdMap(thnSym.name.toString))
           val elsIds = bbIdShortcut(bbIdMap(elsSym.name.toString))
@@ -820,7 +810,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
             inTpe,
             outTpe,
             1,
-            Seq((condReplSym, condReplRef)),
+            Seq(condReplSym),
             "condNode",
             1,
             bbIdMap
@@ -1044,7 +1034,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
     tpeIn: u.Type,
     tpeOut: u.Type,
     partTargetPara: Int,
-    inputs: Seq[(u.TermSymbol, u.Ident)],
+    inputs: Seq[u.TermSymbol],
     labyNodeName: String,
     labyNodeParallelism: Int,
     bbIdMap: scala.collection.mutable.Map[String, Int]
@@ -1081,8 +1071,8 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
     var lastRef = labyNodeRefDef._1
     inputs.foreach(
       symRef => {
-        val insideBlock = symRef._1.owner == owner
-        val refDef = getAddInputRefDef(owner, lastRef, symRef._2, insideBlock)
+        val insideBlock = symRef.owner == owner
+        val refDef = getAddInputRefDef(owner, lastRef, core.Ref(symRef), insideBlock)
         refDefs = refDefs :+ refDef
         lastRef = refDef._1
       }
