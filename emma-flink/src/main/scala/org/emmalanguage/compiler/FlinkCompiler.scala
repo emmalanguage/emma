@@ -95,16 +95,6 @@ trait FlinkCompiler extends Compiler
         if FlinkAPI.GenericOps(m) => targs.toSet
     }).traverseAny._syn(tree).head
 
-  /** Generates `FlinkDataSet.memoizeTypeInfo[T]` calls for all required types `T` in the given `tree`. */
-  def memoizedTypeInfos(tree: u.Tree): Seq[u.Tree] = {
-    import u.Quasiquote
-    for (tpe <- requiredTypeInfos(tree).toSeq.sortBy(_.toString)) yield {
-      val ttag = q"implicitly[scala.reflect.runtime.universe.TypeTag[$tpe]]"
-      val info = q"org.apache.flink.api.scala.`package`.createTypeInformation[$tpe]"
-      q"org.emmalanguage.api.FlinkDataSet.memoizeTypeInfo[$tpe]($ttag, $info)"
-    }
-  }
-
   def transformations(implicit cfg: Config): Seq[TreeTransform] = Seq(
     // lifting
     Lib.expand,
