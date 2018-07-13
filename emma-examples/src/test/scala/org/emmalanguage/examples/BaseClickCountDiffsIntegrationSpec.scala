@@ -53,8 +53,8 @@ trait BaseClickCountDiffsIntegrationSpec extends FlatSpec with Matchers with Bef
     clickCountDiffs(s"$tmpDir/clickLog_", numDays)
 
     (2 to numDays).foreach { day =>
-      scala.reflect.io.File(s"$tmpDir/clickLog_" + day + ".out").slurp() should equal (
-        scala.reflect.io.File(s"$tmpDir/clickLog_" + day + ".exp").slurp()
+      scala.reflect.io.File(s"$tmpDir/clickLog_" + day + ".out").slurp().trim should equal (
+        scala.reflect.io.File(s"$tmpDir/clickLog_" + day + ".exp").slurp().trim
       )
     }
   }
