@@ -379,10 +379,9 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
   // --------------------------------------------------------------------------
 
   "Fold" - {
-    // Fixme: Bug in Laby compilation (probably easily fixable)
-    "of an empty DataBag (nonEmpty)" in ignoreForLabyrinth(verify(u.reify {
+    "of an empty DataBag (nonEmpty)" in verify(u.reify {
       //(DataBag[Int]().nonEmpty, DataBag(1 to 3).nonEmpty)
-    }))
+    })
 
     "of primitives (fold)" in verify(u.reify {
       DataBag(0 until 100).fold(0)(Predef.identity, _ + _)
