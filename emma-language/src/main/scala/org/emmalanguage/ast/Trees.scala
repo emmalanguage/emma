@@ -137,8 +137,12 @@ trait Trees { this: AST =>
                 u.TypeTree()
               case u.UnApply(extr, args) =>
                 u.UnApply(extr, args)
-              case u.ValDef(_, _, tpt, rhs) =>
-                u.ValDef(Sym.mods(sym), sym.name.toTermName, tpt, rhs)
+              case vd @ u.ValDef(_, _, tpt, rhs) => {
+                val ret = u.ValDef(Sym.mods(sym), sym.name.toTermName, tpt, rhs)
+                // TODO: This should actually be added to all the above cases...
+                meta(vd).all.all.foreach{g => meta(ret).update(g)}
+                ret
+              }
               case other =>
                 other
             }
