@@ -233,7 +233,7 @@ object ScalaOps {
   }
 
   def cross[A,B]: BagOperator[Either[A, B], (A, B)] =
-    new Cross[A,B] {}
+    new Cross[A,B]
 
   def joinScala[A,B,K](extrA: A => K, extrB: B => K): JoinScala[A,B,K] =
     new JoinScala[A,B,K] {

@@ -210,6 +210,7 @@ trait LabyrinthCompilerBase extends Compiler {
     lazy val sym = api.Sym[ScalaOps.type].asModule
 
     val condNode = op("condNode")
+    val union = op("union")
     val cross = op("cross")
     val empty = op("empty")
     val flatMapDataBagHelper = op("flatMapDataBagHelper")

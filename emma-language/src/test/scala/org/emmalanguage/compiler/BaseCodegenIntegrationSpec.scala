@@ -210,11 +210,10 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
     }))
   }
 
-  // Union is not yet supported in the Labyrinth compilation
   "Union" in {
-    ignoreForLabyrinth(verify(u.reify {
+    verify(u.reify {
       DataBag(jabberwockyEven) union DataBag(jabberwockyOdd)
-    }))
+    })
   }
 
   // --------------------------------------------------------------------------
@@ -239,8 +238,7 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
     })
 
     // Q: how many cannes winners are there in the IMDB top 100?
-    // Union is not yet supported in the Labyrinth compilation
-    "two-way on case classes" in ignoreForLabyrinth(verify(u.reify {
+    "two-way on case classes" in verify(u.reify {
       val cannesTop100 = for {
         movie <- DataBag(imdb)
         winner <- DataBag(cannes)
@@ -254,7 +252,7 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       } yield ("Berlin", movie.year, winner.title)
 
       berlinTop100 union cannesTop100
-    }))
+    })
 
     "multi-way on primitives" in verify(u.reify {
       for {
@@ -265,10 +263,9 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       } yield (x, y, z)
     })
 
-    // Union is not yet supported in the Labyrinth compilation
     "multi-way on case classes with local input" in {
       // Q: how many Cannes or Berlinale winners are there in the IMDB top 100?
-      ignoreForLabyrinth(verify(u.reify {
+      verify(u.reify {
         val cannesTop100 = for {
           movie <- DataBag(imdb)
           winner <- DataBag(cannes)
@@ -282,7 +279,7 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
         } yield (movie.year, winner.title)
 
         cannesTop100 union berlinTop100
-      }))
+      })
     }
   }
 
@@ -474,7 +471,7 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
     "of filters with simple predicates and multiple inputs" in verify(u.reify {
       for {
         x <- DataBag(1 to 1000)
-        y <- DataBag(100 to 2000)
+        y <- DataBag(100 to 200)
         if x < y || x + y < 100 && x % 2 == 0 || y / 2 == 0
       } yield y + x
     })
@@ -492,8 +489,7 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       years forall { case iy @ ImdbYear(yr) => iy == ImdbYear(yr) }
     })
 
-    // Union is not yet supported in the Labyrinth compilation
-    "of local functions" in ignoreForLabyrinth(verify(u.reify {
+    "of local functions" in verify(u.reify {
       val double = (x: Int) => 2 * x
       val add = (x: Int, y: Int) => x + y
 
@@ -501,7 +497,7 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       val increment5 = for { x <- DataBag(1 to 100) } yield add(x, 5)
 
       times2 union increment5
-    }))
+    })
   }
 
   // --------------------------------------------------------------------------
@@ -559,17 +555,15 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       DataBag(0 to 100).sum
     })
 
-    // Union is not yet supported in the Labyrinth compilation
-    "Constant expressions" in ignoreForLabyrinth(verify(u.reify {
+    "Constant expressions" in verify(u.reify {
       val as = for { _ <- DataBag(1 to 100) } yield 1 // map
       val bs = DataBag(101 to 200) flatMap { _ => DataBag(2 to 4) } // flatMap
       val cs = for { _ <- DataBag(201 to 300) if 5 == 1 } yield 5 // filter
       val ds = DataBag(301 to 400) withFilter { _ => true } // filter
       as union bs union cs union ds
-    }))
+    })
 
-    // Union is not yet supported in the Labyrinth compilation
-    "Updated tmp sink (sieve of Eratosthenes)" in ignoreForLabyrinth(verify(u.reify {
+    "Updated tmp sink (sieve of Eratosthenes)" in verify(u.reify {
       val N = 20
       val payload = "#" * 100
 
@@ -598,7 +592,7 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       }
 
       positive union negative
-    }))
+    })
 
     // Bug in the Labyrinth compilation
     "val destructuring" in ignoreForLabyrinth(verify(u.reify {
