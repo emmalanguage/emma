@@ -16,41 +16,24 @@
 
 package org.emmalanguage.labyrinth.operators;
 
-import org.emmalanguage.labyrinth.util.SerializedBuffer;
-import org.emmalanguage.labyrinth.util.Unit;
-import org.apache.flink.api.common.ExecutionConfig;
-import org.apache.flink.api.common.typeinfo.TypeInformation;
-import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
+import org.emmalanguage.labyrinth.util.SerializedBuffer;
+import scala.Unit;
 
-import java.io.IOException;
-import java.io.PrintWriter;
+import scala.util.Either;
+
+import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
 
-/**
- * Each time when the control flow reaches the operator, we create a new out file.
- * First input is a singleton bag with an Integer, which is appended to the filename.
- * Second input is a bag of Integers, which are written to the current file.
- *
- * Warning: At the moment, it only works with para 1.
- */
-public class CFAwareFileSink extends BagOperator<Integer, Unit> implements DontThrowAwayInputBufs {
-
-    private final String baseName;
+public class FileSinkString extends BagOperator<String, Unit> implements DontThrowAwayInputBufs {
 
     private String currentFileName;
 
-    private SerializedBuffer<Integer> buffer;
-
-    private static final TypeSerializer<Integer> integerSer = TypeInformation.of(Integer.class).createSerializer(new ExecutionConfig());
-
     private boolean[] closed = new boolean[2];
 
-    public CFAwareFileSink(String baseName) {
-        this.baseName = baseName;
-    }
+    private SerializedBuffer<String> buffer;
 
     @Override
     public void openOutBag() {
@@ -58,7 +41,7 @@ public class CFAwareFileSink extends BagOperator<Integer, Unit> implements DontT
 
         assert host.subpartitionId == 0; // we need para 1
 
-        buffer = new SerializedBuffer<>(integerSer);
+        buffer = new SerializedBuffer<>(inSer);
 
         closed[0] = false;
         closed[1] = false;
@@ -67,11 +50,11 @@ public class CFAwareFileSink extends BagOperator<Integer, Unit> implements DontT
     }
 
     @Override
-    public void pushInElement(Integer e, int logicalInputId) {
+    public void pushInElement(String e, int logicalInputId) {
         super.pushInElement(e, logicalInputId);
 
         if (logicalInputId == 0) {
-            currentFileName = baseName + e;
+            currentFileName = e;
         } else {
             assert logicalInputId == 1;
             buffer.add(e);
@@ -92,8 +75,8 @@ public class CFAwareFileSink extends BagOperator<Integer, Unit> implements DontT
 
                 //PrintWriter csvWriter = new PrintWriter(currentFileName, "UTF-8");
                 PrintWriter writer = new PrintWriter(fs.create(new Path(currentFileName), FileSystem.WriteMode.OVERWRITE));
-                for (Integer e : buffer) {
-                    writer.println(Integer.toString(e));
+                for (String e : buffer) {
+                    writer.println(e);
                 }
                 buffer = null;
                 writer.close();

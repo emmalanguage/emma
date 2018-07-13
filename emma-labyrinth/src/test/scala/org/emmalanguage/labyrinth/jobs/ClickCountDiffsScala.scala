@@ -13,30 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.emmalanguage.labyrinth.jobs
+package org.emmalanguage
+package labyrinth.jobs
 
-import org.emmalanguage.labyrinth
-import org.emmalanguage.labyrinth.CFLConfig
-import org.emmalanguage.labyrinth.ElementOrEvent
-import org.emmalanguage.labyrinth.KickoffSource
-import org.emmalanguage.labyrinth.LabyNode
-import org.emmalanguage.labyrinth.LabySource
-import org.emmalanguage.labyrinth.operators.CFAwareFileSink
-import org.emmalanguage.labyrinth.operators.ClickLogReader
-import org.emmalanguage.labyrinth.operators.ConditionNode
-import org.emmalanguage.labyrinth.operators.IncMap
-import org.emmalanguage.labyrinth.operators.OuterJoinTupleIntInt
-import org.emmalanguage.labyrinth.operators.SmallerThan
-import org.emmalanguage.labyrinth.operators.Sum
-import org.emmalanguage.labyrinth.operators.SumCombiner
-import org.emmalanguage.labyrinth.partitioners.Always0
-import org.emmalanguage.labyrinth.partitioners.Forward
-import org.emmalanguage.labyrinth.partitioners.IntegerBy0
-import org.emmalanguage.labyrinth.partitioners.RoundRobin
-import org.emmalanguage.labyrinth.partitioners.TupleIntIntBy0
-import org.emmalanguage.labyrinth.util.TupleIntInt
+import labyrinth.CFLConfig
+import labyrinth.ElementOrEvent
+import labyrinth.KickoffSource
+import labyrinth.LabyNode
+import labyrinth.LabySource
+import labyrinth.operators.CFAwareFileSink
+import labyrinth.operators.ClickLogReader
+import labyrinth.operators.ConditionNode
+import labyrinth.operators.IncMap
+import labyrinth.operators.OuterJoinTupleIntInt
+import labyrinth.operators.SmallerThan
+import labyrinth.operators.Sum
+import labyrinth.operators.SumCombiner
+import labyrinth.partitioners.Always0
+import labyrinth.partitioners.Forward
+import labyrinth.partitioners.IntegerBy0
+import labyrinth.partitioners.RoundRobin
+import labyrinth.partitioners.TupleIntIntBy0
+import labyrinth.util.TupleIntInt
 
-import org.emmalanguage.labyrinth.operators._
+import labyrinth.operators._
 import org.apache.flink.api.common.ExecutionConfig
 import org.apache.flink.api.common.functions.MapFunction
 import org.apache.flink.api.common.typeinfo.TypeHint
@@ -56,8 +56,10 @@ object ClickCountDiffsScala {
 			TypeInformation.of(classOf[Integer]),
 			TypeInformation.of(classOf[Integer]))
 
+  // TODO don't use classOF
   private val integerSer = TypeInformation.of(classOf[Integer]).createSerializer(new ExecutionConfig)
   private val booleanSer = TypeInformation.of(classOf[java.lang.Boolean]).createSerializer(new ExecutionConfig)
+  // TODO use TypeHin instead
   private val tupleIntIntSer = new TupleIntInt.TupleIntIntSerializer
   private val tuple2IntIntSerializer = TypeInformation.of(new TypeHint[Tuple2[TupleIntInt, TupleIntInt]]() {})
 		.createSerializer(new ExecutionConfig)
@@ -73,7 +75,7 @@ object ClickCountDiffsScala {
 			registerCustomSerializer(classOf[ElementOrEvent[_]], new ElementOrEvent.ElementOrEventSerializerFactory)
     PojoTypeInfo.registerCustomSerializer(classOf[TupleIntInt], classOf[TupleIntInt.TupleIntIntSerializer])
 
-    CFLConfig.getInstance.reuseInputs = (args(2).toBoolean)
+    CFLConfig.getInstance.reuseInputs = args(2).toBoolean
     CFLConfig.getInstance.terminalBBId = 4
 
     val kickoffSrc = new KickoffSource(0, 1)
@@ -299,6 +301,7 @@ object ClickCountDiffsScala {
     // -- Iteration ends here   BB 4
     // Itt nincs semmi operator. (A kiirast a BB 2-ben csinaljuk.)
     LabyNode.translateAll(env.getJavaEnv)
+
     env.execute
   }
 }

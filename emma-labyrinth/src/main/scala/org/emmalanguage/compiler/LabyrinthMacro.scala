@@ -20,22 +20,21 @@ import com.typesafe.config.Config
 
 import scala.reflect.macros.blackbox
 
-// TODO ajdust to labyrinth
 class LabyrinthMacro(val c: blackbox.Context) extends MacroCompiler with LabyrinthCompiler {
 
-  def onFlinkImpl1[T](e: c.Expr[T]): c.Expr[T] =
-    onFlink(loadConfig(configPaths()))(e)
+  def onLabyrinthImpl1[T](e: c.Expr[T]): c.Expr[T] =
+    onLabyrinth(loadConfig(configPaths()))(e)
 
-  def onFlinkImpl2[T](config: c.Expr[String])(e: c.Expr[T]): c.Expr[T] =
-    onFlink(loadConfig(configPaths(Some(config.tree))))(e)
+  def onLabyrinthImpl2[T](config: c.Expr[String])(e: c.Expr[T]): c.Expr[T] =
+    onLabyrinth(loadConfig(configPaths(Some(config.tree))))(e)
 
-  def onFlink[T](cfg: Config)(e: c.Expr[T]): c.Expr[T] = {
+  def onLabyrinth[T](cfg: Config)(e: c.Expr[T]): c.Expr[T] = {
     // construct the compilation pipeline
     val xfms = transformations(cfg)
     // construct the eval function
     val eval = cfg.getString("emma.compiler.eval") match {
-      case "naive" => NaiveEval(pipeline()(xfms: _*)) _
-      case "timer" => TimerEval(pipeline()(xfms: _*)) _
+      case "naive" => NaiveEval(pipeline(true)(xfms: _*)) _
+      case "timer" => TimerEval(pipeline(true)(xfms: _*)) _
     }
     // apply the pipeline to the input tree
     val rslt = eval(e.tree)

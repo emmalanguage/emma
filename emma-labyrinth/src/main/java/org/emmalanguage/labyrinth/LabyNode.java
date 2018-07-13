@@ -22,6 +22,7 @@ import org.emmalanguage.labyrinth.operators.BagOperator;
 import org.emmalanguage.labyrinth.partitioners.FlinkPartitioner;
 import org.emmalanguage.labyrinth.partitioners.Partitioner;
 import org.emmalanguage.labyrinth.util.LogicalInputIdFiller;
+import org.emmalanguage.labyrinth.util.Nothing;
 import org.emmalanguage.labyrinth.util.Util;
 import org.apache.flink.api.common.functions.FilterFunction;
 import org.apache.flink.api.common.typeinfo.TypeInformation;

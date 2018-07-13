@@ -92,7 +92,7 @@ public class CFAwareFileSinkGen<T> extends BagOperator<Either<Integer, T>, Unit>
                 FileSystem fs = FileSystem.get(new URI(currentFileName));
                 //BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(new Path(currentFileName))));
 
-                //PrintWriter writer = new PrintWriter(currentFileName, "UTF-8");
+                //PrintWriter csvWriter = new PrintWriter(currentFileName, "UTF-8");
                 PrintWriter writer = new PrintWriter(fs.create(new Path(currentFileName), FileSystem.WriteMode.OVERWRITE));
                 for (T e : buffer) {
                     writer.println(e.toString());

@@ -14,15 +14,24 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package api.emma
+package compiler
 
-import compiler.LabyrinthMacro
+class LabyrinthCodegenIntegrationSpec extends BaseCodegenIntegrationSpec
+  with LabyrinthCompilerAware
+  with LabyrinthAware {
 
-import scala.language.experimental.macros
+  import compiler._
 
-object onLabyrinth {
+  def withBackendContext[T](f: Env => T): T =
+    withDefaultFlinkStreamEnv(f)
 
-  final def apply[T](e: T): T = macro LabyrinthMacro.onLabyrinthImpl1[T]
+  // --------------------------------------------------------------------------
+  // Distributed collection conversion
+  // --------------------------------------------------------------------------
 
-  final def apply[T](config: String)(e: T): T = macro LabyrinthMacro.onLabyrinthImpl2[T]
+  "test simple" in withBackendContext(implicit env => {
+    verify(u.reify {
+      val xs = 1
+    })
+  })
 }

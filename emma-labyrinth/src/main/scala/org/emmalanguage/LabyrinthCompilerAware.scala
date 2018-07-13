@@ -14,15 +14,23 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package api.emma
 
-import compiler.LabyrinthMacro
+import compiler.RuntimeCompiler
+import compiler.LabyrinthCompiler
 
-import scala.language.experimental.macros
+import com.typesafe.config.Config
+import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 
-object onLabyrinth {
+trait LabyrinthCompilerAware extends RuntimeCompilerAware {
 
-  final def apply[T](e: T): T = macro LabyrinthMacro.onLabyrinthImpl1[T]
+  type Env = StreamExecutionEnvironment
 
-  final def apply[T](config: String)(e: T): T = macro LabyrinthMacro.onLabyrinthImpl2[T]
+  val compiler = new RuntimeCompiler(codegenDir) with LabyrinthCompiler
+
+  import compiler._
+
+  def Env: u.Type = compiler.StreamExecutionEnvironment
+
+  def transformations(cfg: Config): Seq[TreeTransform] =
+    compiler.transformations(cfg)
 }

@@ -233,7 +233,8 @@ public class ElementOrEvent<T> implements Serializable, CanForceFlush {
 
 		private void deserializeEvent(ElementOrEvent<T> r, DataInputView s) throws IOException {
 			r.event = new Event();
-			r.event.type = Event.enumConsts[s.readInt()];
+			int type = s.readInt();
+			r.event.type = Event.enumConsts[type];
 			r.event.assumedTargetPara = s.readShort();
 			r.event.bagID = new BagID();
 			r.event.bagID.cflSize = s.readInt();
