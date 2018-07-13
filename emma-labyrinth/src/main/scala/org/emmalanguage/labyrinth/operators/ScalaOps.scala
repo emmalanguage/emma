@@ -19,6 +19,7 @@ package labyrinth.operators
 import api.DataBag
 import api.alg.Alg
 import api.Group
+import api.Meta
 import compiler.Memo
 import io.csv.CSV
 import io.csv.CSVScalaSupport
@@ -30,7 +31,6 @@ import labyrinth.KickoffSource
 import labyrinth.LabyNode
 import labyrinth.partitioners.Partitioner
 import labyrinth.util.SocketCollector
-import org.emmalanguage.api.Meta
 
 import org.apache.flink.api.common.typeinfo.TypeInformation
 import org.apache.flink.api.common.typeutils.TypeSerializer

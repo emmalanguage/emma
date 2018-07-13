@@ -53,5 +53,5 @@ object ClickCountDiffs {
   }
 
   val csvConfig = CSV()
-  
+
 }

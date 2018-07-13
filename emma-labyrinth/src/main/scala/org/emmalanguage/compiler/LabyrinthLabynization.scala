@@ -823,7 +823,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
 
           // phiNode refs according to the arg positions of the def are stored in defSymNameToPhiRef. Iterate through
           // phiNode refs and add the according input
-          var defArgPhis = defSymNameToPhiRef(dc.symbol.name.toString)
+          val defArgPhis = defSymNameToPhiRef(dc.symbol.name.toString)
           var currIdx = 0
           var argIdx = 0
           args.foreach(
