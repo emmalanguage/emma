@@ -217,6 +217,11 @@
             </dependency>
             <dependency>
                 <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-labyrinth</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
                 <artifactId>emma-spark</artifactId>
                 <version>${project.version}</version>
             </dependency>
@@ -243,6 +248,11 @@
             <dependency>
                 <groupId>org.emmalanguage</groupId>
                 <artifactId>emma-examples-flink</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.emmalanguage</groupId>
+                <artifactId>emma-examples-labyrinth</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -510,14 +520,15 @@
                 <executions>
                     <execution>
                         <id>scala-compile-first</id>
-                        <phase>compile</phase>
+                        <phase>process-resources</phase>
                         <goals>
+                            <goal>add-source</goal>
                             <goal>compile</goal>
                         </goals>
                     </execution>
                     <execution>
                         <id>scala-test-compile</id>
-                        <phase>test-compile</phase>
+                        <phase>process-test-resources</phase>
                         <goals>
                             <goal>testCompile</goal>
                         </goals>
@@ -873,6 +884,31 @@
                                 <goals>
                                     <goal>sign</goal>
                                 </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <!-- Profile that activates Labyrinth. Note that this depends on a custom Flink version: -->
+        <!-- https://github.com/ggevay/flink/tree/CFL -->
+        <profile>
+            <id>labyrinth</id>
+            <modules>
+                <module>emma-labyrinth</module>
+                <module>emma-examples-labyrinth</module>
+            </modules>
+            <!-- Disable maven-notice-plugin when building Labyrinth, because we would need a different NOTICE file -->
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.jasig.maven</groupId>
+                        <artifactId>maven-notice-plugin</artifactId>
+                        <version>1.0.6.1</version>
+                        <executions>
+                            <execution>
+                                <id>check-notice</id>
+                                <phase>none</phase> <!-- this disables plugin -->
                             </execution>
                         </executions>
                     </plugin>
