@@ -375,6 +375,43 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
               skip(dc)
 
             case dc @ core.DefCall
+              (Some(core.ValRef(lhsSym)), DataBag.union, _, Seq(Seq(core.ValRef(rhsSym)))) =>
+
+              val tpe = lhsSym.info.typeArgs.head
+              val lhsReplSym = replacements(lhsSym)
+              val rhsReplSym = replacements(rhsSym)
+
+              // =========== Labynode union ===========
+              // bagoperator
+
+              val bagOpUnionVDrhs = core.DefCall(
+                Some(ScalaOps$.ref),
+                ScalaOps$.union,
+                Seq(tpe),
+                Seq()
+              )
+              val bagOpUnionRefDef = valRefAndDef(owner, "unionOp", bagOpUnionVDrhs)
+
+              val refDefs = generateLabyNode[Always0[Any]](
+                owner,
+                bagOpUnionRefDef._1,
+                tpe,
+                tpe,
+                1,
+                Seq((lhsReplSym, core.Ref(lhsReplSym)), (rhsReplSym, core.Ref(rhsReplSym))),
+                "union",
+                1,
+                bbIdMap
+              )
+              val defs = refDefs._1.map(_._2)
+              val finalNode = refDefs._2
+
+              // put everything into a block
+              valDefsFinal = valDefsFinal ++ Seq(bagOpUnionRefDef._2) ++ defs :+ finalNode._2
+              replacements += (lhs -> finalNode._3)
+              skip(dc)
+
+            case dc @ core.DefCall
               (_, Ops.cross, Seq(tpeA, tpeB), Seq(Seq(core.ValRef(lhsSym), core.ValRef(rhsSym)))) =>
 
 
