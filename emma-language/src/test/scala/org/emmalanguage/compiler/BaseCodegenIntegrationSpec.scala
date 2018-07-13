@@ -563,7 +563,8 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       as union bs union cs union ds
     })
 
-    "Updated tmp sink (sieve of Eratosthenes)" in verify(u.reify {
+    // Ignored because the Labyrinth compilation doesn't yet handle closures
+    "Updated tmp sink (sieve of Eratosthenes)" in ignoreForLabyrinth(verify(u.reify {
       val N = 20
       val payload = "#" * 100
 
@@ -592,7 +593,7 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       }
 
       positive union negative
-    })
+    }))
 
     // Bug in the Labyrinth compilation
     "val destructuring" in ignoreForLabyrinth(verify(u.reify {
