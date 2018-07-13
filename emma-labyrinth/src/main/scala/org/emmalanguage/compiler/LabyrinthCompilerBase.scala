@@ -19,7 +19,7 @@ package compiler
 import api.CSVConverter
 import api.Meta
 import api.alg.Alg
-import org.emmalanguage.labyrinth.operators.ScalaOps
+import labyrinth.operators.ScalaOps
 
 import org.apache.flink.api.common.typeinfo.TypeInformation
 
@@ -285,7 +285,7 @@ trait LabyrinthCompilerBase extends Compiler {
   }
 
   object LabyStatics$ extends ModuleAPI {
-    lazy val sym = api.Sym[org.emmalanguage.labyrinth.operators.LabyStatics.type].asModule
+    lazy val sym = api.Sym[labyrinth.operators.LabyStatics.type].asModule
 
     val phi = op("phi")
     val registerCustomSerializer = op("registerCustomSerializer")
@@ -314,64 +314,64 @@ trait LabyrinthCompilerBase extends Compiler {
 
 object DB {
 
-  def singSrc[A: org.emmalanguage.api.Meta](l: () => A): org.emmalanguage.api.DataBag[A] = {
-    org.emmalanguage.api.DataBag(Seq(l()))
+  def singSrc[A: api.Meta](l: () => A): api.DataBag[A] = {
+    api.DataBag(Seq(l()))
   }
 
-  def fromSingSrcApply[A: org.emmalanguage.api.Meta](db: org.emmalanguage.api.DataBag[Seq[A]]):
-  org.emmalanguage.api.DataBag[A] = {
-    org.emmalanguage.api.DataBag(db.collect().head)
+  def fromSingSrcApply[A: api.Meta](db: api.DataBag[Seq[A]]):
+  api.DataBag[A] = {
+    api.DataBag(db.collect().head)
   }
 
-  def fromSingSrcReadText(db: org.emmalanguage.api.DataBag[String]):
-  org.emmalanguage.api.DataBag[String] = {
-    org.emmalanguage.api.DataBag.readText(db.collect().head)
+  def fromSingSrcReadText(db: api.DataBag[String]):
+  api.DataBag[String] = {
+    api.DataBag.readText(db.collect().head)
   }
 
   def fromSingSrcReadCSV[A: Meta : CSVConverter](
-    path: org.emmalanguage.api.DataBag[String],format: org.emmalanguage.api.DataBag[org.emmalanguage.api.CSV]
-  ): org.emmalanguage.api.DataBag[A] = {
-    org.emmalanguage.api.DataBag.readCSV[A](path.collect().head, format.collect().head)
+    path: api.DataBag[String],format: api.DataBag[api.CSV]
+  ): api.DataBag[A] = {
+    api.DataBag.readCSV[A](path.collect().head, format.collect().head)
   }
 
-  def fromDatabagWriteCSV[A: org.emmalanguage.api.Meta](
-    db: org.emmalanguage.api.DataBag[A],
-    path: org.emmalanguage.api.DataBag[String],
-    format: org.emmalanguage.api.DataBag[org.emmalanguage.api.CSV])(
+  def fromDatabagWriteCSV[A: api.Meta](
+    db: api.DataBag[A],
+    path: api.DataBag[String],
+    format: api.DataBag[api.CSV])(
     implicit converter: CSVConverter[A]
-  ) : org.emmalanguage.api.DataBag[Unit] = {
+  ) : api.DataBag[Unit] = {
     singSrc( () => db.writeCSV(path.collect()(0), format.collect()(0))(converter) )
   }
 
   // fold Alg
-  def fold1[A: org.emmalanguage.api.Meta, B: org.emmalanguage.api.Meta]
-  (db: org.emmalanguage.api.DataBag[A], alg: Alg[A,B])
-  : org.emmalanguage.api.DataBag[B] = {
-    org.emmalanguage.api.DataBag(Seq(db.fold[B](alg)))
+  def fold1[A: api.Meta, B: api.Meta]
+  (db: api.DataBag[A], alg: Alg[A,B])
+  : api.DataBag[B] = {
+    api.DataBag(Seq(db.fold[B](alg)))
   }
 
   // fold classic
-  def fold2[A: org.emmalanguage.api.Meta, B: org.emmalanguage.api.Meta]
-  ( db: org.emmalanguage.api.DataBag[A], zero: B, init: A => B, plus: (B,B) => B )
-  : org.emmalanguage.api.DataBag[B] = {
-    org.emmalanguage.api.DataBag(Seq(db.fold(zero)(init, plus)))
+  def fold2[A: api.Meta, B: api.Meta]
+  ( db: api.DataBag[A], zero: B, init: A => B, plus: (B,B) => B )
+  : api.DataBag[B] = {
+    api.DataBag(Seq(db.fold(zero)(init, plus)))
   }
 
   // fold2 from zero singSrc
-  def fold2FromSingSrc[A: org.emmalanguage.api.Meta, B: org.emmalanguage.api.Meta]
-  ( db: org.emmalanguage.api.DataBag[A], zero: org.emmalanguage.api.DataBag[B], init: A => B, plus: (B,B) => B )
-  : org.emmalanguage.api.DataBag[B] = {
-    org.emmalanguage.api.DataBag(Seq(db.fold(zero.collect().head)(init, plus)))
+  def fold2FromSingSrc[A: api.Meta, B: api.Meta]
+  ( db: api.DataBag[A], zero: api.DataBag[B], init: A => B, plus: (B,B) => B )
+  : api.DataBag[B] = {
+    api.DataBag(Seq(db.fold(zero.collect().head)(init, plus)))
   }
 
-  def collect[A: org.emmalanguage.api.Meta](db: org.emmalanguage.api.DataBag[A]) :
-  org.emmalanguage.api.DataBag[Seq[A]] = {
-    org.emmalanguage.api.DataBag(Seq(db.collect()))
+  def collect[A: api.Meta](db: api.DataBag[A]) :
+  api.DataBag[Seq[A]] = {
+    api.DataBag(Seq(db.collect()))
   }
 
-  def cross3[A: org.emmalanguage.api.Meta, B: org.emmalanguage.api.Meta, C: org.emmalanguage.api.Meta](
-    xs: org.emmalanguage.api.DataBag[A], ys: org.emmalanguage.api.DataBag[B], zs: org.emmalanguage.api.DataBag[C]
-  )(implicit env: org.emmalanguage.api.LocalEnv): org.emmalanguage.api.DataBag[(A, B, C)] = for {
+  def cross3[A: api.Meta, B: api.Meta, C: api.Meta](
+    xs: api.DataBag[A], ys: api.DataBag[B], zs: api.DataBag[C]
+  )(implicit env: api.LocalEnv): api.DataBag[(A, B, C)] = for {
     x <- xs
     y <- ys
     z <- zs
@@ -389,14 +389,14 @@ object DB {
 object Memo {
   private val memo = collection.mutable.Map.empty[Any, Any]
 
-  def memoizeTypeInfo[T](implicit meta: org.emmalanguage.api.Meta[T], info: TypeInformation[T])
+  def memoizeTypeInfo[T](implicit meta: api.Meta[T], info: TypeInformation[T])
   : TypeInformation[T] = {
     val tpe = fix(meta.tpe).toString
     val res = memo.getOrElseUpdate(tpe, info)
     res.asInstanceOf[TypeInformation[T]]
   }
 
-  implicit def typeInfoForType[T](implicit meta: org.emmalanguage.api.Meta[T]): TypeInformation[T] = {
+  implicit def typeInfoForType[T](implicit meta: api.Meta[T]): TypeInformation[T] = {
     val tpe = fix(meta.tpe).toString
     if (memo.contains(tpe)) memo(tpe).asInstanceOf[TypeInformation[T]]
     else throw new RuntimeException(
