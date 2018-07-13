@@ -13,20 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.emmalanguage.labyrinth.jobs
+package org.emmalanguage
+package labyrinth.jobs
 
-import org.emmalanguage.labyrinth.BagOperatorOutputCollector
-import org.emmalanguage.labyrinth.CFLConfig
-import org.emmalanguage.labyrinth.ElementOrEvent
-import org.emmalanguage.labyrinth.KickoffSource
-import org.emmalanguage.labyrinth.LabyNode
-import org.emmalanguage.labyrinth.LabySource
-import org.emmalanguage.labyrinth.operators.Print
-import org.emmalanguage.labyrinth.partitioners.Always0
-import org.emmalanguage.labyrinth.partitioners.RoundRobin
-import org.emmalanguage.labyrinth.util.Unit
+import labyrinth.BagOperatorOutputCollector
+import labyrinth.CFLConfig
+import labyrinth.ElementOrEvent
+import labyrinth.KickoffSource
+import labyrinth.LabyNode
+import labyrinth.LabySource
+import labyrinth.operators.Print
+import labyrinth.partitioners.Always0
+import labyrinth.partitioners.RoundRobin
+import labyrinth.util.Unit
 
-import org.emmalanguage.labyrinth.operators._
+import labyrinth.operators._
 import org.apache.flink.api.common.ExecutionConfig
 import org.apache.flink.api.common.typeinfo.TypeHint
 import org.apache.flink.api.common.typeinfo.TypeInformation

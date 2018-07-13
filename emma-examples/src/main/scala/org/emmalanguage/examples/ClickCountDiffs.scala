@@ -22,12 +22,12 @@ import api._
 object ClickCountDiffs {
 
   def apply(baseName: String, numDays: Int): Unit = {
-
     val baseInName = baseName
 
     // (no join with pageAttributes yet)
     var yesterdayCounts: DataBag[(Int, Int)] = DataBag.empty // should be null, but the compilation doesn't handle it
-    for(day <- 1 to numDays) {
+    var day = 1
+    while (day <= numDays) {
       // Read all page-visits for this day
       val visits: DataBag[Int] = DataBag.readText(baseInName + day).map(Integer.parseInt) // integer pageIDs
       // Count how many times each page was visited:
@@ -44,11 +44,14 @@ object ClickCountDiffs {
             if c._1 == y._1
           } yield Math.abs(c._2 - y._2)
         val sum = diffs.reduce(0)((x: Int, y: Int) => x + y)
-        //println(sum)
-        scala.tools.nsc.io.File(baseName + day + ".out").writeAll(sum.toString)
+        DataBag(Seq(sum)).writeCSV(baseName + day + ".out", csvConfig)
       }
       yesterdayCounts = counts
+      day += 1
     }
 
   }
+
+  val csvConfig = CSV()
+  
 }

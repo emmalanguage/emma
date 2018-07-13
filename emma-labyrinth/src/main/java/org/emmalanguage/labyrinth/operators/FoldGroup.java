@@ -16,9 +16,11 @@
 
 package org.emmalanguage.labyrinth.operators;
 
+import org.emmalanguage.api.Group;
+
 import java.util.HashMap;
 
-public abstract class FoldGroup<K, IN, OUT> extends BagOperator<IN, OUT> {
+public abstract class FoldGroup<K, IN, OUT> extends BagOperator<IN, Group<K, OUT>> {
 
 	protected HashMap<K, OUT> hm;
 

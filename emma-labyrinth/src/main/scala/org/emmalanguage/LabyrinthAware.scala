@@ -18,9 +18,6 @@ package org.emmalanguage
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 import org.apache.log4j.Logger
 
-/**
- * copied and adjusted from FlinkAway
- */
 trait LabyrinthAware {
 
   Logger.getLogger("org.apache.flink").setLevel(org.apache.log4j.Level.WARN)
@@ -30,7 +27,7 @@ trait LabyrinthAware {
 
   protected val defaultFlinkConfig = new FlinkConfig {}
 
-  protected lazy val defaultFlinkEnv =
+  protected lazy val defaultFlinkStreamEnv =
     flinkEnv(defaultFlinkConfig)
 
   protected def flinkEnv(c: FlinkConfig): StreamExecutionEnvironment = {
@@ -39,6 +36,6 @@ trait LabyrinthAware {
     env
   }
 
-  protected def withDefaultFlinkEnv[T](f: StreamExecutionEnvironment => T): T =
-    f(defaultFlinkEnv)
+  protected def withDefaultFlinkStreamEnv[T](f: StreamExecutionEnvironment => T): T =
+    f(defaultFlinkStreamEnv)
 }

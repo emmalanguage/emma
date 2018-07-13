@@ -13,16 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.emmalanguage
-package api.emma
 
-import compiler.LabyrinthMacro
+package org.emmalanguage.labyrinth.operators;
 
-import scala.language.experimental.macros
-
-object onLabyrinth {
-
-  final def apply[T](e: T): T = macro LabyrinthMacro.onLabyrinthImpl1[T]
-
-  final def apply[T](config: String)(e: T): T = macro LabyrinthMacro.onLabyrinthImpl2[T]
+public class Fold<IN, OUT> extends BagOperator<IN, OUT> {
+	OUT result;
 }

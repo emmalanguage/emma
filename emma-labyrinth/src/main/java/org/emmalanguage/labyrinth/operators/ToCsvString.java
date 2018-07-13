@@ -13,16 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.emmalanguage
-package api.emma
 
-import compiler.LabyrinthMacro
+package org.emmalanguage.labyrinth.operators;
 
-import scala.language.experimental.macros
+import org.emmalanguage.io.csv.CSV;
+import org.emmalanguage.io.csv.CSVConverter;
+import scala.util.Either;
+import org.emmalanguage.labyrinth.util.SerializedBuffer;
 
-object onLabyrinth {
+abstract public class ToCsvString<T> extends BagOperator<Either<T, CSV>, String> {
 
-  final def apply[T](e: T): T = macro LabyrinthMacro.onLabyrinthImpl1[T]
+	protected SerializedBuffer<Either<T, CSV>> buff;
+	protected com.univocity.parsers.csv.CsvWriter csvWriter;
+	protected CSVConverter<T> csvConv;
+	protected CSV csvInfo;
+	protected boolean csvWriterInitiated = false;
+	protected boolean csvInfoInitiated = false;
 
-  final def apply[T](config: String)(e: T): T = macro LabyrinthMacro.onLabyrinthImpl2[T]
+	protected boolean[] closed = new boolean[2];
+
 }

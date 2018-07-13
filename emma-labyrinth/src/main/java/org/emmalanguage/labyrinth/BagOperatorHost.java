@@ -192,6 +192,8 @@ public class BagOperatorHost<IN, OUT>
 
 		cb = new MyCFLCallback();
 		cflMan.subscribe(cb);
+
+		System.out.println("===Name: " + this.name);
 	}
 
 	private int getMul() {
@@ -305,7 +307,7 @@ public class BagOperatorHost<IN, OUT>
 		@Override
 		public void collectElement(OUT e) {
 			numElements++;
-			assert outs.size() != 0; // If the operator wants to emit an element but there are no outs, then we just probably forgot to call .out()
+			//assert outs.size() != 0; // If the operator wants to emit an element but there are no outs, then we just probably forgot to call .out()
 			for(Out o: outs) {
 				o.collectElement(e);
 			}

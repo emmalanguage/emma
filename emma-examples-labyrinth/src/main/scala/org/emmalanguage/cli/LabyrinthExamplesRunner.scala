@@ -17,20 +17,13 @@ package org.emmalanguage
 package cli
 
 import api._
-import examples.graphs.ConnectedComponents
-import examples.graphs.EnumerateTriangles
-import examples.graphs.model.Edge
 import util.Iso
 
 import breeze.linalg.{Vector => Vec}
-
 import org.apache.flink.streaming.api.scala.StreamExecutionEnvironment
 
 import scala.reflect.ClassTag
-//import examples.graphs._
-//import examples.graphs.model._
 import examples.text._
-//import util.Iso
 
 object LabyrinthExamplesRunner extends LabyrinthAware {
   // Text
@@ -71,24 +64,6 @@ object LabyrinthExamplesRunner extends LabyrinthAware {
         c
       })
 
-    section("Graph Analytics")
-    cmd("connected-components")
-      .text("Label undirected graph vertices with component IDs")
-      .children(
-        arg[String]("input")
-          .text("edges path")
-          .action((x, c) => c.copy(input = x)),
-        arg[String]("output")
-          .text("labeled vertices path")
-          .action((x, c) => c.copy(output = x)))
-    note("")
-    cmd("triangle-count")
-      .text("Count the number of triangle cliques in a graph")
-      .children(
-        arg[String]("input")
-          .text("edges path")
-          .action((x, c) => c.copy(input = x)))
-
     section("Text Analytics")
     cmd("word-count")
       .text("Word Count Example")
@@ -106,11 +81,6 @@ object LabyrinthExamplesRunner extends LabyrinthAware {
       cfg <- parser.parse(args, Config())
       cmd <- cfg.command
       res <- cmd match {
-        // Graphs
-        case "connected-components" =>
-          Some(connectedComponents(cfg)(flinkEnv(cfg)))
-        case "triangle-count" =>
-          Some(triangleCount(cfg)(flinkEnv(cfg)))
         // Text
         case "word-count" =>
           Some(wordCount(cfg)(flinkEnv(cfg)))
@@ -126,33 +96,8 @@ object LabyrinthExamplesRunner extends LabyrinthAware {
   implicit def breezeVectorCSVConverter[V: CSVColumn : ClassTag]: CSVConverter[Vec[V]] =
     CSVConverter.iso[Array[V], Vec[V]](Iso.make(Vec.apply, _.toArray), implicitly)
 
-  // Graphs
-
-  def connectedComponents(c: Config)(implicit flink: StreamExecutionEnvironment): Unit =
-    emma.onLabyrinth {
-      // read in set of edges to be used as input
-      val edges = DataBag.readCSV[Edge[Long]](c.input, c.csv)
-      // build the connected components
-      val paths = ConnectedComponents(edges)
-      // write the results into a file
-      paths.writeCSV(c.output, c.csv)
-    }
-
-  def triangleCount(c: Config)(implicit flink: StreamExecutionEnvironment): Unit =
-    emma.onLabyrinth {
-      // convert a bag of directed edges into an undirected set
-      val incoming = DataBag.readCSV[Edge[Long]](c.input, c.csv)
-      val outgoing = incoming.map(e => Edge(e.dst, e.src))
-      val edges = (incoming union outgoing).distinct
-      // compute all triangles
-      val triangles = EnumerateTriangles(edges)
-      // count the number of enumerated triangles
-      val triangleCount = triangles.size
-      // print the result to the console
-      println(s"The number of triangles in the graph is $triangleCount")
-    }
-
   def wordCount(c: Config)(implicit flink: StreamExecutionEnvironment): Unit =
+
     emma.onLabyrinth {
       // read the input files and split them into lowercased words
       val docs = DataBag.readText(c.input)

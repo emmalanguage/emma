@@ -14,15 +14,14 @@
  * limitations under the License.
  */
 package org.emmalanguage
-package api.emma
+package examples
 
-import compiler.LabyrinthMacro
+import api._
 
-import scala.language.experimental.macros
+class ClickCountDiffsIntegrationSpec extends BaseClickCountDiffsIntegrationSpec with LabyrinthAware {
 
-object onLabyrinth {
-
-  final def apply[T](e: T): T = macro LabyrinthMacro.onLabyrinthImpl1[T]
-
-  final def apply[T](config: String)(e: T): T = macro LabyrinthMacro.onLabyrinthImpl2[T]
+  override def clickCountDiffs(baseInName: String, numDays: Int): Unit =
+    withDefaultFlinkStreamEnv(implicit flink => emma.onLabyrinth {
+      ClickCountDiffs(baseInName, numDays)
+    })
 }
