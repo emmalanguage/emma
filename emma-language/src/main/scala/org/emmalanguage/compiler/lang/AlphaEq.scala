@@ -119,7 +119,7 @@ trait AlphaEq extends Common {
 
       // Alpha equivalence of types
       def types(lhT: Type, rhT: Type): Eq Or Neq =
-        if (lhT.substituteSymbols(keys, vals) =:= rhT) pass
+        if (lhT.substituteSymbols(keys, vals).widen =:= rhT.widen) pass
         else failHere because s"Types $lhT and $rhT differ"
 
       // Alpha equivalence of constants
