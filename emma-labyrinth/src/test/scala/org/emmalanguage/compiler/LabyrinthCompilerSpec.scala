@@ -109,16 +109,13 @@ class LabyrinthCompilerSpec extends BaseCompilerSpec
     pipeline(typeCheck = true)(
       Core.lnf,
       labyrinthNormalize.timed,
-      Core.unnest,
-      labyrinthLabynize.timed,
-      Core.unnest
+      labyrinthLabynize.timed
     ).compose(_.tree)
   }
 
   def applyLabynizationOnly(): u.Expr[Any] => u.Tree = {
     pipeline(typeCheck = true)(
-      labyrinthLabynize.timed,
-      Core.unnest
+      labyrinthLabynize.timed
     ).compose(_.tree)
   }
 

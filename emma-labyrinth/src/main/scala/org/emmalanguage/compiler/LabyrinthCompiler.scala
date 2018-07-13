@@ -47,9 +47,7 @@ trait LabyrinthCompiler
     Core.unnest,
     // labyrinth transformations
     labyrinthNormalize,
-    Core.unnest,
     labyrinthLabynize,
-    Core.unnest,
     prependMemoizeTypeInfoCalls
   ) filterNot (_ == noop)
 

@@ -880,7 +880,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
           case None =>
             val execDC =
               core.DefCall(Some(LabyStatics$.ref), LabyStatics$.executeWithCatch, Seq(), Seq(Seq(envImplDCRefDef._1)))
-            valRefAndDef(owner, "envExecuteWithCatch", execDC)
+            valRefAndDef(owner, "env.executeWithCatch", execDC)
 
           case Some(exprSym) =>
             val (socCollRef, socCollDef) =
@@ -890,12 +890,24 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
 
             collValDef.append(socCollDef)
 
-            val execDC = core.DefCall(Some(LabyStatics$.ref), LabyStatics$.executeAndGetCollected, Seq(),
+            val ortIsBag = meta(tree).all.all.find(_.isInstanceOf[OrigReturnType]) match {
+              case Some(OrigReturnType(isBag)) => isBag
+              case _ =>
+                throw new AssertionError("OrigReturnType attachment not found. (LabyrinthNormalization adds it)")
+            }
+
+            val execDC = core.DefCall(Some(LabyStatics$.ref),
+              if (ortIsBag) {
+                LabyStatics$.executeAndGetCollectedBag
+              } else {
+                LabyStatics$.executeAndGetCollectedNonBag
+              },
+              Seq(),
               Seq(Seq(
                 envImplDCRefDef._1,
                 socCollRef
               )))
-            valRefAndDef(owner, "envExecuteAndGetCollected", execDC)
+            valRefAndDef(owner, "env.executeAndGetCollectedBag", execDC)
         }
 
         val newVals = Seq(customSerDCRefDef._2, termIdDCRefDef._2, kickOffWorldCup2018SourceDCRefDef._2) ++
@@ -911,7 +923,7 @@ trait LabyrinthLabynization extends LabyrinthCompilerBase {
 
     // println("+++++++++++++++++++++++++++++++++++++++++++++++")
     // postPrint(labyStaticsTrans)
-    labyStaticsTrans
+    Core.unnest(labyStaticsTrans)
   })
 
   // =======================
