@@ -20,8 +20,11 @@ import api._
 
 class ClickCountDiffsIntegrationSpec extends BaseClickCountDiffsIntegrationSpec with FlinkAware {
 
-  override def clickCountDiffs(baseName: String, numDays: Int): Unit =
-    withDefaultFlinkEnv(implicit flink => emma.onFlink {
+  override def clickCountDiffs(baseName: String, numDays: Int): Unit = {
+    implicit val flink = org.apache.flink.api.scala.ExecutionEnvironment.getExecutionEnvironment
+    flink.setParallelism(1)
+    emma.onFlink {
       ClickCountDiffs(baseName, numDays)
-    })
+    }
+  }
 }
