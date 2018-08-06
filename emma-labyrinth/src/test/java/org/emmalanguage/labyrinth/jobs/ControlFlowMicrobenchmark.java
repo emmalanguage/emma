@@ -97,7 +97,7 @@ public class ControlFlowMicrobenchmark {
 						.addInput(inputBag, false);
 
 		LabyNode<Integer, Integer> phi2 =
-				LabyNode.phi("phi2", 1, new Random<>(env.getParallelism()), integerSer, integerTypeInfo)
+				LabyNode.phi("phi2", 1, new Forward<>(env.getParallelism()), integerSer, integerTypeInfo)
 						.addInput(inputBag2Partitioned, false, true);
 
 		LabyNode<Integer, Integer> inced =
