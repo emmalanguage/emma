@@ -100,7 +100,7 @@ public class NoCF {
 		//CFLConfig.getInstance().setNumToSubscribe(); //translateAll does this
 
 		System.out.println(env.getExecutionPlan());
-		//env.execute();
-		Util.executeWithCatch(env);
+		env.execute();
+		//Util.executeWithCatch(env);
 	}
 }
