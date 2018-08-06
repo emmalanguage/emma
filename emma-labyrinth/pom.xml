@@ -34,7 +34,7 @@
         <scala-maven-plugin.skip>false</scala-maven-plugin.skip>
         <scalastyle-maven-plugin.skip>true</scalastyle-maven-plugin.skip>
         <scalatest-maven-plugin.skip>${skipTests}</scalatest-maven-plugin.skip>
-        <flink.version>1.5-labyrinth</flink.version>
+        <flink.version>1.7-labyrinth</flink.version>
     </properties>
 
     <dependencies>
