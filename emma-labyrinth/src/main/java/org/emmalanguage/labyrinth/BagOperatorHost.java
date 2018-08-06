@@ -874,7 +874,7 @@ public class BagOperatorHost<IN, OUT>
 			if (CFLConfig.vlog) LOG.info("Out("+ splitId + ") of {" + name + "}[" + BagOperatorHost.this.subpartitionId + "] sending element to " + part + ": " + new ElementOrEvent<>(subpartitionId, e, splitId, part));
 
 			//output.collect(new StreamRecord<>(new ElementOrEvent<>(subpartitionId, e, splitId, part), 0));
-			output.collect(reuseStreamRecord.replace(reuseEleOrEvent.replace(subpartitionId, e, splitId, part), 0));
+			output.collect(reuseStreamRecord.replace(reuseEleOrEvent.replace(subpartitionId, e, splitId, part)));
 		}
 
 		void broadcastStart() {
@@ -902,13 +902,13 @@ public class BagOperatorHost<IN, OUT>
 			sentStart[part] = true;
 			ElementOrEvent.Event event = new ElementOrEvent.Event(ElementOrEvent.Event.Type.START, partitioner.targetPara, new BagID(outCFLSize, opID));
 			if (CFLConfig.vlog) LOG.info("Out("+ splitId + ") of {" + name + "}[" + BagOperatorHost.this.subpartitionId + "] sending START to " + part + ": " + new ElementOrEvent<>(subpartitionId, event, splitId, part));
-			output.collect(new StreamRecord<>(new ElementOrEvent<>(subpartitionId, event, splitId, part), 0));
+			output.collect(new StreamRecord<>(new ElementOrEvent<>(subpartitionId, event, splitId, part)));
 		}
 
 		private void sendEnd(short part) {
 			if (CFLConfig.vlog) LOG.info("Out("+ splitId + ") of {" + name + "}[" + BagOperatorHost.this.subpartitionId + "] sending END to " + part);
 			ElementOrEvent.Event event = new ElementOrEvent.Event(ElementOrEvent.Event.Type.END, partitioner.targetPara, new BagID(outCFLSize, opID));
-			output.collect(new StreamRecord<>(new ElementOrEvent<>(subpartitionId, event, splitId, part), 0));
+			output.collect(new StreamRecord<>(new ElementOrEvent<>(subpartitionId, event, splitId, part)));
 		}
 	}
 
