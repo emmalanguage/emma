@@ -16,15 +16,16 @@
 
 package org.emmalanguage.labyrinth;
 
+import org.apache.flink.streaming.api.functions.source.RichSourceFunction;
+import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.emmalanguage.labyrinth.util.Unit;
 import eu.stratosphere.labyrinth.CFLManager;
-import org.apache.flink.streaming.api.functions.source.SourceFunction;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 // Note: We couldn't directly tell the CFLManager from the driver, because it is important
 // that these calls to the CFLManager happen on the TMs.
-public class KickoffSource implements SourceFunction<Unit> {
+public class KickoffSource extends RichSourceFunction<Unit> {
 
 	private static final Logger LOG = LoggerFactory.getLogger(KickoffSource.class);
 
@@ -42,7 +43,8 @@ public class KickoffSource implements SourceFunction<Unit> {
 	@Override
 	public void run(SourceContext sourceContext) throws Exception {
 		LOG.info("KickoffSource kicking off");
-		CFLManager cflManager = CFLManager.getSing();
+		//CFLManager cflManager = CFLManager.getSing();
+		CFLManager cflManager = ((StreamingRuntimeContext)getRuntimeContext()).getCFLManager();
 
 		//cflManager.resetCFL(); // I moved this to TaskManager.scala
 		cflManager.specifyTerminalBB(terminalBBId);

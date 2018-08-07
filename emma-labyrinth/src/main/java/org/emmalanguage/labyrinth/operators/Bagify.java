@@ -18,6 +18,7 @@ package org.emmalanguage.labyrinth.operators;
 
 import eu.stratosphere.labyrinth.BagID;
 import eu.stratosphere.labyrinth.CFLManager;
+import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.emmalanguage.labyrinth.ElementOrEvent;
 import org.emmalanguage.labyrinth.partitioners.Partitioner;
 import org.apache.flink.streaming.api.graph.StreamConfig;
@@ -71,7 +72,8 @@ public class Bagify<T>
         subpartitionId = (short)getRuntimeContext().getIndexOfThisSubtask();
         sentStart = new boolean[partitioner.targetPara];
 
-        cflMan = CFLManager.getSing();
+        //cflMan = CFLManager.getSing();
+        cflMan = getRuntimeContext().getCFLManager();
     }
 
 

@@ -20,6 +20,7 @@ package org.emmalanguage.labyrinth;
 import eu.stratosphere.labyrinth.BagID;
 import eu.stratosphere.labyrinth.CFLCallback;
 import eu.stratosphere.labyrinth.CFLManager;
+import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
 import org.emmalanguage.labyrinth.operators.ReusingBagOperator;
 import org.emmalanguage.labyrinth.operators.BagOperator;
 import org.emmalanguage.labyrinth.operators.DontThrowAwayInputBufs;
@@ -178,7 +179,8 @@ public class BagOperatorHost<IN, OUT>
 
 		es = Executors.newSingleThreadExecutor();
 
-		cflMan = CFLManager.getSing();
+		//cflMan = CFLManager.getSing();
+		cflMan = getRuntimeContext().getCFLManager();
 
 		cflMan.specifyTerminalBB(terminalBBId);
 		cflMan.specifyNumToSubscribe(cflConfig.numToSubscribe);
