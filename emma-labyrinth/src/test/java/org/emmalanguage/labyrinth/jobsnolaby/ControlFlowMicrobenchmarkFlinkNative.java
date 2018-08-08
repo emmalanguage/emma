@@ -16,6 +16,8 @@
 
 package org.emmalanguage.labyrinth.jobsnolaby;
 
+import org.apache.flink.api.common.functions.Partitioner;
+import org.apache.flink.api.java.functions.KeySelector;
 import org.emmalanguage.labyrinth.util.TestFailedException;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.RichFlatMapFunction;
@@ -26,7 +28,9 @@ import org.apache.flink.api.java.operators.IterativeDataSet;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 /**
  * // BB 0
@@ -39,21 +43,34 @@ import java.util.Arrays;
  * assert i == 100
  */
 
-public class SimpleCFFlinkNative {
+public class ControlFlowMicrobenchmarkFlinkNative {
 
 	public static void main(String[] args) throws Exception {
 		ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 
 		//env.getConfig().setParallelism(1);
 
-		final int n = Integer.parseInt(args[0]);
+		final int numSteps = Integer.parseInt(args[0]);
+		final int numElements = Integer.parseInt(args[1]);
 
+		List<Integer> coll = new ArrayList<>(numElements);
+		for (int i = 0; i < numElements; i++) {
+			coll.add(i);
+		}
 
-		Integer[] input = new Integer[]{0};
+		DataSet<Integer> in = env.fromCollection(coll).setParallelism(env.getParallelism()).partitionCustom(new Partitioner<Integer>() {
+			@Override
+			public int partition(Integer x, int numParts) {
+				return x % numParts;
+			}
+		}, new KeySelector<Integer, Integer>() {
+			@Override
+			public Integer getKey(Integer x) throws Exception {
+				return x;
+			}
+		});
 
-		DataSet<Integer> in = env.fromCollection(Arrays.asList(input));
-
-		IterativeDataSet<Integer> it = in.iterate(n);
+		IterativeDataSet<Integer> it = in.iterate(numSteps);
 
 		DataSet<Integer> inced = it.map(new MapFunction<Integer, Integer>() {
 			@Override
@@ -63,6 +80,7 @@ public class SimpleCFFlinkNative {
 		});
 
 		DataSet<Integer> res = it.closeWith(inced);
+
 
 		res.flatMap(new RichFlatMapFunction<Integer, Object>() {
 
@@ -75,7 +93,7 @@ public class SimpleCFFlinkNative {
 
 			@Override
 			public void close() throws Exception {
-				if (cnt != 1) {
+				if (cnt != numElements) {
 					throw new TestFailedException("Received " + cnt + " number of elements, instead of 1");
 				}
 			}
@@ -83,13 +101,10 @@ public class SimpleCFFlinkNative {
 			@Override
 			public void flatMap(Integer i, Collector<Object> collector) throws Exception {
 				cnt++;
-				if (i != n) {
-					throw new TestFailedException("Received record " + i + " instead of " + n);
-				}
 			}
 		}).setParallelism(1).output(new DiscardingOutputFormat<>());
 
-		System.out.println(env.getExecutionPlan());
+		//System.out.println(env.getExecutionPlan());
 		env.execute();
 	}
 }

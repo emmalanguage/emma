@@ -17,36 +17,54 @@
 package org.emmalanguage.labyrinth.jobsnolaby;
 
 import org.apache.flink.api.common.functions.MapFunction;
+import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.java.DataSet;
 import org.apache.flink.api.java.ExecutionEnvironment;
+import org.apache.flink.api.java.functions.KeySelector;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
  * // BB 0
  * i = 1
+ * coll = <200 elements>
  * do {
  *     // BB 1
  *     i = i + 1
+ *     coll.map{x => x + 1}
  * } while (i < 100)
  * // BB 2
- * assert i == 100
  */
 
-public class SimpleCFNewjobs {
+public class ControlFlowMicrobenchmarkNewJobs {
 
 	public static void main(String[] args) throws Exception {
 		ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();
 
 		//env.getConfig().setParallelism(1);
 
-		final int n = Integer.parseInt(args[0]);
+		final int numSteps = Integer.parseInt(args[0]);
+		final int numElements = Integer.parseInt(args[1]);
 
-		int i = 0;
+		List<Integer> coll = new ArrayList<>(numElements);
+		for (int i = 0; i < numElements; i++) {
+			coll.add(i);
+		}
 
-		for (int cnt=0; cnt<n; cnt++) {
+		for (int i=0; i < numSteps; i++) {
 
-			DataSet<Integer> ds = env.fromElements(i).setParallelism(env.getParallelism());
+			DataSet<Integer> ds = env.fromCollection(coll).setParallelism(env.getParallelism()).partitionCustom(new Partitioner<Integer>() {
+				@Override
+				public int partition(Integer x, int numParts) {
+					return x % numParts;
+				}
+			}, new KeySelector<Integer, Integer>() {
+				@Override
+				public Integer getKey(Integer x) throws Exception {
+					return x;
+				}
+			});
 
 			DataSet<Integer> inced = ds.map(new MapFunction<Integer, Integer>() {
 				@Override
@@ -55,15 +73,8 @@ public class SimpleCFNewjobs {
 				}
 			});
 
-//			inced.output(new DiscardingOutputFormat<>()).setParallelism(1);
-//			System.out.println(env.getExecutionPlan());
-//			assert false;
-
-			List<Integer> collected = inced.collect();
-			assert collected.size() == 1;
-			i = collected.get(0);
+			coll = inced.collect();
+			assert coll.size() == numElements;
 		}
-
-		assert i == n;
 	}
 }
