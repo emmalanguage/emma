@@ -107,7 +107,7 @@ public class ControlFlowMicrobenchmark {
 						.setParallelism(1);
 
 		LabyNode<Integer, Integer> inced2 =
-				new LabyNode<>("inc-map2", new IncMap(), 1, new Forward<>(env.getParallelism()), integerSer, integerTypeInfo)
+				new LabyNode<>("IncMapSynced", new IncMapSynced(), 1, new Forward<>(env.getParallelism()), integerSer, integerTypeInfo)
 						.addInput(phi2, true, false);
 
 		phi.addInput(inced, false, true);
