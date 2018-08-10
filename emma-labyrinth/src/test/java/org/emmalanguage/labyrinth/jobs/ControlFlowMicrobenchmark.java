@@ -93,20 +93,22 @@ public class ControlFlowMicrobenchmark {
 						.addInput(inputBag2, true);
 
 		LabyNode<Integer, Integer> phi =
-				LabyNode.phi("phi", 1, new Random<>(env.getParallelism()), integerSer, integerTypeInfo)
-						.addInput(inputBag, false);
+				LabyNode.phi("phi", 1, new Always0<>(1), integerSer, integerTypeInfo)
+						.addInput(inputBag, false)
+						.setParallelism(1);
 
 		LabyNode<Integer, Integer> phi2 =
 				LabyNode.phi("phi2", 1, new Forward<>(env.getParallelism()), integerSer, integerTypeInfo)
 						.addInput(inputBag2Partitioned, false, true);
 
 		LabyNode<Integer, Integer> inced =
-				new LabyNode<>("inc-map", new IncMap(), 1, new Random<>(env.getParallelism()), integerSer, integerTypeInfo)
-						.addInput(phi, true, false);
+				new LabyNode<>("inc-map", new IncMap(), 1, new Always0<>(1), integerSer, integerTypeInfo)
+						.addInput(phi, true, false)
+						.setParallelism(1);
 
 		LabyNode<Integer, Integer> inced2 =
 				new LabyNode<>("inc-map2", new IncMap(), 1, new Forward<>(env.getParallelism()), integerSer, integerTypeInfo)
-						.addInput(phi, true, false);
+						.addInput(phi2, true, false);
 
 		phi.addInput(inced, false, true);
 
@@ -122,10 +124,10 @@ public class ControlFlowMicrobenchmark {
 						.addInput(smallerThan, true, false)
 						.setParallelism(1);
 
-		LabyNode<Integer, Unit> assertEquals =
-				new LabyNode<>("Check i == " + n, new AssertEquals<>(n), 2, new Always0<>(1), integerSer, unitTypeInfo)
-					.addInput(inced, false, true)
-					.setParallelism(1);
+//		LabyNode<Integer, Unit> assertEquals =
+//				new LabyNode<>("Check i == " + n, new AssertEquals<>(n), 2, new Always0<>(1), integerSer, unitTypeInfo)
+//					.addInput(inced, false, true)
+//					.setParallelism(1);
 
 
 		LabyNode.translateAll(env);
