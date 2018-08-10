@@ -237,7 +237,8 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
 
             inputStream = inputStream
                     .map(new LogicalInputIdFiller<>(forward.index))
-                    .iterate(1000000000L);
+                    .iterate(1000000000L)
+                    .setParallelism(parallelism); // This is good to have, for example, when the phi node has 1 para
             iterativeStream = (IterativeStream)inputStream;
 
             assert bagOpHost instanceof PhiNode;
@@ -295,7 +296,8 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
             if (flinkStream instanceof SplitStream) {
                 maybeSelected = ((SplitStream<ElementOrEvent<OUT>>)maybeSelected).select(((Integer)c.splitID).toString());
             }
-            DataStream<ElementOrEvent<OUT>> toCloseWith = maybeSelected.map(new LogicalInputIdFiller<>(c.index));
+            DataStream<ElementOrEvent<OUT>> toCloseWith = maybeSelected.map(new LogicalInputIdFiller<>(c.index))
+                    .setParallelism(c.iterativeStream.getParallelism());
             try {
                 c.iterativeStream.closeWith(toCloseWith);
             } catch (UnsupportedOperationException ex) {
