@@ -946,7 +946,7 @@ public class BagOperatorHost<IN, OUT>
 
 		class Buffer {
 			SerializedBuffer<T> elements;
-			BagID bagID;
+			final BagID bagID;
 
 			Buffer(BagID bagID) {
 				this.elements = new SerializedBuffer<T>(ser);
@@ -954,15 +954,16 @@ public class BagOperatorHost<IN, OUT>
 			}
 		}
 
-		ArrayList<Buffer> buffers;
+		final ArrayList<Buffer> buffers;
 
 		Status status;
 
 		boolean damming;
 
-		TypeSerializer<T> ser;
+		final TypeSerializer<T> ser;
 
 		private final boolean throwAwayOldBufs;
+		private int thrown = 0; // has already thrown away all input bufs before this
 
 		InputSubpartition(TypeSerializer<T> ser, boolean throwAwayOldBufs) {
 			this.ser = ser;
@@ -979,11 +980,20 @@ public class BagOperatorHost<IN, OUT>
 				// Setting elements to null instead of throwing the buffer away ensures that we easily notice if this assumption is violated.
 				// Note: We set up the conditional outputs in such a way that we never send a buffer that won't be ever be used,
 				// so the consumeStarted condition shouldn't pin stuff forever.
-				for (int i = 0; i < buffers.size() - 2; i++) {
+				boolean allNullSoFar = true;
+				for (int i = thrown; i < buffers.size() - 2; i++) {
 					Buffer bufI = buffers.get(i);
 					if (bufI.elements != null && bufI.elements.consumeStarted) { // throw away only if it was already used
 						bufI.elements = null;
 					}
+
+					if (allNullSoFar && bufI.elements != null) {
+						allNullSoFar = false;
+						thrown = i;
+					}
+				}
+				if (allNullSoFar) {
+					thrown = Math.max(0, buffers.size() - 2);
 				}
 			}
 

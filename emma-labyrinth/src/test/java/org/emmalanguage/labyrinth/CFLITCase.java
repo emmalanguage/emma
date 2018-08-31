@@ -18,6 +18,7 @@ package org.emmalanguage.labyrinth;
 
 import org.emmalanguage.labyrinth.jobs.ClickCountDiffs;
 import org.emmalanguage.labyrinth.jobs.ClickCountDiffsScala;
+import org.emmalanguage.labyrinth.jobs.ControlFlowMicrobenchmark;
 import org.emmalanguage.labyrinth.jobsold.NoCF;
 import org.emmalanguage.labyrinth.jobsold.SimpleCF;
 import org.emmalanguage.labyrinth.inputgen.ClickCountDiffsInputGen;
@@ -130,6 +131,13 @@ public class CFLITCase {
 
         int[] exp = new int[]{1010, 1032, 981, 977, 978, 981, 988, 987, 958, 997, 985, 994, 1001, 987, 1007, 971, 960, 976, 1025, 1022, 971, 993, 997, 996, 1038, 985, 974, 999, 1020};
         ClickCountDiffsInputGen.checkLabyOut(path, numDays, exp);
+    }
+
+    @Test(expected=JobCancellationException.class)
+    public void testControlFlowMicrobenchmark() throws Exception {
+        LabyNode.labyNodes.clear();
+
+        ControlFlowMicrobenchmark.main(new String[]{"100", "200"});
     }
 
 //    @Test()
