@@ -31,6 +31,7 @@ import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.datastream.IterativeStream;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.datastream.SplitStream;
+import scala.xml.Elem;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -237,8 +238,10 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
 
             inputStream = inputStream
                     .map(new LogicalInputIdFiller<>(forward.index))
-                    .iterate(1000000000L)
-                    .setParallelism(parallelism); // This is good to have, for example, when the phi node has 1 para
+                    .iterate(1000000000L);
+            if (parallelism != -1) {
+                inputStream = ((IterativeStream)inputStream).setParallelism(parallelism); // This is good to have, for example, when the phi node has 1 para
+            }
             iterativeStream = (IterativeStream)inputStream;
 
             assert bagOpHost instanceof PhiNode;
@@ -296,8 +299,11 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
             if (flinkStream instanceof SplitStream) {
                 maybeSelected = ((SplitStream<ElementOrEvent<OUT>>)maybeSelected).select(((Integer)c.splitID).toString());
             }
-            DataStream<ElementOrEvent<OUT>> toCloseWith = maybeSelected.map(new LogicalInputIdFiller<>(c.index))
-                    .setParallelism(c.iterativeStream.getParallelism());
+            DataStream<ElementOrEvent<OUT>> toCloseWith = maybeSelected.map(new LogicalInputIdFiller<>(c.index));
+            int paraToSet = c.iterativeStream.getParallelism();
+            if (paraToSet != -1) {
+                ((SingleOutputStreamOperator<ElementOrEvent<OUT>>)toCloseWith).setParallelism(c.iterativeStream.getParallelism());
+            }
             try {
                 c.iterativeStream.closeWith(toCloseWith);
             } catch (UnsupportedOperationException ex) {
