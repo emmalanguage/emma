@@ -547,9 +547,9 @@ public class BagOperatorHost<IN, OUT>
 
 	private class MyCFLCallback implements CFLCallback {
 
-		public void notify(List<Integer> cfl0) {
+		public void notify(List<Integer> cfl) {
 			synchronized (es) {
-				List<Integer> cfl = new ArrayList<>(cfl0);
+				//List<Integer> cfl = new ArrayList<>(cfl0);
 				es.submit(new Runnable() {
 					@Override
 					public void run() {
