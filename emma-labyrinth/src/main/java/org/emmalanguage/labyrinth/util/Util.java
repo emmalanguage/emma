@@ -111,15 +111,16 @@ public class Util {
 	}
 
 	public static void executeWithCatch(StreamExecutionEnvironment env) throws Exception {
+		// This doesn't work as intended in cluster execution...
 		try {
-			try {
+//			try {
 				env.execute();
-			} catch (ProgramInvocationException ex) { // This is thrown when executing on the cluster.
-				if (ex.getCause() instanceof JobCancellationException)
-					return; // OK
-				else
-					throw ex;
-			}
+//			} catch (ProgramInvocationException ex) { // This is thrown when executing on the cluster.
+//				if (ex.getCause() instanceof JobCancellationException)
+//					return; // OK
+//				else
+//					throw ex;
+//			}
 		} catch (JobCancellationException ex) { // This is thrown when executing from the IDE
 			return; // OK
 		}
