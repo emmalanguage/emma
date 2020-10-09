@@ -36,6 +36,7 @@ import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.api.java.typeutils.PojoTypeInfo;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
+import org.emmalanguage.labyrinth.util.Util;
 
 import java.util.Arrays;
 
@@ -108,6 +109,6 @@ public class SimpleCF {
 		LabyNode.translateAll(env);
 
 		System.out.println(env.getExecutionPlan());
-		env.execute();
+		Util.executeWithCatch(env);
 	}
 }

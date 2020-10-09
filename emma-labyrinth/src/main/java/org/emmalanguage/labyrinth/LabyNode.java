@@ -16,6 +16,7 @@
 
 package org.emmalanguage.labyrinth;
 
+import org.apache.flink.runtime.client.JobCancellationException;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.emmalanguage.labyrinth.partitioners.Always0;
 import org.emmalanguage.labyrinth.operators.BagOperator;

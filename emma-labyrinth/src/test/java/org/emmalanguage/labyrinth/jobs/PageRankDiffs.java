@@ -29,16 +29,13 @@ import org.emmalanguage.labyrinth.partitioners.Always0;
 import org.emmalanguage.labyrinth.partitioners.Broadcast;
 import org.emmalanguage.labyrinth.partitioners.RoundRobin;
 import org.emmalanguage.labyrinth.partitioners.TupleIntIntBy0;
-import org.emmalanguage.labyrinth.util.TupleIntDouble;
-import org.emmalanguage.labyrinth.util.TupleIntIntInt;
+import org.emmalanguage.labyrinth.util.*;
 import org.emmalanguage.labyrinth.CFLConfig;
 import org.emmalanguage.labyrinth.KickoffSource;
 import org.emmalanguage.labyrinth.partitioners.Forward;
 import org.emmalanguage.labyrinth.partitioners.IntegerBy0;
 import org.emmalanguage.labyrinth.partitioners.Tuple2by0;
 import org.emmalanguage.labyrinth.partitioners.TupleIntDoubleBy0;
-import org.emmalanguage.labyrinth.util.TupleIntInt;
-import org.emmalanguage.labyrinth.util.Unit;
 import org.apache.flink.api.common.ExecutionConfig;
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
@@ -636,7 +633,7 @@ public class PageRankDiffs {
         LabyNode.translateAll(env);
 
         System.out.println(env.getExecutionPlan());
-        env.execute();
+        Util.executeWithCatch(env);
 
         long endTime = System.nanoTime();
         System.out.println("Time: " + (endTime-startTime)/1000000000);

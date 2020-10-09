@@ -37,6 +37,7 @@ import org.emmalanguage.labyrinth.operators.*;
 import org.emmalanguage.labyrinth.partitioners.*;
 import org.emmalanguage.labyrinth.util.TupleIntInt;
 import org.emmalanguage.labyrinth.util.Unit;
+import org.emmalanguage.labyrinth.util.Util;
 
 import java.util.Collections;
 
@@ -240,7 +241,6 @@ public class ClickCountDiffsNoJoin {
 
         LabyNode.printOperatorIDNameMapping();
         LabyNode.translateAll(env);
-
-        env.execute();
+        Util.executeWithCatch(env);
     }
 }

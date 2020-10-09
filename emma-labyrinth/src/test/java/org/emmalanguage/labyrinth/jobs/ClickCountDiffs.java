@@ -53,6 +53,7 @@ import org.apache.flink.core.fs.Path;
 import org.apache.flink.streaming.api.datastream.DataStream;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.sink.DiscardingSink;
+import org.emmalanguage.labyrinth.util.Util;
 
 import java.util.Collections;
 
@@ -264,7 +265,6 @@ public class ClickCountDiffs {
         // Itt nincs semmi operator. (A kiirast a BB 2-ben csinaljuk.)
 
         LabyNode.translateAll(env);
-
-        env.execute();
+        Util.executeWithCatch(env);
     }
 }

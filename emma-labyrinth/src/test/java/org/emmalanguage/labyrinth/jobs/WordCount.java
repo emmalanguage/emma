@@ -31,6 +31,7 @@ import org.apache.flink.util.Collector;
 import org.emmalanguage.labyrinth.operators.FlatMap;
 import org.emmalanguage.labyrinth.operators.GroupByString0Count1;
 import org.emmalanguage.labyrinth.operators.Print;
+import org.emmalanguage.labyrinth.util.Util;
 
 import java.util.Arrays;
 
@@ -138,6 +139,6 @@ public class WordCount {
 		LabyNode.translateAll(env);
 
 		System.out.println(env.getExecutionPlan());
-		env.execute();
+		Util.executeWithCatch(env);
 	}
 }

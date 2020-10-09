@@ -31,6 +31,7 @@ import org.emmalanguage.labyrinth.partitioners.Random;
 import org.emmalanguage.labyrinth.partitioners.RoundRobin;
 import org.emmalanguage.labyrinth.util.TupleIntInt;
 import org.emmalanguage.labyrinth.util.Unit;
+import org.emmalanguage.labyrinth.util.Util;
 
 import java.util.Arrays;
 
@@ -132,6 +133,6 @@ public class ControlFlowMicrobenchmark {
 		LabyNode.translateAll(env);
 
 		System.out.println(env.getExecutionPlan());
-		env.execute();
+		Util.executeWithCatch(env);
 	}
 }
