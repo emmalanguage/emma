@@ -18,6 +18,7 @@ package org.emmalanguage.labyrinth.util;
 
 import org.apache.flink.api.common.typeinfo.TypeHint;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
+import org.apache.flink.client.program.ProgramInvocationException;
 import org.apache.flink.runtime.client.JobCancellationException;
 import org.apache.flink.runtime.net.ConnectionUtils;
 import org.apache.flink.streaming.api.environment.LocalStreamEnvironment;
@@ -111,8 +112,15 @@ public class Util {
 
 	public static void executeWithCatch(StreamExecutionEnvironment env) throws Exception {
 		try {
-			env.execute();
-		} catch (JobCancellationException ex) {
+			try {
+				env.execute();
+			} catch (ProgramInvocationException ex) { // This is thrown when executing on the cluster.
+				if (ex.getCause() instanceof JobCancellationException)
+					return; // OK
+				else
+					throw ex;
+			}
+		} catch (JobCancellationException ex) { // This is thrown when executing from the IDE
 			return; // OK
 		}
 		throw new RuntimeException(); // The job has to finish with JobCancellationException.
