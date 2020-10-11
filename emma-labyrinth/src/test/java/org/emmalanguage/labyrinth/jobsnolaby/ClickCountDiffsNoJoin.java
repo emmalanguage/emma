@@ -61,9 +61,7 @@ public class ClickCountDiffsNoJoin {
 					.types(IntValue.class);
 
 			DataSet<Tuple2<IntValue, IntValue>> counts = visits.map(new MapFunction<Tuple1<IntValue>, Tuple2<IntValue, IntValue>>() {
-
 				Tuple2<IntValue, IntValue> reuse = Tuple2.of(new IntValue(-1),new IntValue(1));
-
 				@Override
 				public Tuple2<IntValue, IntValue> map(Tuple1<IntValue> value) throws Exception {
 					reuse.f0 = value.f0;
@@ -76,11 +74,8 @@ public class ClickCountDiffsNoJoin {
 				DataSet<Tuple2<IntValue, IntValue>> yesterdayCounts = env.readCsvFile(yesterdayCountsTmpFilename).types(IntValue.class, IntValue.class);
 
 				DataSet<Tuple1<IntValue>> diffs = counts.fullOuterJoin(yesterdayCounts).where(0).equalTo(0).with(new JoinFunction<Tuple2<IntValue,IntValue>, Tuple2<IntValue,IntValue>, Tuple1<IntValue>>() {
-
 					Tuple2<IntValue, IntValue> nulla = Tuple2.of(new IntValue(0),new IntValue(0));
-
 					Tuple1<IntValue> reuse = Tuple1.of(new IntValue(-1));
-
 					@Override
 					public Tuple1<IntValue> join(Tuple2<IntValue, IntValue> first, Tuple2<IntValue, IntValue> second) throws Exception {
 						if (first == null) {
@@ -99,7 +94,7 @@ public class ClickCountDiffsNoJoin {
 					public String map(Tuple1<IntValue> integerTuple1) throws Exception {
 						return integerTuple1.f0.toString();
 					}
-				}).setParallelism(1).writeAsText(pref + "out_nojoin/expected/diff_" + day, FileSystem.WriteMode.OVERWRITE);
+				}).setParallelism(1).writeAsText(pref + "out_nojoin/flinksep/diff_" + day, FileSystem.WriteMode.OVERWRITE);
 			}
 
 			// Workaround for https://issues.apache.org/jira/browse/FLINK-1268
