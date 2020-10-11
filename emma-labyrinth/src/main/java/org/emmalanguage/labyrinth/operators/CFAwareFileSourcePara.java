@@ -54,7 +54,8 @@ public abstract class CFAwareFileSourcePara<OT, IS extends InputSplit>
         InputFormat<OT, IS> inputFormat = getInputFormatFromFilename(filename);
         try {
             assert host.outs.size() == 1;
-            for(IS inputSplit: inputFormat.createInputSplits(host.outs.get(0).partitioner.targetPara)) {
+            IS[] splits = inputFormat.createInputSplits(host.outs.get(0).partitioner.targetPara);
+            for(IS inputSplit: splits) {
                 out.collectElement(new InputFormatWithInputSplit<>(inputFormat, inputSplit));
             }
         } catch (IOException e) {
