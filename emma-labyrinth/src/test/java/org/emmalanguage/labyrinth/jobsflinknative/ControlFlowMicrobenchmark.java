@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.emmalanguage.labyrinth.jobsnolaby;
+package org.emmalanguage.labyrinth.jobsflinknative;
 
 import org.apache.flink.api.common.functions.Partitioner;
 import org.apache.flink.api.java.functions.KeySelector;
@@ -29,7 +29,6 @@ import org.apache.flink.configuration.Configuration;
 import org.apache.flink.util.Collector;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 /**
@@ -43,7 +42,7 @@ import java.util.List;
  * assert i == 100
  */
 
-public class ControlFlowMicrobenchmarkFlinkNative {
+public class ControlFlowMicrobenchmark {
 
 	public static void main(String[] args) throws Exception {
 		ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();

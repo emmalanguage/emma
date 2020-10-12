@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.emmalanguage.labyrinth.jobsnolaby;
+package org.emmalanguage.labyrinth.jobsflinksep;
 
 import org.apache.flink.api.common.functions.FlatJoinFunction;
 import org.apache.flink.api.common.functions.JoinFunction;
@@ -115,7 +115,7 @@ public class ClickCountDiffs {
 					public String map(Tuple1<IntValue> integerTuple1) throws Exception {
 						return integerTuple1.f0.toString();
 					}
-				}).setParallelism(1).writeAsText(pref + "out/expected/diff_" + day, FileSystem.WriteMode.OVERWRITE);
+				}).setParallelism(1).writeAsText(pref + "out/flinksep/diff_" + day, FileSystem.WriteMode.OVERWRITE);
 			}
 
 			// Workaround for https://issues.apache.org/jira/browse/FLINK-1268

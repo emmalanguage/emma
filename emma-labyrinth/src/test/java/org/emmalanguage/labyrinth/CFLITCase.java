@@ -16,9 +16,9 @@
 
 package org.emmalanguage.labyrinth;
 
-import org.emmalanguage.labyrinth.jobs.ClickCountDiffs;
 import org.emmalanguage.labyrinth.jobs.ClickCountDiffsScala;
 import org.emmalanguage.labyrinth.jobs.ControlFlowMicrobenchmark;
+import org.emmalanguage.labyrinth.jobsflinksep.ClickCountDiffs;
 import org.emmalanguage.labyrinth.jobsold.NoCF;
 import org.emmalanguage.labyrinth.jobsold.SimpleCF;
 import org.emmalanguage.labyrinth.inputgen.ClickCountDiffsInputGen;
@@ -91,7 +91,7 @@ public class CFLITCase {
 
         boolean exceptionReceived = false;
         try {
-            ClickCountDiffs.main(new String[]{path, Integer.toString(numDays), "true"});
+            org.emmalanguage.labyrinth.jobs.ClickCountDiffs.main(new String[]{path, Integer.toString(numDays), "true"});
         } catch (JobCancellationException ex) {
             exceptionReceived = true;
         }
@@ -103,7 +103,7 @@ public class CFLITCase {
         ClickCountDiffsInputGen.checkLabyOut(path, numDays, exp);
 
         int nocflNumDays = numDays/10;
-        org.emmalanguage.labyrinth.jobsnolaby.ClickCountDiffs.main(new String[]{path, Integer.toString(nocflNumDays)});
+        ClickCountDiffs.main(new String[]{path, Integer.toString(nocflNumDays)});
         ClickCountDiffsInputGen.checkNocflOut(path, nocflNumDays, exp);
     }
 

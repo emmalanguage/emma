@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.emmalanguage.labyrinth.jobsnolaby;
+package org.emmalanguage.labyrinth.jobsflinksep;
 
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.Partitioner;
@@ -37,7 +37,7 @@ import java.util.List;
  * // BB 2
  */
 
-public class ControlFlowMicrobenchmarkNewJobs {
+public class ControlFlowMicrobenchmark {
 
 	public static void main(String[] args) throws Exception {
 		ExecutionEnvironment env = ExecutionEnvironment.getExecutionEnvironment();

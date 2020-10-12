@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.emmalanguage.labyrinth.jobsnolaby;
+package org.emmalanguage.labyrinth.jobsflinknative;
 
 import org.apache.flink.api.common.functions.*;
 import org.apache.flink.api.common.io.InputFormat;
@@ -32,19 +32,15 @@ import org.apache.flink.types.IntValue;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.xerial.snappy.buffer.BufferAllocator;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.net.URI;
-import java.util.function.Function;
 
 
-public class ClickCountDiffsNoJoinNative {
+public class ClickCountDiffsNoJoin {
 
-	private static final Logger LOG = LoggerFactory.getLogger(ClickCountDiffsNoJoinNative.class);
+	private static final Logger LOG = LoggerFactory.getLogger(ClickCountDiffsNoJoin.class);
 
 	// /home/ggevay/Dropbox/cfl_testdata/ClickCount 4
 	public static void main(String[] args) throws Exception {

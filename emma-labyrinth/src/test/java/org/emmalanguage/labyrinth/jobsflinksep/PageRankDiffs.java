@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package org.emmalanguage.labyrinth.jobsnolaby;
+package org.emmalanguage.labyrinth.jobsflinksep;
 
 import org.apache.flink.api.common.functions.*;
 import org.apache.flink.api.common.operators.base.ReduceOperatorBase;
