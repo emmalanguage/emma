@@ -233,7 +233,7 @@ public class ClickCountDiffs {
                 .setParallelism(1);
 
         LabyNode<Integer, Unit> printSum =
-                new LabyNode<>("printSum", new CFAwareFileSink(pref + "out/diff_"), 2, new Always0<>(1), integerSer, TypeInformation.of(new TypeHint<ElementOrEvent<Unit>>(){}))
+                new LabyNode<>("printSum", new CFAwareFileSink(pref + "out/laby/diff_"), 2, new Always0<>(1), integerSer, TypeInformation.of(new TypeHint<ElementOrEvent<Unit>>(){}))
                 .addInput(day_2, false, true)
                 .addInput(sum, true, false)
                 .setParallelism(1);

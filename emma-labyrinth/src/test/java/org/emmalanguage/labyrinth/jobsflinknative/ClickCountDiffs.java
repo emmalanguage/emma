@@ -16,7 +16,10 @@
 
 package org.emmalanguage.labyrinth.jobsflinknative;
 
-import org.apache.flink.api.common.functions.*;
+import org.apache.flink.api.common.functions.FlatJoinFunction;
+import org.apache.flink.api.common.functions.FlatMapFunction;
+import org.apache.flink.api.common.functions.JoinFunction;
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.io.InputFormat;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.DataSet;
@@ -27,7 +30,10 @@ import org.apache.flink.api.java.operators.IterativeDataSet;
 import org.apache.flink.api.java.tuple.Tuple1;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.TupleTypeInfo;
-import org.apache.flink.core.fs.*;
+import org.apache.flink.core.fs.FSDataOutputStream;
+import org.apache.flink.core.fs.FileInputSplit;
+import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.core.fs.Path;
 import org.apache.flink.types.IntValue;
 import org.apache.flink.util.Collector;
 import org.slf4j.Logger;
@@ -38,9 +44,9 @@ import java.io.OutputStreamWriter;
 import java.net.URI;
 
 
-public class ClickCountDiffsNoJoin {
+public class ClickCountDiffs {
 
-	private static final Logger LOG = LoggerFactory.getLogger(ClickCountDiffsNoJoin.class);
+	private static final Logger LOG = LoggerFactory.getLogger(ClickCountDiffs.class);
 
 	// /home/ggevay/Dropbox/cfl_testdata/ClickCount 4
 	public static void main(String[] args) throws Exception {
@@ -54,24 +60,39 @@ public class ClickCountDiffsNoJoin {
 
 		final int days = Integer.parseInt(args[1]); // 365
 
+		DataSet<Tuple2<IntValue, IntValue>> pageAttributes = env.readCsvFile(pref + "in/pageAttributes.tsv")
+				.fieldDelimiter("\t")
+				.lineDelimiter("\n")
+				.types(IntValue.class, IntValue.class);
+
 		// Dummy yesterdayCounts for the first iteration, because we can't do the if
 		DataSet<Tuple2<IntValue, IntValue>> initYesterdayCounts = env.fromElements(Tuple2.of(new IntValue(-1), new IntValue(0)));
 
 		IterativeDataSet<Tuple2<IntValue, IntValue>> yesterdayCounts = initYesterdayCounts.iterate(days);
 
-		final TupleTypeInfo<Tuple1<Integer>> typeInfo = new TupleTypeInfo<>(TypeInformation.of(Integer.class));
-		DataSet<Tuple1<Integer>> visits = yesterdayCounts.readFile(new MapFunction<Integer, InputFormat<Tuple1<Integer>, FileInputSplit>>() {
+		final TupleTypeInfo<Tuple1<IntValue>> typeInfo = new TupleTypeInfo<>(TypeInformation.of(IntValue.class));
+		DataSet<Tuple1<IntValue>> visits = yesterdayCounts.readFile(new MapFunction<Integer, InputFormat<Tuple1<IntValue>, FileInputSplit>>() {
 			@Override
-			public InputFormat<Tuple1<Integer>, FileInputSplit> map(Integer day) {
+			public InputFormat<Tuple1<IntValue>, FileInputSplit> map(Integer day) {
 				return new TupleCsvInputFormat<>(new Path(pref + "in/clickLog_" + day), "\n", "\t", typeInfo);
 			}
 		}, typeInfo);
 
-		DataSet<Tuple2<IntValue, IntValue>> counts = visits.map(new MapFunction<Tuple1<Integer>, Tuple2<IntValue, IntValue>>() {
+		DataSet<IntValue> visitsFiltered = visits.join(pageAttributes).where(0).equalTo(0).with(new FlatJoinFunction<Tuple1<IntValue>, Tuple2<IntValue, IntValue>, IntValue>() {
+			private final IntValue zero = new IntValue(0);
+			@Override
+			public void join(Tuple1<IntValue> first, Tuple2<IntValue, IntValue> second, Collector<IntValue> out) throws Exception {
+				if (second.f1.equals(zero)) {
+					out.collect(first.f0);
+				}
+			}
+		});
+
+		DataSet<Tuple2<IntValue, IntValue>> counts = visitsFiltered.map(new MapFunction<IntValue, Tuple2<IntValue, IntValue>>() {
 			private final Tuple2<IntValue, IntValue> reuse = Tuple2.of(new IntValue(-1),new IntValue(1));
 			@Override
-			public Tuple2<IntValue, IntValue> map(Tuple1<Integer> value) throws Exception {
-				reuse.f0.setValue(value.f0);
+			public Tuple2<IntValue, IntValue> map(IntValue value) throws Exception {
+				reuse.f0.setValue(value.getValue());
 				return reuse;
 			}
 		}).groupBy(0).sum(1);
@@ -105,7 +126,7 @@ public class ClickCountDiffsNoJoin {
 					public void flatMap(Tuple2<String, Integer> tup, Collector<Object> out) throws Exception {
 						String toWrite = tup.f0;
 						int day = tup.f1;
-						String path = pref + "out_nojoin/native/diff_" + day;
+						String path = pref + "out/native/diff_" + day;
 						LOG.info("Iteration writing file " + path);
 						FileSystem fs = FileSystem.get(new URI(path));
 						FSDataOutputStream stream = fs.create(new Path(path), FileSystem.WriteMode.OVERWRITE);

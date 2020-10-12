@@ -65,9 +65,7 @@ public class ClickCountDiffs {
 					.types(IntValue.class);
 
 			DataSet<IntValue> visitsFiltered = visits.join(pageAttributes).where(0).equalTo(0).with(new FlatJoinFunction<Tuple1<IntValue>, Tuple2<IntValue, IntValue>, IntValue>() {
-
-				IntValue zero = new IntValue(0);
-
+				private final IntValue zero = new IntValue(0);
 				@Override
 				public void join(Tuple1<IntValue> first, Tuple2<IntValue, IntValue> second, Collector<IntValue> out) throws Exception {
 					if (second.f1.equals(zero)) {
@@ -77,9 +75,7 @@ public class ClickCountDiffs {
 			});
 
 			DataSet<Tuple2<IntValue, IntValue>> counts = visitsFiltered.map(new MapFunction<IntValue, Tuple2<IntValue, IntValue>>() {
-
-				Tuple2<IntValue, IntValue> reuse = Tuple2.of(new IntValue(-1),new IntValue(1));
-
+				private final Tuple2<IntValue, IntValue> reuse = Tuple2.of(new IntValue(-1),new IntValue(1));
 				@Override
 				public Tuple2<IntValue, IntValue> map(IntValue value) throws Exception {
 					reuse.f0 = value;
@@ -92,11 +88,8 @@ public class ClickCountDiffs {
 				DataSet<Tuple2<IntValue, IntValue>> yesterdayCounts = env.readCsvFile(yesterdayCountsTmpFilename).types(IntValue.class, IntValue.class);
 
 				DataSet<Tuple1<IntValue>> diffs = counts.fullOuterJoin(yesterdayCounts).where(0).equalTo(0).with(new JoinFunction<Tuple2<IntValue,IntValue>, Tuple2<IntValue,IntValue>, Tuple1<IntValue>>() {
-
-					Tuple2<IntValue, IntValue> nulla = Tuple2.of(new IntValue(0),new IntValue(0));
-
-					Tuple1<IntValue> reuse = Tuple1.of(new IntValue(-1));
-
+					private final Tuple2<IntValue, IntValue> nulla = Tuple2.of(new IntValue(0),new IntValue(0));
+					private final Tuple1<IntValue> reuse = Tuple1.of(new IntValue(-1));
 					@Override
 					public Tuple1<IntValue> join(Tuple2<IntValue, IntValue> first, Tuple2<IntValue, IntValue> second) throws Exception {
 						if (first == null) {
