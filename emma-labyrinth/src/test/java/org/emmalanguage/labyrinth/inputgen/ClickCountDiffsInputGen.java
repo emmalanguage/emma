@@ -16,10 +16,7 @@
 
 package org.emmalanguage.labyrinth.inputgen;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.Writer;
+import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -38,7 +35,7 @@ public class ClickCountDiffsInputGen {
 
     public static String generate(int numProducts, int numDays, String pref, Random rnd, double clicksPerDayRatio) throws IOException {
 
-        pref = pref + Integer.toString(numProducts) + "/";
+        pref = pref + numProducts + "/";
 
         final int numClicksPerDay = (int)(numProducts * clicksPerDayRatio);
 
@@ -52,8 +49,8 @@ public class ClickCountDiffsInputGen {
         int j = 0;
         for (int i=0; i<numProducts; i++) {
             int type = rnd.nextInt(2);
-            wr1.write(Integer.toString(i) + "\t" + Integer.toString(type) + "\n");
-            if (j++ == 1000000) {
+            wr1.write(i + "\t" + type + "\n");
+            if (++j == 1000000) {
                 System.out.println(i);
                 j = 0;
             }
@@ -65,7 +62,7 @@ public class ClickCountDiffsInputGen {
             Writer wr2 = new FileWriter(pref + "in/clickLog_" + day);
             for (int i=0; i<numClicksPerDay; i++) {
                 int click = rnd.nextInt(numProducts);
-                wr2.write(Integer.toString(click) + "\n");
+                wr2.write(click + "\n");
             }
             wr2.close();
         }
@@ -75,7 +72,7 @@ public class ClickCountDiffsInputGen {
 
     static public void checkLabyOut(String path, int numDays, int[] expected) throws IOException {
         for (int i = 2; i <= numDays; i++) {
-            String actString = readFile(path + "/out/diff_" + Integer.toString(i), StandardCharsets.UTF_8);
+            String actString = readFile(path + "/out/diff_" + i, StandardCharsets.UTF_8);
             int act = Integer.parseInt(actString.trim());
             if (act != expected[i - 2]) {
                 throw new RuntimeException("ClickCountDiffs output is incorrect on day " + i);
@@ -85,7 +82,7 @@ public class ClickCountDiffsInputGen {
 
     static public void checkNocflOut(String path, int numDays, int[] expected) throws IOException {
         for (int i = 2; i <= numDays; i++) {
-            String actString = readFile(path + "/out/expected/diff_" + Integer.toString(i), StandardCharsets.UTF_8);
+            String actString = readFile(path + "/out/expected/diff_" + i, StandardCharsets.UTF_8);
             int act = Integer.parseInt(actString.trim());
             if (act != expected[i - 2]) {
                 throw new RuntimeException("ClickCountDiffs output is incorrect on day " + i);
