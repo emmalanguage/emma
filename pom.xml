@@ -217,7 +217,7 @@
             </dependency>
             <dependency>
                 <groupId>org.emmalanguage</groupId>
-                <artifactId>emma-labyrinth</artifactId>
+                <artifactId>emma-mitos</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -252,7 +252,7 @@
             </dependency>
             <dependency>
                 <groupId>org.emmalanguage</groupId>
-                <artifactId>emma-examples-labyrinth</artifactId>
+                <artifactId>emma-examples-mitos</artifactId>
                 <version>${project.version}</version>
             </dependency>
             <dependency>
@@ -890,15 +890,15 @@
                 </plugins>
             </build>
         </profile>
-        <!-- Profile that activates Labyrinth. Note that this depends on a custom Flink version: -->
+        <!-- Profile that activates mitos. Note that this depends on a custom Flink version: -->
         <!-- https://github.com/ggevay/flink/tree/CFL -->
         <profile>
-            <id>labyrinth</id>
+            <id>mitos</id>
             <modules>
-                <module>emma-labyrinth</module>
-                <module>emma-examples-labyrinth</module>
+                <module>emma-mitos</module>
+                <module>emma-examples-mitos</module>
             </modules>
-            <!-- Disable maven-notice-plugin when building Labyrinth, because we would need a different NOTICE file -->
+            <!-- Disable maven-notice-plugin when building mitos, because we would need a different NOTICE file -->
             <build>
                 <plugins>
                     <plugin>

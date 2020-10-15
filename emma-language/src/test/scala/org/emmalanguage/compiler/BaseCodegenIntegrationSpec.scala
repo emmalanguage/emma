@@ -73,12 +73,12 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
     actRslt shouldEqual expRslt
   }
 
-  def cancelIfLabyrinth(): Unit = {
-    assume(this.getClass.getSimpleName != "LabyrinthCodegenIntegrationSpec", "Ignored for Labyrinth")
+  def cancelIfmitos(): Unit = {
+    assume(this.getClass.getSimpleName != "mitosCodegenIntegrationSpec", "Ignored for mitos")
   }
 
-  def ignoreForLabyrinth(test: =>Unit): Unit = {
-    cancelIfLabyrinth()
+  def ignoreFormitos(test: =>Unit): Unit = {
+    cancelIfmitos()
     test
   }
 
@@ -123,8 +123,8 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
   // --------------------------------------------------------------------------
 
   "Map" - {
-    // Ignored because the Labyrinth compilation doesn't yet handle closures
-    "primitives" in ignoreForLabyrinth(verify(u.reify {
+    // Ignored because the mitos compilation doesn't yet handle closures
+    "primitives" in ignoreFormitos(verify(u.reify {
       val us = DataBag(1 to 3)
       val vs = DataBag(4 to 6)
       val ws = DataBag(7 to 9)
@@ -139,14 +139,14 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
     }))
 
     // Ignored because it freezes for some reason //fixme: why?
-    "tuples" in ignoreForLabyrinth(verify(u.reify {
+    "tuples" in ignoreFormitos(verify(u.reify {
       for { edge <- DataBag((1, 4, "A") :: (2, 5, "B") :: (3, 6, "C") :: Nil) }
         yield if (edge._1 < edge._2) edge._1 -> edge._2 else edge._2 -> edge._1
     }))
 
     // Ignored because it freezes for some reason //fixme: why?
     "case classes" in {
-      ignoreForLabyrinth(verify(u.reify {
+      ignoreFormitos(verify(u.reify {
         for { edge <- DataBag(graph) } yield
           if (edge.label == "B") LabelledEdge(edge.dst, edge.src, "B")
           else edge.copy(label = "Y")
@@ -184,10 +184,10 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       } yield word
     })
 
-    // Ignored because of a bug in the Labyrinth compilation:
+    // Ignored because of a bug in the mitos compilation:
     // When there are nested lambdas, the compilation gets the inner one out, regardless of the inner one referring to
     // locals of the outer one.
-    "comprehension with correlated result" in ignoreForLabyrinth(verify(u.reify {
+    "comprehension with correlated result" in ignoreFormitos(verify(u.reify {
       for {
         line <- DataBag(jabberwocky)
         word <- DataBag(line split "\\W+")
@@ -199,13 +199,13 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
   // Distinct and Union
   // --------------------------------------------------------------------------
 
-  // Distinct is not yet supported in the Labyrinth compilation
+  // Distinct is not yet supported in the mitos compilation
   "Distinct" - {
-    "strings" in ignoreForLabyrinth(verify(u.reify {
+    "strings" in ignoreFormitos(verify(u.reify {
       DataBag(jabberwocky flatMap { _ split "\\W+" }).distinct
     }))
 
-    "tuples" in ignoreForLabyrinth(verify(u.reify {
+    "tuples" in ignoreFormitos(verify(u.reify {
       DataBag(jabberwocky.flatMap { _ split "\\W+" } map {(_,1)}).distinct
     }))
   }
@@ -294,13 +294,13 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
   // Group (with materialization) and FoldGroup (aggregations)
   // --------------------------------------------------------------------------
 
-  // GroupBy is not yet supported in the Labyrinth compilation
+  // GroupBy is not yet supported in the mitos compilation
   "Group" - {
-    "materialization" in ignoreForLabyrinth(verify(u.reify {
+    "materialization" in ignoreFormitos(verify(u.reify {
       DataBag(Seq(1)) groupBy Predef.identity
     }))
 
-    "materialization with closure" in ignoreForLabyrinth(verify(u.reify {
+    "materialization with closure" in ignoreFormitos(verify(u.reify {
       val semiFinal = 8
       val bag = DataBag(new Random shuffle 0.until(100).toList)
       val top = for (g <- bag groupBy { _ % semiFinal })
@@ -346,8 +346,8 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       }
     })
 
-    // Fixme: Bug in the Labyrinth compilation: the singSrc at the end should be a cross
-    "with duplicate group names" in ignoreForLabyrinth(verify(u.reify {
+    // Fixme: Bug in the mitos compilation: the singSrc at the end should be a cross
+    "with duplicate group names" in ignoreFormitos(verify(u.reify {
       val movies = DataBag(imdb)
 
       val leastPopular = for {
@@ -361,8 +361,8 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       (leastPopular, mostPopular)
     }))
 
-    // GroupBy is not yet supported in the Labyrinth compilation
-    "with multiple groups in the same comprehension" in ignoreForLabyrinth(verify(u.reify {
+    // GroupBy is not yet supported in the mitos compilation
+    "with multiple groups in the same comprehension" in ignoreFormitos(verify(u.reify {
       for {
         can10 <- DataBag(cannes) groupBy { _.year / 10 }
         ber10 <- DataBag(berlin) groupBy { _.year / 10 }
@@ -399,7 +399,7 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
 
   "MutableBag" - {
     "create and collect" in {
-      cancelIfLabyrinth() // MutableBag is not supported in the Labyrinth compilation
+      cancelIfmitos() // MutableBag is not supported in the mitos compilation
 
       val act = withBackendContext(eval[Env => Seq[(Int, Long)]](actPipeline(u.reify(
         MutableBag(DataBag((1 to 100).map(x => x -> x.toLong))).bag().collect()
@@ -411,7 +411,7 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
     }
 
     "update and copy" in {
-      cancelIfLabyrinth() // MutableBag is not supported in the Labyrinth compilation
+      cancelIfmitos() // MutableBag is not supported in the mitos compilation
 
       val exp1 = (1 to 10).map(x => x -> (if (x % 2 == 0) 2L * x else x))
       val exp2 = (1 to 10).map(x => x -> (if (x % 2 == 0) 2L * x else x))
@@ -505,8 +505,8 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
   // --------------------------------------------------------------------------
 
   "CSV" - {
-    // Bug in the Labyrinth compilation
-    "read/write case classes" in ignoreForLabyrinth(verify(u.reify {
+    // Bug in the mitos compilation
+    "read/write case classes" in ignoreFormitos(verify(u.reify {
       val inputPath = materializeResource("/cinema/imdb.csv")
       val outputPath = Paths.get(s"${System.getProperty("java.io.tmpdir")}/emma/cinema/imdb_written.csv").toString
       // Read it, write it, and then read it again
@@ -563,8 +563,8 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       as union bs union cs union ds
     })
 
-    // Ignored because the Labyrinth compilation doesn't yet handle closures
-    "Updated tmp sink (sieve of Eratosthenes)" in ignoreForLabyrinth(verify(u.reify {
+    // Ignored because the mitos compilation doesn't yet handle closures
+    "Updated tmp sink (sieve of Eratosthenes)" in ignoreFormitos(verify(u.reify {
       val N = 20
       val payload = "#" * 100
 
@@ -595,8 +595,8 @@ abstract class BaseCodegenIntegrationSpec extends FreeSpec
       positive union negative
     }))
 
-    // Bug in the Labyrinth compilation
-    "val destructuring" in ignoreForLabyrinth(verify(u.reify {
+    // Bug in the mitos compilation
+    "val destructuring" in ignoreFormitos(verify(u.reify {
       val resource = "file://" + materializeResource("/cinema/imdb.csv")
       val imdbTop100 = DataBag.readCSV[ImdbMovie](resource, CSV())
       val ratingsPerDecade = for {
