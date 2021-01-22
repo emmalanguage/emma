@@ -20,7 +20,10 @@ package org.emmalanguage.mitos;
 import eu.stratosphere.mitos.BagID;
 import eu.stratosphere.mitos.CFLCallback;
 import eu.stratosphere.mitos.CFLManager;
-import org.apache.flink.streaming.api.operators.StreamingRuntimeContext;
+import org.apache.flink.core.fs.FileSystem;
+import org.apache.flink.core.fs.Path;
+import org.apache.flink.core.memory.*;
+import org.emmalanguage.api.MutableBag;
 import org.emmalanguage.mitos.operators.ReusingBagOperator;
 import org.emmalanguage.mitos.operators.BagOperator;
 import org.emmalanguage.mitos.operators.DontThrowAwayInputBufs;
@@ -41,10 +44,15 @@ import org.apache.flink.util.ExceptionUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedOutputStream;
+import java.io.IOException;
 import java.io.Serializable;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 
 public class BagOperatorHost<IN, OUT>
@@ -64,6 +72,11 @@ public class BagOperatorHost<IN, OUT>
 	private CFLConfig cflConfig;
 	public int opID = -1;
 	public TypeSerializer<IN> inSer;
+	public TypeSerializer<OUT> outSer;
+
+	// The following two are needed for snapshotting:
+	public boolean fromLabyNodeTranslation = false;
+	public boolean hasBlockCrossingOut = false; // This is accurate only if fromLabyNodeTranslation
 
 	// ---------------------- Initialized in setup (i.e., on TM):
 
@@ -77,19 +90,24 @@ public class BagOperatorHost<IN, OUT>
 
 	// ----------------------
 
-	protected List<Integer> latestCFL; // note that this is the same object instance as in CFLManager
-	protected Queue<Integer> outCFLSizes; // if not empty, then we are working on the first one; if empty, then we are not working
+	protected List<Integer> cfl = new ArrayList<>();
+	protected final Queue<Integer> outCFLSizes = new ArrayDeque<>(); // if not empty, then we are working on the first one; if empty, then we are not working
+	private final Queue<Integer> checkpointCFLSizes = new ArrayDeque<>();
 
-	public ArrayList<Out> outs = new ArrayList<>(); // conditional and normal outputs
+	private ByteArrayDataOutputView savedBag;
+	private int savedBagCflSize = -17;
+	private int numSavedElements;
+
+	public final ArrayList<Out> outs = new ArrayList<>(); // conditional and normal outputs
 
 	private volatile boolean terminalBBReached;
 
-	private HashSet<BagID> notifyCloseInputs = new HashSet<>();
-	private HashSet<BagID> notifyCloseInputEmpties = new HashSet<>();
+	private final HashSet<BagID> notifyCloseInputs = new HashSet<>();
+	private final HashSet<BagID> notifyCloseInputEmpties = new HashSet<>();
 
 	private boolean consumed = false;
 
-	private HashSet<Tuple2<Integer, Integer>> inputUses = new HashSet<>(); // (inputID, cflSize)
+	private final HashSet<Tuple2<Integer, Integer>> inputUses = new HashSet<>(); // (inputID, cflSize)
 
 	private boolean shouldLogStart;
 
@@ -97,7 +115,9 @@ public class BagOperatorHost<IN, OUT>
 
 	private boolean workInProgress = false;
 
+	// These might not be serializable so better initialize them in setup:
 	private ExecutorService es;
+	private ExecutorService snapshotEs;
 
 	private final boolean reuseInputs;
 
@@ -167,8 +187,6 @@ public class BagOperatorHost<IN, OUT>
 			}
 		}
 
-		outCFLSizes = new ArrayDeque<>();
-
 		terminalBBReached = false;
 
 		op.giveOutputCollector(new MyCollector());
@@ -177,13 +195,24 @@ public class BagOperatorHost<IN, OUT>
 
 		op.giveInputSerializer(inSer);
 
+		cflMan = getRuntimeContext().getCFLManager();
+
 		es = Executors.newSingleThreadExecutor();
 
-		//cflMan = CFLManager.getSing();
-		cflMan = getRuntimeContext().getCFLManager();
+		if (cflMan.isCheckpointingEnabled() && needSnapshotting()) {
+			snapshotEs = Executors.newSingleThreadExecutor();
+		}
 
 		cflMan.specifyTerminalBB(terminalBBId);
 		cflMan.specifyNumToSubscribe(cflConfig.numToSubscribe);
+	}
+
+	private String getNameAndIndex() {
+		return "{" + name + "[" + subpartitionId +"]}";
+	}
+
+	boolean needSnapshotting() {
+		return !fromLabyNodeTranslation || hasBlockCrossingOut;
 	}
 
 	@Override
@@ -307,6 +336,14 @@ public class BagOperatorHost<IN, OUT>
 		@Override
 		public void collectElement(OUT e) {
 			numElements++;
+			if (cflMan.isCheckpointingEnabled() && needSnapshotting()) {
+				try {
+					outSer.serialize(e, savedBag);
+					numSavedElements++;
+				} catch (IOException ioException) {
+					throw new RuntimeException(ioException);
+				}
+			}
 			//assert outs.size() != 0; // If the operator wants to emit an element but there are no outs, then we just probably forgot to call .out()
 			for(Out o: outs) {
 				o.collectElement(e);
@@ -356,35 +393,38 @@ public class BagOperatorHost<IN, OUT>
 
 			outCFLSizesRemove();
 			workInProgress = false;
+
+			writeSnapshotIfNeeded();
+
+			// Maybe start new work
 			if(outCFLSizes.size() > 0) { // if there is pending work
-				if (CFLConfig.vlog) LOG.info("Out.closeBag starting a new out bag {" + name + "}");
+				if (CFLConfig.vlog) LOG.info("MyCollector.closeBag starting a new out bag {" + name + "}");
 				// Note: outs' buffers will be discarded from this, but this is not a problem, because everything that has to be sent
 				// has been already sent
 				startOutBagCheckBarrier();
 			} else {
-				if (CFLConfig.vlog) LOG.info("Out.closeBag not starting a new out bag {" + name + "}");
+				if (CFLConfig.vlog) LOG.info("MyCollector.closeBag not starting a new out bag {" + name + "}");
 				if (terminalBBReached) { // if there is no pending work, and none would come later
-					cflMan.unsubscribe(cb);
-					es.shutdown();
+					shutdown();
 				}
 			}
 		}
 
 		@Override
-		public void appendToCfl(int bbId) {
+		public void appendToCfl(int[] bbId) {
 			cflMan.appendToCFL(bbId);
 		}
+	}
 
-		private int correctBroadcast(int numElements) {
-			if (outs.size() > 0 && outs.get(0).partitioner instanceof Broadcast) {
-				for (Out o: outs) {
-					// We have a limitation that if an output is a broadcast output, then all of them has to be broadcast
-					assert o.partitioner instanceof Broadcast;
-				}
-				return numElements * outs.get(0).partitioner.targetPara;
-			} else {
-				return numElements;
+	private int correctBroadcast(int numElements) {
+		if (outs.size() > 0 && outs.get(0).partitioner instanceof Broadcast) {
+			for (Out o: outs) {
+				// We have a limitation that if an output is a broadcast output, then all of them has to be broadcast
+				assert o.partitioner instanceof Broadcast;
 			}
+			return numElements * outs.get(0).partitioner.targetPara;
+		} else {
+			return numElements;
 		}
 	}
 
@@ -397,7 +437,7 @@ public class BagOperatorHost<IN, OUT>
 				op.pushInElement(e, logicalInputId);
 			}
 		} catch (NullPointerException npe) {
-			throw new RuntimeException();
+			throw new RuntimeException(npe);
 		}
 	}
 
@@ -409,8 +449,7 @@ public class BagOperatorHost<IN, OUT>
 
 	synchronized private void startOutBagCheckBarrier() {
 		if(!CFLManager.barrier) {
-			if (CFLConfig.vlog)
-				LOG.info("[" + name + "] CFLCallback.notify starting an out bag");
+			if (CFLConfig.vlog) LOG.info("{" + name + "}[" + subpartitionId + "] startOutBagCheckBarrier, cflSize: " + cfl.size());
 			startOutBag();
 		} else {
 			assert !outCFLSizes.isEmpty();
@@ -429,13 +468,19 @@ public class BagOperatorHost<IN, OUT>
 		assert !outCFLSizes.isEmpty();
 		Integer outCFLSize = outCFLSizes.peek();
 
-		assert latestCFL.get(outCFLSize - 1).equals(bbId) || this instanceof MutableBagCC;
+		assert cfl.get(outCFLSize - 1).equals(bbId) || this instanceof MutableBagCC;
 
 		workInProgress = true;
 
 		consumed = false;
 
 		shouldLogStart = true;
+
+		if (cflMan.isCheckpointingEnabled() && needSnapshotting()) {
+			savedBag = new ByteArrayDataOutputView(65536);
+			savedBagCflSize = outCFLSize;
+			numSavedElements = 0;
+		}
 
 		chooseOuts(); // This is only needed for MutableBag
 
@@ -475,7 +520,7 @@ public class BagOperatorHost<IN, OUT>
 				inputCFLSize = outCFLSize;
 			} else {
 				int i;
-				for (i = outCFLSize - 2; input.bbId != latestCFL.get(i); i--) {}
+				for (i = outCFLSize - 2; input.bbId != cfl.get(i); i--) {}
 				inputCFLSize = i + 1;
 			}
 
@@ -537,7 +582,7 @@ public class BagOperatorHost<IN, OUT>
 		// I think the "remove buffer if complicated CFG condition" will be needed here
 	}
 
-	protected boolean updateOutCFLSizes(List<Integer> cfl) {
+	protected boolean updateOutCFLSizes() {
 		if (cfl.get(cfl.size() - 1).equals(bbId)) {
 			outCFLSizes.add(cfl.size());
 			return true;
@@ -545,43 +590,138 @@ public class BagOperatorHost<IN, OUT>
 		return false;
 	}
 
+	private void writeSnapshotIfNeeded() {
+		if (CFLConfig.vlog) LOG.info("writeSnapshotIfNeeded {" + name + "} -- " +
+				"checkpointCFLSizes: " + Arrays.toString(checkpointCFLSizes.toArray()) + ", " +
+				"outCFLSizes: " + Arrays.toString(outCFLSizes.toArray()));
+		// We have to write if two conditions hold:
+		// 1. We know about a checkpoint to do;
+		// 2. The currently saved bag would not be overwritten before we reach that checkpoint.
+		assert !workInProgress; // We need this because savedBag has to be a complete bag
+		if (!checkpointCFLSizes.isEmpty() && (outCFLSizes.isEmpty() || outCFLSizes.peek() > checkpointCFLSizes.peek())) {
+			if (CFLConfig.vlog) LOG.info("{" + name + "} decided to write a snapshot");
+
+			//todo: (but first test without this)
+			//  - possibly just link the previous one
+
+			writeSnapshot();
+		}
+	}
+
+	private void writeSnapshot() {
+		final int checkpointId = checkpointCFLSizes.remove();
+
+		//System.out.println("name: " + name + ", getOperatorName(): " + getOperatorName());
+
+		if (!needSnapshotting()) {
+			cflMan.operatorSnapshotCompleteLocal(checkpointId);
+		} else {
+			final ByteArrayDataOutputView savedBagCopiedRef = savedBag;
+			final int savedBagCflSizeCopied = savedBagCflSize;
+			final int numSavedElementsCopied = numSavedElements;
+
+			snapshotEs.submit(new Runnable() {
+				@Override
+				public void run() {
+					try {
+						Path file = getPathForSnapshotFile(checkpointId);
+						FileSystem.WriteMode writeMode =
+								cflMan.didStartFromSnapshot ? FileSystem.WriteMode.OVERWRITE : FileSystem.WriteMode.NO_OVERWRITE; // overwrite old incomplete ones
+						BufferedOutputStream stream = new BufferedOutputStream(cflMan.snapshotFS.create(file, writeMode), 1024 * 1024);
+						DataOutputView dataOutputView = new DataOutputViewStreamWrapper(stream);
+						dataOutputView.writeInt(savedBagCflSizeCopied);
+						dataOutputView.writeInt(numSavedElementsCopied);
+						dataOutputView.write(savedBagCopiedRef.toByteArray());
+						stream.close();
+
+						cflMan.operatorSnapshotCompleteLocal(checkpointId);
+					} catch (Throwable t) {
+						LOG.error("Unhandled exception in writeSnapshot: " + ExceptionUtils.stringifyException(t));
+						//System.err.println(ExceptionUtils.stringifyException(t));
+						System.exit(9);
+					}
+				}
+			});
+		}
+	}
+
+	private Path getPathForSnapshotFile(int checkpointId) {
+		return new Path(cflMan.getPathForCheckpointId(checkpointId) + "/" + name + "-" + subpartitionId);
+	}
+
+	private Path getCompletedPathForSnapshotFile(int checkpointId) {
+		return new Path(cflMan.getCompletedPathForCheckpointId(checkpointId) + "/" + name + "-" + subpartitionId);
+	}
+
 	private class MyCFLCallback implements CFLCallback {
 
-		public void notify(List<Integer> cfl) {
+		List<Runnable> waitList = new ArrayList<>();
+		volatile boolean waitingForSnapshottingInit = true;
+
+		private void admitWaitList() {
 			synchronized (es) {
-				//List<Integer> cfl = new ArrayList<>(cfl0);
-				es.submit(new Runnable() {
-					@Override
-					public void run() {
-						try {
-							synchronized (BagOperatorHost.this) {
-								latestCFL = cfl;
+				waitingForSnapshottingInit = false;
+				if (waitList.size() != 0) {
+					LOG.info("admitWaitList -- waitList.size: " + waitList.size());
+				}
+				for (Runnable r : waitList) {
+					es.submit(r);
+				}
+				waitList.clear();
+			}
+		}
 
-								if (CFLConfig.vlog) LOG.info("CFL notification: " + latestCFL + " {" + name + "}");
+		public void notifyCFLElement(int cflElement, boolean checkpoint) {
+			if (CFLConfig.vlog) LOG.info("notifyCFLElement " + getNameAndIndex() + ": " + cflElement);
+			Runnable r = new Runnable() {
+				@Override
+				public void run() {
+					try {
+						synchronized (BagOperatorHost.this) {
+							if (CFLConfig.vlog) LOG.info("CFL notification: " + cflElement + " CFL notification{" + name + "}");
 
-								// Note: the handling of outs has to be before the startOutBag call, because that will throw away buffers
-								// (and it often happens that reaching a BB triggers both of these things).
+							cfl.add(cflElement);
 
-								for (Out o : outs) {
-									o.notifyAppendToCFL(cfl);
-								}
-
-								//boolean workInProgress = outCFLSizes.size() > 0;
-								boolean hasAdded = updateOutCFLSizes(cfl);
-								if (!workInProgress && hasAdded) {
-									startOutBagCheckBarrier();
-								} else {
-									if (CFLConfig.vlog)
-										LOG.info("[" + name + "] CFLCallback.notify not starting an out bag, because workInProgress=" + workInProgress + ", hasAdded=" + hasAdded + ", outCFLSizes.size()=" + outCFLSizes.size());
-								}
+							if (checkpoint) {
+								assert cflMan.isCheckpointingEnabled();
+								checkpointCFLSizes.add(cfl.size());
 							}
-						} catch (Throwable t) {
-							LOG.error("Unhandled exception in MyCFLCallback.notify: " + ExceptionUtils.stringifyException(t));
-							System.err.println(ExceptionUtils.stringifyException(t));
-							System.exit(8);
+
+							// Note: the handling of outs has to be before the startOutBag call, because that will throw away buffers
+							// (and it often happens that reaching a BB triggers both of these things).
+
+							int tmpCFLSize = cfl.size();
+							for (Out o : outs) {
+								o.notifyAppendToCFL();
+							}
+							assert cfl.size() == tmpCFLSize : "cfl.size(): " + cfl.size() + ", tmpCFLSize: " + tmpCFLSize + ", cfl: " + Arrays.toString(cfl.toArray());
+
+							//boolean workInProgress = outCFLSizes.size() > 0;
+							boolean hasAdded = updateOutCFLSizes();
+							if (!workInProgress) {
+								writeSnapshotIfNeeded();
+							}
+							if (!workInProgress && hasAdded) {
+								startOutBagCheckBarrier();
+							} else {
+								if (CFLConfig.vlog)
+									LOG.info("[" + name + "] CFLCallback.notifyCFLElement not starting an out bag, because workInProgress=" + workInProgress + ", hasAdded=" + hasAdded + ", outCFLSizes.size()=" + outCFLSizes.size());
+							}
 						}
+					} catch (Throwable t) {
+						LOG.error("Unhandled exception in MyCFLCallback.notifyCFLElement: " + ExceptionUtils.stringifyException(t));
+						//System.err.println(ExceptionUtils.stringifyException(t));
+						System.exit(8);
 					}
-				});
+				}
+			};
+			synchronized (es) {
+				if (waitingForSnapshottingInit) {
+					waitList.add(r);
+				} else {
+					assert waitList.isEmpty();
+					es.submit(r);
+				}
 			}
 		}
 
@@ -590,78 +730,87 @@ public class BagOperatorHost<IN, OUT>
 			// If this doesn't go through es, then we have the problem that notify submits on subscribe,
 			// and this notify would have to insert something into outCFLSizes, but it hasn't inserted it yet
 			// when we reach the outCFLSizes check here.
-			synchronized (es) {
-				es.submit(new Runnable() {
-					@Override
-					public void run() {
-						try {
-							LOG.info("CFL notifyTerminalBB {" + name + "}");
-							synchronized (BagOperatorHost.this) {
-								terminalBBReached = true;
-								if (outCFLSizes.isEmpty()) {
-									// We have to unsubscribe before shutdown, because we get broadcast notifications
-									// even when we are finished, when others are still working.
-									cflMan.unsubscribe(cb);
-									es.shutdown();
-								}
+			Runnable r = new Runnable() {
+				@Override
+				public void run() {
+					try {
+						LOG.info("CFL notifyTerminalBB {" + name + "}");
+						synchronized (BagOperatorHost.this) {
+							terminalBBReached = true;
+							if (outCFLSizes.isEmpty()) {
+								shutdown();
 							}
-						} catch (Throwable t) {
-							LOG.error("Unhandled exception in MyCFLCallback.notifyTerminalBB: " + ExceptionUtils.stringifyException(t));
-							System.err.println(ExceptionUtils.stringifyException(t));
-							System.exit(8);
 						}
+					} catch (Throwable t) {
+						LOG.error("Unhandled exception in MyCFLCallback.notifyTerminalBB: " + ExceptionUtils.stringifyException(t));
+						//System.err.println(ExceptionUtils.stringifyException(t));
+						System.exit(8);
 					}
-				});
+				}
+			};
+			synchronized (es) {
+				if (waitingForSnapshottingInit) {
+					waitList.add(r);
+				} else {
+					assert waitList.isEmpty();
+					es.submit(r);
+				}
 			}
 		}
 
 		@Override
 		public void notifyCloseInput(BagID bagID, int opID) {
 			if (opID == BagOperatorHost.this.opID || opID == CFLManager.CloseInputBag.emptyBag) {
-				synchronized (es) {
-					es.submit(new Runnable() {
-						@Override
-						public void run() {
-							try {
-								synchronized (BagOperatorHost.this) {
-									assert !notifyCloseInputs.contains(bagID);
-									notifyCloseInputs.add(bagID);
+				Runnable r = new Runnable() {
+					@Override
+					public void run() {
+						try {
+							synchronized (BagOperatorHost.this) {
+								assert !notifyCloseInputs.contains(bagID);
+								notifyCloseInputs.add(bagID);
 
-									if (opID == CFLManager.CloseInputBag.emptyBag) {
-										notifyCloseInputEmpties.add(bagID);
-									}
+								if (opID == CFLManager.CloseInputBag.emptyBag) {
+									notifyCloseInputEmpties.add(bagID);
+								}
 
-									for (Input inp : inputs) {
-										//assert inp.currentBagID != null; // This no longer works, because we broadcast closeInput
-										if (bagID.equals(inp.currentBagID)) {
+								for (Input inp : inputs) {
+									//assert inp.currentBagID != null; // This no longer works, because we broadcast closeInput
+									if (bagID.equals(inp.currentBagID)) {
 
-											if (opID == CFLManager.CloseInputBag.emptyBag) {
-												// The EmptyFromEmpty marker interface is not needed here, because consumed = true doesn't mess up things
-												// even when the result bag will not be empty.
-												consumed = true;
-											}
-
-											inp.closeCurrentInBag();
+										if (opID == CFLManager.CloseInputBag.emptyBag) {
+											// The EmptyFromEmpty marker interface is not needed here, because consumed = true doesn't mess up things
+											// even when the result bag will not be empty.
+											consumed = true;
 										}
+
+										inp.closeCurrentInBag();
 									}
 								}
-							} catch (Throwable t) {
-								LOG.error("Unhandled exception in MyCFLCallback.notifyCloseInput: " + ExceptionUtils.stringifyException(t));
-								System.err.println(ExceptionUtils.stringifyException(t));
-								System.exit(8);
 							}
+						} catch (Throwable t) {
+							LOG.error("Unhandled exception in MyCFLCallback.notifyCloseInput: " + ExceptionUtils.stringifyException(t));
+							//System.err.println(ExceptionUtils.stringifyException(t));
+							System.exit(8);
 						}
-					});
+					}
+				};
+				synchronized (es) {
+					if (waitingForSnapshottingInit) {
+						waitList.add(r);
+					} else {
+						assert waitList.isEmpty();
+						es.submit(r);
+					}
 				}
 			}
 		}
 
 		@Override
 		public void notifyBarrierAllReached(int cflSize) {
-			synchronized (es) {
-				es.submit(new Runnable() {
-					@Override
-					public void run() {
+			Runnable r = new Runnable() {
+				@Override
+				public void run() {
+					try {
 						synchronized (BagOperatorHost.this) {
 							assert CFLManager.barrier;
 							barrierAllReachedCFLSize = cflSize;
@@ -675,8 +824,20 @@ public class BagOperatorHost<IN, OUT>
 								}
 							}
 						}
+					} catch (Throwable t) {
+						LOG.error("Unhandled exception in MyCFLCallback.notifyBarrierAllReached: " + ExceptionUtils.stringifyException(t));
+						//System.err.println(ExceptionUtils.stringifyException(t));
+						System.exit(8);
 					}
-				});
+				}
+			};
+			synchronized (es) {
+				if (waitingForSnapshottingInit) {
+					waitList.add(r);
+				} else {
+					assert waitList.isEmpty();
+					es.submit(r);
+				}
 			}
 		}
 
@@ -684,6 +845,91 @@ public class BagOperatorHost<IN, OUT>
 		public int getOpID() {
 			return BagOperatorHost.this.opID;
 		}
+
+		public void startNormally() {
+			admitWaitList();
+		}
+
+		public void startFromSnapshot(int checkpointId, List<Integer> givenCfl) {
+			Runnable r = new Runnable() {
+				@Override
+				public void run() {
+					try {
+						synchronized (BagOperatorHost.this) {
+							inStartFromSnapshot = true;
+
+							assert cfl.isEmpty();
+							cfl = givenCfl;
+
+							if (needSnapshotting()) {
+								Path file = getCompletedPathForSnapshotFile(checkpointId);
+								DataInputView dataInputView = new DataInputViewStreamWrapper(cflMan.snapshotFS.open(file));
+
+								int readBagCflSize = dataInputView.readInt();
+
+								chooseOuts(); // This is only needed for MutableBag
+								for (Out o : outs) {
+									o.startOutBag(readBagCflSize);
+								}
+
+								int num = dataInputView.readInt();
+								for (int i = 0; i < num; i++) {
+									OUT e = outSer.deserialize(dataInputView);
+									for (Out o : outs) {
+										o.collectElement(e);
+									}
+								}
+								for (Out o : outs) {
+									o.closeBag();
+								}
+
+								BagID[] inputBagIDsArr = new BagID[0]; // "tehat mindenhonnan varunk"
+								BagID outBagID = new BagID(readBagCflSize, opID);
+								// Following if copied from MyCollector.closeBag
+								//if (num > 0 || consumed || inputBagIDs.size() == 0) {
+								if (true) {
+									// In the inputBagIDs.size() == 0 case we have to send, because in this case checkForClosingProduced expects from everywhere
+									// (because of the s.inputs.size() == 0) at its beginning)
+									if (!(BagOperatorHost.this instanceof MutableBagCC && ((MutableBagCC.MutableBagOperator) op).inpID == 2)) {
+										num = correctBroadcast(num);
+										cflMan.producedLocal(outBagID, inputBagIDsArr, num, para, subpartitionId, opID);
+									}
+								}
+
+								LOG.info("Operator {" + name + "}[" + subpartitionId + "]" + " startFromSnapshot sent " + num + " elements, with cflSize: " + readBagCflSize);
+							}
+							inStartFromSnapshot = false;
+						}
+					} catch (Throwable t) {
+						LOG.error("Unhandled exception in MyCFLCallback.startFromSnapshot: " + ExceptionUtils.stringifyException(t));
+						//System.err.println(ExceptionUtils.stringifyException(t));
+						System.exit(8);
+					}
+				}
+			};
+			synchronized (es) {
+				es.submit(r);
+			}
+			admitWaitList();
+		}
+	}
+
+	private boolean inStartFromSnapshot = false;
+
+	void shutdown() {
+		if (cflMan.isCheckpointingEnabled() && needSnapshotting()) {
+			// Let's wait for all snapshot writing to complete
+			try {
+				snapshotEs.shutdown();
+				snapshotEs.awaitTermination(100, TimeUnit.DAYS);
+			} catch (InterruptedException e) {
+				throw new RuntimeException(e);
+			}
+		}
+		// We have to unsubscribe before shutdown, because we get broadcast notifications
+		// even when we are finished, when others are still working.
+		cflMan.unsubscribe(cb);
+		es.shutdown();
 	}
 
 	// This overload is for manual job building. The auto builder uses the other one.
@@ -752,6 +998,7 @@ public class BagOperatorHost<IN, OUT>
 		}
 
 		void collectElement(OUT e) {
+			assert BagOperatorHost.this instanceof MutableBagCC || active;
 			if (active) {
 				assert state == OutState.FORWARDING || state == OutState.DAMMING;
 				if (state == OutState.FORWARDING) {
@@ -780,7 +1027,7 @@ public class BagOperatorHost<IN, OUT>
 								sendElement(e);
 							}
 						}
-						assert outCFLSize == outCFLSizes.peek();
+						assert inStartFromSnapshot || outCFLSize == outCFLSizes.peek();
 						endBag();
 						break;
 				}
@@ -794,8 +1041,8 @@ public class BagOperatorHost<IN, OUT>
 					targetReached = true;
 				} else {
 					// We don't need +1 for outCFLSize, because it is already the element _after_ outCFL like this
-					for (int i = outCFLSize; i < latestCFL.size(); i++) {
-						int cfli = latestCFL.get(i);
+					for (int i = outCFLSize; i < cfl.size(); i++) {
+						int cfli = cfl.get(i);
 						if (cfli == targetBbId) {
 							targetReached = true;
 						}
@@ -816,8 +1063,9 @@ public class BagOperatorHost<IN, OUT>
 			}
 		}
 
-		void notifyAppendToCFL(List<Integer> cfl) {
+		void notifyAppendToCFL() {
 			// isActive would not be good here, because it happens that a formerly active should be sent only now because of a notify.
+			if (CFLConfig.vlog) LOG.info("Operator {" + name + "}[" + subpartitionId +"]" + "Out.notifyAppendToCFL state: " + state);
 			if (!normal && (state == OutState.DAMMING || state == OutState.WAITING)) {
 				if (cfl.get(cfl.size() - 1).equals(targetBbId)) {
 					// We check that it is not overwritten before reaching the currently added one
@@ -834,8 +1082,8 @@ public class BagOperatorHost<IN, OUT>
 								assert false; // Because the above if makes sure that this doesn't happen
 								break;
 							case DAMMING:
-								assert outCFLSizes.size() > 0;
-								assert outCFLSizes.peek().equals(outCFLSize);
+								assert inStartFromSnapshot || outCFLSizes.size() > 0;
+								assert inStartFromSnapshot || outCFLSizes.peek().equals(outCFLSize);
 								startBag();
 								state = OutState.FORWARDING;
 								break;

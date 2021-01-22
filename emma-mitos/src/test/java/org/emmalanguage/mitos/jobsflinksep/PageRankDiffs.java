@@ -39,7 +39,8 @@ import org.slf4j.LoggerFactory;
 import java.net.URI;
 import java.util.List;
 
-
+// I've been not testing this since (at least) the fault tolerance
+// (2021 Jan -- 88b4914e on Emma, and c98fe93c0a in Flink)
 /**
  * args: path, numDays
  *

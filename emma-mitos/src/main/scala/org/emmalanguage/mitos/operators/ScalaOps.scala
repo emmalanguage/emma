@@ -339,9 +339,7 @@ class ConditionNodeScalaReally(val trueBranchBbIds: Array[Int], val falseBranchB
 
   override def pushInElement(e: Boolean, logicalInputId: Int): Unit = {
     super.pushInElement(e, logicalInputId)
-    for (b <- if (e) trueBranchBbIds else falseBranchBbIds) {
-      out.appendToCfl(b)
-    }
+    out.appendToCfl(if (e) trueBranchBbIds else falseBranchBbIds)
   }
 }
 

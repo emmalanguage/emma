@@ -25,7 +25,6 @@ import org.slf4j.LoggerFactory;
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 
 import java.util.ArrayDeque;
-import java.util.List;
 import java.util.Queue;
 import java.util.function.Consumer;
 
@@ -54,7 +53,7 @@ public class MutableBagCC extends BagOperatorHost<TupleIntInt, TupleIntInt> {
 	}
 
 	@Override
-	protected boolean updateOutCFLSizes(List<Integer> cfl) {
+	protected boolean updateOutCFLSizes() {
 		int addedBB = cfl.get(cfl.size() - 1);
 		outCFLSizes.add(cfl.size()); // because all BBs have at least one operation
 		if (addedBB == 1) { // because BB 1 has two operations

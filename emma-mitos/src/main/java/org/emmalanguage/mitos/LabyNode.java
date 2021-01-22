@@ -74,6 +74,7 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
     public LabyNode(String name, BagOperator<IN,OUT> op, int bbId, Partitioner<IN> inputPartitioner, TypeSerializer<IN> inSer, TypeInformation<ElementOrEvent<OUT>> typeInfo) {
         this.inputPartitioner = inputPartitioner;
         this.bagOpHost = new BagOperatorHost<>(op, bbId, labyNodes.size(), inSer);
+        this.bagOpHost.fromLabyNodeTranslation = true;
         this.bagOpHost.setName(name);
         this.typeInfo = typeInfo;
         labyNodes.add(this);
@@ -86,6 +87,7 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
     private LabyNode(String name, int bbId, Partitioner<IN> inputPartitioner, TypeSerializer<IN> inSer, TypeInformation<ElementOrEvent<OUT>> typeInfo) {
         this.inputPartitioner = inputPartitioner;
         this.bagOpHost = (BagOperatorHost<IN, OUT>) new PhiNode<>(bbId, labyNodes.size(), inSer);
+        this.bagOpHost.fromLabyNodeTranslation = true;
         this.bagOpHost.setName(name);
         this.typeInfo = typeInfo;
         labyNodes.add(this);
@@ -98,6 +100,7 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
         bagOpHost.addInput(inputs.size(), inputLabyNode.bagOpHost.bbId, insideBlock, inputLabyNode.bagOpHost.opID);
         int splitID = inputLabyNode.bagOpHost.out(bagOpHost.bbId, !condOut, inputPartitioner, Collections.emptySet());
         inputs.add(new Input(inputLabyNode, splitID, inputs.size()));
+        if (!insideBlock) inputLabyNode.bagOpHost.hasBlockCrossingOut = true;
         return this;
     }
 
@@ -107,6 +110,7 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
         bagOpHost.addInput(inputs.size(), inputLabyNode.bagOpHost.bbId, insideBlock, inputLabyNode.bagOpHost.opID);
         int splitID = inputLabyNode.bagOpHost.out(bagOpHost.bbId, !condOut, inputPartitioner, overwriters);
         inputs.add(new Input(inputLabyNode, splitID, inputs.size()));
+        if (!insideBlock) inputLabyNode.bagOpHost.hasBlockCrossingOut = true;
         return this;
     }
 
@@ -117,6 +121,7 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
         bagOpHost.addInput(inputs.size(), inputLabyNode.bagOpHost.bbId, insideBlock, inputLabyNode.bagOpHost.opID);
         int splitID = inputLabyNode.bagOpHost.out(bagOpHost.bbId, !condOut, partitioner, Collections.emptySet());
         inputs.add(new Input(inputLabyNode, splitID, inputs.size()));
+        if (!insideBlock) inputLabyNode.bagOpHost.hasBlockCrossingOut = true;
         return this;
     }
 
@@ -126,6 +131,7 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
         bagOpHost.addInput(inputs.size(), inputLabySource.bbId, insideBlock, inputLabySource.opID);
         inputLabySource.bagify.setPartitioner(inputPartitioner);
         inputs.add(new Input(inputLabySource, 0, inputs.size()));
+        // todo: treat hasBlockCrossingOut (at the moment, also for other reasons, we are not correctly handling the case when during a snapshot restore a LabySource has to send)
         return this;
     }
 
@@ -263,6 +269,7 @@ public class LabyNode<IN, OUT> extends AbstractLabyNode<OUT> {
         if (bagOpHost.inSer == null) {
             bagOpHost.inSer = ((ElementOrEvent.ElementOrEventSerializer)inputStream.getType().createSerializer(inputStream.getExecutionConfig())).elementSerializer;
         }
+        bagOpHost.outSer = ((ElementOrEvent.ElementOrEventSerializer)typeInfo.createSerializer(env.getConfig())).elementSerializer;
 
         assert inputStream != null;
         SingleOutputStreamOperator<ElementOrEvent<OUT>> tmpFlinkStream =

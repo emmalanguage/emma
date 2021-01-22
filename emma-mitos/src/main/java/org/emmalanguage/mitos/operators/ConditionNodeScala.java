@@ -39,8 +39,6 @@ public class ConditionNodeScala extends SingletonBagOperator<scala.Boolean, Unit
 	@Override
 	public void pushInElement(scala.Boolean e, int logicalInputId) {
 		super.pushInElement(e, logicalInputId);
-		for (int b: scala.Boolean.unbox(e) ? trueBranchBbIds : falseBranchBbIds) {
-			out.appendToCfl(b);
-		}
+		out.appendToCfl(scala.Boolean.unbox(e) ? trueBranchBbIds : falseBranchBbIds);
 	}
 }

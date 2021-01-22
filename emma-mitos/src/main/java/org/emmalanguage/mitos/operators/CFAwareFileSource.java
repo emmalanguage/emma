@@ -16,6 +16,7 @@
 
 package org.emmalanguage.mitos.operators;
 
+import org.apache.flink.core.fs.FSDataInputStream;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.slf4j.Logger;
@@ -49,7 +50,9 @@ public abstract class CFAwareFileSource<T> extends BagOperator<Integer, T> {
             LOG.info("Reading file " + path);
 
             FileSystem fs = FileSystem.get(new URI(path));
-            BufferedReader br = new BufferedReader(new InputStreamReader(fs.open(new Path(path))), 1024*1024);
+            FSDataInputStream stream = fs.open(new Path(path));
+            InputStreamReader isr = new InputStreamReader(stream);
+            BufferedReader br = new BufferedReader(isr, 1024*1024);
 
             String line;
             line = br.readLine();
@@ -57,6 +60,10 @@ public abstract class CFAwareFileSource<T> extends BagOperator<Integer, T> {
                 out.collectElement(parseLine(line));
                 line = br.readLine();
             }
+
+            br.close();
+            isr.close();
+            stream.close();
         } catch (URISyntaxException | IOException e2) {
             throw new RuntimeException(e2);
         }

@@ -32,5 +32,5 @@ public interface BagOperatorOutputCollector<T> {
  	 */
 	void closeBag();
 
-	void appendToCfl(int bbId);
+	void appendToCfl(int[] bbId);
 }

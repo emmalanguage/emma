@@ -250,7 +250,7 @@ object ClickCountDiffsScala {
       .setParallelism(1)
 
     val printSum = new LabyNode[Integer, mitos.util.Unit]("printSum",
-      new CFAwareFileSink(pref + "out/diff_"),
+      new CFAwareFileSink(pref + "out/laby/diff_"),
       2,
       new Always0[Integer](1),
       integerSer,

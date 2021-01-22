@@ -39,8 +39,6 @@ public class ConditionNode extends SingletonBagOperator<Boolean, Unit> {
 	@Override
 	public void pushInElement(Boolean e, int logicalInputId) {
 		super.pushInElement(e, logicalInputId);
-		for (int b: e ? trueBranchBbIds : falseBranchBbIds) {
-			out.appendToCfl(b);
-		}
+		out.appendToCfl(e ? trueBranchBbIds : falseBranchBbIds);
 	}
 }

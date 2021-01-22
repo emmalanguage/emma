@@ -30,13 +30,13 @@ public class KickoffSource extends RichSourceFunction<Unit> {
 	private static final Logger LOG = LoggerFactory.getLogger(KickoffSource.class);
 
 	private final int[] kickoffBBs;
+	private final CFLConfig cflConfig;
 	private int terminalBBId = -2;
-	private CFLConfig cflConfig;
 
 	public KickoffSource(int... kickoffBBs) {
 		this.kickoffBBs = kickoffBBs;
-		this.terminalBBId = CFLConfig.getInstance().terminalBBId;
 		this.cflConfig = CFLConfig.getInstance();
+		this.terminalBBId = cflConfig.terminalBBId;
 		assert this.terminalBBId >= 0 : "CFLConfig has to be set before creating KickoffSource";
 	}
 
@@ -52,9 +52,12 @@ public class KickoffSource extends RichSourceFunction<Unit> {
 		assert cflConfig.numToSubscribe != -10;
 		cflManager.specifyNumToSubscribe(cflConfig.numToSubscribe);
 
-		for(int bb: kickoffBBs) {
-			cflManager.appendToCFL(bb);
-		}
+		if (cflConfig.shouldEnableCheckpointing) cflManager.setCheckpointingEnabled(true);
+		if (cflConfig.checkpointInterval != CFLConfig.checkpointIntervalNotSet) cflManager.setCheckpointInterval(cflConfig.checkpointInterval);
+		if (cflConfig.checkpointDir != null) cflManager.setCheckpointDir(cflConfig.checkpointDir);
+		cflManager.initSnapshottingLocal(kickoffBBs); //todo: make it return a boolean to decide whether to appendToCFL(kickoffBBs)
+
+		//cflManager.appendToCFL(kickoffBBs); // Moved to initSnapshottingRemote
 	}
 
 	@Override

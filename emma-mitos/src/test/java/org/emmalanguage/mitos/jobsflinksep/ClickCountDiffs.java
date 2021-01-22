@@ -27,6 +27,7 @@ import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.types.IntValue;
 import org.apache.flink.util.Collector;
+import org.emmalanguage.mitos.inputgen.ClickCountDiffsInputGen;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -108,7 +109,7 @@ public class ClickCountDiffs {
 					public String map(Tuple1<IntValue> integerTuple1) throws Exception {
 						return integerTuple1.f0.toString();
 					}
-				}).setParallelism(1).writeAsText(pref + "out/flinksep/diff_" + day, FileSystem.WriteMode.OVERWRITE);
+				}).setParallelism(1).writeAsText(pref + ClickCountDiffsInputGen.outPrefFlinkSep + day, FileSystem.WriteMode.OVERWRITE);
 			}
 
 			// Workaround for https://issues.apache.org/jira/browse/FLINK-1268

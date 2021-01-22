@@ -42,7 +42,7 @@ public class PhiNode<T> extends BagOperatorHost<T,T> implements Serializable {
 			int j = 0;
 			boolean brk = false;
 			for (Input inp: inputs) {
-				if(inp.bbId == latestCFL.get(i)) {
+				if(inp.bbId == cfl.get(i)) {
 					assert !brk; // because two logical inputs can't have the same basic block id
 					activateLogicalInput(j, outCFLSize, i + 1);
 					brk = true;
