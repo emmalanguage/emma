@@ -23,7 +23,6 @@ import eu.stratosphere.mitos.CFLManager;
 import org.apache.flink.core.fs.FileSystem;
 import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.memory.*;
-import org.emmalanguage.api.MutableBag;
 import org.emmalanguage.mitos.operators.ReusingBagOperator;
 import org.emmalanguage.mitos.operators.BagOperator;
 import org.emmalanguage.mitos.operators.DontThrowAwayInputBufs;
@@ -47,8 +46,6 @@ import org.slf4j.LoggerFactory;
 import java.io.BufferedOutputStream;
 import java.io.IOException;
 import java.io.Serializable;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -80,7 +77,7 @@ public class BagOperatorHost<IN, OUT>
 
 	// ---------------------- Initialized in setup (i.e., on TM):
 
-	public short subpartitionId = -25;
+	public short partitionId = -25;
 	private short para;
 
 	private CFLManager cflMan;
@@ -169,7 +166,7 @@ public class BagOperatorHost<IN, OUT>
 	public void setup(StreamTask<?, ?> containingTask, StreamConfig config, Output<StreamRecord<ElementOrEvent<OUT>>> output) {
 		super.setup(containingTask, config, output);
 
-		this.subpartitionId = (short)getRuntimeContext().getIndexOfThisSubtask();
+		this.partitionId = (short)getRuntimeContext().getIndexOfThisSubtask();
 
 		assert getRuntimeContext().getNumberOfParallelSubtasks() <= Short.MAX_VALUE;
 		this.para = (short)getRuntimeContext().getNumberOfParallelSubtasks();
@@ -208,7 +205,7 @@ public class BagOperatorHost<IN, OUT>
 	}
 
 	private String getNameAndIndex() {
-		return "{" + name + "[" + subpartitionId +"]}";
+		return "{" + name + "[" + partitionId +"]}";
 	}
 
 	boolean needSnapshotting() {
@@ -262,7 +259,7 @@ public class BagOperatorHost<IN, OUT>
 	@Override
 	synchronized public void processElement(StreamRecord<ElementOrEvent<IN>> streamRecord) throws Exception {
 
-		if (CFLConfig.vlog) LOG.info("Operator {" + name + "}[" + subpartitionId +"] processElement " + streamRecord.getValue());
+		if (CFLConfig.vlog) LOG.info("Operator {" + name + "}[" + partitionId +"] processElement " + streamRecord.getValue());
 
 		ElementOrEvent<IN> eleOrEvent = streamRecord.getValue();
 		if (inputs.size() == 1) {
@@ -315,7 +312,7 @@ public class BagOperatorHost<IN, OUT>
 					assert sp.status == InputSubpartition.Status.OPEN;
 					sp.status = InputSubpartition.Status.CLOSED;
 					InputSubpartition.Buffer lastBuffer = sp.buffers.get(sp.buffers.size()-1);
-					cflMan.consumedLocal(lastBuffer.bagID,lastBuffer.elements.size(),subpartitionId,opID);
+					cflMan.consumedLocal(lastBuffer.bagID,lastBuffer.elements.size(), partitionId,opID);
 					break;
 				default:
 					assert false;
@@ -385,7 +382,7 @@ public class BagOperatorHost<IN, OUT>
 				// (because of the s.inputs.size() == 0) at its beginning)
 				if (!(BagOperatorHost.this instanceof MutableBagCC && ((MutableBagCC.MutableBagOperator)op).inpID == 2)) {
 					numElements = correctBroadcast(numElements);
-					cflMan.producedLocal(outBagID, inputBagIDsArr, numElements, para, subpartitionId, opID);
+					cflMan.producedLocal(outBagID, inputBagIDsArr, numElements, para, partitionId, opID);
 				}
 			}
 
@@ -449,7 +446,7 @@ public class BagOperatorHost<IN, OUT>
 
 	synchronized private void startOutBagCheckBarrier() {
 		if(!CFLManager.barrier) {
-			if (CFLConfig.vlog) LOG.info("{" + name + "}[" + subpartitionId + "] startOutBagCheckBarrier, cflSize: " + cfl.size());
+			if (CFLConfig.vlog) LOG.info("{" + name + "}[" + partitionId + "] startOutBagCheckBarrier, cflSize: " + cfl.size());
 			startOutBag();
 		} else {
 			assert !outCFLSizes.isEmpty();
@@ -646,11 +643,11 @@ public class BagOperatorHost<IN, OUT>
 	}
 
 	private Path getPathForSnapshotFile(int checkpointId) {
-		return new Path(cflMan.getPathForCheckpointId(checkpointId) + "/" + name + "-" + subpartitionId);
+		return new Path(cflMan.getPathForCheckpointId(checkpointId) + "/" + name + "-" + partitionId);
 	}
 
 	private Path getCompletedPathForSnapshotFile(int checkpointId) {
-		return new Path(cflMan.getCompletedPathForCheckpointId(checkpointId) + "/" + name + "-" + subpartitionId);
+		return new Path(cflMan.getCompletedPathForCheckpointId(checkpointId) + "/" + name + "-" + partitionId);
 	}
 
 	private class MyCFLCallback implements CFLCallback {
@@ -892,11 +889,11 @@ public class BagOperatorHost<IN, OUT>
 									// (because of the s.inputs.size() == 0) at its beginning)
 									if (!(BagOperatorHost.this instanceof MutableBagCC && ((MutableBagCC.MutableBagOperator) op).inpID == 2)) {
 										num = correctBroadcast(num);
-										cflMan.producedLocal(outBagID, inputBagIDsArr, num, para, subpartitionId, opID);
+										cflMan.producedLocal(outBagID, inputBagIDsArr, num, para, partitionId, opID);
 									}
 								}
 
-								LOG.info("Operator {" + name + "}[" + subpartitionId + "]" + " startFromSnapshot sent " + num + " elements, with cflSize: " + readBagCflSize);
+								LOG.info("Operator {" + name + "}[" + partitionId + "]" + " startFromSnapshot sent " + num + " elements, with cflSize: " + readBagCflSize);
 							}
 							inStartFromSnapshot = false;
 						}
@@ -1065,7 +1062,7 @@ public class BagOperatorHost<IN, OUT>
 
 		void notifyAppendToCFL() {
 			// isActive would not be good here, because it happens that a formerly active should be sent only now because of a notify.
-			if (CFLConfig.vlog) LOG.info("Operator {" + name + "}[" + subpartitionId +"]" + "Out.notifyAppendToCFL state: " + state);
+			if (CFLConfig.vlog) LOG.info("Operator {" + name + "}[" + partitionId +"]" + "Out.notifyAppendToCFL state: " + state);
 			if (!normal && (state == OutState.DAMMING || state == OutState.WAITING)) {
 				if (cfl.get(cfl.size() - 1).equals(targetBbId)) {
 					// We check that it is not overwritten before reaching the currently added one
@@ -1112,7 +1109,7 @@ public class BagOperatorHost<IN, OUT>
 		private ElementOrEvent<OUT> reuseEleOrEvent = new ElementOrEvent<>();
 
 		void sendElement(OUT e) {
-			short part = partitioner.getPart(e, subpartitionId);
+			short part = partitioner.getPart(e, partitionId);
 			if (part != -1) {
 				// Note that this logic is duplicated on Bagify, but without the -1 (broadcast) handling
 				if (!sentStart[part]) {
@@ -1121,10 +1118,10 @@ public class BagOperatorHost<IN, OUT>
 			} else {
 				broadcastStart();
 			}
-			if (CFLConfig.vlog) LOG.info("Out("+ splitId + ") of {" + name + "}[" + BagOperatorHost.this.subpartitionId + "] sending element to " + part + ": " + new ElementOrEvent<>(subpartitionId, e, splitId, part));
+			if (CFLConfig.vlog) LOG.info("Out("+ splitId + ") of {" + name + "}[" + BagOperatorHost.this.partitionId + "] sending element to " + part + ": " + new ElementOrEvent<>(partitionId, e, splitId, part));
 
 			//output.collect(new StreamRecord<>(new ElementOrEvent<>(subpartitionId, e, splitId, part), 0));
-			output.collect(reuseStreamRecord.replace(reuseEleOrEvent.replace(subpartitionId, e, splitId, part)));
+			output.collect(reuseStreamRecord.replace(reuseEleOrEvent.replace(partitionId, e, splitId, part)));
 		}
 
 		void broadcastStart() {
@@ -1151,14 +1148,14 @@ public class BagOperatorHost<IN, OUT>
 		private void sendStart(short part) {
 			sentStart[part] = true;
 			ElementOrEvent.Event event = new ElementOrEvent.Event(ElementOrEvent.Event.Type.START, partitioner.targetPara, new BagID(outCFLSize, opID));
-			if (CFLConfig.vlog) LOG.info("Out("+ splitId + ") of {" + name + "}[" + BagOperatorHost.this.subpartitionId + "] sending START to " + part + ": " + new ElementOrEvent<>(subpartitionId, event, splitId, part));
-			output.collect(new StreamRecord<>(new ElementOrEvent<>(subpartitionId, event, splitId, part)));
+			if (CFLConfig.vlog) LOG.info("Out("+ splitId + ") of {" + name + "}[" + BagOperatorHost.this.partitionId + "] sending START to " + part + ": " + new ElementOrEvent<>(partitionId, event, splitId, part));
+			output.collect(new StreamRecord<>(new ElementOrEvent<>(partitionId, event, splitId, part)));
 		}
 
 		private void sendEnd(short part) {
-			if (CFLConfig.vlog) LOG.info("Out("+ splitId + ") of {" + name + "}[" + BagOperatorHost.this.subpartitionId + "] sending END to " + part);
+			if (CFLConfig.vlog) LOG.info("Out("+ splitId + ") of {" + name + "}[" + BagOperatorHost.this.partitionId + "] sending END to " + part);
 			ElementOrEvent.Event event = new ElementOrEvent.Event(ElementOrEvent.Event.Type.END, partitioner.targetPara, new BagID(outCFLSize, opID));
-			output.collect(new StreamRecord<>(new ElementOrEvent<>(subpartitionId, event, splitId, part)));
+			output.collect(new StreamRecord<>(new ElementOrEvent<>(partitionId, event, splitId, part)));
 		}
 	}
 

@@ -201,7 +201,7 @@ object ScalaOps {
     new Fold[A,B] {
       override def openInBag(logicalInputId: Int): Unit = {
         super.openInBag(logicalInputId)
-        assert (host.subpartitionId == 0) // Parallelism should be 1.
+        assert (host.partitionId == 0) // Parallelism should be 1.
         result = zero
       }
 

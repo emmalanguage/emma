@@ -56,7 +56,7 @@ public class CFAwareFileSink extends BagOperator<Integer, Unit> implements DontT
     public void openOutBag() {
         super.openOutBag();
 
-        assert host.subpartitionId == 0; // we need para 1
+        assert host.partitionId == 0; // we need para 1
 
         buffer = new SerializedBuffer<>(integerSer);
 

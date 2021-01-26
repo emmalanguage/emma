@@ -27,7 +27,7 @@ public class SumDouble extends BagOperator<Double, Double> {
     @Override
     public void openInBag(int logicalInputId) {
         super.openInBag(logicalInputId);
-        assert host.subpartitionId == 0; // Parallelism should be 1.
+        assert host.partitionId == 0; // Parallelism should be 1.
         sum = 0;
     }
 

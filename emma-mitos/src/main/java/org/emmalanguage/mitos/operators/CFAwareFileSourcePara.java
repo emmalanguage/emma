@@ -17,17 +17,11 @@
 package org.emmalanguage.mitos.operators;
 
 import org.apache.flink.api.common.io.InputFormat;
-import org.apache.flink.core.fs.FileSystem;
-import org.apache.flink.core.fs.Path;
 import org.apache.flink.core.io.InputSplit;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.net.URISyntaxException;
 
 /**
  * This version can read a each file in parallel.
@@ -44,7 +38,7 @@ public abstract class CFAwareFileSourcePara<OT, IS extends InputSplit>
     @Override
     public void openOutBag() {
         super.openOutBag();
-        assert host.subpartitionId == 0; // we need para 1
+        assert host.partitionId == 0; // we need para 1
     }
 
     @Override

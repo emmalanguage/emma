@@ -21,8 +21,6 @@ import org.apache.flink.core.fs.Path;
 import org.emmalanguage.mitos.util.SerializedBuffer;
 import scala.Unit;
 
-import scala.util.Either;
-
 import java.io.*;
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -39,7 +37,7 @@ public class FileSinkString extends BagOperator<String, Unit> implements DontThr
     public void openOutBag() {
         super.openOutBag();
 
-        assert host.subpartitionId == 0; // we need para 1
+        assert host.partitionId == 0; // we need para 1
 
         buffer = new SerializedBuffer<>(inSer);
 

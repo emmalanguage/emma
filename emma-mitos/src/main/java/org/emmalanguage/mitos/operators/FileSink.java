@@ -49,7 +49,7 @@ public class FileSink<T> extends BagOperator<T, Unit> {
         super.openOutBag();
 
         try {
-            writer = new PrintWriter(path + "/" + host.subpartitionId, "UTF-8");
+            writer = new PrintWriter(path + "/" + host.partitionId, "UTF-8");
         } catch (FileNotFoundException | UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }

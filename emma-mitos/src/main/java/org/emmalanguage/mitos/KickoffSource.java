@@ -55,7 +55,7 @@ public class KickoffSource extends RichSourceFunction<Unit> {
 		if (cflConfig.shouldEnableCheckpointing) cflManager.setCheckpointingEnabled(true);
 		if (cflConfig.checkpointInterval != CFLConfig.checkpointIntervalNotSet) cflManager.setCheckpointInterval(cflConfig.checkpointInterval);
 		if (cflConfig.checkpointDir != null) cflManager.setCheckpointDir(cflConfig.checkpointDir);
-		cflManager.initSnapshottingLocal(kickoffBBs); //todo: make it return a boolean to decide whether to appendToCFL(kickoffBBs)
+		cflManager.initSnapshottingLocal(kickoffBBs);
 
 		//cflManager.appendToCFL(kickoffBBs); // Moved to initSnapshottingRemote
 	}
