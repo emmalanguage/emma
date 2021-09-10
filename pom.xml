@@ -152,7 +152,7 @@
         <!-- Other dependencies -->
         <scopt.version>3.5.0</scopt.version>
         <scala-arm.version>2.0</scala-arm.version>
-        <spray-json.version>1.3.3</spray-json.version>
+        <spray-json.version>1.3.5</spray-json.version>
         <quiver.version>5.5.14-scalaz-7.2</quiver.version>
         <univocity-parsers.version>2.4.1</univocity-parsers.version>
         <typesafe-config.version>1.3.1</typesafe-config.version>
